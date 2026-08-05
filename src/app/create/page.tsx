@@ -213,17 +213,41 @@ export default function CreatePage() {
         <label htmlFor="token-image" className="text-sm font-medium text-gray-700">
           Image <span className="text-red-500">*</span>
         </label>
-        <input
-          id="token-image"
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={(e) => setImage(e.target.files?.[0] ?? null)}
-          className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-900 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-gray-700"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          PNG, JPEG, WEBP or GIF, max 2 MB. Hosted with your token&apos;s metadata;
-          the on-chain description locks to it forever.
-        </p>
+        <div className="relative mt-1 flex min-h-32 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white p-4 hover:border-purple-400">
+          <input
+            id="token-image"
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+            className="absolute inset-0 cursor-pointer opacity-0"
+            aria-label="Upload token image"
+          />
+          {image ? (
+            <div className="flex items-center gap-3 text-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={URL.createObjectURL(image)}
+                alt=""
+                className="size-16 rounded-full object-cover"
+              />
+              <div>
+                <div className="font-medium">{image.name}</div>
+                <div className="text-xs text-gray-500">
+                  {(image.size / 1024).toFixed(0)} KB · click to replace
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center text-sm text-gray-500">
+              <div className="font-medium text-gray-700">
+                Select an image or drag and drop it here
+              </div>
+              <div className="mt-1 text-xs">
+                PNG, JPEG, WEBP or GIF · max 2 MB · square (1:1) recommended
+              </div>
+            </div>
+          )}
+        </div>
         {isTaproot && (
           <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
             <input
@@ -261,8 +285,13 @@ export default function CreatePage() {
         />
       </div>
 
-      {/* Socials */}
-      <div className="grid gap-4 sm:grid-cols-2">
+      {/* Socials — optional, tucked away */}
+      <details className="group">
+        <summary className="cursor-pointer text-sm font-medium text-gray-700 marker:content-none">
+          <span className="text-purple-600">＋</span> Add social links{" "}
+          <span className="font-normal text-gray-400">(optional)</span>
+        </summary>
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="x-profile" className="text-sm font-medium text-gray-700">
             X profile
@@ -295,7 +324,8 @@ export default function CreatePage() {
             />
           </div>
         </div>
-      </div>
+        </div>
+      </details>
 
       {/* The terms — fixed by the standard, shown, not asked */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
@@ -319,6 +349,11 @@ export default function CreatePage() {
           <Row k="Minimum community" v={`${XCP69_MIN_PARTICIPANTS} distinct addresses`} />
         </dl>
       </div>
+
+      <p className="text-xs text-gray-500">
+        Name, image, description and socials can only be set now — the on-chain
+        description locks at launch and can never be changed.
+      </p>
 
       {uploadError && (
         <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
