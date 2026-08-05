@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { TokenImage } from "@/components/token-image";
 import {
   fetchBlockHeight,
   fetchFairmints,
@@ -53,12 +54,7 @@ export default async function LaunchPage({
     <div className="space-y-8">
       {/* Identity */}
       <div className="flex items-center gap-4">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`https://cdn.xcp.io/img/icon/${asset}`}
-          alt=""
-          className="size-14 rounded-full bg-gray-100"
-        />
+        <TokenImage asset={asset} className="size-14 rounded-full bg-gray-100" />
         <div>
           <h1 className="text-2xl font-bold">{asset}</h1>
           <p className="text-sm text-gray-500">

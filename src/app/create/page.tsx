@@ -21,10 +21,13 @@ export default function CreatePage() {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
 
+  const [displayName, setDisplayName] = useState("");
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<NameCheck>("idle");
   const [image, setImage] = useState<File | null>(null);
   const [description, setDescription] = useState("");
+  const [xProfile, setXProfile] = useState("");
+  const [telegram, setTelegram] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -67,7 +70,10 @@ export default function CreatePage() {
       //    description URL resolves from the first block.
       const form = new FormData();
       form.set("asset", name);
+      form.set("name", displayName);
       form.set("description", description);
+      form.set("x", xProfile);
+      form.set("telegram", telegram);
       form.set("image", image);
       const uploadRes = await fetch("/api/launches", { method: "POST", body: form });
       const upload = await uploadRes.json();
@@ -136,35 +142,53 @@ export default function CreatePage() {
         </p>
       </div>
 
-      {/* Name */}
-      <div>
-        <label htmlFor="asset-name" className="text-sm font-medium text-gray-700">
-          Name <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="asset-name"
-          type="text"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          onBlur={() => checkName(name)}
-          placeholder="PEPECOIN"
-          maxLength={12}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 font-mono uppercase outline-none focus:border-purple-500"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          {nameCheck === "invalid" &&
-            "4-12 letters A-Z, cannot start with A (named assets only)."}
-          {nameCheck === "checking" && "Checking availability…"}
-          {nameCheck === "available" && (
-            <span className="text-green-600">Available (0.5 XCP name fee applies).</span>
-          )}
-          {nameCheck === "taken" && (
-            <span className="text-red-600">Already registered.</span>
-          )}
-          {nameCheck === "idle" &&
-            "4-12 letters. Named assets survive: 43.5% trade past six months vs 7.3% for numerics."}
-        </p>
+      {/* Name | Ticker */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="display-name" className="text-sm font-medium text-gray-700">
+            Name
+          </label>
+          <input
+            id="display-name"
+            type="text"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            placeholder="Token name"
+            maxLength={127}
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 outline-none focus:border-purple-500"
+          />
+        </div>
+        <div>
+          <label htmlFor="asset-name" className="text-sm font-medium text-gray-700">
+            Ticker <span className="text-red-500">*</span>
+          </label>
+          <input
+            id="asset-name"
+            type="text"
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onBlur={() => checkName(name)}
+            placeholder="PEPECOIN"
+            maxLength={12}
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 font-mono uppercase outline-none focus:border-purple-500"
+          />
+        </div>
       </div>
+      <p className="-mt-4 text-xs text-gray-500">
+        {nameCheck === "invalid" &&
+          "Ticker: 4-12 letters A-Z, cannot start with A (named assets only)."}
+        {nameCheck === "checking" && "Checking availability…"}
+        {nameCheck === "available" && (
+          <span className="text-green-600">
+            {name} is available (0.5 XCP registration fee applies).
+          </span>
+        )}
+        {nameCheck === "taken" && (
+          <span className="text-red-600">{name} is already registered.</span>
+        )}
+        {nameCheck === "idle" &&
+          "The ticker is the on-chain asset name, universally unique, and can never change."}
+      </p>
 
       {/* Image */}
       <div>
@@ -198,6 +222,42 @@ export default function CreatePage() {
           placeholder="What is this?"
           className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
         />
+      </div>
+
+      {/* Socials */}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="x-profile" className="text-sm font-medium text-gray-700">
+            X profile
+          </label>
+          <div className="mt-1 flex items-center rounded-md border border-gray-300 bg-white focus-within:border-purple-500">
+            <span className="pl-2.5 text-sm text-gray-400">x.com/</span>
+            <input
+              id="x-profile"
+              type="text"
+              value={xProfile}
+              onChange={(e) => setXProfile(e.target.value)}
+              placeholder="handle"
+              className="w-full rounded-md bg-transparent p-2.5 pl-0.5 text-sm outline-none"
+            />
+          </div>
+        </div>
+        <div>
+          <label htmlFor="telegram" className="text-sm font-medium text-gray-700">
+            Telegram
+          </label>
+          <div className="mt-1 flex items-center rounded-md border border-gray-300 bg-white focus-within:border-purple-500">
+            <span className="pl-2.5 text-sm text-gray-400">t.me/</span>
+            <input
+              id="telegram"
+              type="text"
+              value={telegram}
+              onChange={(e) => setTelegram(e.target.value)}
+              placeholder="community"
+              className="w-full rounded-md bg-transparent p-2.5 pl-0.5 text-sm outline-none"
+            />
+          </div>
+        </div>
       </div>
 
       {/* The terms — fixed by the standard, shown, not asked */}

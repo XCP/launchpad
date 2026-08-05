@@ -1,3 +1,4 @@
+import { TokenImage } from "@/components/token-image";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
@@ -123,12 +124,7 @@ function CardShell({
       className="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
     >
       <div className="flex items-center gap-3">
-        {/* eslint-disable-next-line @next/next/no-img-element -- cdn convention, no next/image */}
-        <img
-          src={`https://cdn.xcp.io/img/icon/${fm.asset}`}
-          alt=""
-          className="size-10 rounded-full bg-gray-100"
-        />
+        <TokenImage asset={fm.asset} className="size-10 rounded-full bg-gray-100" />
         <div className="min-w-0">
           <div className="truncate font-bold">{fm.asset}</div>
           <div className="text-xs text-gray-500">{shortAddress(fm.source)}</div>

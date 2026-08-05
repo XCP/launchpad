@@ -7,6 +7,16 @@ import {
 
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
+
+/** "@handle", "x.com/handle", or a bare handle → the bare handle (or ""). */
+function sanitizeHandle(input: string): string {
+  const bare = input
+    .trim()
+    .replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com|t\.me)\//i, "")
+    .replace(/^@/, "")
+    .split(/[/?#]/)[0]!;
+  return /^[A-Za-z0-9_]{1,32}$/.test(bare) ? bare : "";
+}
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_DESCRIPTION_CHARS = 2000;
@@ -19,7 +29,10 @@ const MAX_DESCRIPTION_CHARS = 2000;
 export async function POST(request: Request) {
   const form = await request.formData();
   const asset = String(form.get("asset") ?? "").toUpperCase();
+  const name = String(form.get("name") ?? "").trim().slice(0, 127);
   const description = String(form.get("description") ?? "").trim();
+  const xHandle = sanitizeHandle(String(form.get("x") ?? ""));
+  const telegram = sanitizeHandle(String(form.get("telegram") ?? ""));
   const image = form.get("image");
 
   if (!ASSET_NAME_REGEX.test(asset)) {
@@ -61,9 +74,13 @@ export async function POST(request: Request) {
   // CIP-25 v2 Enhanced Asset Information (required: asset, name). The image
   // hash makes the write-once JSON an integrity commitment: locked on-chain
   // description URL → hashed content.
+  const social = [
+    ...(xHandle ? [{ type: "twitter", data: `https://x.com/${xHandle}` }] : []),
+    ...(telegram ? [{ type: "telegram", data: `https://t.me/${telegram}` }] : []),
+  ];
   const json = JSON.stringify({
     asset,
-    name: asset,
+    name: name || asset,
     description,
     website: `https://xcp.fun/launch/${asset}`,
     // Deprecated in v2 but still read by older parsers.
@@ -72,6 +89,7 @@ export async function POST(request: Request) {
       { type: "icon", size: "48x48", data: metadataImageUrl(asset), hash: imageHash },
       { type: "standard", data: metadataImageUrl(asset), hash: imageHash },
     ],
+    ...(social.length > 0 ? { social } : {}),
   });
   await bucket.put(`j/${asset}`, json, {
     httpMetadata: { contentType: "application/json" },
