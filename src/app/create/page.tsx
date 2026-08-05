@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { fromSats, commas } from "@/lib/format";
+import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
@@ -17,9 +18,22 @@ const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
 
 type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
 
+const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
+  preparing: "Preparing inscription…",
+  "sign-commit": "Confirm commit in wallet…",
+  "broadcast-commit": "Broadcasting commit…",
+  "sign-reveal": "Confirm reveal in wallet…",
+  "broadcast-reveal": "Broadcasting reveal…",
+  done: "Done",
+};
+
 export default function CreatePage() {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus, connect, signPsbt, broadcastTransaction } = useWallet();
   const compose = useCompose();
+  const isTaproot = address?.startsWith("bc1p") ?? false;
+  const [inscribe, setInscribe] = useState(false);
+  const [inscribeStep, setInscribeStep] = useState<InscribeStep | null>(null);
+  const [inscribeTxid, setInscribeTxid] = useState<string | null>(null);
 
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<NameCheck>("idle");
@@ -81,7 +95,27 @@ export default function CreatePage() {
       const heightRes = await fetch(`${COUNTERPARTY_API_BASE}/`);
       const height = (await heightRes.json()).result.counterparty_height as number;
 
-      // 3. Compose → sign → broadcast through the wallet.
+      if (inscribe && isTaproot && address) {
+        // 3a. Commit/reveal inscription: the image becomes the permanent
+        //     on-chain description; the inscription output is burned.
+        const { revealTxid } = await inscribeLaunch({
+          asset: name,
+          lpAsset: generateLpAssetName(),
+          softCapDeadlineBlock: height + XCP69.DEADLINE_BLOCKS,
+          jsonUrl: upload.json_url,
+          imageData: new Uint8Array(await image.arrayBuffer()),
+          mimeType: image.type,
+          feeRate: 2,
+          address,
+          signPsbt,
+          broadcast: broadcastTransaction,
+          onStep: setInscribeStep,
+        });
+        setInscribeTxid(revealTxid);
+        return;
+      }
+
+      // 3b. Standard compose → sign → broadcast through the wallet.
       compose.composeFairminter({
         asset: name,
         price: XCP69.PRICE,
@@ -97,12 +131,14 @@ export default function CreatePage() {
       });
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Something went wrong");
+      setInscribeStep(null);
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (compose.status === "confirmed") {
+  const launchTxid = compose.status === "confirmed" ? compose.txid : inscribeTxid;
+  if (launchTxid) {
     return (
       <div className="mx-auto max-w-lg space-y-4 text-center">
         <div className="holo-border rounded-xl p-8">
@@ -110,12 +146,12 @@ export default function CreatePage() {
           <p className="mt-2 text-sm text-gray-600">
             Broadcast as{" "}
             <a
-              href={`https://xcp.io/tx/${compose.txid}`}
+              href={`https://xcp.io/tx/${launchTxid}`}
               className="font-mono text-purple-600 underline"
               target="_blank"
               rel="noreferrer"
             >
-              {compose.txid.slice(0, 12)}…
+              {launchTxid.slice(0, 12)}…
             </a>
             . Once confirmed, minting is open for ~7 days: it sells out, or
             everyone is refunded.
@@ -188,6 +224,25 @@ export default function CreatePage() {
           PNG, JPEG, WEBP or GIF, max 2 MB. Hosted with your token&apos;s metadata;
           the on-chain description locks to it forever.
         </p>
+        {isTaproot && (
+          <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={inscribe}
+              onChange={(e) => setInscribe(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">Inscribe the image on-chain.</span>{" "}
+              <span className="text-xs text-gray-500">
+                The image itself becomes the permanent on-chain description
+                (commit + reveal, two signatures, higher fees scale with image
+                size; the inscription is burned so it belongs to the asset
+                forever). Taproot wallets only.
+              </span>
+            </span>
+          </label>
+        )}
       </div>
 
       {/* Description */}
@@ -291,11 +346,15 @@ export default function CreatePage() {
           disabled={!canSubmit}
           className="w-full rounded-md bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {compose.status === "composing" && "Composing…"}
-          {compose.status === "signing" && "Confirm in wallet…"}
-          {compose.status === "broadcasting" && "Broadcasting…"}
-          {(compose.status === "idle" || compose.status === "error") &&
-            `Launch ${name || "token"} from ${address?.slice(0, 8)}…`}
+          {inscribeStep && inscribeStep !== "done"
+            ? INSCRIBE_STEP_LABELS[inscribeStep]
+            : compose.status === "composing"
+              ? "Composing…"
+              : compose.status === "signing"
+                ? "Confirm in wallet…"
+                : compose.status === "broadcasting"
+                  ? "Broadcasting…"
+                  : `Launch ${name || "token"} from ${address?.slice(0, 8)}…`}
         </button>
       )}
     </div>
