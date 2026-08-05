@@ -148,7 +148,7 @@ function CardShell({
   const conforming = isXcp69(fm);
   return (
     <a
-      href={`/launch/${encodeURIComponent(fm.asset)}`}
+      href={`/coin/${fm.tx_hash}`}
       className={`block rounded-lg bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${
         conforming ? "holo-border" : "border border-gray-200"
       }`}
