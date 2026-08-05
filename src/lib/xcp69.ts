@@ -93,21 +93,37 @@ export function isXcp69(fm: Fairminter): boolean {
   );
 }
 
-export type LaunchPhase = "launching" | "launched" | "refunded";
+export type LaunchPhase = "scheduled" | "minting" | "graduated" | "refunded";
 
 /**
- * Lifecycle bucket. "Launched" requires confirming the pool exists because
+ * Lifecycle bucket. "Graduated" requires confirming the pool exists because
  * success and failure both end at status "closed"; callers pass whether a
  * TOKEN/XCP pool row exists for the asset.
  */
 export function launchPhase(fm: Fairminter, hasPool: boolean): LaunchPhase {
-  if (fm.status === "pending" || fm.status === "open") return "launching";
-  return hasPool ? "launched" : "refunded";
+  if (fm.status === "pending") return "scheduled";
+  if (fm.status === "open") return "minting";
+  return hasPool ? "graduated" : "refunded";
+}
+
+/**
+ * Record-driven sale target: pool fairminters are all-or-nothing at soft cap;
+ * others (non-standard, shown in relaxed mode) fall back to hard cap.
+ */
+export function saleTarget(fm: Fairminter): number {
+  return fm.soft_cap > 0 ? fm.soft_cap : fm.hard_cap;
 }
 
 /** Sale progress in [0, 1]; earned_quantity is null before the first mint. */
 export function saleProgress(fm: Fairminter): number {
-  return (fm.earned_quantity ?? 0) / XCP69.SOFT_CAP;
+  const target = saleTarget(fm);
+  return target > 0 ? (fm.earned_quantity ?? 0) / target : 0;
+}
+
+/** Pool opening multiple over mint price, from the record; null if no pool. */
+export function openingMultiple(fm: Fairminter): number | null {
+  if (!fm.pool_quantity || fm.pool_quantity <= 0 || fm.soft_cap <= 0) return null;
+  return fm.soft_cap / fm.pool_quantity;
 }
 
 /**

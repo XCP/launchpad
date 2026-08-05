@@ -8,13 +8,17 @@ import { blocksEta, compact, fromSats, shortAddress } from "@/lib/format";
 import {
   type Fairminter,
   isXcp69,
+  type LaunchPhase,
   launchPhase,
+  openingMultiple,
   saleProgress,
   XCP69_MIN_PARTICIPANTS,
-  XCP69_OPENING_MULTIPLE,
 } from "@/lib/xcp69";
+import { SHOW_NONCONFORMING } from "@/utils/constants";
 
 export const revalidate = 60;
+
+const MAX_PER_SECTION = 12;
 
 export default async function HomePage() {
   const [fairminters, blockHeight] = await Promise.all([
@@ -22,35 +26,55 @@ export default async function HomePage() {
     fetchBlockHeight(),
   ]);
 
-  const conforming = fairminters.filter(isXcp69);
-  // Success and failure both end "closed"; the pool row is the oracle.
+  const listed = fairminters.filter((fm) =>
+    SHOW_NONCONFORMING
+      ? Boolean(fm.asset) && !fm.status.startsWith("invalid")
+      : isXcp69(fm),
+  );
+
+  // Newest first; the pool row is the graduated-vs-refunded oracle, only
+  // worth a lookup for closed pool fairminters.
+  listed.sort((a, b) => b.block_index - a.block_index);
   const phased = await Promise.all(
-    conforming.map(async (fm) => {
+    listed.map(async (fm) => {
       const hasPool =
-        fm.status === "closed" ? (await fetchPool(fm.asset)) !== null : false;
+        fm.status === "closed" && (fm.pool_quantity ?? 0) > 0
+          ? (await fetchPool(fm.asset)) !== null
+          : false;
       return { fm, phase: launchPhase(fm, hasPool) };
     }),
   );
 
-  const launching = phased.filter((p) => p.phase === "launching");
-  const launched = phased.filter((p) => p.phase === "launched");
-  const refunded = phased.filter((p) => p.phase === "refunded");
+  const byPhase = (phase: LaunchPhase) =>
+    phased.filter((p) => p.phase === phase).slice(0, MAX_PER_SECTION);
+  const minting = byPhase("minting");
+  const scheduled = byPhase("scheduled");
+  const graduated = byPhase("graduated");
+  const refunded = byPhase("refunded");
 
   return (
     <div className="space-y-12">
-      {conforming.length === 0 && <FirstLaunchHero />}
+      {phased.length === 0 && <FirstLaunchHero />}
 
       <Section
-        title="Launching"
+        title="Minting"
         empty="No live launches. Start one — it sells out or everyone gets refunded."
-        items={launching}
-        render={(fm) => <LaunchingCard fm={fm} blockHeight={blockHeight} />}
+        items={minting}
+        render={(fm) => <MintingCard fm={fm} blockHeight={blockHeight} />}
       />
+      {scheduled.length > 0 && (
+        <Section
+          title="Scheduled"
+          empty=""
+          items={scheduled}
+          render={(fm) => <ScheduledCard fm={fm} blockHeight={blockHeight} />}
+        />
+      )}
       <Section
-        title="Launched"
-        empty="No launches have closed successfully yet."
-        items={launched}
-        render={(fm) => <LaunchedCard fm={fm} />}
+        title="Graduated"
+        empty="No launches have graduated to a pool yet."
+        items={graduated}
+        render={(fm) => <GraduatedCard fm={fm} />}
       />
       <Section
         title="Graveyard"
@@ -93,6 +117,7 @@ function Section({
   items: { fm: Fairminter }[];
   render: (fm: Fairminter) => React.ReactNode;
 }) {
+  if (items.length === 0 && !empty) return null;
   return (
     <section>
       <h2 className="mb-4 text-xl font-bold">{title}</h2>
@@ -113,37 +138,37 @@ function Section({
 
 function CardShell({
   fm,
+  badge,
   children,
 }: {
   fm: Fairminter;
+  badge?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const conforming = isXcp69(fm);
   return (
     <a
       href={`/launch/${encodeURIComponent(fm.asset)}`}
-      className="block rounded-lg border border-gray-200 bg-white p-4 shadow-sm transition-shadow hover:shadow-md"
+      className={`block rounded-lg bg-white p-4 shadow-sm transition-shadow hover:shadow-md ${
+        conforming ? "holo-border" : "border border-gray-200"
+      }`}
     >
       <div className="flex items-center gap-3">
-        <TokenImage asset={fm.asset} className="size-10 rounded-full bg-gray-100" />
-        <div className="min-w-0">
-          <div className="truncate font-bold">{fm.asset}</div>
+        <TokenImage asset={fm.asset} className="size-10 rounded-full bg-gray-100 object-cover" />
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-bold">{fm.asset_longname ?? fm.asset}</div>
           <div className="text-xs text-gray-500">{shortAddress(fm.source)}</div>
         </div>
+        {badge}
       </div>
       <div className="mt-3">{children}</div>
     </a>
   );
 }
 
-function LaunchingCard({
-  fm,
-  blockHeight,
-}: {
-  fm: Fairminter;
-  blockHeight: number;
-}) {
+function MintingCard({ fm, blockHeight }: { fm: Fairminter; blockHeight: number }) {
   const progress = saleProgress(fm);
-  const blocksLeft = fm.soft_cap_deadline_block - blockHeight;
+  const deadline = fm.soft_cap_deadline_block || fm.end_block;
   return (
     <CardShell fm={fm}>
       <div className="h-2 overflow-hidden rounded-full bg-gray-100">
@@ -153,22 +178,49 @@ function LaunchingCard({
         />
       </div>
       <div className="mt-2 flex justify-between text-xs text-gray-600">
-        <span>{(progress * 100).toFixed(1)}% of 69M</span>
-        <span>{blocksEta(blocksLeft)} left</span>
+        <span>{(progress * 100).toFixed(1)}%</span>
+        <span>{deadline > 0 ? `${blocksEta(deadline - blockHeight)} left` : "no deadline"}</span>
       </div>
       <div className="mt-1 text-xs text-gray-500">
-        {compact(fromSats(fm.paid_quantity))} XCP raised
+        {compact(fromSats(fm.earned_quantity))} of{" "}
+        {compact(fromSats(fm.soft_cap > 0 ? fm.soft_cap : fm.hard_cap))} minted
       </div>
     </CardShell>
   );
 }
 
-function LaunchedCard({ fm }: { fm: Fairminter }) {
+function ScheduledCard({ fm, blockHeight }: { fm: Fairminter; blockHeight: number }) {
   return (
-    <CardShell fm={fm}>
+    <CardShell
+      fm={fm}
+      badge={
+        <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+          upcoming
+        </span>
+      }
+    >
       <div className="text-xs text-gray-600">
-        Sold out · pool opened at {XCP69_OPENING_MULTIPLE.toFixed(2)}× mint ·
-        liquidity locked
+        Minting opens at block {fm.start_block.toLocaleString()} —{" "}
+        {blocksEta(fm.start_block - blockHeight)} from now
+      </div>
+    </CardShell>
+  );
+}
+
+function GraduatedCard({ fm }: { fm: Fairminter }) {
+  const multiple = openingMultiple(fm);
+  return (
+    <CardShell
+      fm={fm}
+      badge={
+        <span className="rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+          graduated
+        </span>
+      }
+    >
+      <div className="text-xs text-gray-600">
+        Sold out · liquidity locked
+        {multiple ? ` · pool opened ${multiple.toFixed(2)}× mint` : ""}
       </div>
     </CardShell>
   );
@@ -179,8 +231,9 @@ function RefundedCard({ fm }: { fm: Fairminter }) {
   return (
     <CardShell fm={fm}>
       <div className="text-xs text-gray-500">
-        Reached {(progress * 100).toFixed(1)}% — all{" "}
-        {compact(fromSats(fm.paid_quantity))} XCP refunded
+        Closed at {(progress * 100).toFixed(1)}% ·{" "}
+        {compact(fromSats(fm.paid_quantity))} XCP{" "}
+        {(fm.pool_quantity ?? 0) > 0 ? "refunded" : "collected"}
       </div>
     </CardShell>
   );

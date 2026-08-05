@@ -10,11 +10,12 @@ import { blocksEta, commas, compact, fromSats, shortAddress } from "@/lib/format
 import {
   isXcp69,
   launchPhase,
+  openingMultiple,
   saleProgress,
-  XCP69,
+  saleTarget,
   XCP69_MIN_PARTICIPANTS,
-  XCP69_OPENING_MULTIPLE,
 } from "@/lib/xcp69";
+import { SHOW_NONCONFORMING } from "@/utils/constants";
 import { MintPanel } from "./mint-panel";
 
 export const revalidate = 30;
@@ -28,8 +29,13 @@ export default async function LaunchPage({
   const asset = decodeURIComponent(rawAsset).toUpperCase();
 
   const fairminters = await fetchFairmintersByAsset(asset);
-  const fm = fairminters.find(isXcp69);
+  const fm =
+    fairminters.find(isXcp69) ??
+    (SHOW_NONCONFORMING
+      ? fairminters.find((f) => !f.status.startsWith("invalid"))
+      : undefined);
   if (!fm) notFound();
+  const conforming = isXcp69(fm);
 
   const [mints, blockHeight, pool] = await Promise.all([
     fetchFairmints(fm.tx_hash),
@@ -58,15 +64,24 @@ export default async function LaunchPage({
         <div>
           <h1 className="text-2xl font-bold">{asset}</h1>
           <p className="text-sm text-gray-500">
-            by {shortAddress(fm.source)} ·{" "}
-            {phase === "launching" && "launching"}
-            {phase === "launched" && "launched"}
-            {phase === "refunded" && "refunded"}
+            by {shortAddress(fm.source)} · {phase}
+            {!conforming && (
+              <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
+                not XCP-69
+              </span>
+            )}
           </p>
         </div>
       </div>
 
-      {phase === "launching" && (
+      {phase === "scheduled" && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-sm text-blue-800">
+          Minting opens at block {fm.start_block.toLocaleString()} —{" "}
+          {blocksEta(fm.start_block - blockHeight)} from now.
+        </div>
+      )}
+
+      {phase === "minting" && (
         <>
           {/* Progress */}
           <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -75,8 +90,9 @@ export default async function LaunchPage({
                 {(progress * 100).toFixed(1)}%
               </span>
               <span className="text-sm text-gray-500">
-                {compact(fromSats(fm.earned_quantity))} / 69M · sells out or
-                refunds
+                {compact(fromSats(fm.earned_quantity))} /{" "}
+                {compact(fromSats(saleTarget(fm)))}
+                {(fm.pool_quantity ?? 0) > 0 ? " · sells out or refunds" : ""}
               </span>
             </div>
             <div className="h-3 overflow-hidden rounded-full bg-gray-100">
@@ -96,13 +112,17 @@ export default async function LaunchPage({
               />
               <Stat
                 label="At close"
-                value={`pool opens ${XCP69_OPENING_MULTIPLE.toFixed(2)}× mint`}
+                value={
+                  openingMultiple(fm)
+                    ? `pool opens ${openingMultiple(fm)!.toFixed(2)}× mint`
+                    : "no pool"
+                }
               />
             </div>
           </div>
 
-          {/* Mint */}
-          <MintPanel asset={asset} />
+          {/* Mint — the panel's lot math assumes the standard's parameters */}
+          {conforming && <MintPanel asset={asset} />}
 
           {/* Organic panel */}
           <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -127,9 +147,9 @@ export default async function LaunchPage({
         </>
       )}
 
-      {phase === "launched" && pool && (
+      {phase === "graduated" && pool && (
         <div className="holo-border rounded-lg p-5">
-          <h2 className="font-semibold">Launched — liquidity locked</h2>
+          <h2 className="font-semibold">Graduated — liquidity locked</h2>
           <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
             <Stat
               label="Pool XCP"
