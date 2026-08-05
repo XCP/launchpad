@@ -196,6 +196,48 @@ export function useCompose() {
 
   const composeDetach = (utxo: string) => executeUtxo(utxo, 'detach', {})
 
+  /** Open an XCP-69 fairminter. All values raw satoshi units. */
+  const composeFairminter = (params: {
+    asset: string
+    price: number
+    quantity_by_price: number
+    hard_cap: number
+    soft_cap: number
+    soft_cap_deadline_block: number
+    max_mint_per_tx: number
+    max_mint_per_address: number
+    pool_quantity: number
+    lp_asset: string
+    description: string
+  }) => execute('fairminter', {
+    asset: params.asset,
+    price: params.price,
+    quantity_by_price: params.quantity_by_price,
+    hard_cap: params.hard_cap,
+    soft_cap: params.soft_cap,
+    soft_cap_deadline_block: params.soft_cap_deadline_block,
+    max_mint_per_tx: params.max_mint_per_tx,
+    max_mint_per_address: params.max_mint_per_address,
+    pool_quantity: params.pool_quantity,
+    lp_asset: params.lp_asset,
+    description: params.description,
+    premint_quantity: 0,
+    minted_asset_commission: 0,
+    burn_payment: 'false',
+    lock_description: 'true',
+    lock_quantity: 'true',
+    divisible: 'true',
+    start_block: 0,
+    end_block: 0,
+  })
+
+  /** Mint from a fairminter; quantity is raw earn units (whole lots). */
+  const composeFairmint = (params: { asset: string; quantity: number }) =>
+    execute('fairmint', {
+      asset: params.asset,
+      quantity: params.quantity,
+    })
+
   const reset = () => setState(INITIAL_STATE)
 
   return {
@@ -207,6 +249,8 @@ export function useCompose() {
     composePoolDeposit,
     composePoolWithdraw,
     composeDetach,
+    composeFairminter,
+    composeFairmint,
     reset,
   }
 }

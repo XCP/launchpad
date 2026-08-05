@@ -109,3 +109,18 @@ export function launchPhase(fm: Fairminter, hasPool: boolean): LaunchPhase {
 export function saleProgress(fm: Fairminter): number {
   return (fm.earned_quantity ?? 0) / XCP69.SOFT_CAP;
 }
+
+/**
+ * LP asset name: "A69" + random tail. Brand-consistent but unpredictable —
+ * a deterministic tail would let a griefer pre-issue expected names for
+ * pennies and invalidate launches (the unissued check happens at parse).
+ * "A69" + 16 random digits lands in [6.9e17, 7.0e17), inside the valid
+ * numeric range (26^12+1 .. 2^64-1).
+ */
+export function generateLpAssetName(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  let tail = "";
+  for (const b of bytes) tail += (b % 10).toString();
+  return `A69${tail}`;
+}

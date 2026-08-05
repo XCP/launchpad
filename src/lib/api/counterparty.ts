@@ -34,6 +34,15 @@ export async function fetchAllFairminters(revalidate = 60): Promise<Fairminter[]
   return all;
 }
 
+/** Fairminters opened on an asset; the XCP-69 one (if any) is what we show. */
+export async function fetchFairmintersByAsset(asset: string): Promise<Fairminter[]> {
+  const data = await get<Paginated<Fairminter>>(
+    `/assets/${encodeURIComponent(asset)}/fairminters?limit=100&verbose=true`,
+    30,
+  );
+  return data.result;
+}
+
 export async function fetchFairminter(txHash: string): Promise<Fairminter | null> {
   const data = await get<{ result: Fairminter | null }>(
     `/fairminters/${txHash}?verbose=true`,

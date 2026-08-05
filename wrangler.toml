@@ -8,3 +8,10 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"
+
+# Hosted token metadata: enhanced-asset-info JSON at /j/<ASSET>.json and the
+# uploaded image at /i/<ASSET>. Write-once — descriptions lock on-chain, so
+# what they point at must not drift.
+[[r2_buckets]]
+binding = "METADATA"
+bucket_name = "launchpad-metadata"
