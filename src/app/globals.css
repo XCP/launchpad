@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+}
+
+/* XCP-69 signature: the holographic conformance border, carried over from xcp.fun */
+@keyframes holographic {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.holo-border {
+  position: relative;
+  background:
+    linear-gradient(white, white) padding-box,
+    linear-gradient(45deg, #22c55e, #3b82f6, #a855f7, #ec4899, #22c55e) border-box;
+  background-size: 100% 100%, 300% 300%;
+  border: 2px solid transparent;
+  animation: holographic 6s ease infinite;
+}

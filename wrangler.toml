@@ -1,0 +1,10 @@
+# xcp.fun launchpad — Next.js on OpenNext, same worker pattern as xcp-explorer/exchange.
+# Route/zone binding to xcp.fun happens at cutover; until then workers.dev preview.
+name = "launchpad"
+main = ".open-next/worker.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
