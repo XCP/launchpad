@@ -1,22 +1,15 @@
 import { NextResponse } from "next/server";
 import {
   getMetadataBucket,
+  metadataIconUrl,
   metadataImageUrl,
   metadataJsonUrl,
 } from "@/lib/metadata";
 
+import { sanitizeHandle } from "@/lib/social";
+
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
-
-/** "@handle", "x.com/handle", or a bare handle → the bare handle (or ""). */
-function sanitizeHandle(input: string): string {
-  const bare = input
-    .trim()
-    .replace(/^https?:\/\/(www\.)?(x\.com|twitter\.com|t\.me)\//i, "")
-    .replace(/^@/, "")
-    .split(/[/?#]/)[0]!;
-  return /^[A-Za-z0-9_]{1,32}$/.test(bare) ? bare : "";
-}
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_DESCRIPTION_CHARS = 2000;
@@ -86,7 +79,7 @@ export async function POST(request: Request) {
     // Deprecated in v2 but still read by older parsers.
     image: metadataImageUrl(asset),
     images: [
-      { type: "icon", size: "48x48", data: metadataImageUrl(asset), hash: imageHash },
+      { type: "icon", size: "48x48", data: metadataIconUrl(asset) },
       { type: "standard", data: metadataImageUrl(asset), hash: imageHash },
     ],
     ...(social.length > 0 ? { social } : {}),

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { fromSats, commas } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
+import { isValidSocial } from "@/lib/social";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
@@ -68,6 +69,8 @@ export default function CreatePage() {
   const canSubmit =
     nameCheck === "available" &&
     image !== null &&
+    isValidSocial(xProfile) &&
+    isValidSocial(telegram) &&
     walletStatus === "connected" &&
     !submitting &&
     compose.status !== "composing" &&
@@ -292,38 +295,20 @@ export default function CreatePage() {
           <span className="font-normal text-gray-400">(optional)</span>
         </summary>
         <div className="mt-3 grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="x-profile" className="text-sm font-medium text-gray-700">
-            X profile
-          </label>
-          <div className="mt-1 flex items-center rounded-md border border-gray-300 bg-white focus-within:border-purple-500">
-            <span className="pl-2.5 text-sm text-gray-400">x.com/</span>
-            <input
-              id="x-profile"
-              type="text"
-              value={xProfile}
-              onChange={(e) => setXProfile(e.target.value)}
-              placeholder="handle"
-              className="w-full rounded-md bg-transparent p-2.5 pl-0.5 text-sm outline-none"
-            />
-          </div>
-        </div>
-        <div>
-          <label htmlFor="telegram" className="text-sm font-medium text-gray-700">
-            Telegram
-          </label>
-          <div className="mt-1 flex items-center rounded-md border border-gray-300 bg-white focus-within:border-purple-500">
-            <span className="pl-2.5 text-sm text-gray-400">t.me/</span>
-            <input
-              id="telegram"
-              type="text"
-              value={telegram}
-              onChange={(e) => setTelegram(e.target.value)}
-              placeholder="community"
-              className="w-full rounded-md bg-transparent p-2.5 pl-0.5 text-sm outline-none"
-            />
-          </div>
-        </div>
+          <SocialInput
+            id="x-profile"
+            label="X profile"
+            placeholder="https://x.com/yourtoken"
+            value={xProfile}
+            onChange={setXProfile}
+          />
+          <SocialInput
+            id="telegram"
+            label="Telegram"
+            placeholder="https://t.me/yourtoken"
+            value={telegram}
+            onChange={setTelegram}
+          />
         </div>
       </details>
 
@@ -391,6 +376,44 @@ export default function CreatePage() {
                   ? "Broadcasting…"
                   : `Launch ${name || "token"} from ${address?.slice(0, 8)}…`}
         </button>
+      )}
+    </div>
+  );
+}
+
+function SocialInput({
+  id,
+  label,
+  placeholder,
+  value,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  placeholder: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const valid = isValidSocial(value);
+  return (
+    <div>
+      <label htmlFor={id} className="text-sm font-medium text-gray-700">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`mt-1 block w-full rounded-md border bg-white p-2.5 text-sm outline-none ${
+          valid ? "border-gray-300 focus:border-purple-500" : "border-red-400"
+        }`}
+      />
+      {!valid && (
+        <p className="mt-1 text-xs text-red-600">
+          Paste the profile URL or enter the handle.
+        </p>
       )}
     </div>
   );
