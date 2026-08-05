@@ -21,7 +21,6 @@ export default function CreatePage() {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
 
-  const [displayName, setDisplayName] = useState("");
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<NameCheck>("idle");
   const [image, setImage] = useState<File | null>(null);
@@ -70,7 +69,6 @@ export default function CreatePage() {
       //    description URL resolves from the first block.
       const form = new FormData();
       form.set("asset", name);
-      form.set("name", displayName);
       form.set("description", description);
       form.set("x", xProfile);
       form.set("telegram", telegram);
@@ -142,53 +140,37 @@ export default function CreatePage() {
         </p>
       </div>
 
-      {/* Name | Ticker */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="display-name" className="text-sm font-medium text-gray-700">
-            Name
-          </label>
-          <input
-            id="display-name"
-            type="text"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Token name"
-            maxLength={127}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 outline-none focus:border-purple-500"
-          />
-        </div>
-        <div>
-          <label htmlFor="asset-name" className="text-sm font-medium text-gray-700">
-            Ticker <span className="text-red-500">*</span>
-          </label>
-          <input
-            id="asset-name"
-            type="text"
-            value={name}
-            onChange={(e) => handleNameChange(e.target.value)}
-            onBlur={() => checkName(name)}
-            placeholder="PEPECOIN"
-            maxLength={12}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 font-mono uppercase outline-none focus:border-purple-500"
-          />
-        </div>
+      {/* Name — on Counterparty the asset name is the ticker; one identity */}
+      <div>
+        <label htmlFor="asset-name" className="text-sm font-medium text-gray-700">
+          Name <span className="text-red-500">*</span>
+        </label>
+        <input
+          id="asset-name"
+          type="text"
+          value={name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          onBlur={() => checkName(name)}
+          placeholder="PEPECOIN"
+          maxLength={12}
+          className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 font-mono uppercase outline-none focus:border-purple-500"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          {nameCheck === "invalid" &&
+            "4-12 letters A-Z, cannot start with A (named assets only)."}
+          {nameCheck === "checking" && "Checking availability…"}
+          {nameCheck === "available" && (
+            <span className="text-green-600">
+              {name} is available (0.5 XCP registration fee applies).
+            </span>
+          )}
+          {nameCheck === "taken" && (
+            <span className="text-red-600">{name} is already registered.</span>
+          )}
+          {nameCheck === "idle" &&
+            "The on-chain asset name — universally unique, can never change."}
+        </p>
       </div>
-      <p className="-mt-4 text-xs text-gray-500">
-        {nameCheck === "invalid" &&
-          "Ticker: 4-12 letters A-Z, cannot start with A (named assets only)."}
-        {nameCheck === "checking" && "Checking availability…"}
-        {nameCheck === "available" && (
-          <span className="text-green-600">
-            {name} is available (0.5 XCP registration fee applies).
-          </span>
-        )}
-        {nameCheck === "taken" && (
-          <span className="text-red-600">{name} is already registered.</span>
-        )}
-        {nameCheck === "idle" &&
-          "The ticker is the on-chain asset name, universally unique, and can never change."}
-      </p>
 
       {/* Image */}
       <div>
