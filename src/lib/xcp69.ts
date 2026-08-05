@@ -47,21 +47,21 @@ export const XCP69 = {
   POOL_QUANTITY: 3_100_000_000_000_000,
   /** 1,000-token lots */
   QUANTITY_BY_PRICE: 100_000_000_000,
-  /** 0.1 XCP per lot */
-  PRICE: 10_000_000,
-  /** 690k tokens = 1% of the sale = 69 XCP per address */
-  MAX_MINT_PER_ADDRESS: 69_000_000_000_000,
-  MAX_MINT_PER_TX: 69_000_000_000_000,
+  /** 0.01 XCP per lot */
+  PRICE: 1_000_000,
+  /** 1M tokens = 10 XCP per address; 69M ÷ 1M = 69 minimum participants */
+  MAX_MINT_PER_ADDRESS: 100_000_000_000_000,
+  MAX_MINT_PER_TX: 100_000_000_000_000,
   /** Mint window in blocks (~7 days) */
   DEADLINE_BLOCKS: 1_000,
 } as const;
 
-/** Derived, exact: 6,900 XCP raised on success (raw sats). */
+/** Derived, exact: 690 XCP raised on success (raw sats). */
 export const XCP69_RAISE_SATS =
   (XCP69.SOFT_CAP / XCP69.QUANTITY_BY_PRICE) * XCP69.PRICE;
 
 /** Derived: minimum distinct minting addresses for a launch to succeed. */
-export const XCP69_MIN_PARTICIPANTS = XCP69.SOFT_CAP / XCP69.MAX_MINT_PER_ADDRESS; // 100
+export const XCP69_MIN_PARTICIPANTS = XCP69.SOFT_CAP / XCP69.MAX_MINT_PER_ADDRESS; // 69
 
 /** Derived: pool opens at soft_cap/pool_quantity × mint price ≈ 2.23×. */
 export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;

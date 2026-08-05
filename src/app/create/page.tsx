@@ -331,10 +331,10 @@ export default function CreatePage() {
         <div className="mb-2 font-semibold">XCP-69 terms (fixed)</div>
         <dl className="space-y-1 text-gray-600">
           <Row k="Supply" v="100,000,000 — locked at launch" />
-          <Row k="Public sale" v="69,000,000 at 0.1 XCP per 1,000" />
+          <Row k="Public sale" v="69,000,000 at 0.01 XCP per 1,000" />
           <Row
             k="Per address"
-            v={`max ${commas(fromSats(XCP69.MAX_MINT_PER_ADDRESS))} (1% · 69 XCP)`}
+            v={`max ${commas(fromSats(XCP69.MAX_MINT_PER_ADDRESS))} (10 XCP)`}
           />
           <Row k="Window" v="1,000 blocks (~7 days), sells out or refunds" />
           <Row

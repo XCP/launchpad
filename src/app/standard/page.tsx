@@ -9,8 +9,8 @@ const PARAMS: [string, string][] = [
   ["Supply", "100,000,000 — locked at close"],
   ["Public sale", "69,000,000 (the soft cap IS the whole sale)"],
   ["Pool reserve", "31,000,000"],
-  ["Price", "0.1 XCP per 1,000-token lot"],
-  ["Per-address cap", "690,000 tokens (1% of sale · 69 XCP)"],
+  ["Price", "0.01 XCP per 1,000-token lot"],
+  ["Per-address cap", "1,000,000 tokens (10 XCP)"],
   ["Mint window", "1,000 blocks (~7 days)"],
   ["Premine / commission", "none — the creator mints like everyone else"],
   ["Asset", "named assets only, divisible"],
@@ -38,7 +38,7 @@ export default function StandardPage() {
           </li>
           <li>
             <strong>The creator receives none of the raised XCP.</strong> All
-            6,900 XCP goes into the TOKEN/XCP pool at close.
+            690 XCP goes into the TOKEN/XCP pool at close.
           </li>
           <li>
             <strong>Liquidity is locked forever.</strong> The pool&apos;s LP
@@ -47,8 +47,8 @@ export default function StandardPage() {
           </li>
           <li>
             <strong>At least {XCP69_MIN_PARTICIPANTS} participants.</strong>{" "}
-            The 1% per-address cap makes the soft cap unreachable without a
-            real crowd.
+            The 10 XCP per-address cap makes the soft cap unreachable without
+            a real crowd.
           </li>
           <li>
             <strong>

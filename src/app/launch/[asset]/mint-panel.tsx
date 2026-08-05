@@ -6,9 +6,9 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
 
 const MAX_LOTS = XCP69.MAX_MINT_PER_ADDRESS / XCP69.QUANTITY_BY_PRICE; // 690
-const XCP_PER_LOT = XCP69.PRICE / 1e8; // 0.1
+const XCP_PER_LOT = XCP69.PRICE / 1e8; // 0.01
 
-/** Fixed-lot mint: pick a lot count, pay lots × 0.1 XCP, escrowed until close. */
+/** Fixed-lot mint: pick a lot count, pay lots × 0.01 XCP, escrowed until close. */
 export function MintPanel({ asset }: { asset: string }) {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
@@ -25,7 +25,7 @@ export function MintPanel({ asset }: { asset: string }) {
       <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm">
         <div className="font-semibold text-green-800">
           Mint broadcast — {(clampedLots * 1000).toLocaleString()} {asset} for{" "}
-          {(clampedLots * XCP_PER_LOT).toFixed(1)} XCP
+          {(clampedLots * XCP_PER_LOT).toFixed(2)} XCP
         </div>
         <p className="mt-1 text-green-700">
           Escrowed until the launch resolves: tokens if it sells out, full XCP
@@ -73,7 +73,7 @@ export function MintPanel({ asset }: { asset: string }) {
           <br />
           costs{" "}
           <span className="font-semibold text-gray-900">
-            {(clampedLots * XCP_PER_LOT).toFixed(1)} XCP
+            {(clampedLots * XCP_PER_LOT).toFixed(2)} XCP
           </span>
         </div>
       </div>

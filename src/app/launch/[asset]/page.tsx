@@ -134,7 +134,7 @@ export default async function LaunchPage({
               />
               <Stat
                 label="Top address share"
-                value={`${(topShare * 100).toFixed(1)}% (cap 1%)`}
+                value={`${(topShare * 100).toFixed(1)}% (cap 1.45%)`}
               />
               <Stat label="Mints" value={String(mints.length)} />
             </div>

@@ -52,9 +52,9 @@ const PREDICATE_SNIPPET = `export const XCP69 = {
   POOL_QUANTITY: 3_100_000_000_000_000,
   /** 1,000-token lots */
   QUANTITY_BY_PRICE: 100_000_000_000,
-  /** 0.1 XCP per lot */
+  /** 0.01 XCP per lot */
   PRICE: 10_000_000,
-  /** 690k tokens = 1% of the sale = 69 XCP per address */
+  /** 1M tokens = 10 XCP per address; 69M ÷ 1M = 69 participants */
   MAX_MINT_PER_ADDRESS: 69_000_000_000_000,
   MAX_MINT_PER_TX: 69_000_000_000_000,
   /** Mint window in blocks (~7 days) */
@@ -99,7 +99,7 @@ const CURL_HOLDERS = `# Holders — the unspendable address appears holding the 
 curl "https://api.counterparty.io:4000/v2/assets/<ASSET>/holders"`;
 
 const FEE_ROWS: [string, string][] = [
-  ["Creator's share of the 6,900 XCP raise", "0%"],
+  ["Creator's share of the 690 XCP raise", "0%"],
   ["Protocol / platform share of the raise", "0%"],
   ["Premine or mint commission to the creator", "0"],
   ["LP tokens", "burned at the unspendable address, forever"],
@@ -164,8 +164,8 @@ export default function DocsPage() {
         </p>
         <p className="text-sm text-gray-700">
           Every XCP-69 launch is identical: 100M supply, 69M public sale at
-          0.1 XCP per 1,000-token lot, 31M reserved for the liquidity pool,
-          1% per-address cap, 1,000-block window. There is no fine print to
+          0.01 XCP per 1,000-token lot, 31M reserved for the liquidity pool,
+          10 XCP per-address cap, 1,000-block window. There is no fine print to
           read because there is no fine print. The full parameter set lives on
           the <a href="/standard" className="text-purple-600 underline">Standard</a> page.
         </p>
@@ -177,7 +177,7 @@ export default function DocsPage() {
           <strong>The inversion:</strong> on most launchpads, trading starts
           instantly and the crowd arrives later, if ever. XCP-69 flips this —
           trading cannot begin until the community has fully funded the
-          launch. The 1% per-address cap means the 69M sale is unreachable
+          launch. The 10 XCP per-address cap means the 69M sale is unreachable
           without at least {XCP69_MIN_PARTICIPANTS} distinct addresses. By
           construction, no token trades before a real crowd has paid for it.
         </div>
@@ -185,8 +185,8 @@ export default function DocsPage() {
         <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-700">
           <li>
             <strong>Mint.</strong> A 1,000-block window (~7 days). Anyone can
-            mint whole 1,000-token lots at 0.1 XCP per lot, up to 690,000
-            tokens (69 XCP) per address. Both the paid XCP and the minted
+            mint whole 1,000-token lots at 0.01 XCP per lot, up to 1,000,000
+            tokens (6.9 XCP) per address. Both the paid XCP and the minted
             tokens sit in escrow at the unspendable address — nobody holds
             anything until the launch resolves.
           </li>
@@ -200,7 +200,7 @@ export default function DocsPage() {
             nobody can trade the pool in the transaction that creates it.
           </li>
           <li>
-            <strong>Trade.</strong> All 6,900 raised XCP plus the 31M reserved
+            <strong>Trade.</strong> All 690 raised XCP plus the 31M reserved
             tokens seed a TOKEN/XCP AMM pool. The LP tokens are minted
             directly to the unspendable address — liquidity is locked by
             consensus, permanently. Supply and description lock in the same
@@ -219,7 +219,7 @@ export default function DocsPage() {
           the locked liquidity rather than paying anyone out.
         </p>
         <p className="text-sm text-gray-700">
-          The pool opens with 6,900 XCP against 31M tokens: 69/31 ≈{" "}
+          The pool opens with 690 XCP against 31M tokens: 69/31 ≈{" "}
           {XCP69_OPENING_MULTIPLE.toFixed(2)}× the mint price. Every minter is
           structurally in profit at open, and the pool — not later buyers —
           absorbs early exits.

@@ -39,9 +39,9 @@ XCP-69.
 | Public sale (soft cap) | 69,000,000 | `soft_cap: 6900000000000000` |
 | Pool reserve | 31,000,000 | `pool_quantity: 3100000000000000` |
 | Lot size | 1,000 tokens | `quantity_by_price: 100000000000` |
-| Price | 0.1 XCP per lot | `price: 10000000` |
-| Per-address cap | 690,000 tokens (1% of sale, 69 XCP) | `max_mint_per_address: 69000000000000` |
-| Per-tx cap | same as per-address | `max_mint_per_tx: 69000000000000` |
+| Price | 0.01 XCP per lot | `price: 1000000` |
+| Per-address cap | 1,000,000 tokens (10 XCP) | `max_mint_per_address: 100000000000000` |
+| Per-tx cap | same as per-address | `max_mint_per_tx: 100000000000000` |
 | Mint window | 1,000 blocks (~7 days) | `soft_cap_deadline_block: <creation + 1000>` |
 | Start / end | immediate / unset | `start_block: 0`, `end_block: 0` |
 | Premine | none | `premint_quantity: 0` |
@@ -57,16 +57,16 @@ have no `_normalized` form in the API — divide by 10⁸ for display.
 
 ## 📐 What the numbers produce
 
-- **Raise:** exactly **6,900 XCP** on success (69M ÷ 1,000 lots × 0.1 XCP). Exact,
+- **Raise:** exactly **690 XCP** on success (69M ÷ 1,000 lots × 0.01 XCP). Exact,
   not approximate — mints are whole lots, so no rounding exists.
-- **Participation floor:** at 69 XCP max per address, success requires **at least
-  100 distinct addresses**. (Historically, launches with 100+ buyers survive six
+- **Participation floor:** at 10 XCP max per address, success requires **at least
+  69 distinct addresses**. (Historically, launches with 100+ buyers survive six
   months ~98% of the time; 1–4 buyers, 0%.) The cap is per address, not per person —
   it raises the cost of faking a crowd, it cannot prevent one.
-- **Pool opening price:** 6,900 XCP against 31M tokens =
+- **Pool opening price:** 690 XCP against 31M tokens =
   **69/31 ≈ 2.23× the mint price**. Every minter is structurally in profit at open;
   the pool, not later buyers, absorbs early exits.
-- **Depth at open:** ~6,900 XCP of real, permanently locked liquidity; constant
+- **Depth at open:** ~690 XCP of real, permanently locked liquidity; constant
   50 bps swap fee (XCP pair).
 - **Allocation:** 69% of supply publicly minted, 31% in the pool. They sum to 100% —
   there is nowhere else for supply to be.
@@ -77,7 +77,7 @@ have no `_normalized` form in the API — divide by 10⁸ for display.
    XCP and the tokens) at the unspendable address until resolution. Window closes at
    `soft_cap_deadline_block`, or earlier the moment the supply sells out.
 2. **Launched** — sold out at or before the deadline: escrow releases, minters
-   receive tokens, all 6,900 XCP + 31M tokens seed the AMM pool, LP is minted to the
+   receive tokens, all 690 XCP + 31M tokens seed the AMM pool, LP is minted to the
    unspendable address, supply and description lock. Trading is live in the same
    block's resolution phase.
 3. **Refunded** — soft cap missed at the deadline: every minter's XCP is returned
@@ -97,8 +97,8 @@ def is_xcp69(fm):  # raw integer fields
         and fm["soft_cap"] == 6900000000000000
         and fm["hard_cap"] == 10000000000000000
         and fm["quantity_by_price"] == 100000000000
-        and fm["price"] == 10000000
-        and fm["max_mint_per_address"] == 69000000000000
+        and fm["price"] == 1000000
+        and fm["max_mint_per_address"] == 100000000000000
         and fm["premint_quantity"] == 0
         and (fm["minted_asset_commission_int"] or 0) == 0
         and bool(fm["lock_quantity"]) and bool(fm["lock_description"])
