@@ -48,14 +48,30 @@ export async function POST(request: Request) {
     );
   }
 
-  await bucket.put(`i/${asset}`, await image.arrayBuffer(), {
+  const imageBytes = await image.arrayBuffer();
+  const digest = await crypto.subtle.digest("SHA-256", imageBytes);
+  const imageHash = Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  await bucket.put(`i/${asset}`, imageBytes, {
     httpMetadata: { contentType: image.type },
   });
+
+  // CIP-25 v2 Enhanced Asset Information (required: asset, name). The image
+  // hash makes the write-once JSON an integrity commitment: locked on-chain
+  // description URL → hashed content.
   const json = JSON.stringify({
     asset,
+    name: asset,
     description,
+    website: `https://xcp.fun/launch/${asset}`,
+    // Deprecated in v2 but still read by older parsers.
     image: metadataImageUrl(asset),
-    website: "https://xcp.fun",
+    images: [
+      { type: "icon", size: "48x48", data: metadataImageUrl(asset), hash: imageHash },
+      { type: "standard", data: metadataImageUrl(asset), hash: imageHash },
+    ],
   });
   await bucket.put(`j/${asset}`, json, {
     httpMetadata: { contentType: "application/json" },
