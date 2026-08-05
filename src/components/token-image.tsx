@@ -3,8 +3,8 @@
 import { useState } from "react";
 
 /**
- * Token art with a fallback chain: our own hosted image first (authoritative
- * for launches created here), then the ecosystem CDN, then a monogram.
+ * Token art from the ecosystem CDN (which ingests our CIP-25 metadata), with
+ * a monogram fallback. The /i host exists for ingestion, not for display.
  */
 export function TokenImage({
   asset,
@@ -13,10 +13,7 @@ export function TokenImage({
   asset: string;
   className?: string;
 }) {
-  const sources = [
-    `/i/${asset}`,
-    `https://cdn.xcp.io/img/icon/${asset}`,
-  ];
+  const sources = [`https://cdn.xcp.io/img/icon/${asset}`];
   const [index, setIndex] = useState(0);
 
   if (index >= sources.length) {
