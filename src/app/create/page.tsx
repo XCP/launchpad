@@ -17,6 +17,12 @@ import {
 
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
 
+/**
+ * Inscribed images live in the reveal witness; Bitcoin's 400k-weight
+ * standardness ceiling puts the practical content limit around 400 KB.
+ */
+const INSCRIBE_MAX_BYTES = 400 * 1024;
+
 type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
@@ -66,9 +72,11 @@ export default function CreatePage() {
     setNameCheck("idle");
   };
 
+  const imageTooBigToInscribe = inscribe && image !== null && image.size > INSCRIBE_MAX_BYTES;
   const canSubmit =
     nameCheck === "available" &&
     image !== null &&
+    !imageTooBigToInscribe &&
     isValidSocial(xProfile) &&
     isValidSocial(telegram) &&
     walletStatus === "connected" &&
@@ -265,8 +273,14 @@ export default function CreatePage() {
                 The image itself becomes the permanent on-chain description
                 (commit + reveal, two signatures, higher fees scale with image
                 size; the inscription is burned so it belongs to the asset
-                forever). Taproot wallets only.
+                forever). Max 400 KB. Taproot wallets only.
               </span>
+              {imageTooBigToInscribe && (
+                <span className="mt-1 block text-xs text-red-600">
+                  This image is {(image!.size / 1024).toFixed(0)} KB — inscribing
+                  caps at 400 KB. Use a smaller file or uncheck to host it instead.
+                </span>
+              )}
             </span>
           </label>
         )}
