@@ -3,9 +3,12 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
+import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
 import { commas, compact, shortAddress, usd as usdFmt } from "@/lib/format";
+import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
@@ -630,31 +633,11 @@ function LoadCard({
         </p>
       </div>
 
-      {routeOpen && (
-        <div
-          className="backdrop-fade fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 pt-[15vh]"
-          onClick={() => setRouteOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Choose a route"
-        >
-          <div
-            className="modal-pop w-full max-w-sm rounded-3xl bg-white p-3 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-2 pb-2 pt-1">
-              <span className="text-sm font-semibold text-gray-900">
-                Choose a route
-              </span>
-              <button
-                type="button"
-                onClick={() => setRouteOpen(false)}
-                aria-label="Close"
-                className="flex size-7 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-              >
-                ✕
-              </button>
-            </div>
+      <Dialog
+        open={routeOpen}
+        onOpenChange={(o) => !o && setRouteOpen(false)}
+        title="Choose a route"
+      >
             <div className="max-h-[45vh] overflow-y-auto">
               {open.map((disp, i) => (
                 <button
@@ -694,9 +677,7 @@ function LoadCard({
                 purchase is pending in the mempool.
               </p>
             )}
-          </div>
-        </div>
-      )}
+      </Dialog>
     </div>
     <RouteBook open={open} plan={plan} hiddenCount={hiddenCount} />
     </div>
@@ -766,10 +747,7 @@ function UnloadCard({
   const insufficient =
     balance !== undefined && escrowRaw > 0 && escrowRaw > balance;
 
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = isBusy(compose.status);
   const ready = escrowRaw >= SATS && priceSats > 0 && !busy && !existing && !insufficient;
 
   const openDispenser = () =>
@@ -792,30 +770,18 @@ function UnloadCard({
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-3xl border border-green-200 bg-green-50 p-5 text-sm">
-        <div className="font-semibold text-green-800">Broadcast</div>
+      <ConfirmCard
+        title="Broadcast"
+        onReset={() => {
+          compose.reset();
+          refreshExisting();
+        }}
+        resetLabel="Done"
+      >
         <p className="mt-1 text-green-700">
-          Takes effect when it confirms.{" "}
-          <a
-            href={`https://xcp.io/tx/${compose.txid}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {compose.txid.slice(0, 12)}…
-          </a>
+          Takes effect when it confirms. <TxLink txid={compose.txid} />
         </p>
-        <button
-          type="button"
-          onClick={() => {
-            compose.reset();
-            refreshExisting();
-          }}
-          className="mt-2 text-green-800 underline"
-        >
-          Done
-        </button>
-      </div>
+      </ConfirmCard>
     );
   }
 

@@ -4,9 +4,11 @@ import { useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { OrderTracker } from "@/components/order-tracker";
+import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { QuoteRing } from "@/components/quote-ring";
 import { commas, price as formatPrice } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
@@ -109,10 +111,7 @@ export function TradePanel({
     { refreshInterval: 30_000 },
   );
 
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = isBusy(compose.status);
 
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
   const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;
@@ -181,31 +180,20 @@ export function TradePanel({
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm">
-        <div className="font-semibold text-green-800">Order broadcast</div>
+      <ConfirmCard
+        title="Order broadcast"
+        onReset={() => compose.reset()}
+        resetLabel="Trade again"
+      >
         <p className="mt-1 text-green-700">
-          <a
-            href={`https://xcp.io/tx/${compose.txid}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {compose.txid.slice(0, 12)}…
-          </a>
+          <TxLink txid={compose.txid} />
         </p>
         <OrderTracker
           txHash={compose.txid}
           busy={busy}
           onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
         />
-        <button
-          type="button"
-          onClick={() => compose.reset()}
-          className="mt-3 text-green-800 underline"
-        >
-          Trade again
-        </button>
-      </div>
+      </ConfirmCard>
     );
   }
 

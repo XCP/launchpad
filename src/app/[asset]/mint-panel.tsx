@@ -2,7 +2,11 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { ConnectButton } from "@/components/connect-button";
+import { CTA } from "@/components/ui/button";
+import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { usd } from "@/lib/format";
+import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
@@ -18,43 +22,25 @@ export function MintPanel({
   asset: string;
   xcpUsd?: number | null;
 }) {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [lots, setLots] = useState(10);
 
   const clampedLots = Math.max(1, Math.min(MAX_LOTS, Math.floor(lots) || 1));
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = isBusy(compose.status);
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
-        <div className="font-semibold text-green-800">
-          Mint broadcast — {(clampedLots * 1000).toLocaleString()} {asset} for{" "}
-          {(clampedLots * XCP_PER_LOT).toFixed(2)} XCP
-        </div>
+      <ConfirmCard
+        title={`Mint broadcast — ${(clampedLots * 1000).toLocaleString()} ${asset} for ${(clampedLots * XCP_PER_LOT).toFixed(2)} XCP`}
+        onReset={compose.reset}
+        resetLabel="Mint again"
+      >
         <p className="mt-1 text-green-700">
           Escrowed until the launch resolves: tokens if it sells out, full XCP
-          refund if it doesn&apos;t.{" "}
-          <a
-            href={`https://xcp.io/tx/${compose.txid}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {compose.txid.slice(0, 12)}…
-          </a>
+          refund if it doesn&apos;t. <TxLink txid={compose.txid} />
         </p>
-        <button
-          type="button"
-          onClick={compose.reset}
-          className="mt-2 text-green-800 underline"
-        >
-          Mint again
-        </button>
-      </div>
+      </ConfirmCard>
     );
   }
 
@@ -127,16 +113,11 @@ export function MintPanel({
       )}
 
       {walletStatus !== "connected" ? (
-        <button
-          type="button"
-          onClick={() => connect()}
-          className="mt-4 w-full rounded-xl bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
-        >
-          {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-        </button>
+        <ConnectButton size="md" className="mt-4" />
       ) : (
-        <button
-          type="button"
+        <CTA
+          size="md"
+          className="mt-4"
           disabled={busy}
           onClick={() =>
             compose.composeFairmint({
@@ -144,14 +125,13 @@ export function MintPanel({
               quantity: clampedLots * XCP69.QUANTITY_BY_PRICE,
             })
           }
-          className="mt-4 w-full rounded-xl bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {compose.status === "composing" && "Composing…"}
           {compose.status === "signing" && "Confirm in wallet…"}
           {compose.status === "broadcasting" && "Broadcasting…"}
           {(compose.status === "idle" || compose.status === "error") &&
             `Mint from ${address?.slice(0, 8)}…`}
-        </button>
+        </CTA>
       )}
       <p className="mt-2 text-xs text-gray-500">
         Your XCP is escrowed by the protocol, not sent to the creator. If the

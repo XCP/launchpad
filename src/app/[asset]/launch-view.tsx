@@ -409,14 +409,15 @@ function Guarantees({ fm }: { fm: Fairminter }) {
     <details className="group rounded-2xl border border-gray-200 bg-white">
       <summary className="flex cursor-pointer flex-wrap items-center gap-1.5 p-3 [&::-webkit-details-marker]:hidden">
         {rows.map(([claim, how]) => (
-          <span
-            key={claim}
-            title={how}
-            className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800"
-          >
-            <span aria-hidden>✓</span>
-            {claim}
-          </span>
+          <Hint key={claim} content={how}>
+            <span
+              tabIndex={0}
+              className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800"
+            >
+              <span aria-hidden>✓</span>
+              {claim}
+            </span>
+          </Hint>
         ))}
         <span className="ml-auto whitespace-nowrap text-xs text-gray-400 transition-transform group-open:rotate-180">
           ▾

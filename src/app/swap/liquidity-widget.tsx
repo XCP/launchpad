@@ -5,9 +5,13 @@ import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { TokenImage } from "@/components/token-image";
 import { TokenSelectModal } from "@/components/token-select-modal";
+import { ConnectButton } from "@/components/connect-button";
+import { CTA } from "@/components/ui/button";
+import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { GearPopover } from "@/components/ui/popover";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
@@ -61,7 +65,7 @@ export function LiquidityWidget({
   assets: string[];
   xcpUsd: number | null;
 }) {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [asset, setAsset] = useState(assets[0] ?? "");
   const [tab, setTab] = useState<"add" | "remove">("add");
@@ -152,10 +156,7 @@ export function LiquidityWidget({
         : withdrawQuote.quantity_b_estimate) ?? 0
     : 0;
 
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = isBusy(compose.status);
 
   const insufficientToken =
     tokenBalance !== undefined && amountRaw > 0 && amountRaw > tokenBalance;
@@ -205,29 +206,15 @@ export function LiquidityWidget({
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-3xl border border-green-200 bg-green-50 p-5 text-sm">
-        <div className="font-semibold text-green-800">
-          {tab === "add" ? "Deposit broadcast" : "Withdrawal broadcast"}
-        </div>
+      <ConfirmCard
+        title={tab === "add" ? "Deposit broadcast" : "Withdrawal broadcast"}
+        onReset={compose.reset}
+        resetLabel="Done"
+      >
         <p className="mt-1 text-green-700">
-          Settles when it confirms.{" "}
-          <a
-            href={`https://xcp.io/tx/${compose.txid}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {compose.txid.slice(0, 12)}…
-          </a>
+          Settles when it confirms. <TxLink txid={compose.txid} />
         </p>
-        <button
-          type="button"
-          onClick={compose.reset}
-          className="mt-2 text-green-800 underline"
-        >
-          Done
-        </button>
-      </div>
+      </ConfirmCard>
     );
   }
 
@@ -521,19 +508,12 @@ export function LiquidityWidget({
         )}
 
         {walletStatus !== "connected" ? (
-          <button
-            type="button"
-            onClick={() => connect()}
-            className="mt-3 w-full rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white hover:bg-gray-700"
-          >
-            {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-          </button>
+          <ConnectButton className="mt-3" />
         ) : (
-          <button
-            type="button"
+          <CTA
+            className="mt-3"
             disabled={tab === "add" ? !addReady : !removeReady}
             onClick={tab === "add" ? submitAdd : submitRemove}
-            className="mt-3 w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
           >
             {tab === "add"
               ? addLabel
@@ -546,7 +526,7 @@ export function LiquidityWidget({
                     ? "No LP in this pool"
                     : "Choose an amount"
                   : "Remove liquidity"}
-          </button>
+          </CTA>
         )}
       </div>
 

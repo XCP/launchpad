@@ -12,6 +12,7 @@ import {
   tokenQty,
 } from "@/lib/format";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
+import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchJson } from "@/lib/client";
@@ -165,10 +166,7 @@ export function ActivityTabs({
       ),
     { refreshInterval: 15_000 },
   );
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = isBusy(compose.status);
 
   const tabs: (typeof tab)[] = address
     ? ["mints", "trades", "holders", "orders"]

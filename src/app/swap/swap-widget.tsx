@@ -7,9 +7,13 @@ import { OrderTracker } from "@/components/order-tracker";
 import { QuoteRing } from "@/components/quote-ring";
 import { TokenImage } from "@/components/token-image";
 import { TokenSelectModal } from "@/components/token-select-modal";
+import { ConnectButton } from "@/components/connect-button";
+import { CTA } from "@/components/ui/button";
+import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { GearPopover } from "@/components/ui/popover";
 import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
@@ -39,7 +43,7 @@ export function SwapWidget({
   assets: string[];
   xcpUsd: number | null;
 }) {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [asset, setAsset] = useState(assets[0] ?? "");
   const [side, setSide] = useState<"buy" | "sell">("buy");
@@ -98,10 +102,7 @@ export function SwapWidget({
   const impact = quote?.price_impact ?? 0;
   const insufficient =
     balance !== undefined && amountRaw > 0 && amountRaw > balance;
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = isBusy(compose.status);
   const ready = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
 
   // USD on BOTH sides, derived through the XCP leg of the trade.
@@ -167,31 +168,16 @@ export function SwapWidget({
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-3xl border border-green-200 bg-green-50 p-5 text-sm">
-        <div className="font-semibold text-green-800">Swap broadcast</div>
+      <ConfirmCard title="Swap broadcast" onReset={compose.reset} resetLabel="Swap again">
         <p className="mt-1 text-green-700">
-          <a
-            href={`https://xcp.io/tx/${compose.txid}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {compose.txid.slice(0, 12)}…
-          </a>
+          <TxLink txid={compose.txid} />
         </p>
         <OrderTracker
           txHash={compose.txid}
           busy={busy}
           onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
         />
-        <button
-          type="button"
-          onClick={compose.reset}
-          className="mt-3 text-green-800 underline"
-        >
-          Swap again
-        </button>
-      </div>
+      </ConfirmCard>
     );
   }
 
@@ -525,26 +511,15 @@ export function SwapWidget({
         )}
 
         {walletStatus !== "connected" ? (
-          <button
-            type="button"
-            onClick={() => connect()}
-            className="w-full rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
-          >
-            {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-          </button>
+          <ConnectButton />
         ) : (
-          <button
-            type="button"
+          <CTA
             disabled={!ready}
             onClick={submit}
-            className={`w-full rounded-2xl px-5 py-3.5 font-medium text-white transition-all active:scale-[0.99] disabled:cursor-not-allowed ${
-              impact >= 5 && ready
-                ? "bg-red-600 hover:bg-red-500"
-                : "bg-purple-600 hover:bg-purple-500 disabled:bg-gray-200 disabled:text-gray-400"
-            }`}
+            variant={impact >= 5 && ready ? "danger" : "primary"}
           >
             {buttonLabel}
-          </button>
+          </CTA>
         )}
       </div>
 
