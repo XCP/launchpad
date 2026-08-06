@@ -147,9 +147,11 @@ export async function fetchOriginalDeadline(txHash: string): Promise<number | nu
 }
 
 /**
- * Open XCP dispensers, cheapest first. Non-oracle only: oracle dispensers
+ * Open XCP dispensers, cheapest first. Non-oracle only (oracle dispensers
  * price via an external feed, so the BTC trigger amount can't be computed
- * safely client-side. `price` is the API's computed sats per whole XCP.
+ * safely client-side) and single-unit only (give_quantity of exactly 1 XCP)
+ * so quantities read one-XCP-at-a-time and the presets land exactly.
+ * `price` is the API's computed sats per whole XCP.
  */
 export interface Dispenser {
   source: string;
@@ -159,12 +161,14 @@ export interface Dispenser {
   price: number;
 }
 
-export async function fetchXcpDispensers(limit = 8): Promise<Dispenser[]> {
+export async function fetchXcpDispensers(limit = 10): Promise<Dispenser[]> {
   const data = await get<Paginated<Dispenser>>(
-    `/assets/XCP/dispensers?status=open&exclude_with_oracle=true&sort=price:asc&limit=50`,
+    `/assets/XCP/dispensers?status=open&exclude_with_oracle=true&sort=price:asc&limit=100`,
     60,
   );
-  return data.result.filter((d) => d.give_remaining > 0).slice(0, limit);
+  return data.result
+    .filter((d) => d.give_remaining > 0 && d.give_quantity === 1e8)
+    .slice(0, limit);
 }
 
 export async function fetchBlockHeight(): Promise<number> {

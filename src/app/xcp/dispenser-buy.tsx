@@ -78,7 +78,12 @@ export function DispenserBuy({
 
   const presets = [1, 5, 10, 100].map((target) => {
     const k = Math.max(1, Math.round((target * SATS) / d.give_quantity));
-    return { label: `~${target} XCP`, k, available: k <= maxTriggers };
+    const exact = k * d.give_quantity === target * SATS;
+    return {
+      label: exact ? `${target} XCP` : `~${target} XCP`,
+      k,
+      available: k <= maxTriggers,
+    };
   });
 
   // The deal, relative to market: dispenser rate in USD vs the XCP spot.
