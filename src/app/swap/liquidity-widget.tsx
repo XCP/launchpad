@@ -2,19 +2,40 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { AmountInput } from "@/components/amount-input";
 import { TokenImage } from "@/components/token-image";
 import { commas, usd as usdFmt } from "@/lib/format";
+import { useDebounced } from "@/lib/use-debounced";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const SATS = 1e8;
+/**
+ * Liquidity slippage is looser than swap slippage by industry convention
+ * (deposits/withdrawals drift with every pool trade), and a breach here is
+ * benign: the transaction is simply invalid — nothing debited, no XCP gas
+ * charged, only the BTC miner fee spent.
+ */
+const LIQUIDITY_TOLERANCE = 0.025;
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();
 };
+
+async function fetchBalance(address: string, asset: string): Promise<number> {
+  const data = await fetchJson(
+    `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
+  );
+  const rows: { quantity: number }[] = Array.isArray(data.result)
+    ? data.result
+    : data.result
+      ? [data.result]
+      : [];
+  return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
+}
 
 interface PoolInfo {
   asset_a: string;
@@ -43,11 +64,9 @@ interface WithdrawQuote {
 }
 
 /**
- * Liquidity on top of the locked floor. The launch LP is burned forever —
- * that liquidity can never leave. Anything YOU add mints LP to your
- * address, earns the 50 bps swap fee while it's in, and withdraws whenever
- * you like. Deposits are proportional: quote one side, the protocol takes
- * matching amounts of both.
+ * Liquidity on top of the locked floor: the launch LP is burned forever;
+ * anything YOU add mints LP to your address, earns the 50 bps swap fee,
+ * and withdraws whenever you like.
  */
 export function LiquidityWidget({
   assets,
@@ -68,14 +87,17 @@ export function LiquidityWidget({
     (url: string) => fetchJson(url).then((d) => d.result ?? null),
     { refreshInterval: 30_000 },
   );
+
   const amountRaw = Math.round((parseFloat(amount) || 0) * SATS);
-  const { data: depositQuote } = useSWR<DepositQuote>(
-    tab === "add" && asset && amountRaw > 0
-      ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/deposit?quantity=${amountRaw}`
+  const debouncedRaw = useDebounced(amountRaw, 250);
+  const { data: depositQuote, isValidating: depFetching } = useSWR<DepositQuote>(
+    tab === "add" && asset && debouncedRaw > 0
+      ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/deposit?quantity=${debouncedRaw}`
       : null,
     (url: string) => fetchJson(url).then((d) => d.result),
-    { refreshInterval: 15_000 },
+    { refreshInterval: 15_000, keepPreviousData: true },
   );
+  const depStale = depFetching || amountRaw !== debouncedRaw;
   const depTokenRaw = depositQuote
     ? (depositQuote.asset_a === asset
         ? depositQuote.quantity_a_required
@@ -87,29 +109,44 @@ export function LiquidityWidget({
         : depositQuote.quantity_b_required) ?? 0
     : 0;
 
+  const { data: tokenBalance } = useSWR(
+    address && asset ? [address, asset, "lq-token-balance"] : null,
+    ([addr, a]) => fetchBalance(addr, a),
+    { refreshInterval: 30_000 },
+  );
+  const { data: xcpBalance } = useSWR(
+    address ? [address, "XCP", "lq-xcp-balance"] : null,
+    ([addr]) => fetchBalance(addr, "XCP"),
+    { refreshInterval: 30_000 },
+  );
+
+  // Congestion-priced XCP gas for pool ops — usually 0, but never hardcode.
+  const { data: gasFee } = useSWR<number>(
+    address
+      ? `${COUNTERPARTY_API_BASE}/addresses/${address}/compose/${
+          tab === "add" ? "pooldeposit" : "poolwithdraw"
+        }/estimatexcpfees`
+      : null,
+    (url: string) => fetchJson(url).then((d) => Number(d.result) || 0),
+    { refreshInterval: 60_000 },
+  );
+
   const { data: lpBalance } = useSWR(
     address && pool?.lp_asset
-      ? `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${pool.lp_asset}`
+      ? [address, pool.lp_asset, "lq-lp-balance"]
       : null,
-    (url: string) =>
-      fetchJson(url).then((d) => {
-        const rows: { quantity: number }[] = Array.isArray(d.result)
-          ? d.result
-          : d.result
-            ? [d.result]
-            : [];
-        return rows.reduce((s: number, r) => s + (r.quantity ?? 0), 0);
-      }),
+    ([addr, lp]) => fetchBalance(addr, lp),
     { refreshInterval: 30_000 },
   );
   const lpToRemove = Math.floor(((lpBalance ?? 0) * pct) / 100);
+  const debouncedLp = useDebounced(lpToRemove, 250);
 
   const { data: withdrawQuote } = useSWR<WithdrawQuote>(
-    tab === "remove" && asset && lpToRemove > 0
-      ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/withdraw?quantity=${lpToRemove}`
+    tab === "remove" && asset && debouncedLp > 0
+      ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/withdraw?quantity=${debouncedLp}`
       : null,
     (url: string) => fetchJson(url).then((d) => d.result),
-    { refreshInterval: 15_000 },
+    { refreshInterval: 15_000, keepPreviousData: true },
   );
   const outTokenRaw = withdrawQuote
     ? (withdrawQuote.asset_a === asset
@@ -127,8 +164,23 @@ export function LiquidityWidget({
     compose.status === "signing" ||
     compose.status === "broadcasting";
 
+  const insufficientToken =
+    tokenBalance !== undefined && amountRaw > 0 && amountRaw > tokenBalance;
+  // The XCP leg must cover the deposit plus any XCP gas fee.
+  const insufficientXcp =
+    xcpBalance !== undefined &&
+    depXcpRaw > 0 &&
+    depXcpRaw + (gasFee ?? 0) > xcpBalance;
+
   const addReady =
-    tab === "add" && amountRaw > 0 && depTokenRaw > 0 && depXcpRaw > 0 && !busy;
+    tab === "add" &&
+    amountRaw > 0 &&
+    depTokenRaw > 0 &&
+    depXcpRaw > 0 &&
+    !busy &&
+    !insufficientToken &&
+    !insufficientXcp &&
+    !depositQuote?.first_deposit;
   const removeReady = tab === "remove" && lpToRemove > 0 && !busy;
 
   const submitAdd = () => {
@@ -138,7 +190,9 @@ export function LiquidityWidget({
       asset_b: "XCP",
       quantity_a: depTokenRaw,
       quantity_b: depXcpRaw,
-      min_lp_quantity: Math.floor((depositQuote.quantity_minted_estimate ?? 0) * 0.99),
+      min_lp_quantity: Math.floor(
+        (depositQuote.quantity_minted_estimate ?? 0) * (1 - LIQUIDITY_TOLERANCE),
+      ),
     });
   };
 
@@ -147,14 +201,18 @@ export function LiquidityWidget({
     compose.composePoolWithdraw({
       lp_asset: pool.lp_asset,
       quantity: lpToRemove,
-      min_quantity_a: Math.floor(((withdrawQuote?.quantity_a_estimate ?? 0) * 99) / 100),
-      min_quantity_b: Math.floor(((withdrawQuote?.quantity_b_estimate ?? 0) * 99) / 100),
+      min_quantity_a: Math.floor(
+        (withdrawQuote?.quantity_a_estimate ?? 0) * (1 - LIQUIDITY_TOLERANCE),
+      ),
+      min_quantity_b: Math.floor(
+        (withdrawQuote?.quantity_b_estimate ?? 0) * (1 - LIQUIDITY_TOLERANCE),
+      ),
     });
   };
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm">
+      <div className="rounded-3xl border border-green-200 bg-green-50 p-5 text-sm">
         <div className="font-semibold text-green-800">
           {tab === "add" ? "Deposit broadcast" : "Withdrawal broadcast"}
         </div>
@@ -180,9 +238,25 @@ export function LiquidityWidget({
     );
   }
 
+  const addLabel = busy
+    ? compose.status === "signing"
+      ? "Confirm in wallet…"
+      : "Working…"
+    : amountRaw === 0
+      ? "Enter an amount"
+      : insufficientToken
+        ? `Insufficient ${asset} balance`
+        : insufficientXcp
+          ? "Insufficient XCP balance"
+          : depositQuote?.first_deposit
+            ? "Pool is empty"
+            : depStale && depXcpRaw === 0
+              ? "Fetching quote…"
+              : "Add liquidity";
+
   return (
-    <div>
-      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+      <div className="p-2">
         <div className="flex items-center gap-3">
           <TokenImage
             asset={asset}
@@ -195,7 +269,7 @@ export function LiquidityWidget({
               setAmount("");
             }}
             aria-label="Pool"
-            className="block flex-1 rounded-md border border-gray-300 bg-white p-2.5 text-sm font-medium outline-none focus:border-purple-500"
+            className="block flex-1 rounded-xl border border-gray-300 bg-white p-2.5 text-sm font-medium outline-none focus:border-purple-500"
           >
             {assets.map((a) => (
               <option key={a} value={a}>
@@ -205,13 +279,13 @@ export function LiquidityWidget({
           </select>
         </div>
 
-        <div className="mt-3 flex items-center gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium">
+        <div className="mt-3 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
           {(["add", "remove"] as const).map((t) => (
             <button
               key={t}
               type="button"
               onClick={() => setTab(t)}
-              className={`flex-1 rounded-md px-3 py-1.5 capitalize ${
+              className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
                 tab === t
                   ? "bg-white text-gray-900 shadow-sm"
                   : "text-gray-500 hover:text-gray-700"
@@ -223,27 +297,47 @@ export function LiquidityWidget({
         </div>
 
         {tab === "add" ? (
-          <div className="mt-4 space-y-3">
-            <div>
-              <label htmlFor="lq-amount" className="text-xs text-gray-500">
-                {asset} to deposit
-              </label>
-              <input
+          <div className="mt-3 space-y-3">
+            <div className="rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <label htmlFor="lq-amount">{asset} to deposit</label>
+                {tokenBalance !== undefined && (
+                  <button
+                    type="button"
+                    className="hover:text-gray-700 hover:underline"
+                    onClick={() =>
+                      setAmount(
+                        (tokenBalance / SATS).toFixed(8).replace(/\.?0+$/, ""),
+                      )
+                    }
+                  >
+                    Balance: {commas(tokenBalance / SATS)}
+                  </button>
+                )}
+              </div>
+              <AmountInput
                 id="lq-amount"
-                type="number"
-                min={0}
-                step="any"
                 value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                placeholder="0"
-                className="mt-1 block w-full rounded-md border border-gray-300 p-3 text-lg outline-none focus:border-purple-500"
+                onChange={setAmount}
+                className={`mt-1 block w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 ${
+                  insufficientToken ? "text-red-600" : "text-gray-900"
+                }`}
               />
             </div>
             {depositQuote && amountRaw > 0 && !depositQuote.first_deposit && (
-              <dl className="space-y-1 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+              <dl
+                className="space-y-1 rounded-2xl bg-gray-50 p-3 text-xs text-gray-600"
+                style={{
+                  filter: depStale ? "grayscale(1)" : "none",
+                  opacity: depStale ? 0.5 : 1,
+                  transition: depStale ? "none" : "opacity 250ms ease-in-out",
+                }}
+              >
                 <div className="flex justify-between">
-                  <dt>Paired XCP required</dt>
-                  <dd className="font-semibold text-gray-900">
+                  <dt>Paired XCP (max)</dt>
+                  <dd
+                    className={`font-semibold ${insufficientXcp ? "text-red-600" : "text-gray-900"}`}
+                  >
                     {commas(depXcpRaw / SATS)} XCP
                     {xcpUsd ? (
                       <span className="font-normal text-gray-400">
@@ -253,52 +347,66 @@ export function LiquidityWidget({
                     ) : null}
                   </dd>
                 </div>
+                {xcpBalance !== undefined && (
+                  <div className="flex justify-between">
+                    <dt>Your XCP</dt>
+                    <dd>{commas(xcpBalance / SATS)}</dd>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <dt>LP tokens minted (est.)</dt>
+                  <dt>LP minted (est.)</dt>
                   <dd className="font-semibold text-gray-900">
                     {commas((depositQuote.quantity_minted_estimate ?? 0) / SATS)}
                   </dd>
                 </div>
+                {(gasFee ?? 0) > 0 && (
+                  <div className="flex justify-between">
+                    <dt>Protocol gas fee</dt>
+                    <dd>{commas((gasFee ?? 0) / SATS)} XCP</dd>
+                  </div>
+                )}
               </dl>
             )}
-            <p className="text-xs text-gray-500">
-              Deposits are proportional at the current price — both sides move
-              together. Your LP earns the 50 bps fee on every swap while
-              it&apos;s in, and withdraws whenever you like.
+            <p className="px-1 text-xs text-gray-500">
+              Amounts are maximums — the largest proportional deposit is taken
+              and any excess never leaves your wallet. Your LP earns the 50 bps
+              fee on every swap.
             </p>
           </div>
         ) : (
-          <div className="mt-4 space-y-3">
-            <div className="flex items-baseline justify-between text-xs text-gray-500">
-              <span>Amount to remove</span>
-              <span className="text-2xl font-bold text-gray-900">{pct}%</span>
+          <div className="mt-3 space-y-3">
+            <div className="rounded-2xl bg-gray-50 p-4">
+              <div className="flex items-baseline justify-between text-xs text-gray-500">
+                <span>Amount to remove</span>
+                <span className="text-3xl font-bold text-gray-900">{pct}%</span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={pct}
+                onChange={(e) => setPct(Number(e.target.value))}
+                className="ui-slider mt-2 w-full"
+                aria-label="Percent of LP to remove"
+              />
+              <div className="mt-2 flex items-center gap-2">
+                {[25, 50, 75, 100].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPct(p)}
+                    className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                      pct === p
+                        ? "border-purple-600 bg-purple-50 text-purple-700"
+                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                    }`}
+                  >
+                    {p === 100 ? "Max" : `${p}%`}
+                  </button>
+                ))}
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={pct}
-              onChange={(e) => setPct(Number(e.target.value))}
-              className="ui-slider w-full"
-              aria-label="Percent of LP to remove"
-            />
-            <div className="flex items-center gap-2">
-              {[25, 50, 75, 100].map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPct(p)}
-                  className={`flex-1 rounded-md border px-3 py-1.5 text-xs font-medium ${
-                    pct === p
-                      ? "border-purple-600 bg-purple-50 text-purple-700"
-                      : "border-gray-300 text-gray-600 hover:border-gray-400"
-                  }`}
-                >
-                  {p === 100 ? "MAX" : `${p}%`}
-                </button>
-              ))}
-            </div>
-            <dl className="space-y-1 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
+            <dl className="space-y-1 rounded-2xl bg-gray-50 p-3 text-xs text-gray-600">
               <div className="flex justify-between">
                 <dt>Your LP balance</dt>
                 <dd className="font-semibold text-gray-900">
@@ -306,7 +414,7 @@ export function LiquidityWidget({
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt>You will receive (est.)</dt>
+                <dt>You receive (est.)</dt>
                 <dd className="text-right font-semibold text-gray-900">
                   {commas(outTokenRaw / SATS)} {asset}
                   <br />
@@ -319,16 +427,22 @@ export function LiquidityWidget({
                   ) : null}
                 </dd>
               </div>
+              {(gasFee ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <dt>Protocol gas fee</dt>
+                  <dd>{commas((gasFee ?? 0) / SATS)} XCP</dd>
+                </div>
+              )}
             </dl>
-            <p className="text-xs text-gray-500">
+            <p className="px-1 text-xs text-gray-500">
               Only liquidity you added can leave — the launch liquidity is
-              burned at the unspendable address and stays forever.
+              burned and stays forever.
             </p>
           </div>
         )}
 
         {compose.status === "error" && (
-          <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
             {compose.error}
           </p>
         )}
@@ -337,7 +451,7 @@ export function LiquidityWidget({
           <button
             type="button"
             onClick={() => connect()}
-            className="mt-4 w-full rounded-xl bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700"
+            className="mt-3 w-full rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white hover:bg-gray-700"
           >
             {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
           </button>
@@ -346,15 +460,19 @@ export function LiquidityWidget({
             type="button"
             disabled={tab === "add" ? !addReady : !removeReady}
             onClick={tab === "add" ? submitAdd : submitRemove}
-            className="mt-4 w-full rounded-xl bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+            className="mt-3 w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
           >
-            {busy
-              ? compose.status === "signing"
-                ? "Confirm in wallet…"
-                : "Working…"
-              : tab === "add"
-                ? "Add liquidity"
-                : "Remove liquidity"}
+            {tab === "add"
+              ? addLabel
+              : busy
+                ? compose.status === "signing"
+                  ? "Confirm in wallet…"
+                  : "Working…"
+                : lpToRemove === 0
+                  ? (lpBalance ?? 0) === 0
+                    ? "No LP in this pool"
+                    : "Choose an amount"
+                  : "Remove liquidity"}
           </button>
         )}
       </div>
