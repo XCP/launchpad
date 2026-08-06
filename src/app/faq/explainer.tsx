@@ -151,7 +151,7 @@ function LaunchMeter({
             sale fill, so the two segments read apart). */}
         <div
           className={`absolute inset-y-0 transition-colors duration-300 ${
-            soldOut ? "bg-cyan-400" : "bg-gray-200"
+            soldOut ? "bg-cyan-500" : "bg-gray-200"
           }`}
           style={{ left: `${salePct}%`, right: 0 }}
         />

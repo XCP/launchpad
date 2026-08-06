@@ -105,10 +105,14 @@ export function LiveProgress({
             style={{ width: `${confirmedPct}%` }}
           />
           {pendingPct > 0 && (
-            <div
-              className="h-full animate-pulse bg-purple-300 transition-[width] duration-700"
-              style={{ width: `${pendingPct}%` }}
-            />
+            <>
+              {/* 2px surface gap so the segments read as two quantities */}
+              <div className="h-full w-0.5 shrink-0 bg-white" />
+              <div
+                className="h-full animate-pulse bg-purple-400 transition-[width] duration-700"
+                style={{ width: `${pendingPct}%` }}
+              />
+            </>
           )}
         </div>
       </div>

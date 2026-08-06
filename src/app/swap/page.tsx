@@ -16,6 +16,13 @@ export const metadata = {
     "Swap XCP against graduated XCP-69 launches. Every pair trades against permanently locked liquidity — pool and order book, best price first.",
 };
 
+/**
+ * Classic Counterparty pools seeded into the picker until the first XCP-69
+ * graduates exist — real liquidity beats an empty placeholder. Each is
+ * verified live (dropped if its pool disappears).
+ */
+const LEGACY_POOLS = ["PEPECASH"];
+
 export default async function SwapPage() {
   const [fairminters, xcpUsd] = await Promise.all([
     fetchAllFairminters(),
@@ -38,18 +45,27 @@ export default async function SwapPage() {
       return { asset: fm.asset, xcpDepth };
     }),
   );
-  const assets = withPools
+  const graduates = withPools
     .filter((p): p is { asset: string; xcpDepth: number } => p !== null)
     .sort((a, b) => b.xcpDepth - a.xcpDepth)
     .map((p) => p.asset);
+  const legacy = (
+    await Promise.all(
+      LEGACY_POOLS.filter((a) => !graduates.includes(a)).map(async (a) =>
+        (await fetchPool(a)) ? a : null,
+      ),
+    )
+  ).filter((a): a is string => a !== null);
+  const assets = [...graduates, ...legacy];
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Swap</h1>
         <p className="mt-2 text-sm text-gray-600">
-          XCP on one side, a graduated XCP-69 launch on the other — every pair
-          trades against liquidity that can never be withdrawn.
+          XCP on one side, a graduated XCP-69 launch on the other.
+          {legacy.length > 0 &&
+            " Until the first launch graduates, classic Counterparty pools like PEPECASH stand in."}
         </p>
       </div>
 
