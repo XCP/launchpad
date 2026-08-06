@@ -1,3 +1,4 @@
+import Link from "next/link";
 import {
   XCP69_MIN_PARTICIPANTS,
   XCP69_OPENING_MULTIPLE,
@@ -26,6 +27,7 @@ const TOC: { section: string; items: [string, string][] }[] = [
     items: [
       ["#network", "Network"],
       ["#message-format", "Message format"],
+      ["#composing", "Composing transactions"],
       ["#conformance", "Conformance"],
       ["#onchain-events", "Onchain events"],
       ["#reading-state", "Reading state"],
@@ -53,13 +55,16 @@ const PREDICATE_SNIPPET = `export const XCP69 = {
   /** 1,000-token lots */
   QUANTITY_BY_PRICE: 100_000_000_000,
   /** 0.01 XCP per lot */
-  PRICE: 10_000_000,
+  PRICE: 1_000_000,
   /** 1M tokens = 10 XCP per address; 69M ÷ 1M = 69 participants */
-  MAX_MINT_PER_ADDRESS: 69_000_000_000_000,
-  MAX_MINT_PER_TX: 69_000_000_000_000,
-  /** Mint window in blocks (~7 days) */
+  MAX_MINT_PER_ADDRESS: 100_000_000_000_000,
+  MAX_MINT_PER_TX: 100_000_000_000_000,
+  /** Mint window: soft_cap_deadline_block − start_block, exactly (~7 days) */
   DEADLINE_BLOCKS: 1_000,
 } as const;
+
+/** core's block_index sentinel for unconfirmed transactions */
+const MEMPOOL_BLOCK_INDEX = 9_999_999;
 
 export function isXcp69(fm: Fairminter): boolean {
   return (
@@ -70,15 +75,63 @@ export function isXcp69(fm: Fairminter): boolean {
     fm.quantity_by_price === XCP69.QUANTITY_BY_PRICE &&
     fm.price === XCP69.PRICE &&
     fm.max_mint_per_address === XCP69.MAX_MINT_PER_ADDRESS &&
+    fm.max_mint_per_tx === XCP69.MAX_MINT_PER_TX &&
     fm.premint_quantity === 0 &&
     (fm.minted_asset_commission_int ?? 0) === 0 &&
     fm.lock_quantity &&
     fm.lock_description &&
     fm.divisible &&
     !fm.burn_payment &&
-    !fm.asset.startsWith("A") // named assets only
+    !fm.asset.startsWith("A") && // named assets only
+    // timing: scheduled start, fixed window, no end_block
+    fm.start_block > 0 &&
+    fm.end_block === 0 &&
+    (fm.confirmed === false ||
+      fm.block_index >= MEMPOOL_BLOCK_INDEX || // unconfirmed sentinel
+      fm.start_block > fm.block_index) &&      // confirmed before start
+    (fm.status === "closed"
+      // core rewrites the deadline to the fill block on early sell-out
+      ? fm.soft_cap_deadline_block <= fm.start_block + XCP69.DEADLINE_BLOCKS
+      : fm.soft_cap_deadline_block === fm.start_block + XCP69.DEADLINE_BLOCKS)
   );
 }`;
+
+const COMPOSE_LAUNCH_SNIPPET = `# Compose an XCP-69 launch (unsigned tx back; sign + broadcast yourself).
+# START = a future block: the pre-announcement window. The launch must
+# CONFIRM before START or it opens instantly and fails conformance.
+curl -G "https://api.counterparty.io:4000/v2/addresses/$ISSUER/compose/fairminter" \\
+  --data-urlencode "asset=MYTOKEN" \\
+  --data-urlencode "price=1000000" \\
+  --data-urlencode "quantity_by_price=100000000000" \\
+  --data-urlencode "hard_cap=10000000000000000" \\
+  --data-urlencode "soft_cap=6900000000000000" \\
+  --data-urlencode "pool_quantity=3100000000000000" \\
+  --data-urlencode "lp_asset=$LP_NAME" \\  # any unissued numeric; house style: 69…69, ≡69 (mod 97)
+  --data-urlencode "max_mint_per_address=100000000000000" \\
+  --data-urlencode "max_mint_per_tx=100000000000000" \\
+  --data-urlencode "start_block=$START" \\
+  --data-urlencode "soft_cap_deadline_block=$((START + 1000))" \\
+  --data-urlencode "end_block=0" \\
+  --data-urlencode "premint_quantity=0" \\
+  --data-urlencode "minted_asset_commission=0" \\
+  --data-urlencode "burn_payment=false" \\
+  --data-urlencode "lock_quantity=true" \\
+  --data-urlencode "lock_description=true" \\
+  --data-urlencode "divisible=true" \\
+  --data-urlencode "description=https://…/MYTOKEN.json" \\
+  --data-urlencode "sat_per_vbyte=$FEE_RATE" \\
+  --data-urlencode "verbose=true"`;
+
+const COMPOSE_MINT_SNIPPET = `# Compose a mint. quantity is the TOKEN amount (raw, whole lots) —
+# the XCP price is computed by consensus and debited from the minter's
+# on-ledger XCP balance; nothing rides in the Bitcoin outputs.
+curl -G "https://api.counterparty.io:4000/v2/addresses/$MINTER/compose/fairmint" \\
+  --data-urlencode "asset=MYTOKEN" \\
+  --data-urlencode "quantity=100000000000000" \\
+  --data-urlencode "sat_per_vbyte=$FEE_RATE"
+
+# Issuer-side XCP cost of the pool settlement (prepaid at creation):
+curl "https://api.counterparty.io:4000/v2/addresses/$ISSUER/compose/pooldeposit/estimatexcpfees"`;
 
 const CURL_OPEN_LAUNCHES = `# All fairminters currently minting (filter with isXcp69 client-side)
 curl "https://api.counterparty.io:4000/v2/fairminters?status=open&verbose=true"
@@ -165,9 +218,10 @@ export default function DocsPage() {
         <p className="text-sm text-gray-700">
           Every XCP-69 launch is identical: 100M supply, 69M public sale at
           0.01 XCP per 1,000-token lot, 31M reserved for the liquidity pool,
-          10 XCP per-address cap, 1,000-block window. There is no fine print to
-          read because there is no fine print. The full parameter set lives on
-          the <a href="/standard" className="text-purple-600 underline">Standard</a> page.
+          10 XCP per-address cap, an on-chain pre-announcement before minting
+          opens, and a 1,000-block window. There is no fine print to read
+          because there is no fine print. The full parameter set lives on
+          the <Link href="/faq" className="text-purple-600 underline">How it works</Link> page.
         </p>
       </section>
 
@@ -181,14 +235,26 @@ export default function DocsPage() {
           without at least {XCP69_MIN_PARTICIPANTS} distinct addresses. By
           construction, no token trades before a real crowd has paid for it.
         </div>
-        <p className="text-sm text-gray-700">A launch moves through three phases:</p>
+        <p className="text-sm text-gray-700">A launch moves through four phases:</p>
         <ol className="list-decimal space-y-2 pl-5 text-sm text-gray-700">
           <li>
-            <strong>Mint.</strong> A 1,000-block window (~7 days). Anyone can
-            mint whole 1,000-token lots at 0.01 XCP per lot, up to 1,000,000
-            tokens (6.9 XCP) per address. Both the paid XCP and the minted
-            tokens sit in escrow at the unspendable address — nobody holds
-            anything until the launch resolves.
+            <strong>Announce.</strong> Every launch confirms on-chain{" "}
+            <em>before</em> its <code className="rounded bg-gray-100 px-1">start_block</code>.
+            Until that block arrives the fairminter is{" "}
+            <code className="rounded bg-gray-100 px-1">pending</code> and
+            consensus rejects every mint — nobody, creator included, can mint
+            early. There are no stealth launches: the full terms sit on-chain,
+            inspectable, before the first lot can be bought.
+          </li>
+          <li>
+            <strong>Mint.</strong> A 1,000-block window (~7 days) from{" "}
+            <code className="rounded bg-gray-100 px-1">start_block</code>.
+            Anyone can mint whole 1,000-token lots at 0.01 XCP per lot, up to
+            1,000,000 tokens (10 XCP) per address. Both the paid XCP and the
+            minted tokens sit in escrow at the unspendable address — nobody
+            holds anything until the launch resolves. The window length only
+            ever delays failure: a sell-out settles the moment it fills, while
+            a miss frees every minter&apos;s XCP within about a week.
           </li>
           <li>
             <strong>Resolve.</strong> All-or-nothing at the 69M soft cap. The
@@ -323,11 +389,17 @@ export default function DocsPage() {
             token from trading below mint price.
           </li>
           <li>
-            <strong>Token image and description are hosted off-chain.</strong>{" "}
-            The chain permanently carries the URL of the asset-info JSON
-            (via <code className="rounded bg-gray-100 px-1">lock_description</code>),
-            which provides hashed integrity of what was committed — but the
-            hosted content itself lives off-chain.
+            <strong>Token media is on-chain only if the creator chooses.</strong>{" "}
+            By default the chain permanently carries the URL of the asset-info
+            JSON (via{" "}
+            <code className="rounded bg-gray-100 px-1">lock_description</code>)
+            while the image and info are hosted off-chain, editable only by
+            the asset&apos;s current on-chain owner via a wallet-signed
+            message. If that hosting ever vanished, the token&apos;s
+            economics — supply, pool, refunds — are untouched; only the
+            artwork would be. Creators launching from a taproot wallet can
+            remove the dependency entirely by inscribing the image on-chain
+            as the permanent description.
           </li>
         </ul>
       </section>
@@ -386,6 +458,45 @@ export default function DocsPage() {
         </p>
       </section>
 
+      <section id="composing" className="space-y-3">
+        <h2 className="text-xl font-bold">Composing transactions</h2>
+        <p className="text-sm text-gray-700">
+          The compose API returns an <strong>unsigned</strong> raw Bitcoin
+          transaction — the node never sees a key. Sign with your own wallet,
+          broadcast, done. Add{" "}
+          <code className="rounded bg-gray-100 px-1">verbose=true</code> for a
+          PSBT and echoed params; every quantity is a raw integer.
+        </p>
+        <CodeBlock>{COMPOSE_LAUNCH_SNIPPET}</CodeBlock>
+        <p className="text-sm text-gray-700">
+          Consensus enforces the standard&apos;s coherence at parse time:{" "}
+          <code className="rounded bg-gray-100 px-1">soft_cap</code> must equal{" "}
+          <code className="rounded bg-gray-100 px-1">
+            hard_cap − premint − pool_quantity
+          </code>{" "}
+          whenever <code className="rounded bg-gray-100 px-1">pool_quantity</code>{" "}
+          &gt; 0 — all-or-nothing is a protocol rule, not site policy. The
+          issuer&apos;s address must hold the 0.5 XCP name-registration fee
+          plus the pooldeposit gas fee on-ledger; both debit at confirmation,
+          so settlement later costs nothing. Pick{" "}
+          <code className="rounded bg-gray-100 px-1">lp_asset</code> with real
+          randomness: numeric issuance is free, and a predictable name lets
+          anyone pre-register it between broadcast and confirmation,
+          invalidating the launch.
+        </p>
+        <CodeBlock>{COMPOSE_MINT_SNIPPET}</CodeBlock>
+        <p className="text-sm text-gray-700">
+          Mints must be whole-lot multiples of{" "}
+          <code className="rounded bg-gray-100 px-1">quantity_by_price</code>,
+          within the per-transaction cap, and within the address&apos;s
+          remaining allowance — a partially used cap can be topped up across
+          multiple transactions. The minter needs the XCP{" "}
+          <em>on their Counterparty balance</em>; a funded BTC wallet with no
+          XCP will compose-fail with{" "}
+          <em>&quot;insufficient XCP balance&quot;</em>.
+        </p>
+      </section>
+
       <section id="conformance" className="space-y-3">
         <h2 className="text-xl font-bold">Conformance</h2>
         <p className="text-sm text-gray-700">
@@ -400,6 +511,22 @@ export default function DocsPage() {
           allows a fairminter to skim up to 99% of every mint back to the
           creator — a premine with extra steps — and no other field catches
           it. XCP-69 requires it to be exactly 0.
+        </p>
+        <p className="text-sm text-gray-700">
+          The timing clauses are the two deliberate inequalities. Consensus
+          does not require a future start — a launch confirming late simply
+          opens instantly — so the pre-announcement guarantee lives here:{" "}
+          <code className="rounded bg-gray-100 px-1">start_block</code> must
+          exceed the confirmation block. Without that clause, a creator could
+          broadcast a nominal 1,000-block sale late, confirm just before its
+          own deadline, and run a near-instant insider mint behind
+          thousand-block metadata. And on the fairminter row the window check
+          relaxes to <code className="rounded bg-gray-100 px-1">≤</code> once
+          closed because core rewrites the deadline on early sell-out — for
+          closed launches this site restores exact equality from the immutable{" "}
+          <code className="rounded bg-gray-100 px-1">NEW_FAIRMINTER</code>{" "}
+          event (see the trap in Reading state). Everything else is exact
+          equality on the row.
         </p>
       </section>
 
@@ -458,6 +585,23 @@ export default function DocsPage() {
             &quot;soft cap not reached&quot;)
           </li>
         </ul>
+        <p className="text-sm text-gray-700">
+          <strong>Second integration trap:</strong>{" "}
+          <code className="rounded bg-gray-100 px-1">soft_cap_deadline_block</code>{" "}
+          is <em>rewritten</em> when a launch sells out early — core pulls it
+          forward to the fill block so the pool seeds at that block&apos;s
+          end-of-block phase. On a closed record the field is the settlement
+          block, not the original deadline. Countdown UIs are only meaningful
+          while status is <code className="rounded bg-gray-100 px-1">open</code>.
+          The composed value survives in the append-only event history:{" "}
+          <code className="rounded bg-gray-100 px-1">
+            GET /v2/transactions/&lt;tx_hash&gt;/events/NEW_FAIRMINTER
+          </code>{" "}
+          returns the original bindings (the rewrite is a separate{" "}
+          <code className="rounded bg-gray-100 px-1">FAIRMINTER_UPDATE</code>{" "}
+          event), which is how this site verifies the exact window for closed
+          launches.
+        </p>
       </section>
 
       <section id="reference-launch" className="space-y-3">

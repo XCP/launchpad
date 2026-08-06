@@ -1,9 +1,9 @@
 # launchpad
 
 The XCP-69 launchpad for xcp.fun — trustless token launches on Counterparty
-fairmint pools. All-or-nothing mints, ≥100 participants required, every raised
-XCP locked into an AMM pool with burned LP. Enforced by consensus, not by this
-website.
+fairmint pools. All-or-nothing mints, ≥69 participants required, on-chain
+pre-announcement before minting opens, every raised XCP locked into an AMM pool
+with burned LP. Enforced by consensus, not by this website.
 
 - **[PLAN.md](./PLAN.md)** — architecture, pages, phases, research findings
 - **[docs/xcp-69.md](./docs/xcp-69.md)** — the standard (fixed parameters, conformance predicate)

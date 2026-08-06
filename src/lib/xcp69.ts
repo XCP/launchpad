@@ -52,9 +52,16 @@ export const XCP69 = {
   /** 1M tokens = 10 XCP per address; 69M ÷ 1M = 69 minimum participants */
   MAX_MINT_PER_ADDRESS: 100_000_000_000_000,
   MAX_MINT_PER_TX: 100_000_000_000_000,
-  /** Mint window in blocks (~7 days) */
+  /** Mint window: soft_cap_deadline_block − start_block, exactly (~7 days) */
   DEADLINE_BLOCKS: 1_000,
 } as const;
+
+/**
+ * Unconfirmed transactions carry this sentinel as block_index
+ * (core config.MEMPOOL_BLOCK_INDEX); timing clauses that compare against the
+ * confirmation block are meaningless until the launch confirms.
+ */
+const MEMPOOL_BLOCK_INDEX = 9_999_999;
 
 /** Derived, exact: 690 XCP raised on success (raw sats). */
 export const XCP69_RAISE_SATS =
@@ -72,7 +79,31 @@ export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;
  *
  * The commission clause is load-bearing: the protocol permits skimming up to
  * 99% of every mint to the issuer — a premine with extra steps — and no other
- * clause catches it.
+ * clause catches it. max_mint_per_tx is equally load-bearing: without it, a
+ * launch could conform on every other field while forcing one lot per
+ * transaction (1,000 txs per participant).
+ *
+ * Timing clauses are the two deliberate departures from pure equality:
+ *
+ * - Pre-announcement (`start_block > block_index`): consensus does NOT require
+ *   a future start — a fairminter confirming at or past its start_block just
+ *   opens instantly (core fairminter.py parse). Requiring confirmation
+ *   strictly before start_block makes every listed launch verifiably
+ *   announced on-chain before minting could begin: consensus rejects fairmints
+ *   while status is "pending", so the announcement window is mint-proof.
+ *   An inequality is unavoidable — composers cannot know their confirmation
+ *   block in advance, so no exact lead time is composable.
+ *
+ * - Window (`soft_cap_deadline_block` vs `start_block + DEADLINE_BLOCKS`):
+ *   exact equality while pending/open. Once closed, core may have REWRITTEN
+ *   soft_cap_deadline_block to the sell-out block (fairmint.py
+ *   _handle_hard_cap_reached defers pool creation to end-of-block by pulling
+ *   the deadline forward), so for closed records the field holds the
+ *   settlement block and the check relaxes to <=. A short-windowed launch
+ *   could in principle slip through this clause after graduating — but it
+ *   would have failed the exact check during its entire open phase and so
+ *   was never listed while mintable. Call sites close even that gap with
+ *   windowIsExact() against the immutable NEW_FAIRMINTER event.
  */
 export function isXcp69(fm: Fairminter): boolean {
   return (
@@ -83,27 +114,56 @@ export function isXcp69(fm: Fairminter): boolean {
     fm.quantity_by_price === XCP69.QUANTITY_BY_PRICE &&
     fm.price === XCP69.PRICE &&
     fm.max_mint_per_address === XCP69.MAX_MINT_PER_ADDRESS &&
+    fm.max_mint_per_tx === XCP69.MAX_MINT_PER_TX &&
     fm.premint_quantity === 0 &&
     (fm.minted_asset_commission_int ?? 0) === 0 &&
     fm.lock_quantity &&
     fm.lock_description &&
     fm.divisible &&
     !fm.burn_payment &&
-    !fm.asset.startsWith("A") // named assets only
+    !fm.asset.startsWith("A") && // named assets only
+    // timing: scheduled start, fixed window, no end_block
+    fm.start_block > 0 &&
+    fm.end_block === 0 &&
+    (fm.confirmed === false ||
+      fm.block_index >= MEMPOOL_BLOCK_INDEX ||
+      fm.start_block > fm.block_index) &&
+    (fm.status === "closed"
+      ? fm.soft_cap_deadline_block <= fm.start_block + XCP69.DEADLINE_BLOCKS
+      : fm.soft_cap_deadline_block === fm.start_block + XCP69.DEADLINE_BLOCKS)
   );
+}
+
+/**
+ * Exact window verification for closed launches. The fairminters row can't
+ * prove the composed window once closed (see the rewrite note on isXcp69),
+ * but the NEW_FAIRMINTER event recorded at creation is append-only — pass
+ * its soft_cap_deadline_block (fetchOriginalDeadline) to restore exact
+ * equality and close the post-graduation short-window loophole.
+ */
+export function windowIsExact(
+  fm: Fairminter,
+  originalDeadline: number | null,
+): boolean {
+  return originalDeadline === fm.start_block + XCP69.DEADLINE_BLOCKS;
 }
 
 export type LaunchPhase = "scheduled" | "minting" | "graduated" | "refunded";
 
 /**
- * Lifecycle bucket. "Graduated" requires confirming the pool exists because
- * success and failure both end at status "closed"; callers pass whether a
- * TOKEN/XCP pool row exists for the asset.
+ * Lifecycle bucket. For pool fairminters, "graduated" requires confirming the
+ * pool exists because success and failure both end at status "closed" —
+ * callers pass whether a TOKEN/XCP pool row exists. Classic (non-pool)
+ * fairminters, visible only in relaxed mode, succeed by meeting their soft
+ * cap (or having none): a minted-out classic close is a success, not a
+ * refund.
  */
 export function launchPhase(fm: Fairminter, hasPool: boolean): LaunchPhase {
   if (fm.status === "pending") return "scheduled";
   if (fm.status === "open") return "minting";
-  return hasPool ? "graduated" : "refunded";
+  if ((fm.pool_quantity ?? 0) > 0) return hasPool ? "graduated" : "refunded";
+  if (fm.soft_cap > 0 && (fm.earned_quantity ?? 0) < fm.soft_cap) return "refunded";
+  return "graduated";
 }
 
 /**
@@ -127,16 +187,42 @@ export function openingMultiple(fm: Fairminter): number | null {
 }
 
 /**
- * LP asset name: "A69" + random tail. Brand-consistent but unpredictable —
- * a deterministic tail would let a griefer pre-issue expected names for
- * pennies and invalidate launches (the unissued check happens at parse).
- * "A69" + 16 random digits lands in [6.9e17, 7.0e17), inside the valid
- * numeric range (26^12+1 .. 2^64-1).
+ * LP asset name, house format: an 18-digit numeric asset that starts with 69,
+ * ends with 69, and — the handshake — is ≡ 69 (mod 97). Verifiable with one
+ * modulo (see isHouseLpName); 97 is the largest prime under 100, so the
+ * congruence catches any single-digit typo or transposition, IBAN-style.
+ *
+ * The 14 middle digits are random (~10^12 after the congruence adjustment):
+ * enough that pre-issuing the namespace to grief launches costs millions in
+ * transaction fees (numeric issuance is free, but each squat is a real tx;
+ * the unissued check happens at parse). ~10^12 of these names exist.
+ *
+ * House style is branding, not conformance: isXcp69 does not test it, and a
+ * launch composed elsewhere with any unissued numeric lp_asset is still
+ * XCP-69.
  */
 export function generateLpAssetName(): string {
-  const bytes = new Uint8Array(16);
+  const bytes = new Uint8Array(14);
   crypto.getRandomValues(bytes);
-  let tail = "";
-  for (const b of bytes) tail += (b % 10).toString();
-  return `A69${tail}`;
+  let mid = 0n;
+  for (const b of bytes) mid = mid * 10n + BigInt(b % 10);
+  const n = 69n * 10n ** 16n + mid * 100n + 69n;
+  // Stepping mid by 1 moves n by 100 ≡ 3 (mod 97); 65 = 3⁻¹ (mod 97), so one
+  // adjustment of at most +96 lands on the target residue.
+  const delta = ((((69n - (n % 97n)) % 97n) + 97n) % 97n * 65n) % 97n;
+  let mid2 = mid + delta;
+  // On overflow past 14 digits, step back 97 instead: 97 mid-steps ≡ 0
+  // (mod 97), so the residue is preserved.
+  if (mid2 >= 10n ** 14n) mid2 -= 97n;
+  return `A${69n * 10n ** 16n + mid2 * 100n + 69n}`;
+}
+
+/**
+ * The house-format test: starts 69, ends 69, ≡ 69 (mod 97). A random numeric
+ * asset passes by accident ~1 in 10^7. Purely informative — anyone can
+ * generate passing names, so this identifies the format, not the author.
+ */
+export function isHouseLpName(name: string | null | undefined): boolean {
+  if (!name || !/^A69\d{14}69$/.test(name)) return false;
+  return BigInt(name.slice(1)) % 97n === 69n;
 }
