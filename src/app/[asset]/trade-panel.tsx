@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { OrderTracker } from "@/components/order-tracker";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { QuoteRing } from "@/components/quote-ring";
 import { commas, price as formatPrice } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
@@ -462,10 +463,8 @@ export function TradePanel({
       )}
 
       {compose.status === "error" && (
-        <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-          {compose.error}
-        </p>
-      )}
+          <ErrorBanner className="mt-3">{compose.error}</ErrorBanner>
+        )}
     </div>
   );
 }

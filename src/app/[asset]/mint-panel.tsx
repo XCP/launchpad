@@ -5,6 +5,7 @@ import { useState } from "react";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { usd } from "@/lib/format";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
@@ -107,10 +108,8 @@ export function MintPanel({
       </div>
 
       {compose.status === "error" && (
-        <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-          {compose.error}
-        </p>
-      )}
+          <ErrorBanner className="mt-3">{compose.error}</ErrorBanner>
+        )}
 
       {walletStatus !== "connected" ? (
         <ConnectButton size="md" className="mt-4" />

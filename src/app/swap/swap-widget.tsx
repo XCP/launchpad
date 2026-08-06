@@ -3,20 +3,23 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
+import { AssetChip, XcpChip } from "@/components/asset-chip";
+import { ConnectButton } from "@/components/connect-button";
 import { OrderTracker } from "@/components/order-tracker";
 import { QuoteRing } from "@/components/quote-ring";
-import { TokenImage } from "@/components/token-image";
 import { TokenSelectModal } from "@/components/token-select-modal";
-import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { FlipNotch } from "@/components/ui/flip-notch";
 import { GearPopover } from "@/components/ui/popover";
+import { Well } from "@/components/ui/well";
+import { fetchBalance, fetchJson } from "@/lib/client";
 import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const SATS = 1e8;
@@ -185,32 +188,10 @@ export function SwapWidget({
   // control — no chevron, no modal.
   const tokenChip =
     assets.length === 1 ? (
-      <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
-        <TokenImage asset={asset} className="size-6 rounded-full bg-gray-100 object-cover" />
-        <span className="text-sm font-semibold">{asset}</span>
-      </div>
+      <AssetChip asset={asset} />
     ) : (
-      <button
-        type="button"
-        onClick={() => setSelectorOpen(true)}
-        className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm transition-all hover:border-gray-300 hover:shadow active:scale-[0.97]"
-      >
-        <TokenImage asset={asset} className="size-6 rounded-full bg-gray-100 object-cover" />
-        <span className="text-sm font-semibold">{asset}</span>
-        <span aria-hidden className="text-xs text-gray-400">
-          ▾
-        </span>
-      </button>
+      <AssetChip asset={asset} onClick={() => setSelectorOpen(true)} />
     );
-
-  const xcpChip = (
-    <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
-      <span className="flex size-6 items-center justify-center rounded-full bg-purple-600 text-[10px] font-bold text-white">
-        X
-      </span>
-      <span className="text-sm font-semibold">XCP</span>
-    </div>
-  );
 
   const buttonLabel = busy
     ? compose.status === "composing"
@@ -238,88 +219,86 @@ export function SwapWidget({
           active={customSlip > 0 || expiration !== MARKET_EXPIRATION}
           label="Swap settings"
         >
-              <div className="text-xs font-medium text-gray-500">Max slippage</div>
-              <div className="mt-2 flex items-center gap-1.5">
-                {SLIPPAGE_PRESETS.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => {
-                      setSlippagePreset(s);
-                      setCustomSlippage("");
-                    }}
-                    className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
-                      slippage === s && customSlip === 0
-                        ? "border-purple-600 bg-purple-50 text-purple-700"
-                        : "border-gray-200 text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    {s}%
-                  </button>
-                ))}
-                <div
-                  className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                    customSlip > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
-                  }`}
-                >
-                  <AmountInput
-                    value={customSlippage}
-                    onChange={setCustomSlippage}
-                    placeholder="1.5"
-                    ariaLabel="Custom slippage percent"
-                    className="w-8 bg-transparent text-right text-xs font-medium outline-none"
-                  />
-                  <span className="text-xs text-gray-400">%</span>
-                </div>
-              </div>
-              {slippage < 0.5 && (
-                <p className="mt-2 text-[11px] text-amber-600">
-                  Below 0.5% the order may not fill.
-                </p>
-              )}
-              {slippage > 5 && (
-                <p className="mt-2 text-[11px] text-red-600">
-                  High slippage authorizes up to {slippage}% price impact.
-                </p>
-              )}
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text-xs font-medium text-gray-500">
-                  Expiration
-                </span>
-                <span
-                  className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                    expiration !== MARKET_EXPIRATION
-                      ? "border-purple-600 bg-purple-50"
-                      : "border-gray-200"
-                  }`}
-                >
-                  <AmountInput
-                    value={customExpiration}
-                    onChange={setCustomExpiration}
-                    placeholder={String(MARKET_EXPIRATION)}
-                    ariaLabel="Order expiration in blocks"
-                    className="w-10 bg-transparent text-right text-xs font-medium outline-none"
-                  />
-                  <span className="text-xs text-gray-400">blocks</span>
-                </span>
-              </div>
-              <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
-                How long an unfilled remainder rests before auto-refund.{" "}
-                {MARKET_EXPIRATION} = fill at confirmation or refund next
-                block.
-              </p>
-              <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
-                Min received is enforced by the order itself — worse fills are
-                impossible; better ones refund the difference.
-              </div>
+          <div className="text-xs font-medium text-gray-500">Max slippage</div>
+          <div className="mt-2 flex items-center gap-1.5">
+            {SLIPPAGE_PRESETS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => {
+                  setSlippagePreset(s);
+                  setCustomSlippage("");
+                }}
+                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+                  slippage === s && customSlip === 0
+                    ? "border-purple-600 bg-purple-50 text-purple-700"
+                    : "border-gray-200 text-gray-600 hover:border-gray-300"
+                }`}
+              >
+                {s}%
+              </button>
+            ))}
+            <div
+              className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+                customSlip > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+              }`}
+            >
+              <AmountInput
+                value={customSlippage}
+                onChange={setCustomSlippage}
+                placeholder="1.5"
+                ariaLabel="Custom slippage percent"
+                className="w-8 bg-transparent text-right text-xs font-medium outline-none"
+              />
+              <span className="text-xs text-gray-400">%</span>
+            </div>
+          </div>
+          {slippage < 0.5 && (
+            <p className="mt-2 text-[11px] text-amber-600">
+              Below 0.5% the order may not fill.
+            </p>
+          )}
+          {slippage > 5 && (
+            <p className="mt-2 text-[11px] text-red-600">
+              High slippage authorizes up to {slippage}% price impact.
+            </p>
+          )}
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-gray-500">Expiration</span>
+            <span
+              className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+                expiration !== MARKET_EXPIRATION
+                  ? "border-purple-600 bg-purple-50"
+                  : "border-gray-200"
+              }`}
+            >
+              <AmountInput
+                value={customExpiration}
+                onChange={setCustomExpiration}
+                placeholder={String(MARKET_EXPIRATION)}
+                ariaLabel="Order expiration in blocks"
+                className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+              />
+              <span className="text-xs text-gray-400">blocks</span>
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+            How long an unfilled remainder rests before auto-refund.{" "}
+            {MARKET_EXPIRATION} = fill at confirmation or refund next block.
+          </p>
+          <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
+            Min received is enforced by the order itself — worse fills are
+            impossible; better ones refund the difference.
+          </div>
         </GearPopover>
       </div>
 
       {/* Sell well — inset follows focus; balance row swaps to presets on hover */}
-      <div className="group rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
-        <div className="flex h-5 items-center justify-between text-xs text-gray-500">
-          <span>Sell</span>
-          {balance !== undefined && (
+      <Well
+        focusable
+        label="Sell"
+        topRight={
+          balance !== undefined && (
             <>
               <button
                 type="button"
@@ -347,63 +326,45 @@ export function SwapWidget({
                 )}
               </span>
             </>
-          )}
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <AmountInput
-            value={amount}
-            onChange={(v) => {
-              setAmount(v);
-              setPriceMoved(false);
-            }}
-            ariaLabel={`Amount of ${giveAsset} to sell`}
-            className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-              insufficient ? "text-red-600" : "text-gray-900"
-            }`}
-          />
-          {giveAsset === "XCP" ? xcpChip : tokenChip}
-        </div>
-        <div className="mt-1 h-4 text-xs text-gray-400">
-          {giveUsd !== null && `≈ ${usdFmt(giveUsd)}`}
-        </div>
-      </div>
+          )
+        }
+        chip={giveAsset === "XCP" ? <XcpChip /> : tokenChip}
+        footer={<span>{giveUsd !== null && `≈ ${usdFmt(giveUsd)}`}</span>}
+      >
+        <AmountInput
+          value={amount}
+          onChange={(v) => {
+            setAmount(v);
+            setPriceMoved(false);
+          }}
+          ariaLabel={`Amount of ${giveAsset} to sell`}
+          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+            insufficient ? "text-red-600" : "text-gray-900"
+          }`}
+        />
+      </Well>
 
-      {/* Flip — ring in the card color punches through the seam */}
-      <div className="relative z-10 h-0.5">
-        <button
-          type="button"
-          onClick={flip}
-          aria-label="Flip direction"
-          title="Flip direction"
-          className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-gray-50 text-gray-500 shadow-[0_0_0_4px_white] transition-transform duration-300 hover:bg-gray-100 hover:text-purple-600 active:scale-95"
-          style={{ transform: `translate(-50%, -50%) rotate(${flips * 180}deg)` }}
-        >
-          ↓
-        </button>
-      </div>
+      <FlipNotch onFlip={flip} flips={flips} />
 
       {/* Buy well */}
-      <div className="rounded-2xl bg-gray-50 p-4">
-        <div className="flex h-5 items-center text-xs text-gray-500">Buy</div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <div
-            className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-              out > 0 ? "text-gray-900" : "text-gray-300"
-            }`}
-            style={{
-              filter: staleQuote && out > 0 ? "grayscale(1)" : "none",
-              opacity: staleQuote && out > 0 ? 0.4 : 1,
-              transition: staleQuote ? "none" : "opacity 250ms ease-in-out",
-            }}
-          >
-            {out > 0 ? commas(out) : "0"}
-          </div>
-          {getAsset === "XCP" ? xcpChip : tokenChip}
+      <Well
+        label="Buy"
+        chip={getAsset === "XCP" ? <XcpChip /> : tokenChip}
+        footer={<span>{getUsd !== null && `≈ ${usdFmt(getUsd)}`}</span>}
+      >
+        <div
+          className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
+            out > 0 ? "text-gray-900" : "text-gray-300"
+          }`}
+          style={{
+            filter: staleQuote && out > 0 ? "grayscale(1)" : "none",
+            opacity: staleQuote && out > 0 ? 0.4 : 1,
+            transition: staleQuote ? "none" : "opacity 250ms ease-in-out",
+          }}
+        >
+          {out > 0 ? commas(out) : "0"}
         </div>
-        <div className="mt-1 h-4 text-xs text-gray-400">
-          {getUsd !== null && `≈ ${usdFmt(getUsd)}`}
-        </div>
-      </div>
+      </Well>
 
       {/* Rate line + expandable details */}
       {rateText && (
@@ -505,9 +466,7 @@ export function SwapWidget({
         )}
 
         {compose.status === "error" && (
-          <p className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {compose.error}
-          </p>
+          <ErrorBanner className="mb-2">{compose.error}</ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (
@@ -523,18 +482,20 @@ export function SwapWidget({
         )}
       </div>
 
-      <TokenSelectModal
-        open={selectorOpen}
-        onClose={() => setSelectorOpen(false)}
-        assets={assets}
-        selected={asset}
-        address={address}
-        onSelect={(a) => {
-          setAsset(a);
-          setAmount("");
-          setPriceMoved(false);
-        }}
-      />
+      {assets.length > 1 && (
+        <TokenSelectModal
+          open={selectorOpen}
+          onClose={() => setSelectorOpen(false)}
+          assets={assets}
+          selected={asset}
+          address={address}
+          onSelect={(a) => {
+            setAsset(a);
+            setAmount("");
+            setPriceMoved(false);
+          }}
+        />
+      )}
     </div>
   );
 }

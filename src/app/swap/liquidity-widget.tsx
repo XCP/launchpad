@@ -8,6 +8,7 @@ import { TokenSelectModal } from "@/components/token-select-modal";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { ErrorBanner } from "@/components/ui/error-banner";
 import { GearPopover } from "@/components/ui/popover";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
@@ -502,9 +503,7 @@ export function LiquidityWidget({
         )}
 
         {compose.status === "error" && (
-          <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {compose.error}
-          </p>
+          <ErrorBanner className="mt-3">{compose.error}</ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (

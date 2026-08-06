@@ -3,6 +3,9 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
+import { BtcChip, XcpChip } from "@/components/asset-chip";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { FlipNotch } from "@/components/ui/flip-notch";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
@@ -38,41 +41,6 @@ async function fetchBusyDispensers(): Promise<Set<string>> {
   const events: { params?: { source?: string } }[] = (await res.json()).result ?? [];
   return new Set(
     events.map((e) => e.params?.source).filter((s): s is string => Boolean(s)),
-  );
-}
-
-const btcChip = (
-  <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
-    <span className="flex size-6 items-center justify-center rounded-full bg-amber-500 text-[11px] font-bold text-white">
-      ₿
-    </span>
-    <span className="text-sm font-semibold">BTC</span>
-  </div>
-);
-
-const xcpChip = (
-  <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
-    <span className="flex size-6 items-center justify-center rounded-full bg-purple-600 text-[10px] font-bold text-white">
-      X
-    </span>
-    <span className="text-sm font-semibold">XCP</span>
-  </div>
-);
-
-function FlipNotch({ onFlip, flips }: { onFlip: () => void; flips: number }) {
-  return (
-    <div className="relative z-10 h-0.5">
-      <button
-        type="button"
-        onClick={onFlip}
-        aria-label="Switch direction"
-        title="Switch direction"
-        className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-gray-50 text-gray-500 shadow-[0_0_0_4px_white] transition-transform duration-300 hover:bg-gray-100 hover:text-purple-600 active:scale-95"
-        style={{ transform: `translate(-50%, -50%) rotate(${flips * 180}deg)` }}
-      >
-        ↓
-      </button>
-    </div>
   );
 }
 
@@ -357,9 +325,7 @@ function LoadCard({
           ))}
         </ul>
         {router.planError && (
-          <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-            {router.planError}
-          </p>
+          <ErrorBanner className="mt-2">{router.planError}</ErrorBanner>
         )}
         {allDone ? (
           <>
@@ -433,7 +399,7 @@ function LoadCard({
             ariaLabel="XCP to receive"
             className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
           />
-          {xcpChip}
+          <XcpChip />
         </div>
         <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
           <span>
@@ -492,7 +458,7 @@ function LoadCard({
             ariaLabel="BTC to send"
             className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
           />
-          {btcChip}
+          <BtcChip />
         </div>
         <div className="mt-1 h-4 text-xs text-gray-400">
           {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
@@ -604,9 +570,7 @@ function LoadCard({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {router.planError && (
-          <p className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {router.planError}
-          </p>
+          <ErrorBanner className="mb-2">{router.planError}</ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (
@@ -820,9 +784,7 @@ function UnloadCard({
           it confirms and returns the rest.
         </p>
         {compose.status === "error" && (
-          <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {compose.error}
-          </p>
+          <ErrorBanner className="mt-3">{compose.error}</ErrorBanner>
         )}
         <button
           type="button"
@@ -876,7 +838,7 @@ function UnloadCard({
               insufficient ? "text-red-600" : "text-gray-900"
             }`}
           />
-          {xcpChip}
+          <XcpChip />
         </div>
         <div className="mt-1 h-4 text-xs text-gray-400">
           {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
@@ -901,7 +863,7 @@ function UnloadCard({
               ? `≤ ${btcIfSold.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`
               : "0"}
           </div>
-          {btcChip}
+          <BtcChip />
         </div>
         <div className="mt-1 h-4 text-xs text-gray-400">
           {btcUsd && btcIfSold > 0 && `≈ ${usdFmt(btcIfSold * btcUsd)} if fully sold`}
@@ -950,9 +912,7 @@ function UnloadCard({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
-          <p className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {compose.error}
-          </p>
+          <ErrorBanner className="mb-2">{compose.error}</ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (
