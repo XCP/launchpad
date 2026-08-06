@@ -6,7 +6,7 @@ import {
 import { fetchXcpUsd } from "@/lib/api/price";
 import { isXcp69, windowIsExact } from "@/lib/xcp69";
 import { SHOW_NONCONFORMING } from "@/utils/constants";
-import { SwapWidget } from "./swap-widget";
+import { TradeSurface } from "./trade-surface";
 
 export const revalidate = 60;
 
@@ -75,7 +75,7 @@ export default async function SwapPage() {
           pool — and it becomes tradeable here in the same block.
         </p>
       ) : (
-        <SwapWidget assets={assets} xcpUsd={xcpUsd} />
+        <TradeSurface assets={assets} xcpUsd={xcpUsd} />
       )}
     </div>
   );
