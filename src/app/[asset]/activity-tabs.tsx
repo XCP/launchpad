@@ -3,21 +3,59 @@
 import { useState } from "react";
 import useSWR from "swr";
 import type { Fairmint } from "@/lib/api/counterparty";
-import { commas, compact, fromSats, shortAddress, tokenQty } from "@/lib/format";
+import {
+  commas,
+  compact,
+  fromSats,
+  price as formatPrice,
+  shortAddress,
+  tokenQty,
+} from "@/lib/format";
+import { useCompose } from "@/lib/wallet/useCompose";
+import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { Identicon } from "./launch-view";
 
 const PER_PAGE = 25;
+const SATS = 1e8;
+
+const fetchJson = async (url: string) => {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+};
 
 interface HolderRow {
   address: string;
   quantity: number;
 }
 
+interface TradeRow {
+  key: string;
+  block: number;
+  buy: boolean;
+  tokenRaw: number;
+  xcpRaw: number;
+  addr: string;
+  via: "pool" | "book";
+  txHash: string;
+}
+
+interface OpenOrder {
+  tx_hash: string;
+  give_asset: string;
+  get_asset: string;
+  give_quantity: number;
+  get_quantity: number;
+  give_remaining: number;
+  expire_index: number | null;
+}
+
 /**
- * The activity card: Mints (the launch tape) and Holders (live top
- * balances) as tabs, paginated locally. Addresses and transactions link
- * out to the explorer.
+ * The activity card: Mints (the launch tape), Trades (pool + book fills,
+ * merged), Holders (live top balances), and — when a wallet is connected —
+ * Orders (your open orders on the pair, cancellable). Paginated locally;
+ * addresses and transactions link out to the explorer.
  */
 export function ActivityTabs({
   asset,
@@ -28,10 +66,13 @@ export function ActivityTabs({
   mints: Fairmint[];
   divisible: boolean;
 }) {
-  const [tab, setTab] = useState<"mints" | "holders">("mints");
+  const { address } = useWallet();
+  const compose = useCompose();
+  const [tab, setTab] = useState<"mints" | "trades" | "holders" | "orders">(
+    "mints",
+  );
   const [pageParam, setPage] = useState(1);
-
-  const setParams = (t: "mints" | "holders", p: number) => {
+  const setParams = (t: typeof tab, p: number) => {
     setTab(t);
     setPage(p);
   };
@@ -41,10 +82,8 @@ export function ActivityTabs({
       ? `${COUNTERPARTY_API_BASE}/assets/${asset}/balances?limit=1000`
       : null,
     async (url: string) => {
-      const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const rows: { address: string | null; utxo: string | null; quantity: number }[] =
-        (await res.json()).result ?? [];
+        (await fetchJson(url)).result ?? [];
       return rows
         .filter((r) => r.quantity > 0)
         .map((r) => ({
@@ -57,7 +96,104 @@ export function ActivityTabs({
   );
   const holderTotal = holders?.reduce((s, h) => s + h.quantity, 0) ?? 0;
 
-  const count = tab === "mints" ? mints.length : (holders?.length ?? 0);
+  // Trades: pool fills + completed book fills, one tape, newest first.
+  const { data: trades } = useSWR<TradeRow[]>(
+    tab === "trades" ? [asset, "pair-trades"] : null,
+    async () => {
+      const [pm, om] = await Promise.all([
+        fetchJson(
+          `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/matches?limit=250`,
+        ).catch(() => ({ result: [] })),
+        fetchJson(
+          `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP/matches?status=completed&limit=250`,
+        ).catch(() => ({ result: [] })),
+      ]);
+      const poolRows: TradeRow[] = (pm.result ?? []).map(
+        (r: {
+          tx_hash: string;
+          block_index: number;
+          source: string;
+          forward_asset: string;
+          forward_quantity: number;
+          backward_quantity: number;
+        }) => ({
+          key: `p-${r.tx_hash}`,
+          block: r.block_index,
+          buy: r.forward_asset === asset,
+          tokenRaw:
+            r.forward_asset === asset ? r.forward_quantity : r.backward_quantity,
+          xcpRaw:
+            r.forward_asset === asset ? r.backward_quantity : r.forward_quantity,
+          addr: r.source,
+          via: "pool" as const,
+          txHash: r.tx_hash,
+        }),
+      );
+      const bookRows: TradeRow[] = (om.result ?? []).map(
+        (r: {
+          id: string;
+          tx1_hash: string;
+          tx1_address: string;
+          block_index: number;
+          forward_asset: string;
+          forward_quantity: number;
+          backward_quantity: number;
+        }) => ({
+          key: `o-${r.id}`,
+          block: r.block_index,
+          buy: r.forward_asset === asset,
+          tokenRaw:
+            r.forward_asset === asset ? r.forward_quantity : r.backward_quantity,
+          xcpRaw:
+            r.forward_asset === asset ? r.backward_quantity : r.forward_quantity,
+          addr: r.tx1_address,
+          via: "book" as const,
+          txHash: r.tx1_hash,
+        }),
+      );
+      return [...poolRows, ...bookRows].sort((a, b) => b.block - a.block);
+    },
+    { refreshInterval: 30_000 },
+  );
+
+  // Your open orders on this pair (connected only).
+  const { data: orders, mutate: refreshOrders } = useSWR<OpenOrder[]>(
+    tab === "orders" && address
+      ? `${COUNTERPARTY_API_BASE}/addresses/${address}/orders?status=open&limit=100`
+      : null,
+    async (url: string) =>
+      ((await fetchJson(url)).result as OpenOrder[]).filter(
+        (o) =>
+          (o.give_asset === asset && o.get_asset === "XCP") ||
+          (o.give_asset === "XCP" && o.get_asset === asset),
+      ),
+    { refreshInterval: 15_000 },
+  );
+  const busy =
+    compose.status === "composing" ||
+    compose.status === "signing" ||
+    compose.status === "broadcasting";
+
+  const tabs: (typeof tab)[] = address
+    ? ["mints", "trades", "holders", "orders"]
+    : ["mints", "trades", "holders"];
+  const tabLabel = (t: typeof tab) =>
+    t === "mints"
+      ? `Mints (${mints.length})`
+      : t === "trades"
+        ? `Trades${trades ? ` (${trades.length})` : ""}`
+        : t === "holders"
+          ? `Holders${holders ? ` (${holders.length})` : ""}`
+          : `Orders${orders ? ` (${orders.length})` : ""}`;
+
+  const count =
+    tab === "mints"
+      ? mints.length
+      : tab === "trades"
+        ? (trades?.length ?? 0)
+        : tab === "holders"
+          ? (holders?.length ?? 0)
+          : (orders?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
   const page = Math.min(pageParam, totalPages);
   const from = (page - 1) * PER_PAGE;
@@ -88,8 +224,8 @@ export function ActivityTabs({
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white">
-      <div className="flex items-center gap-1 border-b border-gray-200 p-2">
-        {(["mints", "holders"] as const).map((t) => (
+      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 p-2">
+        {tabs.map((t) => (
           <button
             key={t}
             type="button"
@@ -100,15 +236,13 @@ export function ActivityTabs({
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t === "mints"
-              ? `Mints (${mints.length})`
-              : `Holders${holders ? ` (${holders.length})` : ""}`}
+            {tabLabel(t)}
           </button>
         ))}
       </div>
 
-      {tab === "mints" ? (
-        mints.length === 0 ? (
+      {tab === "mints" &&
+        (mints.length === 0 ? (
           <p className="p-6 text-center text-sm text-gray-500">No mints yet.</p>
         ) : (
           <>
@@ -146,58 +280,194 @@ export function ActivityTabs({
             </ul>
             {pager}
           </>
-        )
-      ) : !holders ? (
-        <p className="p-6 text-center text-sm text-gray-400">Loading holders…</p>
-      ) : holders.length === 0 ? (
-        <p className="p-6 text-center text-sm text-gray-500">No holders found.</p>
-      ) : (
-        <>
-          <ul className="divide-y divide-gray-100">
-            {holders.slice(from, from + PER_PAGE).map((h, i) => {
-              const pct = holderTotal > 0 ? (h.quantity / holderTotal) * 100 : 0;
-              const isUtxo = h.address.startsWith("utxo:");
-              return (
-                <li
-                  key={h.address}
-                  className="relative flex items-center justify-between overflow-hidden px-4 py-2 text-sm"
-                >
-                  <span
-                    aria-hidden
-                    className="absolute inset-y-0 left-0 bg-purple-50/70"
-                    style={{ width: `${Math.min(100, pct)}%` }}
-                  />
-                  <span className="relative z-10 flex items-center gap-2 font-mono text-gray-600">
-                    <span className="w-8 text-right text-xs text-gray-400">
-                      {from + i + 1}
-                    </span>
-                    <Identicon address={h.address} />
-                    {isUtxo ? (
-                      h.address
-                    ) : (
+        ))}
+
+      {tab === "trades" &&
+        (!trades ? (
+          <p className="p-6 text-center text-sm text-gray-400">Loading trades…</p>
+        ) : trades.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-500">No trades yet.</p>
+        ) : (
+          <>
+            <ul className="divide-y divide-gray-100">
+              {trades.slice(from, from + PER_PAGE).map((t) => {
+                const tokens = tokenQty(t.tokenRaw, divisible);
+                const xcp = t.xcpRaw / SATS;
+                return (
+                  <li
+                    key={t.key}
+                    className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        className={`font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}
+                      >
+                        {t.buy ? "↗ Buy" : "↘ Sell"}
+                      </span>
+                      <span className="text-gray-900">{compact(tokens)}</span>
                       <a
-                        href={`https://xcp.io/address/${h.address}`}
+                        href={`https://xcp.io/address/${t.addr}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="hover:text-purple-700 hover:underline"
+                        className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline sm:flex"
                       >
-                        {shortAddress(h.address)}
+                        <Identicon address={t.addr} />
+                        {shortAddress(t.addr)}
                       </a>
-                    )}
-                  </span>
-                  <span className="relative z-10 text-gray-900">
-                    {compact(tokenQty(h.quantity, divisible))}{" "}
-                    <span className="text-gray-400">
-                      ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
                     </span>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          {pager}
-        </>
-      )}
+                    <span className="text-right text-gray-900">
+                      {commas(xcp)} XCP{" "}
+                      <span className="text-gray-400">
+                        ({formatPrice(tokens > 0 ? xcp / tokens : 0)} ea · {t.via})
+                      </span>
+                    </span>
+                    <a
+                      href={`https://xcp.io/tx/${t.txHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hidden text-xs text-gray-500 hover:text-purple-700 hover:underline md:block"
+                    >
+                      block {t.block}
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+            {pager}
+          </>
+        ))}
+
+      {tab === "holders" &&
+        (!holders ? (
+          <p className="p-6 text-center text-sm text-gray-400">Loading holders…</p>
+        ) : holders.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-500">No holders found.</p>
+        ) : (
+          <>
+            <ul className="divide-y divide-gray-100">
+              {holders.slice(from, from + PER_PAGE).map((h, i) => {
+                const pct = holderTotal > 0 ? (h.quantity / holderTotal) * 100 : 0;
+                const isUtxo = h.address.startsWith("utxo:");
+                return (
+                  <li
+                    key={h.address}
+                    className="relative flex items-center justify-between overflow-hidden px-4 py-2 text-sm"
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 bg-purple-50/70"
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                    <span className="relative z-10 flex items-center gap-2 font-mono text-gray-600">
+                      <span className="w-8 text-right text-xs text-gray-400">
+                        {from + i + 1}
+                      </span>
+                      <Identicon address={h.address} />
+                      {isUtxo ? (
+                        h.address
+                      ) : (
+                        <a
+                          href={`https://xcp.io/address/${h.address}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="hover:text-purple-700 hover:underline"
+                        >
+                          {shortAddress(h.address)}
+                        </a>
+                      )}
+                    </span>
+                    <span className="relative z-10 text-gray-900">
+                      {compact(tokenQty(h.quantity, divisible))}{" "}
+                      <span className="text-gray-400">
+                        ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
+                      </span>
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {pager}
+          </>
+        ))}
+
+      {tab === "orders" &&
+        (!address ? (
+          <p className="p-6 text-center text-sm text-gray-500">
+            Connect your wallet to see your open orders.
+          </p>
+        ) : !orders ? (
+          <p className="p-6 text-center text-sm text-gray-400">Loading orders…</p>
+        ) : orders.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-500">
+            No open orders on this pair.
+          </p>
+        ) : (
+          <>
+            <ul className="divide-y divide-gray-100">
+              {orders.map((o) => {
+                const isBuy = o.get_asset === asset;
+                const tokens = isBuy ? o.get_quantity : o.give_quantity;
+                const xcp = isBuy ? o.give_quantity : o.get_quantity;
+                const filled = 1 - o.give_remaining / o.give_quantity;
+                return (
+                  <li
+                    key={o.tx_hash}
+                    className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
+                  >
+                    <div className="min-w-0">
+                      <span
+                        className={
+                          isBuy
+                            ? "font-medium text-green-700"
+                            : "font-medium text-red-600"
+                        }
+                      >
+                        {isBuy ? "Buy" : "Sell"}
+                      </span>{" "}
+                      {commas(tokens / SATS)} @ {formatPrice(xcp / tokens)}
+                      <span className="ml-2 text-xs text-gray-500">
+                        {(filled * 100).toFixed(0)}% filled ·{" "}
+                        {o.expire_index === null
+                          ? "GTC"
+                          : `expires block ${o.expire_index.toLocaleString()}`}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() =>
+                        compose.composeCancel({ offer_hash: o.tx_hash })
+                      }
+                      className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                    >
+                      {busy ? "…" : "Cancel"}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+            {compose.status === "confirmed" && (
+              <p className="border-t border-gray-100 px-4 py-2 text-xs text-green-700">
+                Cancel broadcast — the remainder refunds when it confirms.{" "}
+                <button
+                  type="button"
+                  className="underline"
+                  onClick={() => {
+                    compose.reset();
+                    refreshOrders();
+                  }}
+                >
+                  Dismiss
+                </button>
+              </p>
+            )}
+            {compose.status === "error" && (
+              <p className="border-t border-gray-100 px-4 py-2 text-xs text-red-600">
+                {compose.error}
+              </p>
+            )}
+          </>
+        ))}
     </div>
   );
 }

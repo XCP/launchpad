@@ -62,6 +62,7 @@ export function SwapWidget({
   const [amount, setAmount] = useState("");
   const [slippagePreset, setSlippagePreset] = useState(1);
   const [customSlippage, setCustomSlippage] = useState("");
+  const [customExpiration, setCustomExpiration] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -72,6 +73,10 @@ export function SwapWidget({
 
   const customSlip = Math.min(parseFloat(customSlippage) || 0, 50);
   const slippage = customSlip > 0 ? customSlip : slippagePreset;
+  const expiration = Math.min(
+    5000,
+    Math.max(1, Math.round(parseFloat(customExpiration)) || MARKET_EXPIRATION),
+  );
 
   const giveAsset = side === "buy" ? "XCP" : asset;
   const getAsset = side === "buy" ? asset : "XCP";
@@ -166,7 +171,7 @@ export function SwapWidget({
       give_quantity: amountRaw,
       get_asset: getAsset,
       get_quantity: Math.floor(fresh.estimated_output * (1 - slippage / 100)),
-      expiration: MARKET_EXPIRATION,
+      expiration,
     });
   };
 
@@ -207,19 +212,27 @@ export function SwapWidget({
     );
   }
 
-  const tokenChip = (
-    <button
-      type="button"
-      onClick={() => setSelectorOpen(true)}
-      className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm transition-all hover:border-gray-300 hover:shadow active:scale-[0.97]"
-    >
-      <TokenImage asset={asset} className="size-6 rounded-full bg-gray-100 object-cover" />
-      <span className="text-sm font-semibold">{asset}</span>
-      <span aria-hidden className="text-xs text-gray-400">
-        ▾
-      </span>
-    </button>
-  );
+  // On a single-asset surface (the asset page) the chip is identity, not a
+  // control — no chevron, no modal.
+  const tokenChip =
+    assets.length === 1 ? (
+      <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
+        <TokenImage asset={asset} className="size-6 rounded-full bg-gray-100 object-cover" />
+        <span className="text-sm font-semibold">{asset}</span>
+      </div>
+    ) : (
+      <button
+        type="button"
+        onClick={() => setSelectorOpen(true)}
+        className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm transition-all hover:border-gray-300 hover:shadow active:scale-[0.97]"
+      >
+        <TokenImage asset={asset} className="size-6 rounded-full bg-gray-100 object-cover" />
+        <span className="text-sm font-semibold">{asset}</span>
+        <span aria-hidden className="text-xs text-gray-400">
+          ▾
+        </span>
+      </button>
+    );
 
   const xcpChip = (
     <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
@@ -257,7 +270,7 @@ export function SwapWidget({
           onClick={() => setSettingsOpen((o) => !o)}
           aria-label="Swap settings"
           className={`flex size-7 items-center justify-center rounded-full transition-colors ${
-            settingsOpen || customSlip > 0
+            settingsOpen || customSlip > 0 || expiration !== MARKET_EXPIRATION
               ? "bg-purple-50 text-purple-600"
               : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
           }`}
@@ -321,6 +334,32 @@ export function SwapWidget({
                   High slippage authorizes up to {slippage}% price impact.
                 </p>
               )}
+              <div className="mt-3 flex items-center justify-between">
+                <span className="text-xs font-medium text-gray-500">
+                  Expiration
+                </span>
+                <span
+                  className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+                    expiration !== MARKET_EXPIRATION
+                      ? "border-purple-600 bg-purple-50"
+                      : "border-gray-200"
+                  }`}
+                >
+                  <AmountInput
+                    value={customExpiration}
+                    onChange={setCustomExpiration}
+                    placeholder={String(MARKET_EXPIRATION)}
+                    ariaLabel="Order expiration in blocks"
+                    className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+                  />
+                  <span className="text-xs text-gray-400">blocks</span>
+                </span>
+              </div>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+                How long an unfilled remainder rests before auto-refund.{" "}
+                {MARKET_EXPIRATION} = fill at confirmation or refund next
+                block.
+              </p>
               <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
                 Min received is enforced by the order itself — worse fills are
                 impossible; better ones refund the difference.

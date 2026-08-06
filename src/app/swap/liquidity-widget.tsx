@@ -268,6 +268,17 @@ export function LiquidityWidget({
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       <div className="p-2">
         <div className="relative flex items-center gap-2">
+          {assets.length === 1 ? (
+            <div className="flex min-w-0 flex-1 items-center gap-3 p-2 pr-3">
+              <TokenImage
+                asset={asset}
+                className="size-10 rounded-full bg-gray-100 object-cover"
+              />
+              <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-900">
+                {asset} / XCP pool
+              </span>
+            </div>
+          ) : (
           <button
             type="button"
             onClick={() => setSelectorOpen(true)}
@@ -284,6 +295,7 @@ export function LiquidityWidget({
               ▾
             </span>
           </button>
+          )}
           <button
             type="button"
             onClick={() => setSettingsOpen((o) => !o)}

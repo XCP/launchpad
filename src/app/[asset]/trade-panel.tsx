@@ -20,7 +20,7 @@ import { COUNTERPARTY_API_BASE } from "@/utils/constants";
  *  - Limit  = the same message at your price. If it's priced through the
  *    pool it fills on confirmation; otherwise it RESTS until a counter-order
  *    takes it — the pool never auto-fills a resting order.
- *  - Orders = your open orders on this pair, cancellable.
+
  */
 
 const SATS = 1e8;
@@ -49,17 +49,6 @@ interface PoolInfo {
   reserve_b: number;
 }
 
-interface OpenOrder {
-  tx_hash: string;
-  give_asset: string;
-  get_asset: string;
-  give_quantity: number;
-  get_quantity: number;
-  give_remaining: number;
-  get_remaining: number;
-  expire_index: number | null;
-}
-
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -84,11 +73,11 @@ export function TradePanel({
 }: {
   asset: string;
   /** Pin to one tab and drop the chrome — for embedding in AssetTradeSurface. */
-  only?: "limit" | "orders";
+  only?: "limit";
 }) {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
-  const [tab, setTab] = useState<"market" | "limit" | "orders">(only ?? "market");
+  const [tab, setTab] = useState<"market" | "limit">(only ?? "market");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState(""); // human units of the GIVE asset
   const [slippage, setSlippage] = useState(1);
@@ -135,21 +124,6 @@ export function TradePanel({
     address ? [address, giveAsset, "balance"] : null,
     ([addr, a]) => fetchBalance(addr, a),
     { refreshInterval: 30_000 },
-  );
-
-  const { data: orders, mutate: refreshOrders } = useSWR<OpenOrder[]>(
-    tab === "orders" && address
-      ? `${COUNTERPARTY_API_BASE}/addresses/${address}/orders?status=open&limit=100`
-      : null,
-    (url: string) =>
-      fetchJson(url).then((d) =>
-        (d.result as OpenOrder[]).filter(
-          (o) =>
-            (o.give_asset === asset && o.get_asset === "XCP") ||
-            (o.give_asset === "XCP" && o.get_asset === asset),
-        ),
-      ),
-    { refreshInterval: 15_000 },
   );
 
   const busy =
@@ -243,10 +217,7 @@ export function TradePanel({
         />
         <button
           type="button"
-          onClick={() => {
-            compose.reset();
-            refreshOrders();
-          }}
+          onClick={() => compose.reset()}
           className="mt-3 text-green-800 underline"
         >
           Trade again
@@ -279,7 +250,7 @@ export function TradePanel({
     >
       {!only && (
       <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium">
-        {(["market", "limit", "orders"] as const).map((t) => (
+        {(["market", "limit"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -294,7 +265,7 @@ export function TradePanel({
       </div>
       )}
 
-      {tab !== "orders" && (
+      {(
         <div className="mt-3 flex gap-2 text-sm font-medium">
           <button
             type="button"
@@ -446,7 +417,7 @@ export function TradePanel({
 
       {tab === "limit" && (
         <div className="mt-3 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+          <div className={only ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}>
             <div>
               <label htmlFor="limit-price" className="text-xs text-gray-500">
                 Price (XCP per {asset})
@@ -516,53 +487,6 @@ export function TradePanel({
             label={busyLabel(compose.status) ?? `Place limit ${side}`}
             onClick={submitLimit}
           />
-        </div>
-      )}
-
-      {tab === "orders" && (
-        <div className="mt-3">
-          {walletStatus !== "connected" ? (
-            <p className="p-3 text-center text-sm text-gray-500">
-              Connect your wallet to see your open orders.
-            </p>
-          ) : !orders || orders.length === 0 ? (
-            <p className="p-3 text-center text-sm text-gray-500">
-              No open orders on this pair.
-            </p>
-          ) : (
-            <ul className="divide-y divide-gray-100 text-sm">
-              {orders.map((o) => {
-                const isBuy = o.get_asset === asset;
-                const tokens = isBuy ? o.get_quantity : o.give_quantity;
-                const xcp = isBuy ? o.give_quantity : o.get_quantity;
-                const filled = 1 - o.give_remaining / o.give_quantity;
-                return (
-                  <li key={o.tx_hash} className="flex items-center justify-between gap-2 py-2">
-                    <div>
-                      <span className={isBuy ? "font-medium text-green-700" : "font-medium text-red-600"}>
-                        {isBuy ? "Buy" : "Sell"}
-                      </span>{" "}
-                      {commas(tokens / SATS)} @ {formatPrice(xcp / tokens)}
-                      <span className="ml-2 text-xs text-gray-400">
-                        {(filled * 100).toFixed(0)}% filled ·{" "}
-                        {o.expire_index === null
-                          ? "GTC"
-                          : `expires block ${o.expire_index.toLocaleString()}`}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => compose.composeCancel({ offer_hash: o.tx_hash })}
-                      className="rounded-md border border-gray-300 px-2 py-1 text-xs text-gray-600 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
-                    >
-                      Cancel
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
         </div>
       )}
 
