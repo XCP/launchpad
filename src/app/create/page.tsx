@@ -25,6 +25,20 @@ const INSCRIBE_MAX_BYTES = 400 * 1024;
 
 type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
 
+/**
+ * Pre-announcement lead: minting opens this many blocks after compose time.
+ * The standard requires only that the launch confirms strictly before
+ * start_block — but a launch that confirms late opens instantly and fails
+ * conformance, so the shortest option still leaves hours of headroom for
+ * the transaction to confirm.
+ */
+const PREANNOUNCE_OPTIONS: { blocks: number; label: string }[] = [
+  { blocks: 36, label: "~6 hours" },
+  { blocks: 144, label: "~1 day" },
+  { blocks: 432, label: "~3 days" },
+];
+const PREANNOUNCE_DEFAULT = 144;
+
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
   preparing: "Preparing inscription…",
   "sign-commit": "Confirm commit in wallet…",
@@ -50,6 +64,8 @@ export default function CreatePage() {
   const [telegram, setTelegram] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [preannounce, setPreannounce] = useState(PREANNOUNCE_DEFAULT);
+  const [scheduledStart, setScheduledStart] = useState<number | null>(null);
 
   const checkName = async (value: string) => {
     if (!ASSET_NAME_REGEX.test(value)) {
@@ -102,9 +118,12 @@ export default function CreatePage() {
       const upload = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(upload.error ?? "Upload failed");
 
-      // 2. Deadline = current block + the standard's 1,000-block window.
+      // 2. Schedule: minting opens after the pre-announcement lead, and the
+      //    window is exactly the standard's 1,000 blocks from that start.
       const heightRes = await fetch(`${COUNTERPARTY_API_BASE}/`);
       const height = (await heightRes.json()).result.counterparty_height as number;
+      const startBlock = height + preannounce;
+      setScheduledStart(startBlock);
 
       if (inscribe && isTaproot && address) {
         // 3a. Commit/reveal inscription: the image becomes the permanent
@@ -112,7 +131,8 @@ export default function CreatePage() {
         const { revealTxid } = await inscribeLaunch({
           asset: name,
           lpAsset: generateLpAssetName(),
-          softCapDeadlineBlock: height + XCP69.DEADLINE_BLOCKS,
+          startBlock,
+          softCapDeadlineBlock: startBlock + XCP69.DEADLINE_BLOCKS,
           jsonUrl: upload.json_url,
           imageData: new Uint8Array(await image.arrayBuffer()),
           mimeType: image.type,
@@ -133,7 +153,8 @@ export default function CreatePage() {
         quantity_by_price: XCP69.QUANTITY_BY_PRICE,
         hard_cap: XCP69.HARD_CAP,
         soft_cap: XCP69.SOFT_CAP,
-        soft_cap_deadline_block: height + XCP69.DEADLINE_BLOCKS,
+        start_block: startBlock,
+        soft_cap_deadline_block: startBlock + XCP69.DEADLINE_BLOCKS,
         max_mint_per_tx: XCP69.MAX_MINT_PER_TX,
         max_mint_per_address: XCP69.MAX_MINT_PER_ADDRESS,
         pool_quantity: XCP69.POOL_QUANTITY,
@@ -153,7 +174,7 @@ export default function CreatePage() {
     return (
       <div className="mx-auto max-w-lg space-y-4 text-center">
         <div className="holo-border rounded-xl p-8">
-          <h1 className="text-2xl font-bold">{name} is launching.</h1>
+          <h1 className="text-2xl font-bold">{name} is scheduled.</h1>
           <p className="mt-2 text-sm text-gray-600">
             Broadcast as{" "}
             <a
@@ -164,11 +185,19 @@ export default function CreatePage() {
             >
               {launchTxid.slice(0, 12)}…
             </a>
-            . Once confirmed, minting is open for ~7 days: it sells out, or
-            everyone is refunded.
+            . Minting opens at block{" "}
+            <span className="font-mono font-medium text-gray-900">
+              {scheduledStart?.toLocaleString()}
+            </span>{" "}
+            (
+            {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.label ??
+              `~${preannounce} blocks`}
+            ) — until then the launch is announced on-chain and nobody, you
+            included, can mint. Then it runs for 1,000 blocks (~7 days): it
+            sells out, or everyone is refunded.
           </p>
           <a
-            href={`/launch/${name}`}
+            href={`/${name}`}
             className="mt-6 inline-block rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
           >
             View launch page
@@ -326,6 +355,30 @@ export default function CreatePage() {
         </div>
       </details>
 
+      {/* Pre-announcement — the only knob the standard leaves open */}
+      <div>
+        <label htmlFor="preannounce" className="text-sm font-medium text-gray-700">
+          Minting opens in
+        </label>
+        <select
+          id="preannounce"
+          value={preannounce}
+          onChange={(e) => setPreannounce(Number(e.target.value))}
+          className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
+        >
+          {PREANNOUNCE_OPTIONS.map((o) => (
+            <option key={o.blocks} value={o.blocks}>
+              {o.label} ({o.blocks} blocks) after launch
+            </option>
+          ))}
+        </select>
+        <p className="mt-1 text-xs text-gray-500">
+          Every XCP-69 launch is announced on-chain before minting opens —
+          nobody, creator included, can mint early. The 1,000-block (~7 day)
+          window starts when minting opens.
+        </p>
+      </div>
+
       {/* The terms — fixed by the standard, shown, not asked */}
       <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
         <div className="mb-2 font-semibold">XCP-69 terms (fixed)</div>
@@ -336,7 +389,7 @@ export default function CreatePage() {
             k="Per address"
             v={`max ${commas(fromSats(XCP69.MAX_MINT_PER_ADDRESS))} (10 XCP)`}
           />
-          <Row k="Window" v="1,000 blocks (~7 days), sells out or refunds" />
+          <Row k="Window" v="1,000 blocks (~7 days) — sells out, or refunds within the week" />
           <Row
             k="You receive"
             v={`0 of the ${commas(fromSats(XCP69_RAISE_SATS))} XCP raised — all of it becomes pool liquidity, LP burned`}
@@ -350,8 +403,9 @@ export default function CreatePage() {
       </div>
 
       <p className="text-xs text-gray-500">
-        Name, image, description and socials can only be set now — the on-chain
-        description locks at launch and can never be changed.
+        The on-chain description locks at launch and can never change. It
+        points at info this site hosts for you — and as the issuer you can
+        edit that info later from the launch page with your wallet.
       </p>
 
       {uploadError && (

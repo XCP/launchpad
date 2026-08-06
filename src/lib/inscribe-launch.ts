@@ -64,6 +64,7 @@ async function pickFundingUtxo(address: string, minValue: number): Promise<Utxo>
 export async function inscribeLaunch(opts: {
   asset: string;
   lpAsset: string;
+  startBlock: number;
   softCapDeadlineBlock: number;
   jsonUrl: string;
   imageData: Uint8Array;

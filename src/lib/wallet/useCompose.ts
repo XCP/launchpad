@@ -196,13 +196,22 @@ export function useCompose() {
 
   const composeDetach = (utxo: string) => executeUtxo(utxo, 'detach', {})
 
-  /** Open an XCP-69 fairminter. All values raw satoshi units. */
+  /** Cancel an open DEX order by its transaction hash. */
+  const composeCancel = (params: { offer_hash: string }) =>
+    execute('cancel', { offer_hash: params.offer_hash })
+
+  /**
+   * Open an XCP-69 fairminter. All values raw satoshi units.
+   * start_block must be in the future (the pre-announcement window); the
+   * compose API itself rejects a start at or below the current block.
+   */
   const composeFairminter = (params: {
     asset: string
     price: number
     quantity_by_price: number
     hard_cap: number
     soft_cap: number
+    start_block: number
     soft_cap_deadline_block: number
     max_mint_per_tx: number
     max_mint_per_address: number
@@ -215,6 +224,7 @@ export function useCompose() {
     quantity_by_price: params.quantity_by_price,
     hard_cap: params.hard_cap,
     soft_cap: params.soft_cap,
+    start_block: params.start_block,
     soft_cap_deadline_block: params.soft_cap_deadline_block,
     max_mint_per_tx: params.max_mint_per_tx,
     max_mint_per_address: params.max_mint_per_address,
@@ -227,7 +237,6 @@ export function useCompose() {
     lock_description: 'true',
     lock_quantity: 'true',
     divisible: 'true',
-    start_block: 0,
     end_block: 0,
   })
 
@@ -249,6 +258,7 @@ export function useCompose() {
     composePoolDeposit,
     composePoolWithdraw,
     composeDetach,
+    composeCancel,
     composeFairminter,
     composeFairmint,
     reset,

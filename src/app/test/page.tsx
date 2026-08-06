@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { generateLpAssetName } from "@/lib/xcp69";
 
 /**
  * Provider test harness: exercises every method the XCP Wallet provider exposes
@@ -256,18 +257,34 @@ const GROUPS: { title: string; note?: string; cases: TestCase[] }[] = [
         label: "Fairminter (XCP-69 shape)",
         expect: "Create Fairminter: <asset> + 3 protocol data outputs",
         composeType: "fairminter",
-        params: () => ({
-          asset: `A${Math.floor(Math.random() * 1e9) + 26 ** 12 + 1}`,
-          price: 1000000,
-          quantity_by_price: 100000000000,
-          hard_cap: 10000000000000000,
-          soft_cap: 6900000000000000,
-          max_mint_per_tx: 100000000000000,
-          max_mint_per_address: 100000000000000,
-          premint_quantity: 0,
-          lock_quantity: true,
-          divisible: true,
-        }),
+        params: () => ({}),
+        prepare: async (c) => {
+          // Full conforming shape needs live height: start in the future
+          // (pre-announcement) and deadline exactly start + 1,000.
+          const res = await fetch(`${c.counterparty}/`);
+          const height = (await res.json()).result.counterparty_height as number;
+          const startBlock = height + 144;
+          return {
+            asset: `A${Math.floor(Math.random() * 1e9) + 26 ** 12 + 1}`,
+            price: 1000000,
+            quantity_by_price: 100000000000,
+            hard_cap: 10000000000000000,
+            soft_cap: 6900000000000000,
+            pool_quantity: 3100000000000000,
+            lp_asset: generateLpAssetName(),
+            start_block: startBlock,
+            soft_cap_deadline_block: startBlock + 1000,
+            end_block: 0,
+            max_mint_per_tx: 100000000000000,
+            max_mint_per_address: 100000000000000,
+            premint_quantity: 0,
+            minted_asset_commission: 0,
+            burn_payment: false,
+            lock_quantity: true,
+            lock_description: true,
+            divisible: true,
+          };
+        },
       },
     ],
   },

@@ -26,7 +26,9 @@ export function assetNameToId(name: string): bigint {
 export interface FairminterInscriptionParams {
   asset: string;
   lpAsset: string;
-  /** current block + XCP69.DEADLINE_BLOCKS, computed at compose time */
+  /** future block minting opens at — the pre-announcement window */
+  startBlock: number;
+  /** startBlock + XCP69.DEADLINE_BLOCKS, exactly */
   softCapDeadlineBlock: number;
   /** hosted CIP-25 JSON — rides in the ord metadata for ecosystem parsers */
   jsonUrl: string;
@@ -50,7 +52,7 @@ export function buildFairminterInscriptionMetadata(
     BigInt(XCP69.MAX_MINT_PER_ADDRESS),
     BigInt(XCP69.HARD_CAP),
     BigInt(0), // premint_quantity
-    BigInt(0), // start_block
+    BigInt(params.startBlock),
     BigInt(0), // end_block
     BigInt(XCP69.SOFT_CAP),
     BigInt(params.softCapDeadlineBlock),
