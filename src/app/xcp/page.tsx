@@ -18,7 +18,7 @@ export default async function GetXcpPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-lg space-y-6">
+    <div className="mx-auto max-w-lg space-y-6 lg:max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold">Get XCP</h1>
         <p className="mt-2 text-sm text-gray-600">
