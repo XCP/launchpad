@@ -34,6 +34,7 @@ type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
  * the transaction to confirm.
  */
 const PREANNOUNCE_OPTIONS: { blocks: number; label: string; priority?: boolean }[] = [
+  { blocks: 1, label: "next block (~10 min)", priority: true },
   { blocks: 6, label: "~1 hour", priority: true },
   { blocks: 36, label: "~6 hours" },
   { blocks: 144, label: "~1 day" },

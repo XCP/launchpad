@@ -162,6 +162,13 @@ export function LaunchView({
       ? [
           ["Market cap", mcapUsd ? usd(mcapUsd) : "—"],
           [
+            "Sold out in",
+            `${(fm.soft_cap_deadline_block - fm.start_block).toLocaleString()} block${
+              fm.soft_cap_deadline_block - fm.start_block === 1 ? "" : "s"
+            }`,
+            "From mint-open to the block that filled the sale — consensus rewrites the deadline to the fill block",
+          ],
+          [
             "Liquidity",
             `${commas(Math.round(poolXcp))} XCP${
               xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""
@@ -351,12 +358,14 @@ export function LaunchView({
       {phase === "refunded" && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <h2 className="text-sm font-semibold text-gray-700">
-            Refunded — soft cap not reached
+            Refunded by consensus — the guarantee executed
           </h2>
           <p className="mt-1.5 text-sm text-gray-600">
-            Reached {(progress * 100).toFixed(1)}% with {participants}{" "}
-            participants. All {commas(fromSats(fm.paid_quantity))} XCP was
-            refunded by the protocol and the escrowed supply destroyed.
+            Reached {(progress * 100).toFixed(1)}% with {participants} of the
+            69 addresses a sellout requires. Every one of the{" "}
+            {commas(fromSats(fm.paid_quantity))} XCP escrowed was returned by
+            the protocol and the unsold supply destroyed. Nobody was left
+            holding a dead token — this is what the guarantee is for.
           </p>
         </div>
       )}
