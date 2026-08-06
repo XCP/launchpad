@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { ReactNode } from "react";
 import { WalletProvider } from "@/lib/wallet/wallet-context";
 import "./globals.css";
@@ -16,18 +17,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <WalletProvider>
         <header className="border-b border-gray-200 bg-white">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-            <a href="/" className="text-lg font-bold tracking-tight">
+            <Link href="/" className="text-lg font-bold tracking-tight">
               xcp<span className="text-purple-600">.fun</span>
-            </a>
+            </Link>
             <nav className="flex items-center gap-4 text-sm font-medium text-gray-600">
-              <a href="/standard" className="hover:text-gray-900">Standard</a>
-              <a href="/docs" className="hover:text-gray-900">Docs</a>
-              <a
+              <Link href="/faq" className="hover:text-gray-900">How it works</Link>
+              <Link href="/docs" className="hover:text-gray-900">Docs</Link>
+              <Link
                 href="/create"
                 className="rounded-md bg-gray-900 px-3 py-1.5 text-white hover:bg-gray-700"
               >
                 Launch
-              </a>
+              </Link>
             </nav>
           </div>
         </header>

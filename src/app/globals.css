@@ -21,3 +21,44 @@
   border: 2px solid transparent;
   animation: holographic 6s ease infinite;
 }
+
+/* Neutral range slider: gray track, white knob, hand cursor — reads as a UI
+   control, not a data bar; the brand color only appears on interaction. */
+.ui-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background: #e5e7eb; /* gray-200 */
+  cursor: pointer;
+}
+.ui-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid #d1d5db; /* gray-300 */
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.ui-slider::-moz-range-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
+}
+.ui-slider:hover::-webkit-slider-thumb,
+.ui-slider:focus-visible::-webkit-slider-thumb {
+  border-color: #9333ea; /* purple-600 */
+}
+.ui-slider:hover::-moz-range-thumb,
+.ui-slider:focus-visible::-moz-range-thumb {
+  border-color: #9333ea;
+}
