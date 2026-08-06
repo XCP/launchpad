@@ -21,6 +21,9 @@ export interface PendingItem {
   addedAt: number;
   /** Resolved state, set by the dock's poller. */
   resolved?: string;
+  /** What this action spends, for optimistic balance display. */
+  giveAsset?: string;
+  giveRaw?: number;
 }
 
 const KEY = "xcpfun:pending:v1";
@@ -68,6 +71,13 @@ export function updatePending(txid: string, patch: Partial<PendingItem>) {
 
 export function dismissPending(txid: string) {
   write(readPending().filter((i) => i.txid !== txid));
+}
+
+/** Raw units of `asset` spent by still-unresolved pending actions. */
+export function pendingSpentRaw(asset: string): number {
+  return readPending()
+    .filter((i) => !i.resolved && i.giveAsset === asset)
+    .reduce((s, i) => s + (i.giveRaw ?? 0), 0);
 }
 
 export function subscribePending(cb: () => void): () => void {

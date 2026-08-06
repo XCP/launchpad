@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { AssetChip, XcpChip } from "@/components/asset-chip";
@@ -9,7 +9,7 @@ import { OrderTracker } from "@/components/order-tracker";
 import { QuoteRing } from "@/components/quote-ring";
 import { TokenSelectModal } from "@/components/token-select-modal";
 import { CTA } from "@/components/ui/button";
-import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { GearPopover } from "@/components/ui/popover";
@@ -17,7 +17,13 @@ import { Well } from "@/components/ui/well";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
-import { registerPending } from "@/lib/pending";
+import {
+  pendingSpentRaw,
+  readPending,
+  readPendingServer,
+  registerPending,
+  subscribePending,
+} from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -98,6 +104,13 @@ export function SwapWidget({
     { refreshInterval: 30_000 },
   );
 
+  // Mempool-aware balance: subtract what unresolved pending actions spend.
+  useSyncExternalStore(subscribePending, readPending, readPendingServer);
+  const effBalance =
+    balance !== undefined
+      ? Math.max(0, balance - pendingSpentRaw(giveAsset))
+      : undefined;
+
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
   const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;
   const out = outRaw / SATS;
@@ -105,7 +118,7 @@ export function SwapWidget({
   const minReceivedRaw = Math.floor(outRaw * (1 - slippage / 100));
   const impact = quote?.price_impact ?? 0;
   const insufficient =
-    balance !== undefined && amountRaw > 0 && amountRaw > balance;
+    effBalance !== undefined && amountRaw > 0 && amountRaw > effBalance;
   const busy = isBusy(compose.status);
 
   useEffect(() => {
@@ -114,9 +127,11 @@ export function SwapWidget({
         txid: compose.txid,
         kind: "order",
         label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — market order`,
+        giveAsset,
+        giveRaw: amountRaw,
       });
     }
-  }, [compose.status, compose.txid, side, asset]);
+  }, [compose.status, compose.txid, side, asset, giveAsset, amountRaw]);
 
   const ready = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
 
@@ -180,21 +195,6 @@ export function SwapWidget({
     setSide(side === "buy" ? "sell" : "buy");
     setPriceMoved(false);
   };
-
-  if (compose.status === "confirmed") {
-    return (
-      <ConfirmCard title="Swap broadcast" onReset={compose.reset} resetLabel="Swap again">
-        <p className="mt-1 text-green-700">
-          <TxLink txid={compose.txid} />
-        </p>
-        <OrderTracker
-          txHash={compose.txid}
-          busy={busy}
-          onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
-        />
-      </ConfirmCard>
-    );
-  }
 
   // On a single-asset surface (the asset page) the chip is identity, not a
   // control — no chevron, no modal.
@@ -310,23 +310,23 @@ export function SwapWidget({
         focusable
         label="Sell"
         topRight={
-          balance !== undefined && (
+          effBalance !== undefined && (
             <>
               <button
                 type="button"
                 className="group-focus-within:hidden group-hover:hidden"
-                onClick={() => setAmount(fmtAmount(balance / SATS))}
+                onClick={() => setAmount(fmtAmount(effBalance! / SATS))}
               >
-                Balance: {commas(balance / SATS)}
+                Balance: {commas(effBalance! / SATS)}
               </button>
               <span className="hidden items-center gap-1 group-focus-within:flex group-hover:flex">
-                {balance > 0 ? (
+                {effBalance! > 0 ? (
                   PRESETS.map((p) => (
                     <button
                       key={p}
                       type="button"
                       onClick={() =>
-                        setAmount(fmtAmount(Math.floor((balance * p) / 100) / SATS))
+                        setAmount(fmtAmount(Math.floor((effBalance! * p) / 100) / SATS))
                       }
                       className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                     >
@@ -491,6 +491,27 @@ export function SwapWidget({
           >
             {buttonLabel}
           </CTA>
+        )}
+        {compose.status === "confirmed" && (
+          <div className="mt-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-green-800">
+                Swap broadcast — <TxLink txid={compose.txid} />
+              </span>
+              <button
+                type="button"
+                onClick={compose.reset}
+                className="text-xs text-green-800 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+            <OrderTracker
+              txHash={compose.txid}
+              busy={busy}
+              onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
+            />
+          </div>
         )}
         {ready && minReceivedRaw > 0 && (
           <p className="mt-1.5 px-1.5 text-center text-[11px] text-gray-400">
