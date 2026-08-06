@@ -11,19 +11,15 @@ import {
   shortAddress,
   tokenQty,
 } from "@/lib/format";
+import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { Identicon } from "./launch-view";
 
 const PER_PAGE = 25;
 const SATS = 1e8;
-
-const fetchJson = async (url: string) => {
-  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
 
 interface HolderRow {
   address: string;
@@ -224,22 +220,17 @@ export function ActivityTabs({
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white">
-      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 p-2">
-        {tabs.map((t) => (
-          <button
-            key={t}
-            type="button"
-            onClick={() => setParams(t, 1)}
-            className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize ${
-              tab === t
-                ? "bg-gray-100 text-gray-900"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {tabLabel(t)}
-          </button>
-        ))}
-      </div>
+      <Tabs value={tab} onValueChange={(v) => setParams(v as typeof tab, 1)}>
+        <div className="border-b border-gray-200 p-2">
+          <SegmentedList variant="card">
+            {tabs.map((t) => (
+              <SegmentedTrigger key={t} value={t} variant="card" grow={false}>
+                {tabLabel(t)}
+              </SegmentedTrigger>
+            ))}
+          </SegmentedList>
+        </div>
+      </Tabs>
 
       {tab === "mints" &&
         (mints.length === 0 ? (

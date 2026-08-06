@@ -5,10 +5,12 @@ import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { TokenImage } from "@/components/token-image";
 import { TokenSelectModal } from "@/components/token-select-modal";
+import { GearPopover } from "@/components/ui/popover";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const SATS = 1e8;
@@ -20,24 +22,6 @@ const SATS = 1e8;
  */
 const SLIPPAGE_PRESETS = [0.5, 1, 2.5];
 const DEFAULT_SLIPPAGE = 2.5;
-
-const fetchJson = async (url: string) => {
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
-async function fetchBalance(address: string, asset: string): Promise<number> {
-  const data = await fetchJson(
-    `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
-  );
-  const rows: { quantity: number }[] = Array.isArray(data.result)
-    ? data.result
-    : data.result
-      ? [data.result]
-      : [];
-  return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
-}
 
 interface PoolInfo {
   asset_a: string;
@@ -86,7 +70,6 @@ export function LiquidityWidget({
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [slippagePreset, setSlippagePreset] = useState(DEFAULT_SLIPPAGE);
   const [customSlippage, setCustomSlippage] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const customSlip = Math.min(parseFloat(customSlippage) || 0, 50);
   const slippage = customSlip > 0 ? customSlip : slippagePreset;
@@ -296,31 +279,7 @@ export function LiquidityWidget({
             </span>
           </button>
           )}
-          <button
-            type="button"
-            onClick={() => setSettingsOpen((o) => !o)}
-            aria-label="Liquidity settings"
-            className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors ${
-              settingsOpen || customSlip > 0
-                ? "bg-purple-50 text-purple-600"
-                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            }`}
-          >
-            <svg viewBox="0 0 20 20" fill="currentColor" className="size-4">
-              <path
-                fillRule="evenodd"
-                d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-                clipRule="evenodd"
-              />
-            </svg>
-          </button>
-          {settingsOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-20"
-                onClick={() => setSettingsOpen(false)}
-              />
-              <div className="modal-pop absolute right-0 top-11 z-30 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg">
+          <GearPopover active={customSlip > 0} label="Liquidity settings">
                 <div className="text-xs font-medium text-gray-500">
                   Max slippage
                 </div>
@@ -364,9 +323,7 @@ export function LiquidityWidget({
                   transaction is void — nothing is debited; only the miner fee
                   is spent.
                 </div>
-              </div>
-            </>
-          )}
+          </GearPopover>
         </div>
 
         <div className="mt-3 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">

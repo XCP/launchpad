@@ -1,4 +1,5 @@
 import { TokenImage } from "@/components/token-image";
+import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
   blocksEta,
@@ -252,16 +253,28 @@ export function LaunchView({
 
       {/* Stat strip — the terminal row */}
       <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-y border-gray-200 py-3">
-        {strip.map(([label, value, hint]) => (
-          <div key={label} title={hint} className={hint ? "cursor-help" : undefined}>
-            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-              {label}
+        {strip.map(([label, value, hint]) => {
+          const cell = (
+            <div
+              className={hint ? "cursor-help" : undefined}
+              tabIndex={hint ? 0 : undefined}
+            >
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                {label}
+              </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                {value}
+              </div>
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-              {value}
-            </div>
-          </div>
-        ))}
+          );
+          return hint ? (
+            <Hint key={label} content={hint}>
+              {cell}
+            </Hint>
+          ) : (
+            <div key={label}>{cell}</div>
+          );
+        })}
       </div>
 
       <div

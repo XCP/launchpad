@@ -3,11 +3,13 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
+import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
 import { commas, compact, shortAddress, usd as usdFmt } from "@/lib/format";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
+import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import {
   MAX_LEGS,
@@ -18,24 +20,6 @@ import {
 const SATS = 1e8;
 /** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
 const TOKENS_PER_XCP = XCP69.QUANTITY_BY_PRICE / XCP69.PRICE;
-
-const fetchJson = async (url: string) => {
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
-async function fetchBalance(address: string, asset: string): Promise<number> {
-  const data = await fetchJson(
-    `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
-  );
-  const rows: { quantity: number }[] = Array.isArray(data.result)
-    ? data.result
-    : data.result
-      ? [data.result]
-      : [];
-  return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
-}
 
 /**
  * Dispenser addresses with a dispense already pending in the mempool: a
@@ -113,24 +97,17 @@ export function XcpBridge({
 
   return (
     <div>
-      <div className="mb-4 flex w-64 items-center gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium">
-        {(["load", "unload"] as const).map((m) => (
-          <button
-            key={m}
-            type="button"
-            onClick={() => {
-              if (direction !== m) flip();
-            }}
-            className={`flex-1 rounded-md px-4 py-2 ${
-              direction === m
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {m === "load" ? "Buy XCP" : "Sell XCP"}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        value={direction}
+        onValueChange={(v) => {
+          if (v !== direction) flip();
+        }}
+      >
+        <SegmentedList className="mb-4 w-64">
+          <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
+          <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
+        </SegmentedList>
+      </Tabs>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         {direction === "load" ? (
           <LoadCard

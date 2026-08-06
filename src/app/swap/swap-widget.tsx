@@ -7,10 +7,12 @@ import { OrderTracker } from "@/components/order-tracker";
 import { QuoteRing } from "@/components/quote-ring";
 import { TokenImage } from "@/components/token-image";
 import { TokenSelectModal } from "@/components/token-select-modal";
+import { GearPopover } from "@/components/ui/popover";
 import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const SATS = 1e8;
@@ -26,24 +28,6 @@ interface Quote {
   book_output: number;
   price_impact: number;
   fee_bps?: number;
-}
-
-const fetchJson = async (url: string) => {
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
-async function fetchBalance(address: string, asset: string): Promise<number> {
-  const data = await fetchJson(
-    `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
-  );
-  const rows: { quantity: number }[] = Array.isArray(data.result)
-    ? data.result
-    : data.result
-      ? [data.result]
-      : [];
-  return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
 }
 
 const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
@@ -63,7 +47,6 @@ export function SwapWidget({
   const [slippagePreset, setSlippagePreset] = useState(1);
   const [customSlippage, setCustomSlippage] = useState("");
   const [customExpiration, setCustomExpiration] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [rateInverted, setRateInverted] = useState(false);
@@ -264,32 +247,11 @@ export function SwapWidget({
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       {/* Settings row */}
-      <div className="relative flex items-center justify-end px-2 pb-1 pt-0.5">
-        <button
-          type="button"
-          onClick={() => setSettingsOpen((o) => !o)}
-          aria-label="Swap settings"
-          className={`flex size-7 items-center justify-center rounded-full transition-colors ${
-            settingsOpen || customSlip > 0 || expiration !== MARKET_EXPIRATION
-              ? "bg-purple-50 text-purple-600"
-              : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-          }`}
+      <div className="flex items-center justify-end px-2 pb-1 pt-0.5">
+        <GearPopover
+          active={customSlip > 0 || expiration !== MARKET_EXPIRATION}
+          label="Swap settings"
         >
-          <svg viewBox="0 0 20 20" fill="currentColor" className="size-4">
-            <path
-              fillRule="evenodd"
-              d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
-              clipRule="evenodd"
-            />
-          </svg>
-        </button>
-        {settingsOpen && (
-          <>
-            <div
-              className="fixed inset-0 z-20"
-              onClick={() => setSettingsOpen(false)}
-            />
-            <div className="modal-pop absolute right-0 top-9 z-30 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg">
               <div className="text-xs font-medium text-gray-500">Max slippage</div>
               <div className="mt-2 flex items-center gap-1.5">
                 {SLIPPAGE_PRESETS.map((s) => (
@@ -364,9 +326,7 @@ export function SwapWidget({
                 Min received is enforced by the order itself — worse fills are
                 impossible; better ones refund the difference.
               </div>
-            </div>
-          </>
-        )}
+        </GearPopover>
       </div>
 
       {/* Sell well — inset follows focus; balance row swaps to presets on hover */}

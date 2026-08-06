@@ -9,6 +9,7 @@ import { commas, price as formatPrice } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 /**
@@ -47,24 +48,6 @@ interface PoolInfo {
   asset_b: string;
   reserve_a: number;
   reserve_b: number;
-}
-
-const fetchJson = async (url: string) => {
-  const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  return res.json();
-};
-
-async function fetchBalance(address: string, asset: string): Promise<number> {
-  const data = await fetchJson(
-    `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
-  );
-  const rows: { quantity: number }[] = Array.isArray(data.result)
-    ? data.result
-    : data.result
-      ? [data.result]
-      : [];
-  return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
 }
 
 export function TradePanel({
