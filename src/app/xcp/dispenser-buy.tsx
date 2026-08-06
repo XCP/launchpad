@@ -1,12 +1,35 @@
 "use client";
 
 import { useState } from "react";
+import useSWR from "swr";
 import type { Dispenser } from "@/lib/api/counterparty";
-import { commas, shortAddress, usd as usdFmt } from "@/lib/format";
+import { commas, compact, shortAddress, usd as usdFmt } from "@/lib/format";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { XCP69 } from "@/lib/xcp69";
+import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const SATS = 1e8;
+/** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
+const TOKENS_PER_XCP = XCP69.QUANTITY_BY_PRICE / XCP69.PRICE;
+
+/**
+ * Dispenser addresses with a dispense already pending in the mempool. A
+ * pending trigger can drain the escrow before yours confirms — and your BTC
+ * still goes to the dispenser with nothing vended and no refund path. Hide
+ * those dispensers until the mempool clears.
+ */
+async function fetchBusyDispensers(): Promise<Set<string>> {
+  const res = await fetch(
+    `${COUNTERPARTY_API_BASE}/mempool/events/DISPENSE?limit=500`,
+    { signal: AbortSignal.timeout(10_000) },
+  );
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const events: { params?: { source?: string } }[] = (await res.json()).result ?? [];
+  return new Set(
+    events.map((e) => e.params?.source).filter((s): s is string => Boolean(s)),
+  );
+}
 
 /**
  * One dispenser, one transaction: dispensers vend fixed units (k ×
@@ -29,25 +52,39 @@ export function DispenserBuy({
   const [selected, setSelected] = useState(0);
   const [triggers, setTriggers] = useState(1);
 
-  if (dispensers.length === 0) {
+  const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
+    refreshInterval: 10_000,
+    revalidateOnFocus: true,
+  });
+  const open = dispensers.filter((disp) => !pendingSources?.has(disp.source));
+  const hiddenCount = dispensers.length - open.length;
+
+  if (open.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-        No open XCP dispensers right now — check the DEX or try again later.
+        {dispensers.length > 0
+          ? "Every open dispenser has a purchase pending in the mempool — check back in a few minutes."
+          : "No open XCP dispensers right now — check the DEX or try again later."}
       </p>
     );
   }
 
-  const d = dispensers[Math.min(selected, dispensers.length - 1)];
+  const d = open[Math.min(selected, open.length - 1)];
   const maxTriggers = Math.max(1, Math.floor(d.give_remaining / d.give_quantity));
   const n = Math.max(1, Math.min(maxTriggers, Math.floor(triggers) || 1));
   const xcpOut = (n * d.give_quantity) / SATS;
   const btcSats = n * d.satoshirate;
   const btc = btcSats / SATS;
 
-  const presets = [1, 5, 10].map((target) => {
-    const k = Math.max(1, Math.min(maxTriggers, Math.round((target * SATS) / d.give_quantity)));
-    return { label: `~${target} XCP`, k };
+  const presets = [1, 5, 10, 100].map((target) => {
+    const k = Math.max(1, Math.round((target * SATS) / d.give_quantity));
+    return { label: `~${target} XCP`, k, available: k <= maxTriggers };
   });
+
+  // The deal, relative to market: dispenser rate in USD vs the XCP spot.
+  const perXcpUsd = btcUsd ? (d.satoshirate / d.give_quantity) * btcUsd : null;
+  const vsMarket =
+    perXcpUsd && xcpUsd ? (perXcpUsd / xcpUsd - 1) * 100 : null;
 
   const busy =
     compose.status === "composing" ||
@@ -91,14 +128,14 @@ export function DispenserBuy({
       </label>
       <select
         id="dispenser"
-        value={selected}
+        value={Math.min(selected, open.length - 1)}
         onChange={(e) => {
           setSelected(Number(e.target.value));
           setTriggers(1);
         }}
         className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
       >
-        {dispensers.map((disp, i) => (
+        {open.map((disp, i) => (
           <option key={disp.source} value={i}>
             {Math.round(disp.price).toLocaleString()} sats/XCP
             {btcUsd ? ` (≈${usdFmt((disp.price / SATS) * btcUsd)})` : ""} ·{" "}
@@ -106,6 +143,13 @@ export function DispenserBuy({
           </option>
         ))}
       </select>
+      {hiddenCount > 0 && (
+        <p className="mt-1 text-xs text-gray-400">
+          {hiddenCount} dispenser{hiddenCount === 1 ? "" : "s"} temporarily
+          hidden — a purchase is already pending in the mempool, and a second
+          buyer could get nothing for their BTC.
+        </p>
+      )}
 
       <div className="mt-3 flex items-end gap-3">
         <div className="flex-1">
@@ -124,9 +168,10 @@ export function DispenserBuy({
         </div>
         <div className="pb-1 text-sm text-gray-600">
           = <span className="font-semibold text-gray-900">{commas(xcpOut)} XCP</span>
-          {xcpUsd ? (
-            <span className="text-gray-400"> (≈{usdFmt(xcpOut * xcpUsd)})</span>
-          ) : null}
+          <span className="text-gray-400">
+            {" "}
+            · mints {compact(xcpOut * TOKENS_PER_XCP)} tokens
+          </span>
           <br />
           for{" "}
           <span className="font-semibold text-gray-900">{btc.toFixed(8)} BTC</span>
@@ -136,16 +181,35 @@ export function DispenserBuy({
         </div>
       </div>
 
+      {perXcpUsd && xcpUsd && vsMarket !== null && (
+        <p className="mt-1 text-xs text-gray-500">
+          This dispenser: ≈{usdFmt(perXcpUsd)}/XCP · market ≈{usdFmt(xcpUsd)}/XCP ·{" "}
+          <span
+            className={
+              vsMarket <= 0 ? "font-medium text-green-600" : "font-medium text-amber-600"
+            }
+          >
+            {vsMarket <= 0
+              ? `${Math.abs(vsMarket).toFixed(0)}% below market`
+              : `${vsMarket.toFixed(0)}% above market`}
+          </span>
+        </p>
+      )}
+
       <div className="mt-2 flex items-center gap-2">
         {presets.map((p) => (
           <button
             key={p.label}
             type="button"
+            disabled={!p.available}
+            title={p.available ? undefined : "This dispenser doesn't have that much left"}
             onClick={() => setTriggers(p.k)}
             className={`rounded-full border px-3 py-1 text-xs font-medium ${
-              n === p.k
-                ? "border-purple-600 bg-purple-50 text-purple-700"
-                : "border-gray-300 text-gray-600 hover:border-gray-400"
+              !p.available
+                ? "cursor-not-allowed border-gray-200 text-gray-300"
+                : n === p.k
+                  ? "border-purple-600 bg-purple-50 text-purple-700"
+                  : "border-gray-300 text-gray-600 hover:border-gray-400"
             }`}
           >
             {p.label}

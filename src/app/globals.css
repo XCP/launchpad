@@ -22,6 +22,15 @@
   animation: holographic 6s ease infinite;
 }
 
+/* Tailwind v4 preflight sets buttons to cursor:default; restore the hand
+   on every interactive control site-wide. */
+button:not(:disabled),
+select,
+summary,
+input[type="range"] {
+  cursor: pointer;
+}
+
 /* Neutral range slider: gray track, white knob, hand cursor — reads as a UI
    control, not a data bar; the brand color only appears on interaction. */
 .ui-slider {
