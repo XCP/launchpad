@@ -5,6 +5,7 @@ import {
   dismissPending,
   type PendingItem,
   readPending,
+  readPendingServer,
   subscribePending,
   updatePending,
 } from "@/lib/pending";
@@ -19,7 +20,11 @@ const POLL_MS = 30_000;
  * not a spinner pretending.
  */
 export function PendingDock() {
-  const items = useSyncExternalStore(subscribePending, readPending, () => []);
+  const items = useSyncExternalStore(
+    subscribePending,
+    readPending,
+    readPendingServer,
+  );
   const [open, setOpen] = useState(false);
 
   // Poll unresolved items: orders resolve through their lifecycle; other

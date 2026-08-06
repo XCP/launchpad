@@ -5,6 +5,11 @@
  * localStorage so they survive navigation and reloads. With ten-minute
  * blocks, leaving the page mid-wait is rational — the dock keeps the
  * truth in view wherever the user goes.
+ *
+ * Snapshot discipline: useSyncExternalStore requires referentially stable
+ * snapshots, so reads serve a module-level cache that is only replaced on
+ * writes (or cross-tab storage events). Returning a fresh JSON.parse per
+ * read caused an infinite render loop (React #185).
  */
 
 export type PendingKind = "order" | "dispense" | "mint" | "pool";
@@ -21,18 +26,32 @@ export interface PendingItem {
 const KEY = "xcpfun:pending:v1";
 const MAX_AGE_MS = 48 * 60 * 60 * 1000;
 const EVENT = "xcpfun:pending-updated";
+const EMPTY: PendingItem[] = [];
 
-export function readPending(): PendingItem[] {
-  if (typeof window === "undefined") return [];
+let cache: PendingItem[] | null = null;
+
+function load(): PendingItem[] {
   try {
     const items: PendingItem[] = JSON.parse(localStorage.getItem(KEY) ?? "[]");
     return items.filter((i) => Date.now() - i.addedAt < MAX_AGE_MS);
   } catch {
-    return [];
+    return EMPTY;
   }
 }
 
+export function readPending(): PendingItem[] {
+  if (typeof window === "undefined") return EMPTY;
+  if (cache === null) cache = load();
+  return cache;
+}
+
+/** Stable server-side snapshot for useSyncExternalStore. */
+export function readPendingServer(): PendingItem[] {
+  return EMPTY;
+}
+
 function write(items: PendingItem[]) {
+  cache = items;
   localStorage.setItem(KEY, JSON.stringify(items));
   window.dispatchEvent(new Event(EVENT));
 }
@@ -52,10 +71,15 @@ export function dismissPending(txid: string) {
 }
 
 export function subscribePending(cb: () => void): () => void {
+  const onStorage = () => {
+    // Another tab wrote — drop the cache so the next read reloads.
+    cache = null;
+    cb();
+  };
   window.addEventListener(EVENT, cb);
-  window.addEventListener("storage", cb);
+  window.addEventListener("storage", onStorage);
   return () => {
     window.removeEventListener(EVENT, cb);
-    window.removeEventListener("storage", cb);
+    window.removeEventListener("storage", onStorage);
   };
 }
