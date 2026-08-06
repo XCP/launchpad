@@ -19,6 +19,8 @@ interface OwnDispenser {
   give_remaining: number;
   satoshirate: number;
   give_quantity: number;
+  status: number;
+  close_block_index: number | null;
 }
 
 /**
@@ -60,14 +62,19 @@ export function SellDispenser({
     { refreshInterval: 30_000 },
   );
 
+  // No status filter: a CLOSING dispenser (status 11) still vends for ~5
+  // blocks and blocks any new open on the address — it must be visible.
   const { data: existing, mutate: refreshExisting } = useSWR<OwnDispenser | null>(
     address ? [address, "own-dispenser"] : null,
     async ([addr]) => {
       const data = await fetchJson(
-        `${COUNTERPARTY_API_BASE}/addresses/${addr}/dispensers?status=open`,
+        `${COUNTERPARTY_API_BASE}/addresses/${addr}/dispensers`,
       );
       const rows: (OwnDispenser & { asset: string })[] = data.result ?? [];
-      return rows.find((d) => d.asset === "XCP") ?? null;
+      return (
+        rows.find((d) => d.asset === "XCP" && [0, 1, 11].includes(d.status)) ??
+        null
+      );
     },
     { refreshInterval: 30_000 },
   );
@@ -135,7 +142,26 @@ export function SellDispenser({
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-6">
-      {existing ? (
+      {existing?.status === 11 ? (
+        <div className="text-sm text-gray-700">
+          <p className="flex items-center gap-2">
+            <span className="size-2 animate-pulse rounded-full bg-amber-500" />
+            <span className="font-semibold">Dispenser closing</span>
+          </p>
+          <p className="mt-2">
+            It can still vend until{" "}
+            {existing.close_block_index
+              ? `block ${existing.close_block_index.toLocaleString()}`
+              : "the close settles (~5 blocks)"}
+            , then the remaining{" "}
+            <span className="font-semibold">
+              {commas(existing.give_remaining / SATS)} XCP
+            </span>{" "}
+            returns to you automatically. Nothing to do — a new dispenser can
+            open once it settles.
+          </p>
+        </div>
+      ) : existing ? (
         <>
           <p className="text-sm text-gray-700">
             You already have an open XCP dispenser:{" "}
@@ -150,7 +176,8 @@ export function SellDispenser({
               sats/XCP
             </span>
             . One per asset per address — close it to reclaim the rest or
-            change your price.
+            change your price. Closing settles ~5 blocks after it confirms,
+            and it can still vend until then.
           </p>
           {compose.status === "error" && (
             <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
@@ -237,7 +264,8 @@ export function SellDispenser({
           <p className="mt-2 text-xs text-gray-500">
             Vends 1 XCP at a time (the format this site lists). BTC arrives
             at your address automatically with every vend — no counterparty,
-            no custody. Close any time to reclaim whatever hasn&apos;t sold.
+            no custody. Closing takes ~5 blocks to settle and returns the
+            rest.
           </p>
 
           {compose.status === "error" && (

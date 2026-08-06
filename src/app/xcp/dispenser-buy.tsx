@@ -51,6 +51,7 @@ export function DispenserBuy({
   const compose = useCompose();
   const [selected, setSelected] = useState(0);
   const [triggers, setTriggers] = useState(1);
+  const [preflightError, setPreflightError] = useState<string | null>(null);
 
   const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
     refreshInterval: 10_000,
@@ -222,9 +223,9 @@ export function DispenserBuy({
         ))}
       </div>
 
-      {compose.status === "error" && (
+      {(compose.status === "error" || preflightError) && (
         <p className="mt-3 rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
-          {compose.error}
+          {preflightError ?? compose.error}
         </p>
       )}
 
@@ -240,9 +241,46 @@ export function DispenserBuy({
         <button
           type="button"
           disabled={busy}
-          onClick={() =>
-            compose.composeDispense({ dispenser: d.source, quantity: btcSats })
-          }
+          onClick={async () => {
+            // Server data can be a minute stale; re-check the dispenser at
+            // the moment of purchase. A dispense that lands on a drained or
+            // closing dispenser forfeits the BTC with no refund path.
+            setPreflightError(null);
+            try {
+              const res = await fetch(
+                `${COUNTERPARTY_API_BASE}/addresses/${d.source}/dispensers`,
+                { signal: AbortSignal.timeout(10_000) },
+              );
+              const rows: {
+                asset: string;
+                status: number;
+                give_remaining: number;
+                satoshirate: number;
+              }[] = res.ok ? ((await res.json()).result ?? []) : [];
+              const live = rows.find((r) => r.asset === "XCP");
+              if (!live || live.status !== 0) {
+                setPreflightError(
+                  "This dispenser just closed — pick another from the list.",
+                );
+                return;
+              }
+              if (live.satoshirate !== d.satoshirate) {
+                setPreflightError(
+                  "This dispenser's price just changed — refresh the page.",
+                );
+                return;
+              }
+              if (live.give_remaining < n * d.give_quantity) {
+                setPreflightError(
+                  `Only ${commas(live.give_remaining / SATS)} XCP left in this dispenser — lower the amount.`,
+                );
+                return;
+              }
+            } catch {
+              // Can't verify — let compose-time validation catch it.
+            }
+            compose.composeDispense({ dispenser: d.source, quantity: btcSats });
+          }}
           className="mt-4 w-full rounded-md bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {compose.status === "composing"
