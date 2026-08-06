@@ -139,7 +139,11 @@ function LoadCard({
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
   const [routeIdx, setRouteIdx] = useState(0);
-  const [amount, setAmount] = useState(""); // XCP to receive
+  // Independent-field pattern: whichever side was typed last drives; the
+  // other derives. No dead fields — start from either end of the bridge.
+  const [xcpAmount, setXcpAmount] = useState("");
+  const [btcAmount, setBtcAmount] = useState("");
+  const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
   const [routeOpen, setRouteOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [preflightError, setPreflightError] = useState<string | null>(null);
@@ -160,11 +164,20 @@ function LoadCard({
   const d = open[Math.min(routeIdx, Math.max(open.length - 1, 0))];
   const unitXcp = d ? d.give_quantity / SATS : 1;
   const maxUnits = d ? Math.max(1, Math.floor(d.give_remaining / d.give_quantity)) : 0;
-  const typed = parseFloat(amount) || 0;
-  const n = d ? Math.max(0, Math.min(maxUnits, Math.round(typed / unitXcp))) : 0;
+  const typedXcp = parseFloat(xcpAmount) || 0;
+  const typedBtcSats = Math.round((parseFloat(btcAmount) || 0) * SATS);
+  // XCP side rounds to the nearest whole unit; BTC side floors, exactly as
+  // the protocol prices a payment (get_must_give floors — overpay is kept).
+  const n = d
+    ? lastEdited === "xcp"
+      ? Math.max(0, Math.min(maxUnits, Math.round(typedXcp / unitXcp)))
+      : Math.max(0, Math.min(maxUnits, Math.floor(typedBtcSats / d.satoshirate)))
+    : 0;
   const snapped = n * unitXcp;
   const btcSats = d ? n * d.satoshirate : 0;
   const btc = btcSats / SATS;
+  const fmtBtc = (sats: number) =>
+    (sats / SATS).toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
 
   const presets = d
     ? [1, 5, 10, 100].map((target) => {
@@ -235,22 +248,29 @@ function LoadCard({
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       {/* You send · Bitcoin */}
-      <div className="rounded-2xl bg-gray-50 p-4">
+      <div className="rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
         <div className="flex h-5 items-center justify-between text-xs text-gray-500">
           <span>You send · Bitcoin</span>
         </div>
         <div className="mt-1 flex items-center justify-between gap-3">
-          <div
-            className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-              btc > 0 ? "text-gray-900" : "text-gray-300"
-            }`}
-          >
-            {btc > 0 ? btc.toFixed(8).replace(/0+$/, "").replace(/\.$/, "") : "0"}
-          </div>
+          <AmountInput
+            value={lastEdited === "btc" ? btcAmount : btc > 0 ? fmtBtc(btcSats) : ""}
+            onChange={(v) => {
+              setBtcAmount(v);
+              setLastEdited("btc");
+            }}
+            ariaLabel="BTC to send"
+            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          />
           {btcChip}
         </div>
         <div className="mt-1 h-4 text-xs text-gray-400">
           {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
+          {lastEdited === "btc" &&
+            typedBtcSats > 0 &&
+            typedBtcSats !== btcSats && (
+              <span className="text-amber-600"> · sends exactly {fmtBtc(btcSats)}</span>
+            )}
         </div>
       </div>
 
@@ -266,8 +286,13 @@ function LoadCard({
         </div>
         <div className="mt-1 flex items-center justify-between gap-3">
           <AmountInput
-            value={amount}
-            onChange={setAmount}
+            value={
+              lastEdited === "xcp" ? xcpAmount : snapped > 0 ? String(snapped) : ""
+            }
+            onChange={(v) => {
+              setXcpAmount(v);
+              setLastEdited("xcp");
+            }}
             ariaLabel="XCP to receive"
             className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
           />
@@ -276,12 +301,14 @@ function LoadCard({
         <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
           <span>
             {xcpUsd && snapped > 0 && `≈ ${usdFmt(snapped * xcpUsd)}`}
-            {typed > 0 && Math.abs(snapped - typed) > 1e-9 && (
-              <span className="text-amber-600">
-                {" "}
-                · snaps to {commas(snapped)} ({commas(unitXcp)}-XCP units)
-              </span>
-            )}
+            {lastEdited === "xcp" &&
+              typedXcp > 0 &&
+              Math.abs(snapped - typedXcp) > 1e-9 && (
+                <span className="text-amber-600">
+                  {" "}
+                  · snaps to {commas(snapped)} ({commas(unitXcp)}-XCP units)
+                </span>
+              )}
           </span>
           <span className="flex items-center gap-1">
             {presets.map((p) => (
@@ -292,11 +319,14 @@ function LoadCard({
                 title={
                   p.available ? undefined : "This route doesn't have that much left"
                 }
-                onClick={() => setAmount(String(p.k * unitXcp))}
+                onClick={() => {
+                  setXcpAmount(String(p.k * unitXcp));
+                  setLastEdited("xcp");
+                }}
                 className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                   !p.available
                     ? "cursor-not-allowed border-gray-100 text-gray-300"
-                    : n === p.k && typed > 0
+                    : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
                       ? "border-purple-400 bg-white text-purple-600"
                       : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
                 }`}
