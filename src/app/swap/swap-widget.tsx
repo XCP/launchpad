@@ -522,12 +522,19 @@ export function SwapWidget({
           </div>
         )}
         {ready && minReceivedRaw > 0 && (
-          <p className="mt-1.5 px-1.5 text-center text-[11px] text-gray-400">
-            Your wallet will show the guaranteed minimum —{" "}
-            {commas(minReceivedRaw / SATS)} {getAsset} — not the estimate.
-            Fills execute at the real price; the minimum only binds if the
-            market moves.
-          </p>
+          <div className="mt-1.5 px-1.5 text-[11px]">
+            <div className="flex items-center justify-between text-gray-600">
+              <span>You receive at least</span>
+              <span className="font-medium tabular-nums">
+                {(minReceivedRaw / SATS).toFixed(8)} {getAsset}
+              </span>
+            </div>
+            <p className="mt-0.5 text-gray-400">
+              Your wallet will show this exact guaranteed minimum. If the
+              pool can&apos;t deliver at least this much, the transaction
+              fails and you keep your {giveAsset}.
+            </p>
+          </div>
         )}
       </div>
 
