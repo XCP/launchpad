@@ -10,7 +10,7 @@ import {
 import { fetchXcpUsd } from "@/lib/api/price";
 import { isXcp69, launchPhase, windowIsExact } from "@/lib/xcp69";
 import { SHOW_NONCONFORMING } from "@/utils/constants";
-import { LaunchView } from "./launch-view";
+import { PhasePreview } from "./phase-preview";
 
 export const revalidate = 30;
 
@@ -53,7 +53,7 @@ export default async function LaunchPage({
     phase === "graduated" ? await fetchPoolPriceHistory(asset) : [];
 
   return (
-    <LaunchView
+    <PhasePreview
       asset={asset}
       fm={fm}
       conforming={conforming}

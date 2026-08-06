@@ -6,7 +6,6 @@ import {
   compact,
   fromSats,
   shortAddress,
-  tokenQty,
   usd,
 } from "@/lib/format";
 import {
@@ -18,11 +17,12 @@ import {
   saleTarget,
   XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
+import { ActivityTabs } from "./activity-tabs";
+import { AssetTradeSurface } from "./asset-trade-surface";
 import { EditPanel } from "./edit-panel";
 import { LiveProgress } from "./live-progress";
 import { MintPanel } from "./mint-panel";
 import { PriceChart } from "./price-chart";
-import { TradePanel } from "./trade-panel";
 
 /**
  * The launch page's entire presentation, data in via props — shared by the
@@ -199,7 +199,9 @@ export function LaunchView({
         </div>
       )}
 
-      {phase === "graduated" && pool && conforming && <TradePanel asset={asset} />}
+      {phase === "graduated" && pool && conforming && (
+        <AssetTradeSurface asset={asset} xcpUsd={xcpUsd} />
+      )}
 
       {phase === "graduated" && pool && (
         <div className="holo-border rounded-lg p-5">
@@ -224,7 +226,7 @@ export function LaunchView({
               </span>
             )}
             ) were minted to the unspendable address — nobody can ever
-            withdraw this liquidity. Trading interface coming here next.
+            withdraw this liquidity.
           </p>
         </div>
       )}
@@ -260,40 +262,8 @@ export function LaunchView({
       {/* Issuer-only metadata curation; renders nothing for everyone else */}
       <EditPanel asset={asset} issuer={fm.source} />
 
-      {/* Mint tape */}
-      <div className="rounded-lg border border-gray-200 bg-white">
-        <h2 className="border-b border-gray-200 p-4 font-semibold">
-          Mints ({mints.length})
-        </h2>
-        {mints.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">
-            No mints yet.
-          </p>
-        ) : (
-          <ul className="divide-y divide-gray-100">
-            {mints.slice(0, 100).map((m) => (
-              <li
-                key={m.tx_hash}
-                className="flex items-center justify-between px-4 py-2 text-sm"
-              >
-                <span className="flex items-center gap-2 font-mono text-gray-600">
-                  <Identicon address={m.source} />
-                  {shortAddress(m.source)}
-                </span>
-                <span className="text-gray-900">
-                  {compact(tokenQty(m.earn_quantity, fm.divisible))}{" "}
-                  <span className="text-gray-400">
-                    ({commas(fromSats(m.paid_quantity))} XCP)
-                  </span>
-                </span>
-                <span className="text-xs text-gray-400">
-                  block {m.block_index}
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
+      {/* Activity: the mint tape and live holders */}
+      <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
     </div>
   );
 }
@@ -350,7 +320,7 @@ function Guarantees({ fm }: { fm: Fairminter }) {
 }
 
 /** Deterministic address identicon: two hues from a cheap string hash. */
-function Identicon({ address }: { address: string }) {
+export function Identicon({ address }: { address: string }) {
   let h = 0;
   for (let i = 0; i < address.length; i++) h = (h * 31 + address.charCodeAt(i)) >>> 0;
   const h1 = h % 360;

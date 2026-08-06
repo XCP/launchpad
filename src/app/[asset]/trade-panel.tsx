@@ -78,10 +78,17 @@ async function fetchBalance(address: string, asset: string): Promise<number> {
   return rows.reduce((s, r) => s + (r.quantity ?? 0), 0);
 }
 
-export function TradePanel({ asset }: { asset: string }) {
+export function TradePanel({
+  asset,
+  only,
+}: {
+  asset: string;
+  /** Pin to one tab and drop the chrome — for embedding in AssetTradeSurface. */
+  only?: "limit" | "orders";
+}) {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
-  const [tab, setTab] = useState<"market" | "limit" | "orders">("market");
+  const [tab, setTab] = useState<"market" | "limit" | "orders">(only ?? "market");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState(""); // human units of the GIVE asset
   const [slippage, setSlippage] = useState(1);
@@ -263,7 +270,14 @@ export function TradePanel({ asset }: { asset: string }) {
             : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div
+      className={
+        only
+          ? "rounded-3xl border border-gray-200 bg-white p-4"
+          : "rounded-lg border border-gray-200 bg-white p-5"
+      }
+    >
+      {!only && (
       <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium">
         {(["market", "limit", "orders"] as const).map((t) => (
           <button
@@ -278,6 +292,7 @@ export function TradePanel({ asset }: { asset: string }) {
           </button>
         ))}
       </div>
+      )}
 
       {tab !== "orders" && (
         <div className="mt-3 flex gap-2 text-sm font-medium">
