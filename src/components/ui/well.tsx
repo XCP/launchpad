@@ -39,9 +39,11 @@ export function Well({
         {children}
         {chip}
       </div>
-      <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
-        {footer}
-      </div>
+      {footer !== undefined && (
+        <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
+          {footer}
+        </div>
+      )}
     </div>
   );
 }

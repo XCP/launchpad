@@ -6,6 +6,7 @@ import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
+import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
@@ -380,95 +381,97 @@ function LoadCard({
     <div className="contents">
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       {/* You receive · Counterparty — XCP always first */}
-      <div className="group rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
-        <div className="flex h-5 items-center justify-between text-xs text-gray-500">
-          <span>You receive · Counterparty</span>
-          {xcpBalance !== undefined && (
+      <Well
+        focusable
+        label="You receive · Counterparty"
+        topRight={
+          xcpBalance !== undefined && (
             <span>Balance: {commas(xcpBalance / SATS)}</span>
-          )}
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <AmountInput
-            value={
-              lastEdited === "xcp" ? xcpAmount : snapped > 0 ? String(snapped) : ""
-            }
-            onChange={(v) => {
-              setXcpAmount(v);
-              setLastEdited("xcp");
-            }}
-            ariaLabel="XCP to receive"
-            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
-          />
-          <XcpChip />
-        </div>
-        <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
-          <span>
-            {xcpUsd && snapped > 0 && `≈ ${usdFmt(snapped * xcpUsd)}`}
-            {lastEdited === "xcp" &&
-              typedXcp > 0 &&
-              Math.abs(snapped - typedXcp) > 1e-9 && (
-                <span className="text-amber-600">
-                  {" "}
-                  · snaps to {commas(snapped)} ({commas(unitXcp)}-XCP units)
-                </span>
-              )}
-          </span>
-          <span className="flex items-center gap-1">
-            {presets.map((p) => (
-              <button
-                key={p.label}
-                type="button"
-                disabled={!p.available}
-                title={
-                  p.available ? undefined : "This route doesn't have that much left"
-                }
-                onClick={() => {
-                  setXcpAmount(String(p.k * unitXcp));
-                  setLastEdited("xcp");
-                }}
-                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                  !p.available
-                    ? "cursor-not-allowed border-gray-100 text-gray-300"
-                    : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
-                      ? "border-purple-400 bg-white text-purple-600"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </span>
-        </div>
-      </div>
+          )
+        }
+        chip={<XcpChip />}
+        footer={
+          <>
+            <span>
+              {xcpUsd && snapped > 0 && `≈ ${usdFmt(snapped * xcpUsd)}`}
+              {lastEdited === "xcp" &&
+                typedXcp > 0 &&
+                Math.abs(snapped - typedXcp) > 1e-9 && (
+                  <span className="text-amber-600">
+                    {" "}
+                    · snaps to {commas(snapped)} ({commas(unitXcp)}-XCP units)
+                  </span>
+                )}
+            </span>
+            <span className="flex items-center gap-1">
+              {presets.map((p) => (
+                <button
+                  key={p.label}
+                  type="button"
+                  disabled={!p.available}
+                  title={
+                    p.available ? undefined : "This route doesn't have that much left"
+                  }
+                  onClick={() => {
+                    setXcpAmount(String(p.k * unitXcp));
+                    setLastEdited("xcp");
+                  }}
+                  className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                    !p.available
+                      ? "cursor-not-allowed border-gray-100 text-gray-300"
+                      : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
+                        ? "border-purple-400 bg-white text-purple-600"
+                        : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </span>
+          </>
+        }
+      >
+        <AmountInput
+          value={
+            lastEdited === "xcp" ? xcpAmount : snapped > 0 ? String(snapped) : ""
+          }
+          onChange={(v) => {
+            setXcpAmount(v);
+            setLastEdited("xcp");
+          }}
+          ariaLabel="XCP to receive"
+          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+        />
+      </Well>
 
       <FlipNotch onFlip={onFlip} flips={flips} />
 
       {/* You send · Bitcoin */}
-      <div className="rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
-        <div className="flex h-5 items-center justify-between text-xs text-gray-500">
-          <span>You send · Bitcoin</span>
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <AmountInput
-            value={lastEdited === "btc" ? btcAmount : btc > 0 ? fmtBtc(btcSats) : ""}
-            onChange={(v) => {
-              setBtcAmount(v);
-              setLastEdited("btc");
-            }}
-            ariaLabel="BTC to send"
-            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
-          />
-          <BtcChip />
-        </div>
-        <div className="mt-1 h-4 text-xs text-gray-400">
-          {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
-          {lastEdited === "btc" &&
-            typedBtcSats > 0 &&
-            typedBtcSats !== btcSats && (
-              <span className="text-amber-600"> · sends exactly {fmtBtc(btcSats)}</span>
-            )}
-        </div>
-      </div>
+      <Well
+        focusable
+        label="You send · Bitcoin"
+        chip={<BtcChip />}
+        footer={
+          <span>
+            {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
+            {lastEdited === "btc" &&
+              typedBtcSats > 0 &&
+              typedBtcSats !== btcSats && (
+                <span className="text-amber-600"> · sends exactly {fmtBtc(btcSats)}</span>
+              )}
+          </span>
+        }
+      >
+        <AmountInput
+          value={lastEdited === "btc" ? btcAmount : btc > 0 ? fmtBtc(btcSats) : ""}
+          onChange={(v) => {
+            setBtcAmount(v);
+            setLastEdited("btc");
+          }}
+          ariaLabel="BTC to send"
+          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+        />
+      </Well>
 
       {/* Rate + route details */}
       <div className="px-2 pt-2">
@@ -814,10 +817,11 @@ function UnloadCard({
     <div className="contents">
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       {/* You send · Counterparty */}
-      <div className="group rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
-        <div className="flex h-5 items-center justify-between text-xs text-gray-500">
-          <span>You send · Counterparty</span>
-          {balance !== undefined && (
+      <Well
+        focusable
+        label="You send · Counterparty"
+        topRight={
+          balance !== undefined && (
             <button
               type="button"
               className="hover:text-gray-700 hover:underline"
@@ -827,48 +831,48 @@ function UnloadCard({
             >
               Balance: {commas(balance / SATS)}
             </button>
-          )}
-        </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <AmountInput
-            value={escrow}
-            onChange={setEscrow}
-            ariaLabel="XCP to unload"
-            className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-              insufficient ? "text-red-600" : "text-gray-900"
-            }`}
-          />
-          <XcpChip />
-        </div>
-        <div className="mt-1 h-4 text-xs text-gray-400">
-          {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
-        </div>
-      </div>
+          )
+        }
+        chip={<XcpChip />}
+        footer={
+          <span>
+            {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
+          </span>
+        }
+      >
+        <AmountInput
+          value={escrow}
+          onChange={setEscrow}
+          ariaLabel="XCP to unload"
+          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+            insufficient ? "text-red-600" : "text-gray-900"
+          }`}
+        />
+      </Well>
 
       <FlipNotch onFlip={onFlip} flips={flips} />
 
       {/* You receive · Bitcoin */}
-      <div className="rounded-2xl bg-gray-50 p-4">
-        <div className="flex h-5 items-center justify-between text-xs text-gray-500">
-          <span>You receive · Bitcoin</span>
-          <span>as it sells, at your price</span>
+      <Well
+        label="You receive · Bitcoin"
+        topRight={<span>as it sells, at your price</span>}
+        chip={<BtcChip />}
+        footer={
+          <span>
+            {btcUsd && btcIfSold > 0 && `≈ ${usdFmt(btcIfSold * btcUsd)} if fully sold`}
+          </span>
+        }
+      >
+        <div
+          className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
+            btcIfSold > 0 ? "text-gray-900" : "text-gray-300"
+          }`}
+        >
+          {btcIfSold > 0
+            ? `≤ ${btcIfSold.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`
+            : "0"}
         </div>
-        <div className="mt-1 flex items-center justify-between gap-3">
-          <div
-            className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-              btcIfSold > 0 ? "text-gray-900" : "text-gray-300"
-            }`}
-          >
-            {btcIfSold > 0
-              ? `≤ ${btcIfSold.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`
-              : "0"}
-          </div>
-          <BtcChip />
-        </div>
-        <div className="mt-1 h-4 text-xs text-gray-400">
-          {btcUsd && btcIfSold > 0 && `≈ ${usdFmt(btcIfSold * btcUsd)} if fully sold`}
-        </div>
-      </div>
+      </Well>
 
       {/* Price row */}
       <div className="px-2 pt-2">

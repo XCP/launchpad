@@ -10,6 +10,7 @@ import { CTA } from "@/components/ui/button";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { GearPopover } from "@/components/ui/popover";
+import { Well } from "@/components/ui/well";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { isBusy } from "@/lib/use-busy";
@@ -333,10 +334,11 @@ export function LiquidityWidget({
 
         {tab === "add" ? (
           <div className="mt-3 space-y-3">
-            <div className="rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white">
-              <div className="flex items-center justify-between text-xs text-gray-500">
-                <label htmlFor="lq-amount">{asset} to deposit</label>
-                {tokenBalance !== undefined && (
+            <Well
+              focusable
+              label={<label htmlFor="lq-amount">{asset} to deposit</label>}
+              topRight={
+                tokenBalance !== undefined && (
                   <button
                     type="button"
                     className="hover:text-gray-700 hover:underline"
@@ -348,17 +350,18 @@ export function LiquidityWidget({
                   >
                     Balance: {commas(tokenBalance / SATS)}
                   </button>
-                )}
-              </div>
+                )
+              }
+            >
               <AmountInput
                 id="lq-amount"
                 value={amount}
                 onChange={setAmount}
-                className={`mt-1 block w-full bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 ${
+                className={`w-full min-w-0 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 ${
                   insufficientToken ? "text-red-600" : "text-gray-900"
                 }`}
               />
-            </div>
+            </Well>
             {depositQuote && amountRaw > 0 && !depositQuote.first_deposit && (
               <dl
                 className="space-y-1 rounded-2xl bg-gray-50 p-3 text-xs text-gray-600"
