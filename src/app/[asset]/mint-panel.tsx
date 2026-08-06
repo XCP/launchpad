@@ -1,15 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { usd } from "@/lib/format";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
 
-const MAX_LOTS = XCP69.MAX_MINT_PER_ADDRESS / XCP69.QUANTITY_BY_PRICE; // 690
+const MAX_LOTS = XCP69.MAX_MINT_PER_ADDRESS / XCP69.QUANTITY_BY_PRICE; // 1000
 const XCP_PER_LOT = XCP69.PRICE / 1e8; // 0.01
 
 /** Fixed-lot mint: pick a lot count, pay lots × 0.01 XCP, escrowed until close. */
-export function MintPanel({ asset }: { asset: string }) {
+export function MintPanel({
+  asset,
+  xcpUsd = null,
+}: {
+  asset: string;
+  xcpUsd?: number | null;
+}) {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
   const [lots, setLots] = useState(10);
@@ -75,7 +82,38 @@ export function MintPanel({ asset }: { asset: string }) {
           <span className="font-semibold text-gray-900">
             {(clampedLots * XCP_PER_LOT).toFixed(2)} XCP
           </span>
+          {xcpUsd && (
+            <span className="text-gray-400">
+              {" "}
+              ≈{usd(clampedLots * XCP_PER_LOT * xcpUsd)}
+            </span>
+          )}
         </div>
+      </div>
+      <div className="mt-2 flex items-center gap-2">
+        {[10, 100, MAX_LOTS].map((preset) => (
+          <button
+            key={preset}
+            type="button"
+            onClick={() => setLots(preset)}
+            className={`rounded-full border px-3 py-1 text-xs font-medium ${
+              clampedLots === preset
+                ? "border-purple-600 bg-purple-50 text-purple-700"
+                : "border-gray-300 text-gray-600 hover:border-gray-400"
+            }`}
+          >
+            {preset === MAX_LOTS
+              ? "Max (10 XCP)"
+              : `${(preset * XCP_PER_LOT).toLocaleString()} XCP`}
+          </button>
+        ))}
+        <span className="ml-auto text-xs text-gray-400">
+          ={" "}
+          {(clampedLots / 1000).toLocaleString("en-US", {
+            maximumFractionDigits: 3,
+          })}
+          % of supply
+        </span>
       </div>
 
       {compose.status === "error" && (
