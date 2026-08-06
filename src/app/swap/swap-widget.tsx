@@ -39,10 +39,10 @@ async function fetchBalance(address: string, asset: string): Promise<number> {
 }
 
 /**
- * Swaps between XCP and XCP-69 graduates only — one leg is always XCP, the
- * other always a launch that passed conformance and seeded its pool. Under
- * the hood it's a DEX order at the router's quoted output minus slippage:
- * fills from the pool and book at best price, dust expires in ~3 hours.
+ * Swaps between XCP and XCP-69 pools in the two-card grammar every swap UI
+ * shares: Sell on top, Buy below, a flip arrow overlapping the seam. Under
+ * the hood it's a DEX order at the router's quoted output minus slippage —
+ * pool + book, best price first, dust expires in ~3 hours.
  */
 export function SwapWidget({
   assets,
@@ -76,6 +76,7 @@ export function SwapWidget({
     { refreshInterval: 30_000 },
   );
 
+  const outXcp = quote && amountRaw > 0 ? quote.estimated_output / SATS : 0;
   const busy =
     compose.status === "composing" ||
     compose.status === "signing" ||
@@ -95,7 +96,7 @@ export function SwapWidget({
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm">
+      <div className="rounded-2xl border border-green-200 bg-green-50 p-5 text-sm">
         <div className="font-semibold text-green-800">Swap broadcast</div>
         <p className="mt-1 text-green-700">
           Matching runs at confirmation — pool first while it beats the book.{" "}
@@ -119,58 +120,81 @@ export function SwapWidget({
     );
   }
 
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
-      <div className="flex items-center gap-3">
-        <TokenImage asset={asset} className="size-10 rounded-full bg-gray-100 object-cover" />
-        <select
-          value={asset}
-          onChange={(e) => {
-            setAsset(e.target.value);
-            setAmount("");
-          }}
-          aria-label="Token to trade"
-          className="block flex-1 rounded-md border border-gray-300 bg-white p-2.5 text-sm font-medium outline-none focus:border-purple-500"
-        >
-          {assets.map((a) => (
-            <option key={a} value={a}>
-              {a} / XCP
-            </option>
-          ))}
-        </select>
-      </div>
+  const tokenChip = (
+    <div className="relative flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm hover:border-gray-300">
+      <TokenImage asset={asset} className="size-6 rounded-full bg-gray-100 object-cover" />
+      <span className="text-sm font-semibold">{asset}</span>
+      <span aria-hidden className="text-xs text-gray-400">
+        ▾
+      </span>
+      <select
+        aria-label="Token to trade"
+        value={asset}
+        onChange={(e) => {
+          setAsset(e.target.value);
+          setAmount("");
+        }}
+        className="absolute inset-0 opacity-0"
+      >
+        {assets.map((a) => (
+          <option key={a} value={a}>
+            {a}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
 
-      <div className="mt-4">
-        <label htmlFor="swap-amount" className="flex justify-between text-xs text-gray-500">
-          <span>
-            You pay ({giveAsset})
-            {giveAsset === "XCP" && xcpUsd && amountRaw > 0
-              ? ` ≈ ${usdFmt((amountRaw / SATS) * xcpUsd)}`
-              : ""}
-          </span>
+  const xcpChip = (
+    <div className="flex shrink-0 items-center gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm">
+      <span className="flex size-6 items-center justify-center rounded-full bg-purple-600 text-[10px] font-bold text-white">
+        X
+      </span>
+      <span className="text-sm font-semibold">XCP</span>
+    </div>
+  );
+
+  const giveUsd =
+    giveAsset === "XCP" && xcpUsd && amountRaw > 0
+      ? usdFmt((amountRaw / SATS) * xcpUsd)
+      : null;
+  const getUsd =
+    getAsset === "XCP" && xcpUsd && outXcp > 0 ? usdFmt(outXcp * xcpUsd) : null;
+
+  return (
+    <div>
+      {/* Sell card */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="flex items-center justify-between text-xs text-gray-500">
+          <span>Sell</span>
           {balance !== undefined && (
             <button
               type="button"
-              className="underline"
+              className="underline hover:text-gray-700"
               onClick={() => setAmount(String(balance / SATS))}
             >
-              max {commas(balance / SATS)}
+              Balance: {commas(balance / SATS)} · Max
             </button>
           )}
-        </label>
-        <input
-          id="swap-amount"
-          type="number"
-          min={0}
-          step="any"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder="0"
-          className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-purple-500"
-        />
+        </div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <input
+            type="number"
+            min={0}
+            step="any"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            placeholder="0"
+            aria-label={`Amount of ${giveAsset} to sell`}
+            className="w-full min-w-0 bg-transparent text-3xl font-semibold text-gray-900 outline-none placeholder:text-gray-300 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          />
+          {giveAsset === "XCP" ? xcpChip : tokenChip}
+        </div>
+        <div className="mt-1 h-4 text-xs text-gray-400">{giveUsd && `≈ ${giveUsd}`}</div>
       </div>
 
-      <div className="my-2 flex justify-center">
+      {/* Flip arrow overlapping the seam */}
+      <div className="relative z-10 -my-3 flex justify-center">
         <button
           type="button"
           onClick={() => {
@@ -179,41 +203,38 @@ export function SwapWidget({
           }}
           aria-label="Flip direction"
           title="Flip direction"
-          className="rounded-full border border-gray-300 bg-white px-3 py-1 text-sm text-gray-600 hover:border-purple-400 hover:text-purple-600"
+          className="flex size-9 items-center justify-center rounded-xl border-4 border-gray-50 bg-white text-gray-500 shadow-sm hover:text-purple-600"
         >
-          ⇅
+          ↓
         </button>
       </div>
 
-      <div className="rounded-md bg-gray-50 p-3 text-sm">
-        <div className="flex justify-between text-xs text-gray-500">
-          <span>You receive (est.)</span>
+      {/* Buy card */}
+      <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="text-xs text-gray-500">Buy</div>
+        <div className="mt-1 flex items-center justify-between gap-3">
+          <div
+            className={`w-full min-w-0 truncate text-3xl font-semibold ${
+              outXcp > 0 ? "text-gray-900" : "text-gray-300"
+            }`}
+          >
+            {outXcp > 0 ? commas(outXcp) : "0"}
+          </div>
+          {getAsset === "XCP" ? xcpChip : tokenChip}
         </div>
-        <div className="mt-0.5 font-semibold text-gray-900">
-          {quote && amountRaw > 0 ? commas(quote.estimated_output / SATS) : "0"}{" "}
-          {getAsset}
-          {getAsset === "XCP" && xcpUsd && quote && amountRaw > 0 ? (
-            <span className="text-xs font-normal text-gray-400">
-              {" "}
-              ≈ {usdFmt((quote.estimated_output / SATS) * xcpUsd)}
-            </span>
-          ) : null}
-        </div>
-        {quote && amountRaw > 0 && (
-          <div className="mt-1 flex justify-between text-xs text-gray-500">
-            <span>
-              Route:{" "}
+        <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
+          <span>{getUsd && `≈ ${getUsd}`}</span>
+          {quote && amountRaw > 0 && (
+            <span className={quote.price_impact > 5 ? "font-medium text-red-600" : ""}>
               {quote.pool_output > 0 && quote.book_output > 0
-                ? "pool + order book"
+                ? "pool + book"
                 : quote.pool_output > 0
                   ? "pool"
-                  : "order book"}
+                  : "order book"}{" "}
+              · impact {quote.price_impact.toFixed(2)}%
             </span>
-            <span className={quote.price_impact > 5 ? "font-medium text-red-600" : ""}>
-              impact {quote.price_impact.toFixed(2)}%
-            </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="mt-3 flex items-center gap-2 text-xs text-gray-500">
@@ -244,7 +265,7 @@ export function SwapWidget({
         <button
           type="button"
           onClick={() => connect()}
-          className="mt-4 w-full rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
+          className="mt-3 w-full rounded-xl bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700"
         >
           {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
         </button>
@@ -253,7 +274,7 @@ export function SwapWidget({
           type="button"
           disabled={!ready}
           onClick={submit}
-          className="mt-4 w-full rounded-md bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-3 w-full rounded-xl bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {compose.status === "composing"
             ? "Composing…"
