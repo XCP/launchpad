@@ -6,6 +6,16 @@ export function fromSats(raw: number | null | undefined): number {
   return (raw ?? 0) / SATS;
 }
 
+/**
+ * Token-quantity display that respects the asset's divisibility: divisible
+ * quantities are ×1e8 raw, indivisible ones are whole units already. XCP-69
+ * assets are always divisible; this matters for the non-conforming
+ * fairminters shown in relaxed mode.
+ */
+export function tokenQty(raw: number | null | undefined, divisible: boolean): number {
+  return divisible ? fromSats(raw) : (raw ?? 0);
+}
+
 /** 1234567.89 → "1.23M"; keeps small numbers plain. */
 export function compact(n: number): string {
   if (!Number.isFinite(n)) return "0";
@@ -26,6 +36,14 @@ export function price(n: number): string {
   if (n === 0) return "0";
   if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
   return n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+}
+
+/** USD display: compact for big figures, cents only where they matter. */
+export function usd(n: number): string {
+  if (n >= 1000) return `$${compact(n)}`;
+  if (n >= 100) return `$${Math.round(n)}`;
+  if (n >= 1) return `$${n.toFixed(2)}`;
+  return `$${n.toLocaleString("en-US", { maximumSignificantDigits: 2 })}`;
 }
 
 export function shortAddress(addr: string): string {

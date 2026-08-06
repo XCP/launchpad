@@ -84,6 +84,41 @@ export interface Pool {
   reserve_b_normalized?: string;
 }
 
+/**
+ * Reserve snapshots for the TOKEN/XCP pair, one row per pool state change
+ * (deposits, withdrawals, and every swap). Ascending by tx_index after the
+ * client-side reverse; price = reserve ratio at each point.
+ */
+export interface PoolSnapshot {
+  block_index: number;
+  tx_index: number;
+  asset_a: string;
+  asset_b: string;
+  reserve_a: number;
+  reserve_b: number;
+}
+
+export async function fetchPoolPriceHistory(
+  asset: string,
+  maxPages = 5,
+): Promise<PoolSnapshot[]> {
+  const rows: PoolSnapshot[] = [];
+  let cursor: number | null = null;
+  let pages = 0;
+  do {
+    const page: Paginated<PoolSnapshot> = await get(
+      `/pools/${encodeURIComponent(asset)}/XCP/price_history?limit=1000${
+        cursor !== null ? `&cursor=${cursor}` : ""
+      }`,
+      30,
+    );
+    rows.push(...page.result);
+    cursor = page.next_cursor;
+    pages++;
+  } while (cursor !== null && pages < maxPages);
+  return rows.reverse();
+}
+
 /** TOKEN/XCP pool for an asset, or null — the launched-vs-refunded oracle. */
 export async function fetchPool(asset: string): Promise<Pool | null> {
   try {
@@ -95,6 +130,20 @@ export async function fetchPool(asset: string): Promise<Pool | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * The composed soft_cap_deadline_block from the immutable NEW_FAIRMINTER
+ * event. The fairminters row is REWRITTEN on an early sell-out (core pulls
+ * the deadline forward to the fill block), so for closed launches only the
+ * event history preserves the original window. Closed records never change —
+ * cache long.
+ */
+export async function fetchOriginalDeadline(txHash: string): Promise<number | null> {
+  const data = await get<{
+    result: { params: { soft_cap_deadline_block: number } }[];
+  }>(`/transactions/${txHash}/events/NEW_FAIRMINTER`, 3600);
+  return data.result?.[0]?.params?.soft_cap_deadline_block ?? null;
 }
 
 export async function fetchBlockHeight(): Promise<number> {
