@@ -2,24 +2,30 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { AmountInput } from "@/components/amount-input";
+import { OrderTracker } from "@/components/order-tracker";
+import { QuoteRing } from "@/components/quote-ring";
 import { commas, price as formatPrice } from "@/lib/format";
+import { useDebounced } from "@/lib/use-debounced";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 /**
  * Trading for graduated launches, built on the one primitive Counterparty
- * has: the DEX order. Matching routes through the AMM pool whenever the
- * pool's marginal price beats the book, so:
- *  - Market  = an order at the router's quoted output minus slippage — fills
- *    from pool + book immediately; any dust expires in ~3 hours.
- *  - Limit   = the same message at your price — rests on the book; the pool
- *    fills it when its price crosses yours.
- *  - Orders  = your open orders on this pair, cancellable.
+ * has: the DEX order. Matching runs once, when a NEW order confirms —
+ * pool and book interleaved, best price first. So:
+ *  - Market = an order at the quoted output minus slippage, expiring in one
+ *    block: it fills at confirmation or the remainder refunds next block.
+ *  - Limit  = the same message at your price. If it's priced through the
+ *    pool it fills on confirmation; otherwise it RESTS until a counter-order
+ *    takes it — the pool never auto-fills a resting order.
+ *  - Orders = your open orders on this pair, cancellable.
  */
 
 const SATS = 1e8;
-const MARKET_EXPIRATION = 20; // blocks — quoted fills land immediately; dust dies fast
+const MARKET_EXPIRATION = 1; // fills at confirmation, or refunds next block
+const QUOTE_REFRESH_MS = 10_000;
 const LIMIT_EXPIRATIONS = [
   { blocks: 144, label: "~1 day" },
   { blocks: 1000, label: "~1 week" },
@@ -36,6 +42,13 @@ interface Quote {
   pool_exists: boolean;
 }
 
+interface PoolInfo {
+  asset_a: string;
+  asset_b: string;
+  reserve_a: number;
+  reserve_b: number;
+}
+
 interface OpenOrder {
   tx_hash: string;
   give_asset: string;
@@ -44,7 +57,7 @@ interface OpenOrder {
   get_quantity: number;
   give_remaining: number;
   get_remaining: number;
-  expire_index: number;
+  expire_index: number | null;
 }
 
 const fetchJson = async (url: string) => {
@@ -72,6 +85,8 @@ export function TradePanel({ asset }: { asset: string }) {
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState(""); // human units of the GIVE asset
   const [slippage, setSlippage] = useState(1);
+  const [priceMoved, setPriceMoved] = useState(false);
+  const [lastQuoteAt, setLastQuoteAt] = useState<number | null>(null);
   const [limitPrice, setLimitPrice] = useState(""); // XCP per token
   const [limitAmount, setLimitAmount] = useState(""); // tokens
   const [expiration, setExpiration] = useState(1000);
@@ -79,14 +94,35 @@ export function TradePanel({ asset }: { asset: string }) {
   const giveAsset = side === "buy" ? "XCP" : asset;
   const getAsset = side === "buy" ? asset : "XCP";
   const amountRaw = Math.round((parseFloat(amount) || 0) * SATS);
+  const debouncedRaw = useDebounced(amountRaw, 250);
 
-  const { data: quote } = useSWR<Quote>(
-    tab === "market" && amountRaw > 0
-      ? `${COUNTERPARTY_API_BASE}/pools/${giveAsset}/${getAsset}/quote?quantity=${amountRaw}`
-      : null,
+  const quoteUrl =
+    tab === "market" && debouncedRaw > 0
+      ? `${COUNTERPARTY_API_BASE}/pools/${giveAsset}/${getAsset}/quote?quantity=${debouncedRaw}`
+      : null;
+  const {
+    data: quote,
+    isValidating,
+    mutate: mutateQuote,
+  } = useSWR<Quote>(
+    quoteUrl,
     (url: string) => fetchJson(url).then((d) => d.result),
-    { refreshInterval: 10_000 },
+    {
+      refreshInterval: QUOTE_REFRESH_MS,
+      keepPreviousData: true,
+      onSuccess: () => setLastQuoteAt(Date.now()),
+    },
   );
+
+  const { data: pool } = useSWR<PoolInfo | null>(
+    tab === "limit" ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP` : null,
+    (url: string) => fetchJson(url).then((d) => d.result ?? null),
+    { refreshInterval: 30_000 },
+  );
+  const spot = pool
+    ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) /
+      (pool.asset_a === asset ? pool.reserve_a : pool.reserve_b)
+    : null;
 
   const { data: balance } = useSWR(
     address ? [address, giveAsset, "balance"] : null,
@@ -114,15 +150,34 @@ export function TradePanel({ asset }: { asset: string }) {
     compose.status === "signing" ||
     compose.status === "broadcasting";
 
-  const marketReady = amountRaw > 0 && (quote?.estimated_output ?? 0) > 0 && !busy;
+  const staleQuote = isValidating || amountRaw !== debouncedRaw;
+  const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;
+  const minReceivedRaw = Math.floor(outRaw * (1 - slippage / 100));
+  const impact = quote?.price_impact ?? 0;
+  const insufficient =
+    balance !== undefined && amountRaw > 0 && amountRaw > balance;
+  const marketReady = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
 
-  const submitMarket = () => {
-    if (!marketReady || !quote) return;
+  const submitMarket = async () => {
+    if (!marketReady || !quote || !quoteUrl) return;
+    let fresh = quote;
+    try {
+      fresh = (await fetchJson(quoteUrl)).result as Quote;
+      mutateQuote(fresh, { revalidate: false });
+      setLastQuoteAt(Date.now());
+      if (fresh.estimated_output < quote.estimated_output * 0.99) {
+        setPriceMoved(true);
+        return;
+      }
+    } catch {
+      // fall back to the polled quote
+    }
+    setPriceMoved(false);
     compose.composeOrder({
       give_asset: giveAsset,
       give_quantity: amountRaw,
       get_asset: getAsset,
-      get_quantity: Math.floor(quote.estimated_output * (1 - slippage / 100)),
+      get_quantity: Math.floor(fresh.estimated_output * (1 - slippage / 100)),
       expiration: MARKET_EXPIRATION,
     });
   };
@@ -131,6 +186,13 @@ export function TradePanel({ asset }: { asset: string }) {
   const limitAmountRaw = Math.round((parseFloat(limitAmount) || 0) * SATS);
   const limitTotalRaw = Math.round(limitAmountRaw * limitPriceNum);
   const limitReady = limitPriceNum > 0 && limitAmountRaw > 0 && limitTotalRaw > 0 && !busy;
+  // Priced through the pool = fills at confirmation; otherwise it rests.
+  const limitFillsNow =
+    spot !== null && limitPriceNum > 0
+      ? side === "buy"
+        ? limitPriceNum >= spot
+        : limitPriceNum <= spot
+      : null;
 
   const submitLimit = () => {
     if (!limitReady) return;
@@ -158,7 +220,6 @@ export function TradePanel({ asset }: { asset: string }) {
       <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm">
         <div className="font-semibold text-green-800">Order broadcast</div>
         <p className="mt-1 text-green-700">
-          Matching runs at confirmation — pool first while it beats the book.{" "}
           <a
             href={`https://xcp.io/tx/${compose.txid}`}
             target="_blank"
@@ -168,19 +229,38 @@ export function TradePanel({ asset }: { asset: string }) {
             {compose.txid.slice(0, 12)}…
           </a>
         </p>
+        <OrderTracker
+          txHash={compose.txid}
+          busy={busy}
+          onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
+        />
         <button
           type="button"
           onClick={() => {
             compose.reset();
             refreshOrders();
           }}
-          className="mt-2 text-green-800 underline"
+          className="mt-3 text-green-800 underline"
         >
           Trade again
         </button>
       </div>
     );
   }
+
+  const marketLabel = busy
+    ? busyLabel(compose.status)
+    : amountRaw === 0
+      ? "Enter an amount"
+      : insufficient
+        ? `Insufficient ${giveAsset} balance`
+        : outRaw === 0
+          ? staleQuote
+            ? "Fetching quote…"
+            : "Insufficient liquidity"
+          : impact >= 5
+            ? `${side === "buy" ? "Buy" : "Sell"} anyway`
+            : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
 
   return (
     <div className="rounded-lg border border-gray-200 bg-white p-5">
@@ -241,45 +321,76 @@ export function TradePanel({ asset }: { asset: string }) {
                 </button>
               )}
             </label>
-            <input
-              id="trade-amount"
-              type="number"
-              min={0}
-              step="any"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              placeholder="0"
-              className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-purple-500"
-            />
+            <div className="mt-1 rounded-md border border-gray-300 transition-colors focus-within:border-purple-500">
+              <AmountInput
+                id="trade-amount"
+                value={amount}
+                onChange={(v) => {
+                  setAmount(v);
+                  setPriceMoved(false);
+                }}
+                className={`block w-full bg-transparent p-2.5 outline-none ${
+                  insufficient ? "text-red-600" : ""
+                }`}
+              />
+            </div>
           </div>
           {quote && amountRaw > 0 && (
             <dl className="space-y-1 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
               <div className="flex justify-between">
                 <dt>You receive (est.)</dt>
-                <dd className="font-semibold text-gray-900">
-                  {commas(quote.estimated_output / SATS)} {getAsset}
+                <dd
+                  className="font-semibold text-gray-900"
+                  style={{
+                    filter: staleQuote ? "grayscale(1)" : "none",
+                    opacity: staleQuote ? 0.4 : 1,
+                    transition: staleQuote ? "none" : "opacity 250ms ease-in-out",
+                  }}
+                >
+                  {commas(outRaw / SATS)} {getAsset}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt>Price impact</dt>
-                <dd className={quote.price_impact > 5 ? "font-semibold text-red-600" : ""}>
-                  {quote.price_impact.toFixed(2)}%
-                </dd>
+                <dt title="Enforced by the order itself — every fill must beat this rate">
+                  Min received
+                </dt>
+                <dd className="font-medium">{commas(minReceivedRaw / SATS)} {getAsset}</dd>
               </div>
+              {impact >= 0.5 && (
+                <div className="flex justify-between">
+                  <dt>Price impact</dt>
+                  <dd
+                    className={
+                      impact >= 5
+                        ? "font-semibold text-red-600"
+                        : impact >= 3
+                          ? "font-medium text-amber-600"
+                          : ""
+                    }
+                  >
+                    {impact.toFixed(2)}%
+                  </dd>
+                </div>
+              )}
               <div className="flex justify-between">
                 <dt>Route</dt>
-                <dd>
+                <dd className="flex items-center gap-1.5">
                   {quote.pool_output > 0 && quote.book_output > 0
                     ? "pool + order book"
                     : quote.pool_output > 0
                       ? "pool"
                       : "order book"}
+                  <QuoteRing
+                    periodMs={QUOTE_REFRESH_MS}
+                    lastUpdated={lastQuoteAt}
+                    fetching={staleQuote}
+                  />
                 </dd>
               </div>
               {quote.fee_bps !== undefined && (
                 <div className="flex justify-between">
-                  <dt>Pool fee</dt>
-                  <dd>{quote.fee_bps} bps (deepens locked liquidity)</dd>
+                  <dt>LP fee</dt>
+                  <dd>{quote.fee_bps} bps</dd>
                 </div>
               )}
             </dl>
@@ -301,12 +412,18 @@ export function TradePanel({ asset }: { asset: string }) {
               </button>
             ))}
           </div>
+          {priceMoved && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              Quote moved — numbers updated. Press again to trade at the new
+              price.
+            </p>
+          )}
           <TradeButton
             walletStatus={walletStatus}
             connect={connect}
             disabled={!marketReady}
-            busyLabel={busyLabel(compose.status)}
-            label={`${side === "buy" ? "Buy" : "Sell"} ${asset}`}
+            danger={impact >= 5 && marketReady}
+            label={marketLabel ?? ""}
             onClick={submitMarket}
           />
         </div>
@@ -319,33 +436,42 @@ export function TradePanel({ asset }: { asset: string }) {
               <label htmlFor="limit-price" className="text-xs text-gray-500">
                 Price (XCP per {asset})
               </label>
-              <input
-                id="limit-price"
-                type="number"
-                min={0}
-                step="any"
-                value={limitPrice}
-                onChange={(e) => setLimitPrice(e.target.value)}
-                placeholder="0.0000223"
-                className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 text-sm outline-none focus:border-purple-500"
-              />
+              <div className="mt-1 rounded-md border border-gray-300 transition-colors focus-within:border-purple-500">
+                <AmountInput
+                  id="limit-price"
+                  value={limitPrice}
+                  onChange={setLimitPrice}
+                  placeholder={spot ? formatPrice(spot) : "0.0000223"}
+                  className="block w-full bg-transparent p-2.5 text-sm outline-none"
+                />
+              </div>
             </div>
             <div>
               <label htmlFor="limit-amount" className="text-xs text-gray-500">
                 Amount ({asset})
               </label>
-              <input
-                id="limit-amount"
-                type="number"
-                min={0}
-                step="any"
-                value={limitAmount}
-                onChange={(e) => setLimitAmount(e.target.value)}
-                placeholder="0"
-                className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 text-sm outline-none focus:border-purple-500"
-              />
+              <div className="mt-1 rounded-md border border-gray-300 transition-colors focus-within:border-purple-500">
+                <AmountInput
+                  id="limit-amount"
+                  value={limitAmount}
+                  onChange={setLimitAmount}
+                  className="block w-full bg-transparent p-2.5 text-sm outline-none"
+                />
+              </div>
             </div>
           </div>
+          {spot !== null && (
+            <p className="text-xs text-gray-500">
+              Pool price: <span className="font-medium">{formatPrice(spot)}</span>
+              {limitFillsNow !== null && (
+                <span className={limitFillsNow ? " text-green-700" : ""}>
+                  {limitFillsNow
+                    ? " · fills at confirmation"
+                    : " · rests until a counter-order takes it — the pool never auto-fills a resting order"}
+                </span>
+              )}
+            </p>
+          )}
           <div className="flex items-center justify-between text-xs text-gray-500">
             <span>
               Total:{" "}
@@ -368,17 +494,11 @@ export function TradePanel({ asset }: { asset: string }) {
               </select>
             </span>
           </div>
-          <p className="text-xs text-gray-400">
-            Rests on the DEX book. The pool fills it automatically if its price
-            crosses yours; funds stay escrowed by the protocol until matched,
-            cancelled, or expired.
-          </p>
           <TradeButton
             walletStatus={walletStatus}
             connect={connect}
             disabled={!limitReady}
-            busyLabel={busyLabel(compose.status)}
-            label={`Place limit ${side}`}
+            label={busyLabel(compose.status) ?? `Place limit ${side}`}
             onClick={submitLimit}
           />
         </div>
@@ -400,8 +520,7 @@ export function TradePanel({ asset }: { asset: string }) {
                 const isBuy = o.get_asset === asset;
                 const tokens = isBuy ? o.get_quantity : o.give_quantity;
                 const xcp = isBuy ? o.give_quantity : o.get_quantity;
-                const filled =
-                  1 - (isBuy ? o.give_remaining / o.give_quantity : o.give_remaining / o.give_quantity);
+                const filled = 1 - o.give_remaining / o.give_quantity;
                 return (
                   <li key={o.tx_hash} className="flex items-center justify-between gap-2 py-2">
                     <div>
@@ -410,8 +529,10 @@ export function TradePanel({ asset }: { asset: string }) {
                       </span>{" "}
                       {commas(tokens / SATS)} @ {formatPrice(xcp / tokens)}
                       <span className="ml-2 text-xs text-gray-400">
-                        {(filled * 100).toFixed(0)}% filled · expires block{" "}
-                        {o.expire_index.toLocaleString()}
+                        {(filled * 100).toFixed(0)}% filled ·{" "}
+                        {o.expire_index === null
+                          ? "GTC"
+                          : `expires block ${o.expire_index.toLocaleString()}`}
                       </span>
                     </div>
                     <button
@@ -450,14 +571,14 @@ function TradeButton({
   walletStatus,
   connect,
   disabled,
-  busyLabel,
+  danger,
   label,
   onClick,
 }: {
   walletStatus: string;
   connect: () => void;
   disabled: boolean;
-  busyLabel: string | null;
+  danger?: boolean;
   label: string;
   onClick: () => void;
 }) {
@@ -477,9 +598,13 @@ function TradeButton({
       type="button"
       disabled={disabled}
       onClick={onClick}
-      className="w-full rounded-md bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+      className={`w-full rounded-md px-5 py-2.5 font-medium text-white disabled:cursor-not-allowed ${
+        danger
+          ? "bg-red-600 hover:bg-red-500"
+          : "bg-purple-600 hover:bg-purple-500 disabled:bg-gray-200 disabled:text-gray-400"
+      }`}
     >
-      {busyLabel ?? label}
+      {label}
     </button>
   );
 }
