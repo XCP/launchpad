@@ -9,6 +9,11 @@ import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import {
+  MAX_LEGS,
+  useDispenseRouter,
+  type PlannedLeg,
+} from "./use-dispense-router";
 
 const SATS = 1e8;
 /** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
@@ -137,7 +142,7 @@ function LoadCard({
   flips: number;
 }) {
   const { address, status: walletStatus, connect } = useWallet();
-  const compose = useCompose();
+  const router = useDispenseRouter();
   const [routeIdx, setRouteIdx] = useState(0);
   // Independent-field pattern: whichever side was typed last drives; the
   // other derives. No dead fields — start from either end of the bridge.
@@ -146,7 +151,6 @@ function LoadCard({
   const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
   const [routeOpen, setRouteOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
-  const [preflightError, setPreflightError] = useState<string | null>(null);
 
   const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
     refreshInterval: 10_000,
@@ -161,64 +165,177 @@ function LoadCard({
     { refreshInterval: 30_000 },
   );
 
-  const d = open[Math.min(routeIdx, Math.max(open.length - 1, 0))];
+  // Routes in fill order: the picked route first, the rest cheapest-first
+  // (list arrives cheapest-first). Up to MAX_LEGS legs, one tx per leg.
+  const pick = Math.min(routeIdx, Math.max(open.length - 1, 0));
+  const ordered = open.length ? [open[pick], ...open.filter((_, i) => i !== pick)] : [];
+  const routes = ordered.slice(0, MAX_LEGS);
+  const capPer = routes.map((r) =>
+    Math.max(0, Math.floor(r.give_remaining / r.give_quantity)),
+  );
+  const capacity = capPer.reduce((s, c) => s + c, 0);
+  const d = routes[0];
   const unitXcp = d ? d.give_quantity / SATS : 1;
-  const maxUnits = d ? Math.max(1, Math.floor(d.give_remaining / d.give_quantity)) : 0;
   const typedXcp = parseFloat(xcpAmount) || 0;
   const typedBtcSats = Math.round((parseFloat(btcAmount) || 0) * SATS);
-  // XCP side rounds to the nearest whole unit; BTC side floors, exactly as
-  // the protocol prices a payment (get_must_give floors — overpay is kept).
+  // XCP side rounds to whole units; BTC side floors per route in fill
+  // order, exactly as the protocol prices a payment (get_must_give floors —
+  // overpay is kept).
+  const unitsForSats = (sats: number) => {
+    let left = sats;
+    let units = 0;
+    for (let i = 0; i < routes.length; i++) {
+      const take = Math.min(capPer[i], Math.floor(left / routes[i].satoshirate));
+      units += take;
+      left -= take * routes[i].satoshirate;
+    }
+    return units;
+  };
   const n = d
     ? lastEdited === "xcp"
-      ? Math.max(0, Math.min(maxUnits, Math.round(typedXcp / unitXcp)))
-      : Math.max(0, Math.min(maxUnits, Math.floor(typedBtcSats / d.satoshirate)))
+      ? Math.max(0, Math.min(capacity, Math.round(typedXcp / unitXcp)))
+      : Math.max(0, Math.min(capacity, unitsForSats(typedBtcSats)))
     : 0;
+  // How n units split across routes, in fill order — one dispense each.
+  const plan: PlannedLeg[] = [];
+  {
+    let left = n;
+    for (let i = 0; i < routes.length && left > 0; i++) {
+      const take = Math.min(capPer[i], left);
+      if (take > 0)
+        plan.push({
+          dispenser: routes[i],
+          units: take,
+          btcSats: take * routes[i].satoshirate,
+        });
+      left -= take;
+    }
+  }
   const snapped = n * unitXcp;
-  const btcSats = d ? n * d.satoshirate : 0;
+  const btcSats = plan.reduce((s, l) => s + l.btcSats, 0);
   const btc = btcSats / SATS;
+  const blendedSatsPerXcp = snapped > 0 ? btcSats / snapped : d ? d.price : 0;
   const fmtBtc = (sats: number) =>
     (sats / SATS).toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
 
   const presets = d
     ? [1, 5, 10, 100].map((target) => {
         const k = Math.max(1, Math.round((target * SATS) / d.give_quantity));
-        return { label: `${target}`, k, available: k <= maxUnits };
+        return { label: `${target}`, k, available: k <= capacity };
       })
     : [];
 
-  const perXcpUsd = d && btcUsd ? (d.satoshirate / d.give_quantity) * btcUsd : null;
+  const perXcpUsd = d && btcUsd ? (blendedSatsPerXcp / SATS) * btcUsd : null;
   const vsMarket = perXcpUsd && xcpUsd ? (perXcpUsd / xcpUsd - 1) * 100 : null;
 
-  const busy =
-    compose.status === "composing" ||
-    compose.status === "signing" ||
-    compose.status === "broadcasting";
+  const busy = router.phase === "running";
 
-  if (compose.status === "confirmed") {
+  if (router.phase !== "idle") {
+    const doneXcp = router.legs
+      .filter((l) => l.status === "done")
+      .reduce((s, l) => s + l.units * (l.dispenser.give_quantity / SATS), 0);
+    const totalXcp = router.legs.reduce(
+      (s, l) => s + l.units * (l.dispenser.give_quantity / SATS),
+      0,
+    );
+    const allDone = router.phase === "done";
     return (
-      <div className="rounded-3xl border border-green-200 bg-green-50 p-5 text-sm">
-        <div className="font-semibold text-green-800">
-          {commas(snapped)} XCP incoming
+      <div className="rounded-3xl border border-gray-200 bg-white p-4">
+        <div className="text-sm font-semibold text-gray-900">
+          {allDone
+            ? `${commas(totalXcp)} XCP incoming`
+            : `Loading ${commas(totalXcp)} XCP · ${router.legs.length} route${
+                router.legs.length === 1 ? "" : "s"
+              }`}
         </div>
-        <p className="mt-1 text-green-700">
-          Lands on your Counterparty balance the moment your BTC confirms —
-          ready to mint with.{" "}
-          <a
-            href={`https://xcp.io/tx/${compose.txid}`}
-            target="_blank"
-            rel="noreferrer"
-            className="underline"
-          >
-            {compose.txid.slice(0, 12)}…
-          </a>
-        </p>
-        <button
-          type="button"
-          onClick={compose.reset}
-          className="mt-2 text-green-800 underline"
-        >
-          Load more
-        </button>
+        <ul className="mt-3 space-y-2">
+          {router.legs.map((leg, i) => (
+            <li
+              key={`${leg.dispenser.source}-${i}`}
+              className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs"
+            >
+              <span className="min-w-0 truncate">
+                <span className="font-medium text-gray-900">
+                  {commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
+                </span>
+                <span className="text-gray-400">
+                  {" "}
+                  · {shortAddress(leg.dispenser.source)}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {leg.status === "done" && leg.txid ? (
+                  <a
+                    href={`https://xcp.io/tx/${leg.txid}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-medium text-green-700 underline"
+                  >
+                    ✓ broadcast
+                  </a>
+                ) : leg.status === "error" ? (
+                  <>
+                    <span
+                      className="max-w-40 truncate text-red-600"
+                      title={leg.error ?? undefined}
+                    >
+                      {leg.error}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => router.retry(i)}
+                      className="rounded-md border border-gray-300 px-2 py-0.5 font-medium text-gray-700 hover:border-purple-400 hover:text-purple-600"
+                    >
+                      Retry
+                    </button>
+                  </>
+                ) : leg.status === "pending" ? (
+                  <span className="text-gray-400">waiting</span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-purple-600">
+                    <span className="size-1.5 animate-pulse rounded-full bg-purple-500" />
+                    {leg.status === "signing"
+                      ? "confirm in wallet…"
+                      : `${leg.status}…`}
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {router.planError && (
+          <p className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            {router.planError}
+          </p>
+        )}
+        {allDone ? (
+          <>
+            <p className="mt-3 text-xs text-gray-500">
+              {commas(doneXcp)} XCP lands on your Counterparty balance as each
+              payment confirms — ready to mint with.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                router.reset();
+                setXcpAmount("");
+                setBtcAmount("");
+              }}
+              className="mt-2 text-sm font-medium text-purple-700 underline"
+            >
+              Load more
+            </button>
+          </>
+        ) : busy ? (
+          <p className="mt-3 text-xs text-gray-400">
+            One wallet confirmation per route — keep this tab open.
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-gray-500">
+            Broadcast legs are final — each is its own transaction. Failed
+            legs can be retried.
+          </p>
+        )}
       </div>
     );
   }
@@ -235,15 +352,10 @@ function LoadCard({
     );
   }
 
-  const buttonLabel = busy
-    ? compose.status === "composing"
-      ? "Composing…"
-      : compose.status === "signing"
-        ? "Confirm in wallet…"
-        : "Broadcasting…"
-    : n === 0
+  const buttonLabel =
+    n === 0
       ? "Enter an amount"
-      : `Load ${commas(snapped)} XCP`;
+      : `Load ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
@@ -342,7 +454,7 @@ function LoadCard({
       <div className="px-2 pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600">
-            1 XCP = {Math.round(d.price).toLocaleString()} sats
+            1 XCP = {Math.round(blendedSatsPerXcp).toLocaleString()} sats
             {perXcpUsd && <span className="text-gray-400"> ({usdFmt(perXcpUsd)})</span>}
             {vsMarket !== null && Math.abs(vsMarket) >= 1 && (
               <span
@@ -371,21 +483,38 @@ function LoadCard({
         </div>
         {detailsOpen && (
           <dl className="mt-2 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+            {plan.length > 1 ? (
+              plan.map((leg, i) => (
+                <div key={leg.dispenser.source} className="flex justify-between">
+                  <dt>{i === 0 ? `Routes (${plan.length} txs)` : ""}</dt>
+                  <dd>
+                    {commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
+                    · {Math.round(leg.dispenser.price).toLocaleString()} sats ·{" "}
+                    {shortAddress(leg.dispenser.source)}
+                  </dd>
+                </div>
+              ))
+            ) : (
+              <div className="flex justify-between">
+                <dt>Route</dt>
+                <dd>
+                  <button
+                    type="button"
+                    onClick={() => setRouteOpen(true)}
+                    className="font-medium text-purple-600 hover:underline"
+                  >
+                    {shortAddress(d.source)} · cheapest of {open.length} ▾
+                  </button>
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between">
-              <dt>Route</dt>
+              <dt>Depth</dt>
               <dd>
-                <button
-                  type="button"
-                  onClick={() => setRouteOpen(true)}
-                  className="font-medium text-purple-600 hover:underline"
-                >
-                  {shortAddress(d.source)} · cheapest of {open.length} ▾
-                </button>
+                {commas(capacity * unitXcp)} XCP across{" "}
+                {Math.min(routes.length, MAX_LEGS)} route
+                {routes.length === 1 ? "" : "s"}
               </dd>
-            </div>
-            <div className="flex justify-between">
-              <dt>Route depth</dt>
-              <dd>{commas(d.give_remaining / SATS)} XCP left</dd>
             </div>
             <div className="flex justify-between">
               <dt>Arrival</dt>
@@ -408,9 +537,9 @@ function LoadCard({
       </div>
 
       <div className="px-0.5 pb-0.5 pt-3">
-        {(compose.status === "error" || preflightError) && (
+        {router.planError && (
           <p className="mb-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            {preflightError ?? compose.error}
+            {router.planError}
           </p>
         )}
 
@@ -426,45 +555,7 @@ function LoadCard({
           <button
             type="button"
             disabled={busy || n === 0}
-            onClick={async () => {
-              // Re-check the route at the moment of purchase: a dispense
-              // onto a drained or closed dispenser forfeits the BTC.
-              setPreflightError(null);
-              try {
-                const res = await fetch(
-                  `${COUNTERPARTY_API_BASE}/addresses/${d.source}/dispensers`,
-                  { signal: AbortSignal.timeout(10_000) },
-                );
-                const rows: {
-                  asset: string;
-                  status: number;
-                  give_remaining: number;
-                  satoshirate: number;
-                }[] = res.ok ? ((await res.json()).result ?? []) : [];
-                const live = rows.find((r) => r.asset === "XCP");
-                if (!live || live.status !== 0) {
-                  setPreflightError(
-                    "This route just closed — pick another from the details.",
-                  );
-                  return;
-                }
-                if (live.satoshirate !== d.satoshirate) {
-                  setPreflightError(
-                    "This route's price just changed — refresh the page.",
-                  );
-                  return;
-                }
-                if (live.give_remaining < n * d.give_quantity) {
-                  setPreflightError(
-                    `Only ${commas(live.give_remaining / SATS)} XCP left on this route — lower the amount.`,
-                  );
-                  return;
-                }
-              } catch {
-                // Can't verify — compose-time validation still applies.
-              }
-              compose.composeDispense({ dispenser: d.source, quantity: btcSats });
-            }}
+            onClick={() => router.start(plan)}
             className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
           >
             {buttonLabel}
