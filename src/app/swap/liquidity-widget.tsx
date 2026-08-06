@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { TokenImage } from "@/components/token-image";
+import { TokenSelectModal } from "@/components/token-select-modal";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { useCompose } from "@/lib/wallet/useCompose";
@@ -81,6 +82,7 @@ export function LiquidityWidget({
   const [tab, setTab] = useState<"add" | "remove">("add");
   const [amount, setAmount] = useState(""); // token units, add tab
   const [pct, setPct] = useState(25); // remove tab
+  const [selectorOpen, setSelectorOpen] = useState(false);
 
   const { data: pool } = useSWR<PoolInfo | null>(
     asset ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP` : null,
@@ -257,27 +259,22 @@ export function LiquidityWidget({
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       <div className="p-2">
-        <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => setSelectorOpen(true)}
+          className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-2 pr-3 transition-all hover:border-gray-300 hover:shadow-sm active:scale-[0.99]"
+        >
           <TokenImage
             asset={asset}
             className="size-10 rounded-full bg-gray-100 object-cover"
           />
-          <select
-            value={asset}
-            onChange={(e) => {
-              setAsset(e.target.value);
-              setAmount("");
-            }}
-            aria-label="Pool"
-            className="block flex-1 rounded-xl border border-gray-300 bg-white p-2.5 text-sm font-medium outline-none focus:border-purple-500"
-          >
-            {assets.map((a) => (
-              <option key={a} value={a}>
-                {a} / XCP pool
-              </option>
-            ))}
-          </select>
-        </div>
+          <span className="flex-1 text-left text-sm font-semibold text-gray-900">
+            {asset} / XCP pool
+          </span>
+          <span aria-hidden className="text-xs text-gray-400">
+            ▾
+          </span>
+        </button>
 
         <div className="mt-3 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
           {(["add", "remove"] as const).map((t) => (
@@ -476,6 +473,20 @@ export function LiquidityWidget({
           </button>
         )}
       </div>
+
+      <TokenSelectModal
+        open={selectorOpen}
+        onClose={() => setSelectorOpen(false)}
+        assets={assets}
+        selected={asset}
+        address={address}
+        title="Select a pool"
+        rowLabel={(a) => `${a} / XCP`}
+        onSelect={(a) => {
+          setAsset(a);
+          setAmount("");
+        }}
+      />
     </div>
   );
 }
