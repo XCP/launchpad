@@ -134,7 +134,7 @@ export function SellDispenser({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-6">
       {existing ? (
         <>
           <p className="text-sm text-gray-700">
@@ -193,7 +193,7 @@ export function SellDispenser({
                 value={escrow}
                 onChange={(e) => setEscrow(e.target.value)}
                 placeholder="0"
-                className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-purple-500"
+                className="mt-1 block w-full rounded-md border border-gray-300 p-3 text-lg outline-none focus:border-purple-500"
               />
             </div>
             <div className="flex-1">
@@ -207,7 +207,7 @@ export function SellDispenser({
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
                 placeholder={marketSats ? String(marketSats) : "0"}
-                className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-purple-500"
+                className="mt-1 block w-full rounded-md border border-gray-300 p-3 text-lg outline-none focus:border-purple-500"
               />
             </div>
           </div>
@@ -218,14 +218,18 @@ export function SellDispenser({
               /XCP ·{" "}
               <span
                 className={
-                  vsMarket >= 0
-                    ? "font-medium text-green-600"
-                    : "font-medium text-amber-600"
+                  Math.abs(vsMarket) < 0.5
+                    ? "font-medium text-gray-600"
+                    : vsMarket > 0
+                      ? "font-medium text-green-600"
+                      : "font-medium text-amber-600"
                 }
               >
-                {vsMarket >= 0
-                  ? `${vsMarket.toFixed(0)}% above market — your premium`
-                  : `${Math.abs(vsMarket).toFixed(0)}% below market — vends fast, earns less`}
+                {Math.abs(vsMarket) < 0.5
+                  ? "at market"
+                  : vsMarket > 0
+                    ? `${vsMarket.toFixed(0)}% above market — your premium`
+                    : `${Math.abs(vsMarket).toFixed(0)}% below market — vends fast, earns less`}
               </span>
             </p>
           )}
@@ -246,7 +250,7 @@ export function SellDispenser({
             <button
               type="button"
               onClick={() => connect()}
-              className="mt-4 w-full rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
+              className="mt-4 w-full rounded-md bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700"
             >
               {walletStatus === "not_detected"
                 ? "Install XCP Wallet"
@@ -257,7 +261,7 @@ export function SellDispenser({
               type="button"
               disabled={!ready}
               onClick={open}
-              className="mt-4 w-full rounded-md bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-4 w-full rounded-md bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {busy
                 ? compose.status === "signing"

@@ -127,7 +127,7 @@ export function DispenserBuy({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-6">
       <label htmlFor="dispenser" className="text-xs text-gray-500">
         Dispenser (cheapest first)
       </label>
@@ -138,7 +138,7 @@ export function DispenserBuy({
           setSelected(Number(e.target.value));
           setTriggers(1);
         }}
-        className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
+        className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-3 text-sm outline-none focus:border-purple-500"
       >
         {open.map((disp, i) => (
           <option key={disp.source} value={i}>
@@ -168,7 +168,7 @@ export function DispenserBuy({
             max={maxTriggers}
             value={triggers}
             onChange={(e) => setTriggers(Number(e.target.value))}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-purple-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 p-3 text-lg outline-none focus:border-purple-500"
           />
         </div>
         <div className="pb-1 text-sm text-gray-600">
@@ -232,7 +232,7 @@ export function DispenserBuy({
         <button
           type="button"
           onClick={() => connect()}
-          className="mt-4 w-full rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
+          className="mt-4 w-full rounded-md bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700"
         >
           {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
         </button>
@@ -243,7 +243,7 @@ export function DispenserBuy({
           onClick={() =>
             compose.composeDispense({ dispenser: d.source, quantity: btcSats })
           }
-          className="mt-4 w-full rounded-md bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-4 w-full rounded-md bg-purple-600 px-5 py-3 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {compose.status === "composing"
             ? "Composing…"
