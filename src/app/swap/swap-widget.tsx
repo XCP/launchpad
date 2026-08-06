@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { AssetChip, XcpChip } from "@/components/asset-chip";
@@ -17,6 +17,7 @@ import { Well } from "@/components/ui/well";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -106,6 +107,17 @@ export function SwapWidget({
   const insufficient =
     balance !== undefined && amountRaw > 0 && amountRaw > balance;
   const busy = isBusy(compose.status);
+
+  useEffect(() => {
+    if (compose.status === "confirmed") {
+      registerPending({
+        txid: compose.txid,
+        kind: "order",
+        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — market order`,
+      });
+    }
+  }, [compose.status, compose.txid, side, asset]);
+
   const ready = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
 
   // USD on BOTH sides, derived through the XCP leg of the trade.

@@ -130,6 +130,7 @@ function LoadCard({
   const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
   const [routeOpen, setRouteOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [armed, setArmed] = useState(false);
 
   const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
     refreshInterval: 10_000,
@@ -317,7 +318,7 @@ function LoadCard({
                   <span className="flex items-center gap-1.5 text-purple-600">
                     <span className="size-1.5 animate-pulse rounded-full bg-purple-500" />
                     {leg.status === "signing"
-                      ? "confirm in wallet…"
+                      ? `confirm in wallet (${i + 1} of ${router.legs.length})`
                       : `${leg.status}…`}
                   </span>
                 )}
@@ -375,7 +376,9 @@ function LoadCard({
   const buttonLabel =
     n === 0
       ? "Enter an amount"
-      : `Load ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
+      : armed && plan.length > 1
+        ? `Sign ${plan.length} transactions`
+        : `Load ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
 
   return (
     <div className="contents">
@@ -415,6 +418,7 @@ function LoadCard({
                   onClick={() => {
                     setXcpAmount(String(p.k * unitXcp));
                     setLastEdited("xcp");
+                    setArmed(false);
                   }}
                   className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                     !p.available
@@ -438,6 +442,7 @@ function LoadCard({
           onChange={(v) => {
             setXcpAmount(v);
             setLastEdited("xcp");
+            setArmed(false);
           }}
           ariaLabel="XCP to receive"
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
@@ -467,6 +472,7 @@ function LoadCard({
           onChange={(v) => {
             setBtcAmount(v);
             setLastEdited("btc");
+            setArmed(false);
           }}
           ariaLabel="BTC to send"
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
@@ -585,14 +591,43 @@ function LoadCard({
             {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
           </button>
         ) : (
-          <button
-            type="button"
-            disabled={busy || n === 0}
-            onClick={() => router.start(plan)}
-            className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-          >
-            {buttonLabel}
-          </button>
+          <>
+            {armed && plan.length > 1 && (
+              <div className="mb-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2.5 text-xs text-purple-900">
+                <div className="font-semibold">
+                  {plan.length} routes → {plan.length} wallet signatures
+                </div>
+                <ul className="mt-1 space-y-0.5">
+                  {plan.map((leg, i) => (
+                    <li key={leg.dispenser.source}>
+                      {i + 1}. {commas(leg.units * (leg.dispenser.give_quantity / SATS))}{" "}
+                      XCP · {fmtBtc(leg.btcSats)} BTC →{" "}
+                      {shortAddress(leg.dispenser.source)}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-1 text-purple-700">
+                  Your wallet will ask once per route, in order — each popup is
+                  one route, nothing more.
+                </div>
+              </div>
+            )}
+            <button
+              type="button"
+              disabled={busy || n === 0}
+              onClick={() => {
+                if (plan.length > 1 && !armed) {
+                  setArmed(true);
+                  return;
+                }
+                setArmed(false);
+                router.start(plan);
+              }}
+              className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+            >
+              {buttonLabel}
+            </button>
+          </>
         )}
         <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
           Non-custodial: the protocol vends automatically when your BTC

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { TokenImage } from "@/components/token-image";
@@ -13,6 +13,7 @@ import { GearPopover } from "@/components/ui/popover";
 import { Well } from "@/components/ui/well";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -159,6 +160,17 @@ export function LiquidityWidget({
     : 0;
 
   const busy = isBusy(compose.status);
+
+  useEffect(() => {
+    if (compose.status === "confirmed") {
+      registerPending({
+        txid: compose.txid,
+        kind: "pool",
+        label: `${tab === "add" ? "Add" : "Remove"} ${asset}/XCP liquidity`,
+      });
+    }
+  }, [compose.status, compose.txid, tab, asset]);
+
 
   const insufficientToken =
     tokenBalance !== undefined && amountRaw > 0 && amountRaw > tokenBalance;

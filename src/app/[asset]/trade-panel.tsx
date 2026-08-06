@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { OrderTracker } from "@/components/order-tracker";
@@ -9,6 +9,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { QuoteRing } from "@/components/quote-ring";
 import { commas, price as formatPrice } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
+import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -113,6 +114,17 @@ export function TradePanel({
   );
 
   const busy = isBusy(compose.status);
+
+  useEffect(() => {
+    if (compose.status === "confirmed") {
+      registerPending({
+        txid: compose.txid,
+        kind: "order",
+        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — ${tab} order`,
+      });
+    }
+  }, [compose.status, compose.txid, side, asset, tab]);
+
 
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
   const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;

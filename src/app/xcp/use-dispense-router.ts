@@ -2,6 +2,8 @@
 
 import { useRef, useState } from "react";
 import type { Dispenser } from "@/lib/api/counterparty";
+import { shortAddress } from "@/lib/format";
+import { registerPending } from "@/lib/pending";
 import { fetchPriorityFeeRate } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
@@ -183,6 +185,11 @@ export function useDispenseRouter() {
           patch(i, { status: "broadcasting" });
           const txid = await broadcastTransaction(signedHex);
           patch(i, { status: "done", txid });
+          registerPending({
+            txid,
+            kind: "dispense",
+            label: `Load ${leg.units * (leg.dispenser.give_quantity / 1e8)} XCP via ${shortAddress(leg.dispenser.source)}`,
+          });
         } catch (e) {
           patch(i, {
             status: "error",

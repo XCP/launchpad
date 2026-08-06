@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { usd } from "@/lib/format";
 import { isBusy } from "@/lib/use-busy";
+import { registerPending } from "@/lib/pending";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { XCP69 } from "@/lib/xcp69";
@@ -29,6 +30,17 @@ export function MintPanel({
 
   const clampedLots = Math.max(1, Math.min(MAX_LOTS, Math.floor(lots) || 1));
   const busy = isBusy(compose.status);
+
+  useEffect(() => {
+    if (compose.status === "confirmed") {
+      registerPending({
+        txid: compose.txid,
+        kind: "mint",
+        label: `Mint ${(clampedLots * 1000).toLocaleString()} ${asset}`,
+      });
+    }
+  }, [compose.status, compose.txid, clampedLots, asset]);
+
 
   if (compose.status === "confirmed") {
     return (

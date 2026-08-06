@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { PendingDock } from "@/components/pending-dock";
 import { WalletProvider } from "@/lib/wallet/wallet-context";
 import "./globals.css";
 
@@ -39,6 +40,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
         <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+        <PendingDock />
         </WalletProvider>
       </body>
     </html>
