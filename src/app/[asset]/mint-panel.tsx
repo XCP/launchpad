@@ -30,7 +30,7 @@ export function MintPanel({
 
   if (compose.status === "confirmed") {
     return (
-      <div className="rounded-lg border border-green-200 bg-green-50 p-5 text-sm">
+      <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
         <div className="font-semibold text-green-800">
           Mint broadcast — {(clampedLots * 1000).toLocaleString()} {asset} for{" "}
           {(clampedLots * XCP_PER_LOT).toFixed(2)} XCP
@@ -59,7 +59,7 @@ export function MintPanel({
   }
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 bg-white p-4">
       <h2 className="font-semibold">Mint</h2>
       <div className="mt-3 flex items-end gap-3">
         <div className="flex-1">
@@ -68,12 +68,15 @@ export function MintPanel({
           </label>
           <input
             id="lots"
-            type="number"
-            min={1}
-            max={MAX_LOTS}
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
             value={lots}
-            onChange={(e) => setLots(Number(e.target.value))}
-            className="mt-1 block w-full rounded-md border border-gray-300 p-2.5 outline-none focus:border-purple-500"
+            onChange={(e) => {
+              const v = e.target.value.replace(/[^\d]/g, "");
+              setLots(v === "" ? 0 : Number(v));
+            }}
+            className="mt-1 block w-full rounded-xl border border-gray-300 p-2.5 outline-none transition-colors focus:border-purple-500"
           />
         </div>
         <div className="pb-1 text-sm text-gray-600">
@@ -108,7 +111,7 @@ export function MintPanel({
               : `${(preset * XCP_PER_LOT).toLocaleString()} XCP`}
           </button>
         ))}
-        <span className="ml-auto text-xs text-gray-400">
+        <span className="ml-auto text-xs text-gray-500">
           ={" "}
           {(clampedLots / 1000).toLocaleString("en-US", {
             maximumFractionDigits: 3,
@@ -127,7 +130,7 @@ export function MintPanel({
         <button
           type="button"
           onClick={() => connect()}
-          className="mt-4 w-full rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
+          className="mt-4 w-full rounded-xl bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
         >
           {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
         </button>
@@ -141,7 +144,7 @@ export function MintPanel({
               quantity: clampedLots * XCP69.QUANTITY_BY_PRICE,
             })
           }
-          className="mt-4 w-full rounded-md bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
+          className="mt-4 w-full rounded-xl bg-purple-600 px-5 py-2.5 font-medium text-white hover:bg-purple-500 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {compose.status === "composing" && "Composing…"}
           {compose.status === "signing" && "Confirm in wallet…"}

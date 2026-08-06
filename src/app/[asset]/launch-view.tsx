@@ -1,4 +1,3 @@
-import { Suspense } from "react";
 import { TokenImage } from "@/components/token-image";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
@@ -6,6 +5,7 @@ import {
   commas,
   compact,
   fromSats,
+  price as formatPrice,
   shortAddress,
   usd,
 } from "@/lib/format";
@@ -27,8 +27,13 @@ import { PriceChart } from "./price-chart";
 
 /**
  * The launch page's entire presentation, data in via props — shared by the
- * real /[asset] route and the /preview state simulator so the two can never
+ * real /[asset] route and the phase-preview simulator so the two can never
  * drift. No fetching happens here.
+ *
+ * Shape: a terminal for one asset. Header answers "how's it doing?" at a
+ * glance (price, multiple, change), a dense stat strip carries the numbers,
+ * the aside answers "do I want in or out?" with the forms, and the prose
+ * collapses into chips and tooltips.
  */
 export function LaunchView({
   asset,
@@ -78,71 +83,236 @@ export function LaunchView({
       ? Math.max(...byAddress.values()) / fm.earned_quantity
       : 0;
 
+  // "How's it doing" numbers (graduated): spot from the pool, change over
+  // the available history, multiple vs the fixed mint price.
+  const mintPrice =
+    fm.quantity_by_price > 0 ? fm.price / fm.quantity_by_price : 0;
+  const spot = poolTokens > 0 ? poolXcp / poolTokens : 0;
+  const first = priceHistory[0];
+  const firstPrice =
+    first && first.reserve_a > 0 && first.reserve_b > 0
+      ? (first.asset_a === "XCP" ? first.reserve_a : first.reserve_b) /
+        (first.asset_a === "XCP" ? first.reserve_b : first.reserve_a)
+      : 0;
+  const change = firstPrice > 0 && spot > 0 ? (spot / firstPrice - 1) * 100 : null;
+  const multiple = mintPrice > 0 && spot > 0 ? spot / mintPrice : null;
+  const supplyTokens = fromSats(fm.hard_cap);
+  const mcapUsd = xcpUsd && spot > 0 ? spot * supplyTokens * xcpUsd : null;
+
   const hasAside =
     (phase === "minting" && conforming) ||
     (phase === "graduated" && pool !== null);
 
+  /* Header right: the one number that answers "how's it doing?" */
+  const headline =
+    phase === "graduated" && pool ? (
+      <div className="text-right">
+        <div className="text-xl font-bold tabular-nums text-gray-900">
+          {formatPrice(spot)} <span className="text-sm font-medium text-gray-500">XCP</span>
+        </div>
+        <div className="mt-0.5 text-xs text-gray-500">
+          {xcpUsd ? `${usd(spot * xcpUsd)} · ` : ""}
+          {multiple ? `${multiple.toFixed(2)}× mint` : ""}
+          {change !== null && (
+            <span
+              className={`ml-1.5 font-semibold ${
+                change >= 0 ? "text-green-600" : "text-red-600"
+              }`}
+            >
+              {change >= 0 ? "+" : ""}
+              {change.toFixed(1)}%
+            </span>
+          )}
+        </div>
+      </div>
+    ) : phase === "minting" ? (
+      <div className="text-right">
+        <div className="text-xl font-bold tabular-nums text-gray-900">
+          {(progress * 100).toFixed(1)}%{" "}
+          <span className="text-sm font-medium text-gray-500">sold</span>
+        </div>
+        <div className="mt-0.5 text-xs text-gray-500">
+          {fm.soft_cap_deadline_block > 0
+            ? `${blocksEta(fm.soft_cap_deadline_block - blockHeight)} left`
+            : "no deadline"}
+        </div>
+      </div>
+    ) : phase === "scheduled" ? (
+      <div className="text-right">
+        <div className="text-xl font-bold text-gray-900">
+          {blocksEta(fm.start_block - blockHeight)}
+        </div>
+        <div className="mt-0.5 text-xs text-gray-500">until minting opens</div>
+      </div>
+    ) : (
+      <div className="text-right">
+        <div className="text-xl font-bold text-gray-400">
+          {phase === "refunded" ? "refunded" : "minted out"}
+        </div>
+        <div className="mt-0.5 text-xs text-gray-500">
+          reached {(progress * 100).toFixed(1)}%
+        </div>
+      </div>
+    );
+
+  /* The stat strip: dense, phase-specific, no prose. */
+  const strip: [string, string, string?][] =
+    phase === "graduated" && pool
+      ? [
+          ["Market cap", mcapUsd ? usd(mcapUsd) : "—"],
+          [
+            "Liquidity",
+            `${commas(Math.round(poolXcp))} XCP${
+              xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""
+            }`,
+            "XCP side of the locked pool",
+          ],
+          ["Supply", compact(supplyTokens)],
+          ["Participants", String(participants)],
+          [
+            "LP",
+            isHouseLpName(pool.lp_asset) ? "burned ✓" : "burned",
+            `${pool.lp_asset} — minted to the unspendable address; liquidity can never leave`,
+          ],
+        ]
+      : phase === "minting"
+        ? [
+            [
+              "Raised",
+              `${commas(fromSats(fm.paid_quantity))} XCP${
+                xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""
+              }`,
+            ],
+            [
+              "At close",
+              openingMultiple(fm)
+                ? `pool opens ${openingMultiple(fm)!.toFixed(2)}× mint`
+                : "no pool",
+            ],
+            [
+              "Participants",
+              `${participants} / ${XCP69_MIN_PARTICIPANTS}+`,
+              `Success requires at least ${XCP69_MIN_PARTICIPANTS} distinct addresses`,
+            ],
+            [
+              "Top address",
+              `${(topShare * 100).toFixed(1)}%`,
+              "Share of the sale held by the largest single address (cap 1.45%). Per address, not per person — it raises the cost of faking a crowd, it cannot prevent one.",
+            ],
+            ["Mints", String(mints.length)],
+          ]
+        : phase === "scheduled"
+          ? [
+              ["Opens", `block ${fm.start_block.toLocaleString()}`],
+              ["Window", "1,000 blocks (~1 week)"],
+              ["Lot price", "0.01 XCP / 1,000 tokens"],
+              ["Per-address cap", "10 XCP"],
+            ]
+          : [
+              ["Reached", `${(progress * 100).toFixed(1)}%`],
+              ["Participants", String(participants)],
+              [
+                phase === "refunded" ? "Returned" : "Raised",
+                `${commas(fromSats(fm.paid_quantity))} XCP`,
+              ],
+              ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
+            ];
+
   return (
     <div>
-      {/* Identity — the art leads */}
-      <div className="flex items-center gap-4">
+      {/* Identity + headline: how's it doing, at a glance */}
+      <div className="flex flex-wrap items-center gap-3">
         <TokenImage
           asset={asset}
           large
-          className="size-16 rounded-xl bg-gray-100 object-cover shadow-sm"
+          className="size-12 rounded-lg bg-gray-100 object-cover shadow-sm"
         />
-        <div>
-          <h1 className="text-2xl font-bold">{asset}</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            by {shortAddress(fm.source)} · {phase}
+        <div className="min-w-0">
+          <h1 className="flex items-center gap-2 text-xl font-bold leading-tight">
+            {asset}
             {conforming ? (
               <span
-                className="ml-2 rounded bg-purple-50 px-1.5 py-0.5 text-xs font-medium text-purple-700"
+                className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] font-medium text-purple-700"
                 title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
               >
                 XCP-69 ✓
               </span>
             ) : (
-              <span className="ml-2 rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-700">
+              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
                 not XCP-69
               </span>
             )}
+          </h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            by {shortAddress(fm.source)} · {phase}
           </p>
         </div>
+        <div className="ml-auto">{headline}</div>
+      </div>
+
+      {/* Stat strip — the terminal row */}
+      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-y border-gray-200 py-3">
+        {strip.map(([label, value, hint]) => (
+          <div key={label} title={hint} className={hint ? "cursor-help" : undefined}>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              {label}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              {value}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div
         className={
           hasAside
-            ? "mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6"
-            : "mt-6"
+            ? "mt-5 lg:grid lg:grid-cols-[21rem_minmax(0,1fr)] lg:items-start lg:gap-6"
+            : "mt-5"
         }
       >
-      {/* Main column: story, chart, receipt, activity */}
-      <div className="min-w-0 space-y-4">
-      {phase === "scheduled" && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
-          Minting opens at block {fm.start_block.toLocaleString()} —{" "}
-          {blocksEta(fm.start_block - blockHeight)} from now.
-        </div>
+      {/* Aside first (pons grammar): do I want in, do I want out */}
+      {hasAside && (
+        <aside className="mb-4 min-w-0 space-y-4 lg:mb-0">
+          {phase === "minting" && conforming && (
+            <MintPanel asset={asset} xcpUsd={xcpUsd} />
+          )}
+          {phase === "graduated" && pool && conforming && (
+            <AssetTradeSurface asset={asset} xcpUsd={xcpUsd} />
+          )}
+          {phase === "graduated" && pool && (
+            <div className="holo-border rounded-2xl p-3 text-xs text-gray-600">
+              <span className="font-semibold text-gray-900">
+                Liquidity locked forever
+              </span>{" "}
+              — LP <span className="font-mono">{pool.lp_asset}</span>
+              {isHouseLpName(pool.lp_asset) && (
+                <span title="House format: starts 69, ends 69, ≡ 69 (mod 97)"> ✓</span>
+              )}{" "}
+              was minted to the unspendable address. {compact(poolTokens)}{" "}
+              {asset} + {commas(Math.round(poolXcp))} XCP can never be
+              withdrawn.
+            </div>
+          )}
+        </aside>
       )}
 
+      {/* Main column: chart, story, receipt, activity */}
+      <div className="min-w-0 space-y-4">
       {phase === "minting" && (
         <>
           {(fm.pool_quantity ?? 0) > 0 && (
-            <div className="rounded-lg border border-purple-200 bg-purple-50 p-4 text-sm text-purple-900">
+            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-3 text-sm text-purple-900">
               <strong>
                 {compact(fromSats(saleTarget(fm)))} minted, or everyone is
-                refunded.
+                refunded
               </strong>{" "}
-              {Math.max(0, fm.soft_cap_deadline_block - blockHeight).toLocaleString()}{" "}
-              blocks ({blocksEta(fm.soft_cap_deadline_block - blockHeight)})
-              left — every mint stays escrowed by consensus until it resolves.
+              — every mint stays escrowed by consensus until it resolves.
             </div>
           )}
 
           {/* Progress — server-rendered baseline, then live with mempool overlay */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4">
             <LiveProgress
               fairminterTxHash={fm.tx_hash}
               initialEarned={fm.earned_quantity ?? 0}
@@ -150,57 +320,12 @@ export function LaunchView({
               allOrNothing={(fm.pool_quantity ?? 0) > 0}
               divisible={fm.divisible}
             />
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
-              <Stat
-                label="XCP raised"
-                value={`${commas(fromSats(fm.paid_quantity))}${
-                  xcpUsd ? ` (≈${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""
-                }`}
-              />
-              <Stat
-                label="Time left"
-                value={
-                  fm.soft_cap_deadline_block > 0
-                    ? blocksEta(fm.soft_cap_deadline_block - blockHeight)
-                    : "no deadline"
-                }
-              />
-              <Stat
-                label="At close"
-                value={
-                  openingMultiple(fm)
-                    ? `pool opens ${openingMultiple(fm)!.toFixed(2)}× mint`
-                    : "no pool"
-                }
-              />
-            </div>
-          </div>
-
-          {/* Organic panel */}
-          <div className="rounded-lg border border-gray-200 bg-white p-4">
-            <h2 className="mb-3 font-semibold">How organic does it look?</h2>
-            <div className="grid grid-cols-3 gap-2 text-center text-sm">
-              <Stat
-                label="Distinct addresses"
-                value={`${participants} / ${XCP69_MIN_PARTICIPANTS}+`}
-              />
-              <Stat
-                label="Top address share"
-                value={`${(topShare * 100).toFixed(1)}% (cap 1.45%)`}
-              />
-              <Stat label="Mints" value={String(mints.length)} />
-            </div>
-            <p className="mt-3 text-xs text-gray-500">
-              Success requires at least {XCP69_MIN_PARTICIPANTS} distinct
-              addresses. The cap is per address, not per person — it raises the
-              cost of faking a crowd, it cannot prevent one.
-            </p>
           </div>
         </>
       )}
 
       {phase === "graduated" && pool && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
           <PriceChart
             asset={asset}
             history={priceHistory}
@@ -211,11 +336,11 @@ export function LaunchView({
       )}
 
       {phase === "refunded" && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="font-semibold text-gray-700">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <h2 className="text-sm font-semibold text-gray-700">
             Refunded — soft cap not reached
           </h2>
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-1.5 text-sm text-gray-600">
             Reached {(progress * 100).toFixed(1)}% with {participants}{" "}
             participants. All {commas(fromSats(fm.paid_quantity))} XCP was
             refunded by the protocol and the escrowed supply destroyed.
@@ -225,9 +350,9 @@ export function LaunchView({
 
       {/* Classic (non-pool) fairminter that met its target — relaxed mode only */}
       {phase === "graduated" && !pool && (
-        <div className="rounded-lg border border-gray-200 bg-white p-4">
-          <h2 className="font-semibold">Minted out</h2>
-          <p className="mt-2 text-sm text-gray-600">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+          <h2 className="text-sm font-semibold">Minted out</h2>
+          <p className="mt-1.5 text-sm text-gray-600">
             Reached {(progress * 100).toFixed(1)}% with {participants}{" "}
             participants. A classic fairminter — no pool, no locked liquidity;
             distribution only.
@@ -235,76 +360,24 @@ export function LaunchView({
         </div>
       )}
 
-      {/* The receipt — consensus guarantees, not platform promises */}
+      {/* The receipt — consensus guarantees as chips; expand to verify */}
       {conforming && <Guarantees fm={fm} />}
 
       {/* Issuer-only metadata curation; renders nothing for everyone else */}
       <EditPanel asset={asset} issuer={fm.source} />
 
       {/* Activity: the mint tape and live holders */}
-      <Suspense>
-        <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
-      </Suspense>
+      <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
       </div>
-
-      {/* Aside: the forms — sticky on desktop, below the story on mobile */}
-      {hasAside && (
-        <aside className="mt-4 min-w-0 space-y-4 lg:sticky lg:top-6 lg:mt-0">
-          {phase === "minting" && conforming && (
-            <MintPanel asset={asset} xcpUsd={xcpUsd} />
-          )}
-          {phase === "graduated" && pool && conforming && (
-            <AssetTradeSurface asset={asset} xcpUsd={xcpUsd} />
-          )}
-          {phase === "graduated" && pool && (
-            <div className="holo-border rounded-lg p-4">
-              <h2 className="text-sm font-semibold">
-                Graduated — liquidity locked
-              </h2>
-              <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
-                <Stat
-                  label="Pool XCP"
-                  value={`${commas(poolXcp)}${
-                    xcpUsd ? ` (≈${usd(poolXcp * xcpUsd)})` : ""
-                  }`}
-                />
-                <Stat label="Pool tokens" value={compact(poolTokens)} />
-                <Stat label="Participants" value={String(participants)} />
-              </div>
-              <p className="mt-3 text-xs text-gray-500">
-                LP tokens (
-                <span className="font-mono">{pool.lp_asset}</span>
-                {isHouseLpName(pool.lp_asset) && (
-                  <span title="House format: starts 69, ends 69, ≡ 69 (mod 97)">
-                    {" "}
-                    ✓
-                  </span>
-                )}
-                ) were minted to the unspendable address — nobody can ever
-                withdraw this liquidity.
-              </p>
-            </div>
-          )}
-        </aside>
-      )}
       </div>
-    </div>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-gray-50 p-2">
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="mt-0.5 font-semibold text-gray-900">{value}</div>
     </div>
   );
 }
 
 /**
  * The inversion of a memecoin launchpad's "Audit" box: where those detect
- * rug vectors heuristically after the fact, XCP-69 forbids them by consensus.
- * Static by design — every conforming launch earns the identical receipt.
+ * rug vectors heuristically after the fact, XCP-69 forbids them by
+ * consensus. Chips up front, the full receipt one click away.
  */
 function Guarantees({ fm }: { fm: Fairminter }) {
   const announcedLead =
@@ -320,26 +393,43 @@ function Guarantees({ fm }: { fm: Fairminter }) {
     ["No rug", "LP tokens are minted to the unspendable address — liquidity can never be withdrawn"],
   ];
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-4">
-      <h2 className="font-semibold">The receipt</h2>
-      <p className="mt-1 text-xs text-gray-500">
-        Not platform policy — protocol consensus. Every row is verifiable
-        against any Counterparty node from this launch&apos;s on-chain record.
-      </p>
-      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+    <details className="group rounded-2xl border border-gray-200 bg-white">
+      <summary className="flex cursor-pointer flex-wrap items-center gap-1.5 p-3 [&::-webkit-details-marker]:hidden">
         {rows.map(([claim, how]) => (
-          <div key={claim} className="flex gap-2 rounded-md bg-gray-50 p-2.5">
-            <span aria-hidden className="font-semibold text-green-600">
-              ✓
-            </span>
-            <div>
-              <dt className="text-sm font-medium text-gray-900">{claim}</dt>
-              <dd className="mt-0.5 text-xs text-gray-600">{how}</dd>
-            </div>
-          </div>
+          <span
+            key={claim}
+            title={how}
+            className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800"
+          >
+            <span aria-hidden>✓</span>
+            {claim}
+          </span>
         ))}
-      </dl>
-    </div>
+        <span className="ml-auto whitespace-nowrap text-xs text-gray-400 transition-transform group-open:rotate-180">
+          ▾
+        </span>
+      </summary>
+      <div className="border-t border-gray-100 p-4">
+        <p className="text-xs text-gray-500">
+          Not platform policy — protocol consensus. Every row is verifiable
+          against any Counterparty node from this launch&apos;s on-chain
+          record.
+        </p>
+        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+          {rows.map(([claim, how]) => (
+            <div key={claim} className="flex gap-2 rounded-md bg-gray-50 p-2.5">
+              <span aria-hidden className="font-semibold text-green-600">
+                ✓
+              </span>
+              <div>
+                <dt className="text-sm font-medium text-gray-900">{claim}</dt>
+                <dd className="mt-0.5 text-xs text-gray-600">{how}</dd>
+              </div>
+            </div>
+          ))}
+        </dl>
+      </div>
+    </details>
   );
 }
 

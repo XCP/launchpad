@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import useSWR from "swr";
 import type { Fairmint } from "@/lib/api/counterparty";
 import { commas, compact, fromSats, shortAddress, tokenQty } from "@/lib/format";
@@ -16,9 +16,8 @@ interface HolderRow {
 
 /**
  * The activity card: Mints (the launch tape) and Holders (live top
- * balances) as tabs, paginated and deep-linkable — ?tab=holders&p=3
- * restores exactly this view. Addresses and transactions link out to the
- * explorer.
+ * balances) as tabs, paginated locally. Addresses and transactions link
+ * out to the explorer.
  */
 export function ActivityTabs({
   asset,
@@ -29,19 +28,12 @@ export function ActivityTabs({
   mints: Fairmint[];
   divisible: boolean;
 }) {
-  const sp = useSearchParams();
-  const router = useRouter();
-  const pathname = usePathname();
-  const tab = sp.get("tab") === "holders" ? "holders" : "mints";
-  const pageParam = Math.max(1, parseInt(sp.get("p") ?? "1", 10) || 1);
+  const [tab, setTab] = useState<"mints" | "holders">("mints");
+  const [pageParam, setPage] = useState(1);
 
   const setParams = (t: "mints" | "holders", p: number) => {
-    const q = new URLSearchParams(sp.toString());
-    if (t === "mints") q.delete("tab");
-    else q.set("tab", t);
-    if (p <= 1) q.delete("p");
-    else q.set("p", String(p));
-    router.replace(q.size ? `${pathname}?${q}` : pathname, { scroll: false });
+    setTab(t);
+    setPage(p);
   };
 
   const { data: holders } = useSWR<HolderRow[]>(
@@ -76,7 +68,7 @@ export function ActivityTabs({
         type="button"
         disabled={page <= 1}
         onClick={() => setParams(tab, page - 1)}
-        className="rounded-md border border-gray-200 px-2.5 py-1 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-md border border-gray-200 px-3 py-1.5 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         ← Prev
       </button>
@@ -87,7 +79,7 @@ export function ActivityTabs({
         type="button"
         disabled={page >= totalPages}
         onClick={() => setParams(tab, page + 1)}
-        className="rounded-md border border-gray-200 px-2.5 py-1 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-md border border-gray-200 px-3 py-1.5 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Next →
       </button>
@@ -95,7 +87,7 @@ export function ActivityTabs({
   );
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white">
+    <div className="rounded-2xl border border-gray-200 bg-white">
       <div className="flex items-center gap-1 border-b border-gray-200 p-2">
         {(["mints", "holders"] as const).map((t) => (
           <button
@@ -145,7 +137,7 @@ export function ActivityTabs({
                     href={`https://xcp.io/tx/${m.tx_hash}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-xs text-gray-400 hover:text-purple-700 hover:underline"
+                    className="text-xs text-gray-500 hover:text-purple-700 hover:underline"
                   >
                     block {m.block_index}
                   </a>
