@@ -17,13 +17,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <WalletProvider>
         <header className="border-b border-gray-200 bg-white">
           <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-            <Link href="/" className="text-lg font-bold tracking-tight">
-              xcp<span className="text-purple-600">.fun</span>
-            </Link>
+            <div className="flex items-center gap-5">
+              <Link href="/" className="text-lg font-bold tracking-tight">
+                xcp<span className="text-purple-600">.fun</span>
+              </Link>
+              <nav className="flex items-center gap-4 text-sm font-medium text-gray-600">
+                <Link href="/swap" className="hover:text-gray-900">Swap</Link>
+                <Link href="/xcp" className="hover:text-gray-900">XCP</Link>
+              </nav>
+            </div>
             <nav className="flex items-center gap-4 text-sm font-medium text-gray-600">
-              <Link href="/faq" className="hover:text-gray-900">How it works</Link>
-              <Link href="/swap" className="hover:text-gray-900">Swap</Link>
-              <Link href="/xcp" className="hover:text-gray-900">Get XCP</Link>
+              <Link href="/faq" className="hover:text-gray-900">FAQ</Link>
               <Link href="/docs" className="hover:text-gray-900">Docs</Link>
               <Link
                 href="/create"
