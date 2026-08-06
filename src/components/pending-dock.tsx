@@ -58,6 +58,22 @@ export function PendingDock() {
             );
             if (!res.ok) continue;
             const t = (await res.json()).result;
+            if (!t?.block_index) {
+              // Not confirmed — check the tx still exists on the Bitcoin
+              // side. A 404 after a propagation grace period means it was
+              // purged or replaced: the phantom subtraction must end.
+              if (Date.now() - item.addedAt > 120_000) {
+                const btc = await fetch(
+                  `https://mempool.space/api/tx/${item.txid}`,
+                  { signal: AbortSignal.timeout(10_000) },
+                ).catch(() => null);
+                if (btc && btc.status === 404)
+                  updatePending(item.txid, {
+                    resolved: "dropped — funds never left",
+                  });
+              }
+              continue;
+            }
             if (t?.block_index)
               updatePending(item.txid, {
                 resolved:

@@ -98,14 +98,22 @@ export function SwapWidget({
     },
   );
 
+  // Mempool-aware balance: subtract what unresolved pending actions spend.
+  // The pending list is part of the balance key, so any resolution
+  // triggers an immediate refetch — no unsynchronized-poller wobble.
+  const pendingItems = useSyncExternalStore(
+    subscribePending,
+    readPending,
+    readPendingServer,
+  );
+  const resolvedCount = pendingItems.filter((i) => i.resolved).length;
   const { data: balance } = useSWR(
-    address && giveAsset ? [address, giveAsset, "swap-balance"] : null,
+    address && giveAsset
+      ? [address, giveAsset, "swap-balance", resolvedCount]
+      : null,
     ([addr, a]) => fetchBalance(addr, a),
     { refreshInterval: 30_000 },
   );
-
-  // Mempool-aware balance: subtract what unresolved pending actions spend.
-  useSyncExternalStore(subscribePending, readPending, readPendingServer);
   const effBalance =
     balance !== undefined
       ? Math.max(0, balance - pendingSpentRaw(giveAsset))
