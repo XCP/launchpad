@@ -1,6 +1,7 @@
 import { fetchXcpDispensers } from "@/lib/api/counterparty";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { DispenserBuy } from "./dispenser-buy";
+import { SellDispenser } from "./sell-dispenser";
 
 export const revalidate = 60;
 
@@ -57,6 +58,16 @@ export default async function GetXcpPage() {
           exchanges if you prefer.
         </p>
       </div>
+
+      <div>
+        <h2 className="text-lg font-bold">Or sell yours</h2>
+        <p className="mt-1 text-sm text-gray-600">
+          Run your own vending machine: escrow XCP at your price and the
+          protocol sells it for you.
+        </p>
+      </div>
+
+      <SellDispenser btcUsd={btcUsd} xcpUsd={xcpUsd} />
     </div>
   );
 }
