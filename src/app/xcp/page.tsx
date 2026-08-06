@@ -1,13 +1,13 @@
 import { fetchXcpDispensers } from "@/lib/api/counterparty";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { XcpMarket } from "./market-tabs";
+import { XcpBridge } from "./bridge";
 
 export const revalidate = 60;
 
 export const metadata = {
   title: "Get XCP — xcp.fun",
   description:
-    "Buy XCP from the cheapest on-chain dispensers, or run your own and sell. Minting costs XCP: 0.01 XCP per 1,000-token lot, 10 XCP for a max mint.",
+    "Load your wallet with XCP straight from Bitcoin — or unload it back. Minting costs XCP: 0.01 XCP per 1,000-token lot, 10 XCP for a max mint.",
 };
 
 export default async function GetXcpPage() {
@@ -18,16 +18,21 @@ export default async function GetXcpPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-5">
+    <div className="mx-auto max-w-lg space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Get XCP</h1>
         <p className="mt-2 text-sm text-gray-600">
-          Minting runs on XCP — it has to sit on your address&apos;s
-          Counterparty balance. Your BTC only ever pays miner fees.
+          Minting runs on XCP. Load your wallet straight from Bitcoin — send
+          BTC, XCP lands next block — or unload it back the same way.
         </p>
       </div>
 
-      <XcpMarket dispensers={dispensers} btcUsd={btcUsd} xcpUsd={xcpUsd} />
+      <XcpBridge dispensers={dispensers} btcUsd={btcUsd} xcpUsd={xcpUsd} />
+
+      <p className="text-center text-xs text-gray-400">
+        0.01 XCP mints a 1,000-token lot · 10 XCP is a full max mint · refunded
+        launches return XCP
+      </p>
     </div>
   );
 }
