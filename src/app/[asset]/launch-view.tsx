@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { TokenImage } from "@/components/token-image";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
@@ -77,17 +78,21 @@ export function LaunchView({
       ? Math.max(...byAddress.values()) / fm.earned_quantity
       : 0;
 
+  const hasAside =
+    (phase === "minting" && conforming) ||
+    (phase === "graduated" && pool !== null);
+
   return (
-    <div className="space-y-8">
+    <div>
       {/* Identity — the art leads */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-4">
         <TokenImage
           asset={asset}
           large
-          className="size-24 rounded-2xl bg-gray-100 object-cover shadow-sm"
+          className="size-16 rounded-xl bg-gray-100 object-cover shadow-sm"
         />
         <div>
-          <h1 className="text-3xl font-bold">{asset}</h1>
+          <h1 className="text-2xl font-bold">{asset}</h1>
           <p className="mt-1 text-sm text-gray-500">
             by {shortAddress(fm.source)} · {phase}
             {conforming ? (
@@ -106,8 +111,17 @@ export function LaunchView({
         </div>
       </div>
 
+      <div
+        className={
+          hasAside
+            ? "mt-6 lg:grid lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:gap-6"
+            : "mt-6"
+        }
+      >
+      {/* Main column: story, chart, receipt, activity */}
+      <div className="min-w-0 space-y-4">
       {phase === "scheduled" && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-sm text-blue-800">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
           Minting opens at block {fm.start_block.toLocaleString()} —{" "}
           {blocksEta(fm.start_block - blockHeight)} from now.
         </div>
@@ -128,7 +142,7 @@ export function LaunchView({
           )}
 
           {/* Progress — server-rendered baseline, then live with mempool overlay */}
-          <div className="rounded-lg border border-gray-200 bg-white p-5">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
             <LiveProgress
               fairminterTxHash={fm.tx_hash}
               initialEarned={fm.earned_quantity ?? 0}
@@ -162,11 +176,8 @@ export function LaunchView({
             </div>
           </div>
 
-          {/* Mint — the panel's lot math assumes the standard's parameters */}
-          {conforming && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
-
           {/* Organic panel */}
-          <div className="rounded-lg border border-gray-200 bg-white p-5">
+          <div className="rounded-lg border border-gray-200 bg-white p-4">
             <h2 className="mb-3 font-semibold">How organic does it look?</h2>
             <div className="grid grid-cols-3 gap-2 text-center text-sm">
               <Stat
@@ -189,7 +200,7 @@ export function LaunchView({
       )}
 
       {phase === "graduated" && pool && (
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
           <PriceChart
             asset={asset}
             history={priceHistory}
@@ -199,40 +210,8 @@ export function LaunchView({
         </div>
       )}
 
-      {phase === "graduated" && pool && conforming && (
-        <AssetTradeSurface asset={asset} xcpUsd={xcpUsd} />
-      )}
-
-      {phase === "graduated" && pool && (
-        <div className="holo-border rounded-lg p-5">
-          <h2 className="font-semibold">Graduated — liquidity locked</h2>
-          <div className="mt-3 grid grid-cols-3 gap-2 text-center text-sm">
-            <Stat
-              label="Pool XCP"
-              value={`${commas(poolXcp)}${
-                xcpUsd ? ` (≈${usd(poolXcp * xcpUsd)})` : ""
-              }`}
-            />
-            <Stat label="Pool tokens" value={compact(poolTokens)} />
-            <Stat label="Participants" value={String(participants)} />
-          </div>
-          <p className="mt-3 text-xs text-gray-500">
-            LP tokens (
-            <span className="font-mono">{pool.lp_asset}</span>
-            {isHouseLpName(pool.lp_asset) && (
-              <span title="House format: starts 69, ends 69, ≡ 69 (mod 97)">
-                {" "}
-                ✓
-              </span>
-            )}
-            ) were minted to the unspendable address — nobody can ever
-            withdraw this liquidity.
-          </p>
-        </div>
-      )}
-
       {phase === "refunded" && (
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="font-semibold text-gray-700">
             Refunded — soft cap not reached
           </h2>
@@ -246,7 +225,7 @@ export function LaunchView({
 
       {/* Classic (non-pool) fairminter that met its target — relaxed mode only */}
       {phase === "graduated" && !pool && (
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
+        <div className="rounded-lg border border-gray-200 bg-white p-4">
           <h2 className="font-semibold">Minted out</h2>
           <p className="mt-2 text-sm text-gray-600">
             Reached {(progress * 100).toFixed(1)}% with {participants}{" "}
@@ -263,7 +242,52 @@ export function LaunchView({
       <EditPanel asset={asset} issuer={fm.source} />
 
       {/* Activity: the mint tape and live holders */}
-      <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
+      <Suspense>
+        <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
+      </Suspense>
+      </div>
+
+      {/* Aside: the forms — sticky on desktop, below the story on mobile */}
+      {hasAside && (
+        <aside className="mt-4 min-w-0 space-y-4 lg:sticky lg:top-6 lg:mt-0">
+          {phase === "minting" && conforming && (
+            <MintPanel asset={asset} xcpUsd={xcpUsd} />
+          )}
+          {phase === "graduated" && pool && conforming && (
+            <AssetTradeSurface asset={asset} xcpUsd={xcpUsd} />
+          )}
+          {phase === "graduated" && pool && (
+            <div className="holo-border rounded-lg p-4">
+              <h2 className="text-sm font-semibold">
+                Graduated — liquidity locked
+              </h2>
+              <div className="mt-3 grid grid-cols-1 gap-2 text-sm">
+                <Stat
+                  label="Pool XCP"
+                  value={`${commas(poolXcp)}${
+                    xcpUsd ? ` (≈${usd(poolXcp * xcpUsd)})` : ""
+                  }`}
+                />
+                <Stat label="Pool tokens" value={compact(poolTokens)} />
+                <Stat label="Participants" value={String(participants)} />
+              </div>
+              <p className="mt-3 text-xs text-gray-500">
+                LP tokens (
+                <span className="font-mono">{pool.lp_asset}</span>
+                {isHouseLpName(pool.lp_asset) && (
+                  <span title="House format: starts 69, ends 69, ≡ 69 (mod 97)">
+                    {" "}
+                    ✓
+                  </span>
+                )}
+                ) were minted to the unspendable address — nobody can ever
+                withdraw this liquidity.
+              </p>
+            </div>
+          )}
+        </aside>
+      )}
+      </div>
     </div>
   );
 }
@@ -296,7 +320,7 @@ function Guarantees({ fm }: { fm: Fairminter }) {
     ["No rug", "LP tokens are minted to the unspendable address — liquidity can never be withdrawn"],
   ];
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 bg-white p-4">
       <h2 className="font-semibold">The receipt</h2>
       <p className="mt-1 text-xs text-gray-500">
         Not platform policy — protocol consensus. Every row is verifiable

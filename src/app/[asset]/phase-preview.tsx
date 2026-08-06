@@ -78,21 +78,28 @@ export function PhasePreview(props: RealProps) {
 
 function fabricate(realProps: RealProps, phase: Phase): RealProps {
   // Previewing a state means previewing the FULL experience of that state,
-  // conformance chrome included. Assets whose real economics can't support
-  // the state (free mints, no pool quantity) borrow XCP-69's numbers so the
-  // derived math (multiples, market cap) stays sane.
+  // conformance chrome included. A non-conforming asset borrows the ENTIRE
+  // XCP-69 economy — blending its real units (indivisible lots, free mints)
+  // with standard fallbacks mixes scales and explodes every derived number.
   const H = realProps.blockHeight;
-  const qbp = realProps.fm.quantity_by_price || XCP69.QUANTITY_BY_PRICE;
-  const fmBase: Fairminter = {
-    ...realProps.fm,
-    quantity_by_price: qbp,
-    price: realProps.fm.price || XCP69.PRICE,
-    soft_cap: realProps.fm.soft_cap || XCP69.SOFT_CAP,
-    hard_cap: realProps.fm.hard_cap || XCP69.HARD_CAP,
-    pool_quantity: realProps.fm.pool_quantity || XCP69.POOL_QUANTITY,
-  };
+  const borrowAll = !realProps.conforming;
+  const fmBase: Fairminter = borrowAll
+    ? {
+        ...realProps.fm,
+        price: XCP69.PRICE,
+        quantity_by_price: XCP69.QUANTITY_BY_PRICE,
+        soft_cap: XCP69.SOFT_CAP,
+        hard_cap: XCP69.HARD_CAP,
+        pool_quantity: XCP69.POOL_QUANTITY,
+        max_mint_per_tx: XCP69.MAX_MINT_PER_TX,
+        max_mint_per_address: XCP69.MAX_MINT_PER_ADDRESS,
+        premint_quantity: 0,
+        divisible: true,
+      }
+    : { ...realProps.fm };
   const real = { ...realProps, fm: fmBase, conforming: true };
   const fm = real.fm;
+  const qbp = fm.quantity_by_price;
   const mintPrice = fm.price / qbp;
   const softCap = fm.soft_cap;
   const poolQty = fm.pool_quantity || XCP69.POOL_QUANTITY;
@@ -137,17 +144,20 @@ function fabricate(realProps: RealProps, phase: Phase): RealProps {
 
   if (phase === "graduated") {
     const history =
-      real.priceHistory.length > 0
+      !borrowAll && real.priceHistory.length > 0
         ? real.priceHistory
         : fakeHistory(real.asset, H, mintPrice, softCap, poolQty);
     const last = history[history.length - 1];
-    const pool: Pool = real.pool ?? {
-      asset_a: real.asset,
-      asset_b: "XCP",
-      reserve_a: last.reserve_a,
-      reserve_b: last.reserve_b,
-      lp_asset: fm.lp_asset || "A693330289231613769",
-    };
+    const pool: Pool =
+      !borrowAll && real.pool
+        ? real.pool
+        : {
+            asset_a: real.asset,
+            asset_b: "XCP",
+            reserve_a: last.reserve_a,
+            reserve_b: last.reserve_b,
+            lp_asset: fm.lp_asset || "A693330289231613769",
+          };
     return {
       ...real,
       fm: {
@@ -160,7 +170,7 @@ function fabricate(realProps: RealProps, phase: Phase): RealProps {
       },
       phase,
       mints:
-        real.mints.length > 0
+        !borrowAll && real.mints.length > 0
           ? real.mints
           : fakeMints(real.asset, fm.tx_hash, H, qbp, mintPrice, 74, softCap),
       pool,
