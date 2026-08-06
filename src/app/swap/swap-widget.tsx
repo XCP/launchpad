@@ -492,6 +492,14 @@ export function SwapWidget({
             {buttonLabel}
           </CTA>
         )}
+        {ready && minReceivedRaw > 0 && (
+          <p className="mt-1.5 px-1.5 text-center text-[11px] text-gray-400">
+            Your wallet will show the guaranteed minimum —{" "}
+            {commas(minReceivedRaw / SATS)} {getAsset} — not the estimate.
+            Fills execute at the real price; the minimum only binds if the
+            market moves.
+          </p>
+        )}
       </div>
 
       {assets.length > 1 && (
