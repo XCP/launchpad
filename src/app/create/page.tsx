@@ -6,7 +6,7 @@ import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { fromSats, commas } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { isValidSocial } from "@/lib/social";
-import { useCompose } from "@/lib/wallet/useCompose";
+import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
   generateLpAssetName,
@@ -33,12 +33,13 @@ type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
  * conformance, so the shortest option still leaves hours of headroom for
  * the transaction to confirm.
  */
-const PREANNOUNCE_OPTIONS: { blocks: number; label: string }[] = [
+const PREANNOUNCE_OPTIONS: { blocks: number; label: string; priority?: boolean }[] = [
+  { blocks: 6, label: "~1 hour", priority: true },
   { blocks: 36, label: "~6 hours" },
   { blocks: 144, label: "~1 day" },
   { blocks: 432, label: "~3 days" },
 ];
-const PREANNOUNCE_DEFAULT = 144;
+const PREANNOUNCE_DEFAULT = 36;
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
   preparing: "Preparing inscription…",
@@ -126,6 +127,14 @@ export default function CreatePage() {
       const startBlock = height + preannounce;
       setScheduledStart(startBlock);
 
+      // Tight leads leave little room for a slow confirmation — a launch
+      // confirming after its start block opens instantly and fails the
+      // standard. Pay the next-block rate so that can't happen.
+      const isPriority = PREANNOUNCE_OPTIONS.find(
+        (o) => o.blocks === preannounce,
+      )?.priority;
+      const feeRate = isPriority ? await fetchPriorityFeeRate() : undefined;
+
       if (inscribe && isTaproot && address) {
         // 3a. Commit/reveal inscription: the image becomes the permanent
         //     on-chain description; the inscription output is burned.
@@ -137,7 +146,7 @@ export default function CreatePage() {
           jsonUrl: upload.json_url,
           imageData: new Uint8Array(await image.arrayBuffer()),
           mimeType: image.type,
-          feeRate: 2,
+          feeRate: feeRate ?? 2,
           address,
           signPsbt,
           broadcast: broadcastTransaction,
@@ -161,6 +170,7 @@ export default function CreatePage() {
         pool_quantity: XCP69.POOL_QUANTITY,
         lp_asset: generateLpAssetName(),
         description: upload.json_url,
+        ...(feeRate ? { fee_rate: feeRate } : {}),
       });
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Something went wrong");
@@ -382,6 +392,14 @@ export default function CreatePage() {
           nobody, creator included, can mint early. The 1,000-block (~7 day)
           window starts when minting opens.
         </p>
+        {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.priority && (
+          <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+            Tight lead: your launch transaction will pay mempool.space&apos;s
+            next-block fee rate, because it must confirm before minting
+            opens — a launch that confirms late opens instantly and fails
+            the standard.
+          </p>
+        )}
       </div>
 
       {/* The terms — fixed by the standard, shown, not asked */}

@@ -38,14 +38,39 @@ async function getFeeRate(): Promise<number> {
   }
 }
 
+let cachedFastFee: number | null = null
+let fastFeeTimestamp = 0
+
+/**
+ * mempool.space's next-block estimate (fastestFee), for transactions that
+ * MUST confirm promptly — e.g. a launch scheduled with a tight
+ * pre-announcement lead, where confirming after start_block would open the
+ * mint instantly and fail the standard. Degrades to median + a bump.
+ */
+export async function fetchPriorityFeeRate(): Promise<number> {
+  const now = Date.now()
+  if (cachedFastFee && now - fastFeeTimestamp < 30_000) return cachedFastFee
+  try {
+    const res = await fetch('https://mempool.space/api/v1/fees/recommended')
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const data: { fastestFee: number } = await res.json()
+    cachedFastFee = Math.max(Math.round(data.fastestFee ?? 0), 1)
+    fastFeeTimestamp = now
+    return cachedFastFee
+  } catch {
+    return (await getFeeRate()) + 2
+  }
+}
+
 /** Call Counterparty compose endpoint */
 async function composeRequest(
   path: string,
   type: string,
   params: Record<string, string | number>,
   extraParams?: Record<string, string>,
+  feeRateOverride?: number,
 ): Promise<string> {
-  const feeRate = await getFeeRate()
+  const feeRate = feeRateOverride ?? (await getFeeRate())
   const qp = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
     qp.set(k, String(v))
@@ -95,7 +120,11 @@ export function useCompose() {
     }
   }
 
-  const execute = (type: string, params: Record<string, string | number>): void => {
+  const execute = (
+    type: string,
+    params: Record<string, string | number>,
+    feeRateOverride?: number,
+  ): void => {
     if (!address) {
       setState({ status: 'error', txid: null, error: 'Wallet not connected' })
       return
@@ -105,7 +134,13 @@ export function useCompose() {
       return
     }
     run(address, () =>
-      composeRequest(`addresses/${address}`, type, params, { exclude_utxos_with_balances: 'true' }),
+      composeRequest(
+        `addresses/${address}`,
+        type,
+        params,
+        { exclude_utxos_with_balances: 'true' },
+        feeRateOverride,
+      ),
     )
   }
 
@@ -204,6 +239,8 @@ export function useCompose() {
    * Open an XCP-69 fairminter. All values raw satoshi units.
    * start_block must be in the future (the pre-announcement window); the
    * compose API itself rejects a start at or below the current block.
+   * Pass fee_rate (e.g. fetchPriorityFeeRate()) for tight leads where the
+   * launch must confirm well before its start block.
    */
   const composeFairminter = (params: {
     asset: string
@@ -218,6 +255,7 @@ export function useCompose() {
     pool_quantity: number
     lp_asset: string
     description: string
+    fee_rate?: number
   }) => execute('fairminter', {
     asset: params.asset,
     price: params.price,
@@ -238,7 +276,7 @@ export function useCompose() {
     lock_quantity: 'true',
     divisible: 'true',
     end_block: 0,
-  })
+  }, params.fee_rate)
 
   /** Mint from a fairminter; quantity is raw earn units (whole lots). */
   const composeFairmint = (params: { asset: string; quantity: number }) =>
