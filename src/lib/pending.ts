@@ -24,6 +24,8 @@ export interface PendingItem {
   /** What this action spends, for optimistic balance display. */
   giveAsset?: string;
   giveRaw?: number;
+  /** Consecutive authoritative 404s — 3 marks the tx dropped. */
+  misses?: number;
 }
 
 const KEY = "xcpfun:pending:v1";
@@ -73,10 +75,21 @@ export function dismissPending(txid: string) {
   write(readPending().filter((i) => i.txid !== txid));
 }
 
-/** Raw units of `asset` spent by still-unresolved pending actions. */
+/**
+ * Raw units of `asset` spent by still-unresolved pending actions. The
+ * subtraction's lifetime is capped at ~6 blocks independently of the row's
+ * 48h visibility: past that, the row stays visible as unconfirmed but the
+ * balance stops lying in the conservative direction — the structural fix
+ * for phantom subtractions, even if every mempool check fails.
+ */
+const SUBTRACT_MS = 60 * 60 * 1000;
 export function pendingSpentRaw(asset: string): number {
+  const now = Date.now();
   return readPending()
-    .filter((i) => !i.resolved && i.giveAsset === asset)
+    .filter(
+      (i) =>
+        !i.resolved && i.giveAsset === asset && now - i.addedAt < SUBTRACT_MS,
+    )
     .reduce((s, i) => s + (i.giveRaw ?? 0), 0);
 }
 

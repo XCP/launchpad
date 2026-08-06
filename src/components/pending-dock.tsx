@@ -52,26 +52,30 @@ export function PendingDock() {
             else if (o.give_remaining < o.give_quantity)
               updatePending(item.txid, { resolved: "partially filled · resting" });
           } else {
+            // Three-state oracle: 404 = unknown, block_hash "mempool" =
+            // pending, real block = confirmed. Only authoritative 404s
+            // count as misses (network errors never do), only after a 60s
+            // propagation grace, and only 3 CONSECUTIVE misses mark a drop.
             const res = await fetch(
               `${COUNTERPARTY_API_BASE}/transactions/${item.txid}`,
               { signal: AbortSignal.timeout(10_000) },
             );
+            if (res.status === 404) {
+              if (Date.now() - item.addedAt > 60_000) {
+                const misses = (item.misses ?? 0) + 1;
+                if (misses >= 3)
+                  updatePending(item.txid, {
+                    resolved: "dropped — nothing was spent",
+                    misses,
+                  });
+                else updatePending(item.txid, { misses });
+              }
+              continue;
+            }
             if (!res.ok) continue;
             const t = (await res.json()).result;
-            if (!t?.block_index) {
-              // Not confirmed — check the tx still exists on the Bitcoin
-              // side. A 404 after a propagation grace period means it was
-              // purged or replaced: the phantom subtraction must end.
-              if (Date.now() - item.addedAt > 120_000) {
-                const btc = await fetch(
-                  `https://mempool.space/api/tx/${item.txid}`,
-                  { signal: AbortSignal.timeout(10_000) },
-                ).catch(() => null);
-                if (btc && btc.status === 404)
-                  updatePending(item.txid, {
-                    resolved: "dropped — funds never left",
-                  });
-              }
+            if (!t?.block_index || t.block_hash === "mempool") {
+              if (item.misses) updatePending(item.txid, { misses: 0 });
               continue;
             }
             if (t?.block_index)

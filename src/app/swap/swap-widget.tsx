@@ -326,6 +326,12 @@ export function SwapWidget({
                 onClick={() => setAmount(fmtAmount(effBalance! / SATS))}
               >
                 Balance: {commas(effBalance! / SATS)}
+                {balance !== undefined && balance > effBalance! && (
+                  <span className="text-gray-400">
+                    {" "}
+                    · {commas((balance - effBalance!) / SATS)} pending
+                  </span>
+                )}
               </button>
               <span className="hidden items-center gap-1 group-focus-within:flex group-hover:flex">
                 {effBalance! > 0 ? (
