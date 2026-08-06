@@ -165,6 +165,14 @@ save integrators real pain:
   the pooldeposit gas fee (`GET …/compose/pooldeposit/estimatexcpfees`, currently
   0, usage-priced) must be on the issuer's Counterparty balance. Both debit at
   confirmation; settlement at close is prepaid.
+- **Existing names welcome; existing supply forbidden.** Consensus requires
+  `soft_cap = hard_cap − existing_supply − premint − pool_quantity`, which with
+  XCP-69's constants only balances at `existing_supply = 0`. A legacy name can
+  host a launch (issuer-owned, unlocked, already divisible, no registration fee
+  since the name exists) but arrives with a clean cap table — any prior supply
+  must be destroyed first, and supply held by others disqualifies the name
+  permanently. The 69M + 31M minted at launch is all the supply that has ever
+  existed.
 - **`lp_asset` must be genuinely random.** Numeric assets are free to issue, and
   the name is validated as unissued at *parse* time — a predictable name can be
   front-run between broadcast and confirmation, invalidating the launch. While a

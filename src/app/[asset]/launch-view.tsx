@@ -318,7 +318,7 @@ function Guarantees({ fm }: { fm: Fairminter }) {
       ? `announced on-chain ${(fm.start_block - fm.block_index).toLocaleString()} blocks before minting could open`
       : "announced on-chain before minting could open";
   const rows: [string, string][] = [
-    ["No premine", "0 tokens to the creator at open — the standard pins premint_quantity to zero"],
+    ["No premine", "0 tokens existed before the launch — consensus rejects the XCP-69 shape on any asset with prior supply, and premint is pinned to zero"],
     ["No commission", "0% of any mint is skimmed to the creator"],
     ["No sniping", announcedLead + " — early mints are rejected by consensus"],
     ["No bundling past the cap", "10 XCP per address, enforced per-address by consensus"],

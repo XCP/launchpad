@@ -135,6 +135,24 @@ export default async function StandardPage() {
           </details>
           <details className="p-4">
             <summary className="cursor-pointer text-sm font-medium text-gray-900">
+              Can I launch on a token name that already exists?
+            </summary>
+            <p className="mt-2 text-sm text-gray-600">
+              Yes — and a name with history is a feature. But only the name
+              comes along: consensus requires <em>zero existing supply</em> at
+              launch (the all-or-nothing equation only balances at zero), so
+              even a decade-old name starts with a clean cap table — the 69M +
+              31M minted at launch is all the supply that has ever existed.
+              You must be the asset&apos;s current issuer, it must be
+              unlocked, and it must already be divisible. If it carries
+              supply, destroy every unit first — and supply in other
+              people&apos;s hands can&apos;t be destroyed, which permanently
+              disqualifies the name. There is no grandfathering old holders;
+              that would be a premine with extra steps.
+            </p>
+          </details>
+          <details className="p-4">
+            <summary className="cursor-pointer text-sm font-medium text-gray-900">
               Are all Counterparty fairminters like this?
             </summary>
             <p className="mt-2 text-sm text-gray-600">
