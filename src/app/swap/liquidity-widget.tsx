@@ -18,7 +18,8 @@ const SATS = 1e8;
  * benign: the transaction is simply invalid — nothing debited, no XCP gas
  * charged, only the BTC miner fee spent.
  */
-const LIQUIDITY_TOLERANCE = 0.025;
+const SLIPPAGE_PRESETS = [0.5, 1, 2.5];
+const DEFAULT_SLIPPAGE = 2.5;
 
 const fetchJson = async (url: string) => {
   const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
@@ -83,6 +84,13 @@ export function LiquidityWidget({
   const [amount, setAmount] = useState(""); // token units, add tab
   const [pct, setPct] = useState(25); // remove tab
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [slippagePreset, setSlippagePreset] = useState(DEFAULT_SLIPPAGE);
+  const [customSlippage, setCustomSlippage] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  const customSlip = Math.min(parseFloat(customSlippage) || 0, 50);
+  const slippage = customSlip > 0 ? customSlip : slippagePreset;
+  const tolerance = slippage / 100;
 
   const { data: pool } = useSWR<PoolInfo | null>(
     asset ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP` : null,
@@ -193,7 +201,7 @@ export function LiquidityWidget({
       quantity_a: depTokenRaw,
       quantity_b: depXcpRaw,
       min_lp_quantity: Math.floor(
-        (depositQuote.quantity_minted_estimate ?? 0) * (1 - LIQUIDITY_TOLERANCE),
+        (depositQuote.quantity_minted_estimate ?? 0) * (1 - tolerance),
       ),
     });
   };
@@ -204,10 +212,10 @@ export function LiquidityWidget({
       lp_asset: pool.lp_asset,
       quantity: lpToRemove,
       min_quantity_a: Math.floor(
-        (withdrawQuote?.quantity_a_estimate ?? 0) * (1 - LIQUIDITY_TOLERANCE),
+        (withdrawQuote?.quantity_a_estimate ?? 0) * (1 - tolerance),
       ),
       min_quantity_b: Math.floor(
-        (withdrawQuote?.quantity_b_estimate ?? 0) * (1 - LIQUIDITY_TOLERANCE),
+        (withdrawQuote?.quantity_b_estimate ?? 0) * (1 - tolerance),
       ),
     });
   };
@@ -259,22 +267,95 @@ export function LiquidityWidget({
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       <div className="p-2">
-        <button
-          type="button"
-          onClick={() => setSelectorOpen(true)}
-          className="flex w-full items-center gap-3 rounded-2xl border border-gray-200 bg-white p-2 pr-3 transition-all hover:border-gray-300 hover:shadow-sm active:scale-[0.99]"
-        >
-          <TokenImage
-            asset={asset}
-            className="size-10 rounded-full bg-gray-100 object-cover"
-          />
-          <span className="flex-1 text-left text-sm font-semibold text-gray-900">
-            {asset} / XCP pool
-          </span>
-          <span aria-hidden className="text-xs text-gray-400">
-            ▾
-          </span>
-        </button>
+        <div className="relative flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSelectorOpen(true)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white p-2 pr-3 transition-all hover:border-gray-300 hover:shadow-sm active:scale-[0.99]"
+          >
+            <TokenImage
+              asset={asset}
+              className="size-10 rounded-full bg-gray-100 object-cover"
+            />
+            <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-900">
+              {asset} / XCP pool
+            </span>
+            <span aria-hidden className="text-xs text-gray-400">
+              ▾
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setSettingsOpen((o) => !o)}
+            aria-label="Liquidity settings"
+            className={`flex size-9 shrink-0 items-center justify-center rounded-full transition-colors ${
+              settingsOpen || customSlip > 0
+                ? "bg-purple-50 text-purple-600"
+                : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            }`}
+          >
+            <svg viewBox="0 0 20 20" fill="currentColor" className="size-4">
+              <path
+                fillRule="evenodd"
+                d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"
+                clipRule="evenodd"
+              />
+            </svg>
+          </button>
+          {settingsOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-20"
+                onClick={() => setSettingsOpen(false)}
+              />
+              <div className="modal-pop absolute right-0 top-11 z-30 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg">
+                <div className="text-xs font-medium text-gray-500">
+                  Max slippage
+                </div>
+                <div className="mt-2 flex items-center gap-1.5">
+                  {SLIPPAGE_PRESETS.map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setSlippagePreset(s);
+                        setCustomSlippage("");
+                      }}
+                      className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+                        slippage === s && customSlip === 0
+                          ? "border-purple-600 bg-purple-50 text-purple-700"
+                          : "border-gray-200 text-gray-600 hover:border-gray-300"
+                      }`}
+                    >
+                      {s}%
+                    </button>
+                  ))}
+                  <div
+                    className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+                      customSlip > 0
+                        ? "border-purple-600 bg-purple-50"
+                        : "border-gray-200"
+                    }`}
+                  >
+                    <AmountInput
+                      value={customSlippage}
+                      onChange={setCustomSlippage}
+                      placeholder="5"
+                      ariaLabel="Custom slippage percent"
+                      className="w-8 bg-transparent text-right text-xs font-medium outline-none"
+                    />
+                    <span className="text-xs text-gray-400">%</span>
+                  </div>
+                </div>
+                <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
+                  If the pool moves past this before confirmation, the whole
+                  transaction is void — nothing is debited; only the miner fee
+                  is spent.
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="mt-3 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
           {(["add", "remove"] as const).map((t) => (
@@ -356,6 +437,19 @@ export function LiquidityWidget({
                     {commas((depositQuote.quantity_minted_estimate ?? 0) / SATS)}
                   </dd>
                 </div>
+                <div className="flex justify-between">
+                  <dt title="Below this the transaction is void — nothing is debited">
+                    Min LP · slippage {slippage}%
+                  </dt>
+                  <dd>
+                    {commas(
+                      Math.floor(
+                        (depositQuote.quantity_minted_estimate ?? 0) *
+                          (1 - tolerance),
+                      ) / SATS,
+                    )}
+                  </dd>
+                </div>
                 {(gasFee ?? 0) > 0 && (
                   <div className="flex justify-between">
                     <dt>Protocol gas fee</dt>
@@ -424,6 +518,19 @@ export function LiquidityWidget({
                   ) : null}
                 </dd>
               </div>
+              {outTokenRaw > 0 && (
+                <div className="flex justify-between">
+                  <dt title="Below this the transaction is void — nothing is debited">
+                    Min received · slippage {slippage}%
+                  </dt>
+                  <dd className="text-right">
+                    {commas(Math.floor(outTokenRaw * (1 - tolerance)) / SATS)}{" "}
+                    {asset}
+                    <br />
+                    {commas(Math.floor(outXcpRaw * (1 - tolerance)) / SATS)} XCP
+                  </dd>
+                </div>
+              )}
               {(gasFee ?? 0) > 0 && (
                 <div className="flex justify-between">
                   <dt>Protocol gas fee</dt>
