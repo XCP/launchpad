@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { fetchXcpUsd } from "@/lib/api/price";
 import {
   XCP69_MIN_PARTICIPANTS,
@@ -115,6 +116,21 @@ export default async function StandardPage() {
               much rather pay one transaction fee and get your XCP back than
               be out both, which is the normal ending on launchpads where a
               half-filled launch just trades into the floor.
+            </p>
+          </details>
+          <details className="p-4">
+            <summary className="cursor-pointer text-sm font-medium text-gray-900">
+              Where do I get the XCP to mint with?
+            </summary>
+            <p className="mt-2 text-sm text-gray-600">
+              Minting is paid in XCP on your address&apos;s Counterparty
+              balance — BTC only covers miner fees. The fastest no-account
+              route is an on-chain dispenser: send BTC, the protocol vends
+              XCP automatically.{" "}
+              <Link href="/xcp" className="text-purple-600 underline">
+                Buy from the cheapest dispensers here
+              </Link>
+              . A max mint is 10 XCP; a launch needs 0.5 XCP for the name.
             </p>
           </details>
           <details className="p-4">

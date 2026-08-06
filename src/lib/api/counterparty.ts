@@ -146,6 +146,27 @@ export async function fetchOriginalDeadline(txHash: string): Promise<number | nu
   return data.result?.[0]?.params?.soft_cap_deadline_block ?? null;
 }
 
+/**
+ * Open XCP dispensers, cheapest first. Non-oracle only: oracle dispensers
+ * price via an external feed, so the BTC trigger amount can't be computed
+ * safely client-side. `price` is the API's computed sats per whole XCP.
+ */
+export interface Dispenser {
+  source: string;
+  give_quantity: number;
+  give_remaining: number;
+  satoshirate: number;
+  price: number;
+}
+
+export async function fetchXcpDispensers(limit = 8): Promise<Dispenser[]> {
+  const data = await get<Paginated<Dispenser>>(
+    `/assets/XCP/dispensers?status=open&exclude_with_oracle=true&sort=price:asc&limit=50`,
+    60,
+  );
+  return data.result.filter((d) => d.give_remaining > 0).slice(0, limit);
+}
+
 export async function fetchBlockHeight(): Promise<number> {
   const data = await get<{ result: { counterparty_height: number } }>("/", 30);
   return data.result.counterparty_height;

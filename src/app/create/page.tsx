@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { fromSats, commas } from "@/lib/format";
@@ -237,7 +238,11 @@ export default function CreatePage() {
           {nameCheck === "checking" && "Checking availability…"}
           {nameCheck === "available" && (
             <span className="text-green-600">
-              {name} is available (0.5 XCP registration fee applies).
+              {name} is available (0.5 XCP registration fee applies —{" "}
+              <Link href="/xcp" className="underline">
+                need XCP?
+              </Link>
+              ).
             </span>
           )}
           {nameCheck === "taken" && (

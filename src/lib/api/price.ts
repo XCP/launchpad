@@ -17,3 +17,17 @@ export async function fetchXcpUsd(): Promise<number | null> {
     return null;
   }
 }
+
+/** BTC/USD from the same feed (same fetch — Next dedupes by URL). */
+export async function fetchBtcUsd(): Promise<number | null> {
+  try {
+    const res = await fetch(`${XCP_API_BASE}/price`, {
+      next: { revalidate: 600 },
+    });
+    if (!res.ok) return null;
+    const usd = (await res.json())?.result?.btc?.usd;
+    return typeof usd === "number" && usd > 0 ? usd : null;
+  } catch {
+    return null;
+  }
+}

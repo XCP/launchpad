@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { usd } from "@/lib/format";
 import { useCompose } from "@/lib/wallet/useCompose";
@@ -151,7 +152,12 @@ export function MintPanel({
       )}
       <p className="mt-2 text-xs text-gray-500">
         Your XCP is escrowed by the protocol, not sent to the creator. If the
-        launch misses its target, every mint is automatically refunded.
+        launch misses its target, every mint is automatically refunded. Need
+        XCP?{" "}
+        <Link href="/xcp" className="text-purple-600 underline">
+          Get some here
+        </Link>
+        .
       </p>
     </div>
   );
