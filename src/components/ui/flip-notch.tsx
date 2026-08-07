@@ -24,7 +24,9 @@ export function FlipNotch({
         className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-gray-50 text-gray-500 shadow-[0_0_0_4px_white] transition-transform duration-300 hover:bg-gray-100 hover:text-purple-600 active:scale-95"
         style={{ transform: `translate(-50%, -50%) rotate(${flips * 180}deg)` }}
       >
-        ↓
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="size-4">
+          <path d="M8 3v10M4 9l4 4 4-4" />
+        </svg>
       </button>
     </div>
   );

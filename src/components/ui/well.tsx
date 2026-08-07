@@ -12,6 +12,7 @@ export function Well({
   label,
   topRight,
   chip,
+  chipRight,
   footer,
   focusable = false,
   layout = "row",
@@ -20,6 +21,8 @@ export function Well({
   label: ReactNode;
   topRight?: ReactNode;
   chip?: ReactNode;
+  /** Right side of the stacked chip row (balance, availability). */
+  chipRight?: ReactNode;
   footer?: ReactNode;
   focusable?: boolean;
   /**
@@ -57,7 +60,14 @@ export function Well({
         </div>
       )}
       {layout === "stack" && chip !== undefined && (
-        <div className="mt-2 flex items-center">{chip}</div>
+        <div className="mt-2 flex items-center justify-between gap-3">
+          {chip}
+          {chipRight !== undefined && (
+            <div className="min-w-0 truncate text-right text-xs text-gray-500">
+              {chipRight}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

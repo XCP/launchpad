@@ -122,6 +122,30 @@ export function SwapWidget({
       ? Math.max(0, balance - pendingSpentRaw(giveAsset))
       : undefined;
 
+  // What the market holds of the buy asset — the pool reserve (the book
+  // varies too fast to sum honestly client-side).
+  const { data: poolInfo } = useSWR<{
+    asset_a: string;
+    reserve_a: number;
+    reserve_b: number;
+  } | null>(
+    asset ? [asset, "swap-pool-reserves"] : null,
+    () =>
+      fetchJson(`${COUNTERPARTY_API_BASE}/pools/${asset}/XCP`)
+        .then((d) => d.result ?? null)
+        .catch(() => null),
+    { refreshInterval: 60_000 },
+  );
+  const availableRaw = poolInfo
+    ? getAsset === "XCP"
+      ? poolInfo.asset_a === "XCP"
+        ? poolInfo.reserve_a
+        : poolInfo.reserve_b
+      : poolInfo.asset_a === "XCP"
+        ? poolInfo.reserve_b
+        : poolInfo.reserve_a
+    : null;
+
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
   const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;
   const out = outRaw / SATS;
@@ -215,6 +239,42 @@ export function SwapWidget({
     ) : (
       <AssetChip asset={asset} onClick={() => setSelectorOpen(true)} />
     );
+
+  const balanceControls = effBalance !== undefined && (
+    <>
+      <button
+        type="button"
+        className="group-focus-within:hidden group-hover:hidden"
+        onClick={() => setAmount(fmtAmount(effBalance / SATS))}
+      >
+        Balance: {commas(effBalance / SATS)}
+        {balance !== undefined && balance > effBalance && (
+          <span className="text-gray-400">
+            {" "}
+            · {commas((balance - effBalance) / SATS)} pending
+          </span>
+        )}
+      </button>
+      <span className="hidden items-center gap-1 group-focus-within:flex group-hover:flex">
+        {effBalance > 0 ? (
+          PRESETS.map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() =>
+                setAmount(fmtAmount(Math.floor((effBalance * p) / 100) / SATS))
+              }
+              className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+            >
+              {p === 100 ? "Max" : `${p}%`}
+            </button>
+          ))
+        ) : (
+          <span>Balance: 0</span>
+        )}
+      </span>
+    </>
+  );
 
   const buttonLabel = busy
     ? compose.status === "composing"
@@ -321,7 +381,11 @@ export function SwapWidget({
         focusable
         layout={compact ? "stack" : "row"}
         label="Sell"
+        chipRight={
+          compact && effBalance !== undefined ? balanceControls : undefined
+        }
         topRight={
+          !compact &&
           effBalance !== undefined && (
             <>
               <button
@@ -359,7 +423,7 @@ export function SwapWidget({
           )
         }
         chip={giveAsset === "XCP" ? <XcpChip /> : tokenChip}
-        footer={<span>{giveUsd !== null && `≈ ${usdFmt(giveUsd)}`}</span>}
+        footer={<span>≈ {usdFmt(giveUsd ?? 0)}</span>}
       >
         <AmountInput
           value={amount}
@@ -381,7 +445,12 @@ export function SwapWidget({
         layout={compact ? "stack" : "row"}
         label="Buy"
         chip={getAsset === "XCP" ? <XcpChip /> : tokenChip}
-        footer={<span>{getUsd !== null && `≈ ${usdFmt(getUsd)}`}</span>}
+        chipRight={
+          compact && availableRaw !== null ? (
+            <span>{commas(availableRaw / SATS)} in pool</span>
+          ) : undefined
+        }
+        footer={<span>≈ {usdFmt(getUsd ?? 0)}</span>}
       >
         <div
           className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
