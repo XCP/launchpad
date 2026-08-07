@@ -2,6 +2,10 @@
 
 import { useState } from "react";
 import { LiquidityWidget } from "@/app/swap/liquidity-widget";
+import {
+  SwapSettingsGear,
+  SwapSettingsProvider,
+} from "@/app/swap/swap-settings";
 import { SwapWidget } from "@/app/swap/swap-widget";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { TradePanel } from "./trade-panel";
@@ -9,7 +13,7 @@ import { TradePanel } from "./trade-panel";
 /**
  * The /swap surface, scoped to one graduated asset: Swap | Liquidity in
  * the same grammar as the swap page, plus the DEX-native Limit tab that
- * only makes sense per-pair.
+ * only makes sense per-pair. Settings gear beside the tabs, Swap only.
  */
 export function AssetTradeSurface({
   asset,
@@ -20,16 +24,19 @@ export function AssetTradeSurface({
 }) {
   const [mode, setMode] = useState<"swap" | "liquidity" | "limit">("swap");
   return (
-    <div>
-      <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
-        <SegmentedList className="mb-4 w-full max-w-md">
-          {(["swap", "liquidity", "limit"] as const).map((m) => (
-            <SegmentedTrigger key={m} value={m}>
-              {m}
-            </SegmentedTrigger>
-          ))}
-        </SegmentedList>
-      </Tabs>
+    <SwapSettingsProvider>
+      <div className="mb-4 flex items-center justify-between gap-2">
+        <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
+          <SegmentedList className="w-full max-w-md">
+            {(["swap", "liquidity", "limit"] as const).map((m) => (
+              <SegmentedTrigger key={m} value={m}>
+                {m}
+              </SegmentedTrigger>
+            ))}
+          </SegmentedList>
+        </Tabs>
+        {mode === "swap" && <SwapSettingsGear />}
+      </div>
       {mode === "swap" ? (
         <SwapWidget assets={[asset]} xcpUsd={xcpUsd} compact />
       ) : mode === "liquidity" ? (
@@ -37,6 +44,6 @@ export function AssetTradeSurface({
       ) : (
         <TradePanel asset={asset} only="limit" />
       )}
-    </div>
+    </SwapSettingsProvider>
   );
 }

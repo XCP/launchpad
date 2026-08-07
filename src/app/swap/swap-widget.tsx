@@ -12,7 +12,6 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
-import { GearPopover } from "@/components/ui/popover";
 import { Well } from "@/components/ui/well";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { commas, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
@@ -25,18 +24,17 @@ import {
   subscribePending,
 } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
-import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
+import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { useSwapSettings } from "./swap-settings";
 
 const SATS = 1e8;
-/** Market orders live one block: match at confirmation or refund next block. */
-const MARKET_EXPIRATION = 1;
 /** Typical composed order size (1–2 inputs, OP_RETURN, change) for the
  *  TX-fee estimate; the true size is known only after compose. */
 const ORDER_VBYTES = 250;
-const QUOTE_REFRESH_MS = 10_000;
-const SLIPPAGE_PRESETS = [0.5, 1, 2];
+/** Ten-minute blocks — a minute-old quote is still fresh by chain time. */
+const QUOTE_REFRESH_MS = 60_000;
 const PRESETS = [25, 50, 75, 100] as const;
 
 interface Quote {
@@ -64,29 +62,27 @@ export function SwapWidget({
   const [asset, setAsset] = useState(assets[0] ?? "");
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
-  const [slippagePreset, setSlippagePreset] = useState(1);
-  const [customSlippage, setCustomSlippage] = useState("");
-  const [customExpiration, setCustomExpiration] = useState("");
-  const [customFeeRate, setCustomFeeRate] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [rateInverted, setRateInverted] = useState(false);
   const [flips, setFlips] = useState(0);
   const [priceMoved, setPriceMoved] = useState(false);
   const [lastQuoteAt, setLastQuoteAt] = useState<number | null>(null);
 
-  const customSlip = Math.min(parseFloat(customSlippage) || 0, 50);
-  const slippage = customSlip > 0 ? customSlip : slippagePreset;
-  const expiration = Math.min(
-    5000,
-    Math.max(1, Math.round(parseFloat(customExpiration)) || MARKET_EXPIRATION),
-  );
+  // Settings live beside the mode tabs; the widget consumes the values
+  // and publishes what the current trade needs for Auto slippage.
+  const {
+    slippage,
+    slippageAuto,
+    customSlip,
+    expiration,
+    customFee,
+    medianFeeRate,
+    setAutoValue,
+  } = useSwapSettings();
 
-  // The Bitcoin cost of pressing the button: next-block median by default,
-  // user-overridable. Total is an estimate — the composed size varies with
-  // UTXO count — but the rate is exactly what compose will pay.
-  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
-    refreshInterval: 30_000,
-  });
+  // The Bitcoin cost of pressing the button: rate from settings (next-block
+  // median by default). Total is an estimate — the composed size varies
+  // with UTXO count — but the rate is exactly what compose will pay.
   const { data: btcUsd } = useSWR(
     "btc-usd",
     () =>
@@ -95,7 +91,6 @@ export function SwapWidget({
       ),
     { refreshInterval: 60_000 },
   );
-  const customFee = Math.min(Math.round(parseFloat(customFeeRate) || 0), 500);
   const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
 
   const giveAsset = side === "buy" ? "XCP" : asset;
@@ -175,6 +170,17 @@ export function SwapWidget({
   const insufficient =
     effBalance !== undefined && amountRaw > 0 && amountRaw > effBalance;
   const busy = isBusy(compose.status);
+
+  // What this trade needs: another taker of the same size moves the price
+  // by roughly this trade's own impact, so Auto tolerates that and no
+  // more — floored at 0.5% (pool fee territory), capped at 5%.
+  const neededSlippage =
+    quote && outRaw > 0
+      ? Math.min(5, Math.max(0.5, Math.ceil(impact * 10) / 10))
+      : 1;
+  useEffect(() => {
+    setAutoValue(neededSlippage);
+  }, [neededSlippage, setAutoValue]);
 
   useEffect(() => {
     if (compose.status === "confirmed") {
@@ -364,130 +370,25 @@ export function SwapWidget({
             : availableRaw
               ? "Amount too small — rounds to 0"
               : "Insufficient liquidity"
-          : impact >= 5
-            ? `${side === "buy" ? "Buy" : "Sell"} anyway`
-            : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
+          : slippage >= 20
+            ? `${side === "buy" ? "Buy" : "Sell"} anyway — ${slippage}% slippage`
+            : impact >= 5
+              ? `${side === "buy" ? "Buy" : "Sell"} anyway`
+              : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
 
-  // Settings live on the rate line, not a header of their own — the card
-  // opens straight into the wells.
-  const settingsPopover = (
-        <GearPopover
-          active={
-            customSlip > 0 || expiration !== MARKET_EXPIRATION || customFee > 0
-          }
-          label="Swap settings"
-          small
-        >
-          <div className="text-xs font-medium text-gray-500">Max slippage</div>
-          <div className="mt-2 flex items-center gap-1.5">
-            {SLIPPAGE_PRESETS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => {
-                  setSlippagePreset(s);
-                  setCustomSlippage("");
-                }}
-                className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
-                  slippage === s && customSlip === 0
-                    ? "border-purple-600 bg-purple-50 text-purple-700"
-                    : "border-gray-200 text-gray-600 hover:border-gray-300"
-                }`}
-              >
-                {s}%
-              </button>
-            ))}
-            <div
-              className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                customSlip > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
-              }`}
-            >
-              <AmountInput
-                value={customSlippage}
-                onChange={setCustomSlippage}
-                placeholder="1.5"
-                ariaLabel="Custom slippage percent"
-                className="w-8 bg-transparent text-right text-xs font-medium outline-none"
-              />
-              <span className="text-xs text-gray-400">%</span>
-            </div>
-          </div>
-          {slippage < 0.5 && (
-            <p className="mt-2 text-[11px] text-amber-600">
-              Below 0.5% the order may not fill.
-            </p>
-          )}
-          {slippage > 5 && (
-            <p className="mt-2 text-[11px] text-red-600">
-              High slippage authorizes up to {slippage}% price impact.
-            </p>
-          )}
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500">Expiration</span>
-            <span
-              className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                expiration !== MARKET_EXPIRATION
-                  ? "border-purple-600 bg-purple-50"
-                  : "border-gray-200"
-              }`}
-            >
-              <AmountInput
-                value={customExpiration}
-                onChange={setCustomExpiration}
-                placeholder={String(MARKET_EXPIRATION)}
-                ariaLabel="Order expiration in blocks"
-                className="w-10 bg-transparent text-right text-xs font-medium outline-none"
-              />
-              <span className="text-xs text-gray-400">blocks</span>
-            </span>
-          </div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
-            How long an unfilled remainder rests before auto-refund.{" "}
-            {MARKET_EXPIRATION} = fill at confirmation or refund next block.
-          </p>
-          <div className="mt-3 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500">TX fee</span>
-            <span
-              className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                customFee > 0
-                  ? "border-purple-600 bg-purple-50"
-                  : "border-gray-200"
-              }`}
-            >
-              <AmountInput
-                value={customFeeRate}
-                onChange={setCustomFeeRate}
-                placeholder={medianFeeRate ? String(medianFeeRate) : "…"}
-                ariaLabel="Bitcoin fee rate in sats per vbyte"
-                className="w-10 bg-transparent text-right text-xs font-medium outline-none"
-              />
-              <span className="text-xs text-gray-400">sat/vB</span>
-            </span>
-          </div>
-          <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
-            The Bitcoin miner fee. Default tracks the next-block median.
-          </p>
-          <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
-            Min received is enforced by the order itself — worse fills are
-            impossible; better ones refund the difference.
-          </div>
-        </GearPopover>
-  );
-
-  // Buy-well header: the live slippage setting in a pill cut like the
-  // sell-well presets, with the gear beside it — settings read where
-  // they apply, and the rate line below keeps a single icon.
+  // The live slippage figure in the buy-well corner; the gear that edits
+  // it sits beside the mode tabs (the Uniswap placement). Auto is marked.
   const slippageControl = (
-    <span className="flex items-center gap-1">
-      <span
-        title="Max slippage"
-        className={
-          customSlip > 0 ? "font-medium text-purple-600" : "text-gray-500"
-        }
-      >
-        Slippage: {slippage}%
-      </span>
-      {settingsPopover}
+    <span
+      title="Max slippage — adjust via the gear beside the tabs"
+      className={
+        !slippageAuto && customSlip > 0
+          ? "font-medium text-purple-600"
+          : "text-gray-500"
+      }
+    >
+      Slippage: {slippage}%
+      {slippageAuto && <span className="text-gray-400"> · auto</span>}
     </span>
   );
 
@@ -656,7 +557,7 @@ export function SwapWidget({
           <CTA
             disabled={!ready}
             onClick={submit}
-            variant={impact >= 5 && ready ? "danger" : "primary"}
+            variant={(impact >= 5 || slippage >= 20) && ready ? "danger" : "primary"}
           >
             {buttonLabel}
           </CTA>
