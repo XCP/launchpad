@@ -19,6 +19,12 @@ const SLIPPAGE_PRESETS = [0.5, 1, 2];
  *  pool trade, and a breach is benign (void tx, nothing debited). */
 const LQ_SLIPPAGE_PRESETS = [0.5, 1, 2.5];
 const LQ_DEFAULT_SLIPPAGE = 2.5;
+/** Resting-order lifetimes, in blocks. */
+export const LIMIT_EXPIRATIONS = [
+  { blocks: 144, label: "~1 day" },
+  { blocks: 1000, label: "~1 week" },
+  { blocks: 5000, label: "~5 weeks" },
+];
 
 /**
  * Swap settings lifted out of the widget so the gear can live beside the
@@ -46,6 +52,9 @@ interface SwapSettingsValue {
   setLqSlippagePreset: (v: number) => void;
   lqCustomSlippage: string;
   setLqCustomSlippage: (v: string) => void;
+  /** Limit-order lifetime in blocks. */
+  limitExpiration: number;
+  setLimitExpiration: (v: number) => void;
   /** Derived */
   customSlip: number;
   slippage: number;
@@ -73,6 +82,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
   const [autoValue, setAutoValue] = useState(1);
   const [lqSlippagePreset, setLqSlippagePreset] = useState(LQ_DEFAULT_SLIPPAGE);
   const [lqCustomSlippage, setLqCustomSlippage] = useState("");
+  const [limitExpiration, setLimitExpiration] = useState(1000);
 
   const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
     refreshInterval: 30_000,
@@ -110,6 +120,8 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
       setLqSlippagePreset,
       lqCustomSlippage,
       setLqCustomSlippage,
+      limitExpiration,
+      setLimitExpiration,
       customSlip,
       slippage,
       expiration,
@@ -127,6 +139,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
     autoValue,
     lqSlippagePreset,
     lqCustomSlippage,
+    limitExpiration,
   ]);
 
   return (
@@ -269,6 +282,62 @@ export function SwapSettingsGear() {
       <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
         Min received is enforced by the order itself — worse fills are
         impossible; better ones refund the difference.
+      </div>
+    </GearPopover>
+  );
+}
+
+/** The gear for the Limit tab — order lifetime + shared TX fee. */
+export function LimitSettingsGear() {
+  const s = useSwapSettings();
+  return (
+    <GearPopover
+      active={s.limitExpiration !== 1000 || s.customFee > 0}
+      label="Limit order settings"
+    >
+      <div className="text-xs font-medium text-gray-500">Expiration</div>
+      <div className="mt-2 flex items-center gap-1.5">
+        {LIMIT_EXPIRATIONS.map((x) => (
+          <button
+            key={x.blocks}
+            type="button"
+            onClick={() => s.setLimitExpiration(x.blocks)}
+            className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+              s.limitExpiration === x.blocks
+                ? "border-purple-600 bg-purple-50 text-purple-700"
+                : "border-gray-200 text-gray-600 hover:border-gray-300"
+            }`}
+          >
+            {x.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+        How long the order rests unfilled before the remainder auto-refunds.
+      </p>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+            s.customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          }`}
+        >
+          <AmountInput
+            value={s.customFeeRate}
+            onChange={s.setCustomFeeRate}
+            placeholder={s.medianFeeRate ? String(s.medianFeeRate) : "…"}
+            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+          />
+          <span className="text-xs text-gray-400">sat/vB</span>
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+        The Bitcoin miner fee. Default tracks the next-block median.
+      </p>
+      <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
+        A resting order refunds in full at expiry — the price you set is
+        enforced by the order itself.
       </div>
     </GearPopover>
   );

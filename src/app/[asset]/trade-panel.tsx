@@ -17,7 +17,7 @@ import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
-import { useSwapSettings } from "@/app/swap/swap-settings";
+import { LIMIT_EXPIRATIONS, useSwapSettings } from "@/app/swap/swap-settings";
 
 /**
  * The limit panel, built on the one primitive Counterparty has: the DEX
@@ -29,11 +29,6 @@ import { useSwapSettings } from "@/app/swap/swap-settings";
 
 const SATS = 1e8;
 const ORDER_VBYTES = 250;
-const LIMIT_EXPIRATIONS = [
-  { blocks: 144, label: "~1 day" },
-  { blocks: 1000, label: "~1 week" },
-  { blocks: 5000, label: "~5 weeks" },
-];
 /** Price nudges off the pool spot: buyers bid under, sellers ask over. */
 const PRICE_PRESETS = [1, 5, 10];
 const fmtPriceInput = (x: number) => x.toFixed(8).replace(/\.?0+$/, "");
@@ -49,18 +44,24 @@ interface PoolInfo {
 export function TradePanel({
   asset,
   xcpUsd = null,
+  onOpenSelector,
 }: {
   asset: string;
   xcpUsd?: number | null;
+  /** When set, the token chip opens the pair selector (multi-asset /swap). */
+  onOpenSelector?: () => void;
 }) {
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [limitPrice, setLimitPrice] = useState(""); // XCP per token
-  const [limitAmount, setLimitAmount] = useState(""); // tokens
-  const [expiration, setExpiration] = useState(1000);
+  // Amount and Total are bidirectional (the liquidity-form pattern):
+  // edit either and the other derives through the price.
+  const [amountStr, setAmountStr] = useState(""); // tokens
+  const [totalStr, setTotalStr] = useState(""); // XCP
+  const [editField, setEditField] = useState<"amount" | "total">("amount");
 
-  const { customFee, medianFeeRate } = useSwapSettings();
+  const { customFee, medianFeeRate, limitExpiration } = useSwapSettings();
   const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
   const { data: btcUsd } = useSWR(
     "btc-usd",
@@ -106,13 +107,28 @@ export function TradePanel({
   }, [compose.status, compose.txid, side, asset, address]);
 
   const limitPriceNum = parseFloat(limitPrice) || 0;
-  const limitAmountRaw = Math.round((parseFloat(limitAmount) || 0) * SATS);
-  const limitTotalRaw = Math.round(limitAmountRaw * limitPriceNum);
-  // The give side must be covered: XCP for a buy, tokens for a sell.
-  const giveBalance = side === "buy" ? xcpBalance : tokenBalance;
-  const giveNeeded = side === "buy" ? limitTotalRaw : limitAmountRaw;
-  const insufficient =
-    giveBalance !== undefined && giveNeeded > 0 && giveNeeded > giveBalance;
+  const limitAmountRaw =
+    editField === "amount"
+      ? Math.round((parseFloat(amountStr) || 0) * SATS)
+      : limitPriceNum > 0
+        ? Math.round(((parseFloat(totalStr) || 0) * SATS) / limitPriceNum)
+        : 0;
+  const limitTotalRaw =
+    editField === "total"
+      ? Math.round((parseFloat(totalStr) || 0) * SATS)
+      : Math.round(limitAmountRaw * limitPriceNum);
+  // The give side must be covered: XCP (Total) for a buy, tokens for a sell.
+  const insufficientToken =
+    side === "sell" &&
+    tokenBalance !== undefined &&
+    limitAmountRaw > 0 &&
+    limitAmountRaw > tokenBalance;
+  const insufficientXcp =
+    side === "buy" &&
+    xcpBalance !== undefined &&
+    limitTotalRaw > 0 &&
+    limitTotalRaw > xcpBalance;
+  const insufficient = insufficientToken || insufficientXcp;
   const limitReady =
     limitPriceNum > 0 &&
     limitAmountRaw > 0 &&
@@ -130,13 +146,6 @@ export function TradePanel({
     spot !== null && spot > 0 && limitPriceNum > 0
       ? (limitPriceNum / spot - 1) * 100
       : null;
-  // Max amount the give balance affords at this price.
-  const maxAmountRaw =
-    side === "sell"
-      ? (tokenBalance ?? 0)
-      : limitPriceNum > 0
-        ? Math.floor((xcpBalance ?? 0) / limitPriceNum)
-        : 0;
 
   const submitLimit = () => {
     if (!limitReady) return;
@@ -147,7 +156,7 @@ export function TradePanel({
             give_quantity: limitTotalRaw,
             get_asset: asset,
             get_quantity: limitAmountRaw,
-            expiration,
+            expiration: limitExpiration,
             fee_rate: customFee > 0 ? customFee : undefined,
           }
         : {
@@ -155,7 +164,7 @@ export function TradePanel({
             give_quantity: limitAmountRaw,
             get_asset: "XCP",
             get_quantity: limitTotalRaw,
-            expiration,
+            expiration: limitExpiration,
             fee_rate: customFee > 0 ? customFee : undefined,
           },
     );
@@ -268,23 +277,26 @@ export function TradePanel({
         </Well>
       </div>
 
-      {/* Amount well */}
+      {/* Amount well — the token leg; the chip is the pair selector on /swap */}
       <div className="mt-1">
         <Well
           focusable
           label="Amount"
           topRight={
-            maxAmountRaw > 0 ? (
+            side === "sell" && (tokenBalance ?? 0) > 0 ? (
               <span className="flex items-center gap-1">
                 {([25, 50, 75, 100] as const).map((p) => (
                   <button
                     key={p}
                     type="button"
-                    onClick={() =>
-                      setLimitAmount(
-                        fmtAmount(Math.floor((maxAmountRaw * p) / 100) / SATS),
-                      )
-                    }
+                    onClick={() => {
+                      setEditField("amount");
+                      setAmountStr(
+                        fmtAmount(
+                          Math.floor(((tokenBalance ?? 0) * p) / 100) / SATS,
+                        ),
+                      );
+                    }}
                     className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                   >
                     {p === 100 ? "Max" : `${p}%`}
@@ -293,7 +305,7 @@ export function TradePanel({
               </span>
             ) : undefined
           }
-          chip={<AssetChip asset={asset} />}
+          chip={<AssetChip asset={asset} onClick={onOpenSelector} />}
           footer={
             <>
               <span>
@@ -304,30 +316,114 @@ export function TradePanel({
                     : 0,
                 )}
               </span>
-              {giveBalance !== undefined && (
+              {tokenBalance !== undefined && (
                 <button
                   type="button"
                   className={`min-w-0 truncate hover:text-purple-600 ${
-                    insufficient ? "text-red-600" : "text-gray-500"
+                    insufficientToken ? "text-red-600" : "text-gray-500"
                   }`}
                   onClick={() => {
-                    if (maxAmountRaw > 0)
-                      setLimitAmount(fmtAmount(maxAmountRaw / SATS));
+                    setEditField("amount");
+                    setAmountStr(fmtAmount(tokenBalance / SATS));
                   }}
                 >
-                  Balance: {commas(giveBalance / SATS)}{" "}
-                  {side === "buy" ? "XCP" : ""}
+                  Balance: {commas(tokenBalance / SATS)}
                 </button>
               )}
             </>
           }
         >
           <AmountInput
-            value={limitAmount}
-            onChange={setLimitAmount}
+            value={
+              editField === "amount"
+                ? amountStr
+                : limitAmountRaw > 0
+                  ? fmtAmount(limitAmountRaw / SATS)
+                  : ""
+            }
+            onChange={(v) => {
+              setEditField("amount");
+              setAmountStr(v);
+            }}
             ariaLabel={`Amount of ${asset}`}
             className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-              insufficient ? "text-red-600" : "text-gray-900"
+              insufficientToken ? "text-red-600" : "text-gray-900"
+            }`}
+          />
+        </Well>
+      </div>
+
+      {/* Total well — the XCP leg, equally editable through the price */}
+      <div className="mt-1">
+        <Well
+          focusable
+          label="Total"
+          topRight={
+            side === "buy" && (xcpBalance ?? 0) > 0 ? (
+              <span className="flex items-center gap-1">
+                {([25, 50, 75, 100] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => {
+                      setEditField("total");
+                      setTotalStr(
+                        fmtAmount(
+                          Math.floor(((xcpBalance ?? 0) * p) / 100) / SATS,
+                        ),
+                      );
+                    }}
+                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  >
+                    {p === 100 ? "Max" : `${p}%`}
+                  </button>
+                ))}
+              </span>
+            ) : undefined
+          }
+          chip={<AssetChip asset="XCP" />}
+          footer={
+            <>
+              <span>
+                ≈{" "}
+                {usdFmt(
+                  xcpUsd && limitTotalRaw > 0
+                    ? (limitTotalRaw / SATS) * xcpUsd
+                    : 0,
+                )}
+              </span>
+              {xcpBalance !== undefined && (
+                <button
+                  type="button"
+                  className={`min-w-0 truncate hover:text-purple-600 ${
+                    insufficientXcp ? "text-red-600" : "text-gray-500"
+                  }`}
+                  onClick={() => {
+                    setEditField("total");
+                    setTotalStr(fmtAmount(xcpBalance / SATS));
+                  }}
+                >
+                  Balance: {commas(xcpBalance / SATS)}
+                </button>
+              )}
+            </>
+          }
+        >
+          <AmountInput
+            value={
+              editField === "total"
+                ? totalStr
+                : limitTotalRaw > 0
+                  ? fmtAmount(limitTotalRaw / SATS)
+                  : ""
+            }
+            onChange={(v) => {
+              setEditField("total");
+              setTotalStr(v);
+            }}
+            ariaLabel="Total in XCP"
+            className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+              insufficientXcp ? "text-red-600" : "text-gray-900"
             }`}
           />
         </Well>
@@ -337,12 +433,6 @@ export function TradePanel({
       {limitPriceNum > 0 && limitAmountRaw > 0 && (
         <div className="px-2 pt-2">
           <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
-            <div className="flex justify-between">
-              <dt>Total</dt>
-              <dd className="font-medium tabular-nums text-gray-700">
-                {commas(limitTotalRaw / SATS)} XCP
-              </dd>
-            </div>
             {spot !== null && (
               <div className="flex justify-between">
                 <dt>Fills</dt>
@@ -355,21 +445,11 @@ export function TradePanel({
                 </dd>
               </div>
             )}
-            <div className="flex items-center justify-between">
+            <div className="flex justify-between">
               <dt>Expires</dt>
               <dd>
-                <select
-                  value={expiration}
-                  onChange={(e) => setExpiration(Number(e.target.value))}
-                  className="rounded-lg border border-gray-200 px-1.5 py-0.5 text-xs"
-                  aria-label="Order expiration"
-                >
-                  {LIMIT_EXPIRATIONS.map((x) => (
-                    <option key={x.blocks} value={x.blocks}>
-                      {x.label}
-                    </option>
-                  ))}
-                </select>
+                {LIMIT_EXPIRATIONS.find((x) => x.blocks === limitExpiration)
+                  ?.label ?? `${limitExpiration} blocks`}
               </dd>
             </div>
             {feeRate !== null && (

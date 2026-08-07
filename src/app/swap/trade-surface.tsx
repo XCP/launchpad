@@ -2,21 +2,20 @@
 
 import { useState } from "react";
 import { TradePanel } from "@/app/[asset]/trade-panel";
-import { AssetChip } from "@/components/asset-chip";
 import { TokenSelectModal } from "@/components/token-select-modal";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { LiquidityWidget } from "./liquidity-widget";
 import {
+  LimitSettingsGear,
   LiquiditySettingsGear,
   SwapSettingsGear,
   SwapSettingsProvider,
 } from "./swap-settings";
 import { SwapWidget } from "./swap-widget";
 
-/** Swap | Limit | Liquidity — one surface for the whole pool. The
- *  settings gear sits to the right of the tabs, per-mode (the Uniswap
- *  placement); Limit brings its own expiration control, so no gear. */
+/** Swap | Limit | Liquidity — one surface for the whole pool, each mode
+ *  with its own gear beside the tabs (the Uniswap placement). */
 export function TradeSurface({
   assets,
   xcpUsd,
@@ -42,9 +41,11 @@ export function TradeSurface({
         </Tabs>
         {mode === "swap" ? (
           <SwapSettingsGear />
-        ) : mode === "liquidity" ? (
+        ) : mode === "limit" ? (
+          <LimitSettingsGear />
+        ) : (
           <LiquiditySettingsGear />
-        ) : null}
+        )}
       </div>
       {mode === "swap" ? (
         <SwapWidget assets={assets} xcpUsd={xcpUsd} />
@@ -52,18 +53,14 @@ export function TradeSurface({
         <LiquidityWidget assets={assets} xcpUsd={xcpUsd} />
       ) : (
         <div>
-          <div className="mb-2 flex items-center gap-2 px-1 text-sm text-gray-500">
-            <AssetChip
-              asset={limitAsset}
-              onClick={
-                assets.length > 1
-                  ? () => setLimitSelectorOpen(true)
-                  : undefined
-              }
-            />
-            <span>/ XCP</span>
-          </div>
-          <TradePanel key={limitAsset} asset={limitAsset} xcpUsd={xcpUsd} />
+          <TradePanel
+            key={limitAsset}
+            asset={limitAsset}
+            xcpUsd={xcpUsd}
+            onOpenSelector={
+              assets.length > 1 ? () => setLimitSelectorOpen(true) : undefined
+            }
+          />
           <TokenSelectModal
             open={limitSelectorOpen}
             onClose={() => setLimitSelectorOpen(false)}

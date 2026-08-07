@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { LiquidityWidget } from "@/app/swap/liquidity-widget";
 import {
+  LimitSettingsGear,
   LiquiditySettingsGear,
   SwapSettingsGear,
   SwapSettingsProvider,
@@ -38,9 +39,11 @@ export function AssetTradeSurface({
         </Tabs>
         {mode === "swap" ? (
           <SwapSettingsGear />
-        ) : mode === "liquidity" ? (
+        ) : mode === "limit" ? (
+          <LimitSettingsGear />
+        ) : (
           <LiquiditySettingsGear />
-        ) : null}
+        )}
       </div>
       {mode === "swap" ? (
         <SwapWidget assets={[asset]} xcpUsd={xcpUsd} compact />
