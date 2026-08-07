@@ -11,7 +11,8 @@ import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
-import { commas, compact, shortAddress, usd as usdFmt } from "@/lib/format";
+import { commas, commasRaw, compact, shortAddress, usd as usdFmt } from "@/lib/format";
+import { approx, parseUnitsToRaw } from "@/lib/numeric";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -389,7 +390,7 @@ function LoadCard({
         label="You receive · Counterparty"
         topRight={
           xcpBalance !== undefined && (
-            <span>Balance: {commas(xcpBalance / SATS)}</span>
+            <span>Balance: {commasRaw(xcpBalance)}</span>
           )
         }
         chip={<XcpChip />}
@@ -742,7 +743,11 @@ function UnloadCard({
   );
 
   const priceSats = Math.round(parseFloat(price)) || (marketSats ?? 0);
-  const escrowRaw = Math.round((parseFloat(escrow) || 0) * SATS);
+  // Exact from the typed digits: this becomes escrow_quantity on a dispenser
+  // the user signs for. XCP's supply keeps it inside the safe range today, but
+  // the value is a signed quantity and reading it is no more work than not.
+  const escrowExact = parseUnitsToRaw(escrow) ?? 0n;
+  const escrowRaw = approx(escrowExact);
   const btcIfSold = priceSats > 0 ? (escrowRaw / SATS) * (priceSats / SATS) : 0;
   const perXcpUsd = btcUsd ? (priceSats / SATS) * btcUsd : null;
   const vsMarket = perXcpUsd && xcpUsd ? (perXcpUsd / xcpUsd - 1) * 100 : null;
@@ -756,7 +761,7 @@ function UnloadCard({
     compose.composeDispenser({
       asset: "XCP",
       give_quantity: SATS, // 1 XCP per vend — matches the load list's filter
-      escrow_quantity: escrowRaw,
+      escrow_quantity: escrowExact,
       mainchainrate: priceSats,
       status: 0,
     });
@@ -846,7 +851,7 @@ function UnloadCard({
         ? "Insufficient XCP balance"
         : escrowRaw < SATS
           ? "Minimum 1 XCP"
-          : `Unload ${commas(escrowRaw / SATS)} XCP`;
+          : `Unload ${commasRaw(escrowExact)} XCP`;
 
   return (
     <div className="contents">
@@ -861,10 +866,12 @@ function UnloadCard({
               type="button"
               className="hover:text-gray-700 hover:underline"
               onClick={() =>
-                setEscrow((balance / SATS).toFixed(8).replace(/\.?0+$/, ""))
+                setEscrow(
+                  (approx(balance) / SATS).toFixed(8).replace(/\.?0+$/, ""),
+                )
               }
             >
-              Balance: {commas(balance / SATS)}
+              Balance: {commasRaw(balance)}
             </button>
           )
         }

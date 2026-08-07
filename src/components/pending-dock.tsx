@@ -10,6 +10,7 @@ import {
   updatePending,
 } from "@/lib/pending";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const POLL_MS = 30_000;
@@ -44,14 +45,23 @@ export function PendingDock() {
               { signal: AbortSignal.timeout(10_000) },
             );
             if (!res.ok) continue;
-            const o = (await res.json()).result;
+            // Lossless: the partial-fill test below compares two 64-bit
+            // quantities, and a fill smaller than the gap between doubles at
+            // their magnitude would read as no fill at all.
+            const o = parseJsonLossless<{
+              result?: {
+                status?: string;
+                give_remaining?: Raw;
+                give_quantity?: Raw;
+              } | null;
+            }>(await res.text()).result;
             if (!o) continue;
             if (o.status === "filled") updatePending(item.txid, { resolved: "filled" });
             else if (o.status === "expired")
               updatePending(item.txid, { resolved: "expired · refunded" });
             else if (o.status === "cancelled")
               updatePending(item.txid, { resolved: "cancelled" });
-            else if (o.give_remaining < o.give_quantity)
+            else if (big(o.give_remaining) < big(o.give_quantity))
               updatePending(item.txid, { resolved: "partially filled · resting" });
           } else {
             // Three-state oracle: 404 = unknown, block_hash "mempool" =

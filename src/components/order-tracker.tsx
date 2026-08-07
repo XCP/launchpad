@@ -1,19 +1,18 @@
 "use client";
 
 import useSWR from "swr";
-import { commas } from "@/lib/format";
+import { commasRaw } from "@/lib/format";
+import { parseJsonLossless, type Raw, ratio } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
-
-const SATS = 1e8;
 
 interface OrderRow {
   status: string;
   give_asset: string;
-  give_quantity: number;
-  give_remaining: number;
+  give_quantity: Raw;
+  give_remaining: Raw;
   get_asset: string;
-  get_quantity: number;
-  get_remaining: number;
+  get_quantity: Raw;
+  get_remaining: Raw;
   expire_index: number | null;
 }
 
@@ -37,7 +36,10 @@ export function OrderTracker({
     async (url: string) => {
       const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) return null;
-      return (await res.json()).result ?? null;
+      return (
+        parseJsonLossless<{ result?: OrderRow | null }>(await res.text())
+          .result ?? null
+      );
     },
     { refreshInterval: 15_000 },
   );
@@ -53,7 +55,7 @@ export function OrderTracker({
 
   const filledPct = Math.max(
     0,
-    Math.min(100, (1 - order.give_remaining / order.give_quantity) * 100),
+    Math.min(100, (1 - ratio(order.give_remaining, order.give_quantity)) * 100),
   );
 
   if (order.status === "filled") {
@@ -64,7 +66,7 @@ export function OrderTracker({
   if (order.status === "expired") {
     return (
       <p className="mt-2 text-sm text-green-700">
-        Expired — the unfilled {commas(order.give_remaining / SATS)}{" "}
+        Expired — the unfilled {commasRaw(order.give_remaining)}{" "}
         {order.give_asset} was refunded automatically.
       </p>
     );
@@ -77,7 +79,7 @@ export function OrderTracker({
     <div className="mt-2 text-sm text-green-700">
       <p>
         {filledPct > 0 ? `${filledPct.toFixed(0)}% filled — the rest is` : "Confirmed —"}{" "}
-        resting on the book with {commas(order.give_remaining / SATS)}{" "}
+        resting on the book with {commasRaw(order.give_remaining)}{" "}
         {order.give_asset} escrowed.
       </p>
       {onCancel && (

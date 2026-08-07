@@ -406,10 +406,10 @@ export function TradePanel({
         const basisPrice = limitPriceNum > 0 ? limitPriceNum : (spot ?? 0);
         const maxAffordableRaw =
           side === "sell"
-            ? (tokenBalance ?? 0)
+            ? (tokenBalance ?? 0n)
             : basisPrice > 0
-              ? Math.floor((xcpBalance ?? 0) / basisPrice)
-              : 0;
+              ? BigInt(Math.floor(approx(xcpBalance ?? 0n) / basisPrice))
+              : 0n;
         return (
           <>
             <div className="mt-1">
@@ -417,7 +417,7 @@ export function TradePanel({
                 focusable
                 label="Amount"
                 topRight={
-                  maxAffordableRaw > 0 ? (
+                  maxAffordableRaw > 0n ? (
                     <span className="flex items-center gap-1">
                       {([25, 50, 75, 100] as const).map((p) => (
                         <button
@@ -458,7 +458,7 @@ export function TradePanel({
                         }`}
                         onClick={() => {
                           setEditField("amount");
-                          setAmountStr(fmtAmount(tokenBalance / SATS));
+                          setAmountStr(fmtAmount(approx(tokenBalance) / SATS));
                         }}
                       >
                         Balance: {commasRaw(tokenBalance)}
@@ -509,7 +509,7 @@ export function TradePanel({
                         }`}
                         onClick={() => {
                           setEditField("total");
-                          setTotalStr(fmtAmount(xcpBalance / SATS));
+                          setTotalStr(fmtAmount(approx(xcpBalance) / SATS));
                         }}
                       >
                         Balance: {commasRaw(xcpBalance)}

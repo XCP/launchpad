@@ -1,6 +1,6 @@
 "use client";
 
-import { approx, parseJsonLossless, type Raw, sumRaw } from "@/lib/numeric";
+import { parseJsonLossless, type Raw, sumRaw } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 /**
@@ -25,19 +25,20 @@ export async function fetchJson(url: string, timeoutMs = 10_000): Promise<any> {
  * only (and composes pass exclude_utxos_with_balances), so counting
  * attached XCP would show funds the forms can't actually use.
  *
- * The rows are summed as exact integers — a `+` accumulator is the classic
- * way a total drifts past what its parts justify, and an address can hold
- * enough of a large-supply asset for it to matter. The number returned is the
- * correctly-rounded double of that exact total, which is what the forms need:
- * they divide it by 1e8 for display and take percentages of it for the preset
- * buttons, both approximations by nature. What must never be approximate is a
- * quantity on its way into a transaction, and that is gated separately in
- * useCompose.
+ * Exact, and a bigint rather than a number, because a balance is the source of
+ * three things that must not drift: what the Max button fills in, what the
+ * insufficient-funds check compares against, and — through those — what gets
+ * signed. Holding the whole supply of a 100M-token XCP-69 asset is 10^16 raw,
+ * already past where a double picks out a single integer, and the Holders tab
+ * shows legacy assets an order of magnitude larger again.
+ *
+ * The `+` accumulator it replaces was the other half of the problem: a total
+ * can leave the safe range even when every row it sums is comfortably inside.
  */
 export async function fetchBalance(
   address: string,
   asset: string,
-): Promise<number> {
+): Promise<bigint> {
   const data = await fetchJson(
     `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
   );
@@ -48,5 +49,5 @@ export async function fetchBalance(
     : data.result
       ? [data.result]
       : [];
-  return approx(sumRaw(rows.filter((r) => !r.utxo).map((r) => r.quantity)));
+  return sumRaw(rows.filter((r) => !r.utxo).map((r) => r.quantity));
 }

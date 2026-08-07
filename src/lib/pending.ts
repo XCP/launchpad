@@ -12,6 +12,8 @@
  * read caused an infinite render loop (React #185).
  */
 
+import { sumRaw } from "@/lib/numeric";
+
 export type PendingKind = "order" | "dispense" | "mint" | "pool";
 
 export interface PendingItem {
@@ -24,9 +26,11 @@ export interface PendingItem {
   address?: string;
   /** Resolved state, set by the dock's poller. */
   resolved?: string;
-  /** What this action spends, for optimistic balance display. */
+  /** What this action spends, for optimistic balance display.
+   *  A decimal STRING: this row is JSON in localStorage, and a raw quantity
+   *  can be larger than JSON.parse would hand back intact on the way out. */
   giveAsset?: string;
-  giveRaw?: number;
+  giveRaw?: string;
   /** Consecutive authoritative 404s — 3 marks the tx dropped. */
   misses?: number;
 }
@@ -86,17 +90,19 @@ export function dismissPending(txid: string) {
  * for phantom subtractions, even if every mempool check fails.
  */
 const SUBTRACT_MS = 60 * 60 * 1000;
-export function pendingSpentRaw(asset: string, address?: string | null): number {
+export function pendingSpentRaw(asset: string, address?: string | null): bigint {
   const now = Date.now();
-  return readPending()
-    .filter(
-      (i) =>
-        !i.resolved &&
-        i.giveAsset === asset &&
-        (!i.address || !address || i.address === address) &&
-        now - i.addedAt < SUBTRACT_MS,
-    )
-    .reduce((s, i) => s + (i.giveRaw ?? 0), 0);
+  return sumRaw(
+    readPending()
+      .filter(
+        (i) =>
+          !i.resolved &&
+          i.giveAsset === asset &&
+          (!i.address || !address || i.address === address) &&
+          now - i.addedAt < SUBTRACT_MS,
+      )
+      .map((i) => i.giveRaw ?? 0),
+  );
 }
 
 export function subscribePending(cb: () => void): () => void {

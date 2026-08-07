@@ -5,20 +5,19 @@ import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { fetchBalance } from "@/lib/client";
-import { commas } from "@/lib/format";
-
-const SATS = 1e8;
+import { commasRaw } from "@/lib/format";
+import { compareRawDesc } from "@/lib/numeric";
 
 async function fetchBalances(
   address: string,
   assets: string[],
-): Promise<Record<string, number>> {
+): Promise<Record<string, bigint>> {
   const entries = await Promise.all(
     assets.map(async (a) => {
       try {
         return [a, await fetchBalance(address, a)] as const;
       } catch {
-        return [a, 0] as const;
+        return [a, 0n] as const;
       }
     }),
   );
@@ -88,8 +87,10 @@ function ModalBody({
 
   const q = query.trim().toUpperCase();
   const filtered = assets.filter((a) => a.toUpperCase().includes(q));
-  const sorted = [...filtered].sort(
-    (a, b) => (balances?.[b] ?? 0) - (balances?.[a] ?? 0),
+  // Holdings first. Not `b - a`: two balances that differ by less than the gap
+  // between doubles at their magnitude would subtract to zero and sort as tied.
+  const sorted = [...filtered].sort((a, b) =>
+    compareRawDesc(balances?.[a] ?? 0n, balances?.[b] ?? 0n),
   );
 
   return (
@@ -128,9 +129,9 @@ function ModalBody({
                 <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
                   {rowLabel ? rowLabel(a) : a}
                 </span>
-                {bal !== undefined && bal > 0 && (
+                {bal !== undefined && bal > 0n && (
                   <span className="shrink-0 text-sm text-gray-500">
-                    {commas(bal / SATS)}
+                    {commasRaw(bal)}
                   </span>
                 )}
               </button>

@@ -17,6 +17,7 @@ import { fetchBalance, fetchJson } from "@/lib/client";
 import { commasRaw, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import {
   approx,
+  bigMax,
   parseUnitsToRaw,
   percentOf,
   type Raw,
@@ -148,7 +149,7 @@ export function SwapWidget({
   );
   const effBalance =
     balance !== undefined
-      ? Math.max(0, balance - pendingSpentRaw(giveAsset, address))
+      ? bigMax(0n, balance - pendingSpentRaw(giveAsset, address))
       : undefined;
 
   // What the market holds of the buy asset — the pool reserve (the book
@@ -205,10 +206,18 @@ export function SwapWidget({
         label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — market order`,
         address: address ?? undefined,
         giveAsset,
-        giveRaw: amountRaw,
+        giveRaw: amountExact.toString(),
       });
     }
-  }, [compose.status, compose.txid, side, asset, giveAsset, amountRaw, address]);
+  }, [
+    compose.status,
+    compose.txid,
+    side,
+    asset,
+    giveAsset,
+    amountExact,
+    address,
+  ]);
 
   const ready = amountRaw > 0 && approx(outRaw) > 0 && !busy && !insufficient;
 
@@ -287,7 +296,7 @@ export function SwapWidget({
   // Wide layout: presets live in the label row, always visible while
   // connected — no hover hunting (Radiant convention). The balance keeps
   // the bottom-right corner as a click-to-fill.
-  const presetRow = effBalance !== undefined && effBalance > 0 && (
+  const presetRow = effBalance !== undefined && effBalance > 0n && (
     <span className="flex items-center gap-1">
       {PRESETS.map((p) => (
         <button
@@ -321,7 +330,7 @@ export function SwapWidget({
     <button
       type="button"
       className="min-w-0 truncate text-gray-500 hover:text-purple-600"
-      onClick={() => setAmount(fmtAmount(effBalance / SATS))}
+      onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
     >
       Balance: {commasRaw(effBalance)}
       {balance !== undefined && balance > effBalance && (
@@ -340,7 +349,7 @@ export function SwapWidget({
       <button
         type="button"
         className="group-hover/bal:hidden"
-        onClick={() => setAmount(fmtAmount(effBalance / SATS))}
+        onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
       >
         Balance: {commasRaw(effBalance)}
         {balance !== undefined && balance > effBalance && (
@@ -351,7 +360,7 @@ export function SwapWidget({
         )}
       </button>
       <span className="hidden items-center gap-1 group-hover/bal:flex">
-        {effBalance > 0 ? (
+        {effBalance > 0n ? (
           PRESETS.map((p) => (
             <button
               key={p}
