@@ -127,7 +127,7 @@ export default async function StandardPage() {
               balance — BTC only covers miner fees. The fastest no-account
               route is an on-chain dispenser: send BTC, the protocol vends
               XCP automatically.{" "}
-              <Link href="/xcp" className="text-purple-600 underline">
+              <Link href="/dispense" className="text-purple-600 underline">
                 Buy from the cheapest dispensers here
               </Link>
               . A max mint is 10 XCP; a launch needs 0.5 XCP for the name.

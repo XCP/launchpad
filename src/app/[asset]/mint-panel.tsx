@@ -149,7 +149,7 @@ export function MintPanel({
         Your XCP is escrowed by the protocol, not sent to the creator. If the
         launch misses its target, every mint is automatically refunded. Need
         XCP?{" "}
-        <Link href="/xcp" className="text-purple-600 underline">
+        <Link href="/dispense" className="text-purple-600 underline">
           Get some here
         </Link>
         .

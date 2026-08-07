@@ -250,7 +250,7 @@ export default function CreatePage() {
           {nameCheck === "available" && (
             <span className="text-green-600">
               {name} is available (0.5 XCP registration fee applies —{" "}
-              <Link href="/xcp" className="underline">
+              <Link href="/dispense" className="underline">
                 need XCP?
               </Link>
               ).
