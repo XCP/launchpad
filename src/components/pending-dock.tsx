@@ -9,6 +9,7 @@ import {
   subscribePending,
   updatePending,
 } from "@/lib/pending";
+import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const POLL_MS = 30_000;
@@ -20,6 +21,7 @@ const POLL_MS = 30_000;
  * not a spinner pretending.
  */
 export function PendingDock() {
+  const { status, address } = useWallet();
   const items = useSyncExternalStore(
     subscribePending,
     readPending,
@@ -101,8 +103,15 @@ export function PendingDock() {
     };
   }, [items]);
 
-  if (items.length === 0) return null;
-  const unresolved = items.filter((i) => !i.resolved).length;
+  // The dock is an extension of the connected wallet: no wallet, no dock.
+  // Polling above keeps running regardless, so resolutions are already
+  // recorded the moment the user reconnects. Items are scoped to the
+  // active account — a switch hides the other account's activity rather
+  // than blending two histories.
+  if (status !== "connected") return null;
+  const visible = items.filter((i) => !i.address || i.address === address);
+  if (visible.length === 0) return null;
+  const unresolved = visible.filter((i) => !i.resolved).length;
 
   return (
     <div className="fixed bottom-4 left-4 z-40">
@@ -122,7 +131,7 @@ export function PendingDock() {
             </button>
           </div>
           <ul className="space-y-1.5">
-            {items.map((item) => (
+            {visible.map((item) => (
               <DockRow key={item.txid} item={item} />
             ))}
           </ul>
@@ -141,7 +150,7 @@ export function PendingDock() {
           ) : (
             <>
               <span className="size-2 rounded-full bg-green-500" />
-              {items.length} done
+              {visible.length} done
             </>
           )}
         </button>

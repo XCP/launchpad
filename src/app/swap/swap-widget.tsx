@@ -119,7 +119,7 @@ export function SwapWidget({
   );
   const effBalance =
     balance !== undefined
-      ? Math.max(0, balance - pendingSpentRaw(giveAsset))
+      ? Math.max(0, balance - pendingSpentRaw(giveAsset, address))
       : undefined;
 
   // What the market holds of the buy asset — the pool reserve (the book
@@ -162,11 +162,12 @@ export function SwapWidget({
         txid: compose.txid,
         kind: "order",
         label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — market order`,
+        address: address ?? undefined,
         giveAsset,
         giveRaw: amountRaw,
       });
     }
-  }, [compose.status, compose.txid, side, asset, giveAsset, amountRaw]);
+  }, [compose.status, compose.txid, side, asset, giveAsset, amountRaw, address]);
 
   const ready = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
 
@@ -241,6 +242,44 @@ export function SwapWidget({
       <AssetChip asset={a} onClick={() => setSelectorOpen(true)} />
     );
 
+  // Wide layout: presets live in the label row, always visible while
+  // connected — no hover hunting (Radiant convention). The balance keeps
+  // the bottom-right corner as a click-to-fill.
+  const presetRow = effBalance !== undefined && effBalance > 0 && (
+    <span className="flex items-center gap-1">
+      {PRESETS.map((p) => (
+        <button
+          key={p}
+          type="button"
+          onClick={() =>
+            setAmount(fmtAmount(Math.floor((effBalance * p) / 100) / SATS))
+          }
+          className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+        >
+          {p === 100 ? "Max" : `${p}%`}
+        </button>
+      ))}
+    </span>
+  );
+
+  const balanceLabel = effBalance !== undefined && (
+    <button
+      type="button"
+      className="min-w-0 truncate text-gray-500 hover:text-purple-600"
+      onClick={() => setAmount(fmtAmount(effBalance / SATS))}
+    >
+      Balance: {commas(effBalance / SATS)}
+      {balance !== undefined && balance > effBalance && (
+        <span className="text-gray-400">
+          {" "}
+          · {commas((balance - effBalance) / SATS)} pending
+        </span>
+      )}
+    </button>
+  );
+
+  // Compact rail keeps the space-saving hover swap: balance at rest,
+  // presets on hover.
   const balanceControls = effBalance !== undefined && (
     <span className="group/bal flex min-w-0 items-center gap-1">
       <button
@@ -384,6 +423,7 @@ export function SwapWidget({
         focusable
         layout={compact ? "stack" : "row"}
         label="Sell"
+        topRight={!compact ? presetRow || undefined : undefined}
         chipRight={
           compact && effBalance !== undefined ? balanceControls : undefined
         }
@@ -391,11 +431,7 @@ export function SwapWidget({
         footer={
           <>
             <span>≈ {usdFmt(giveUsd ?? 0)}</span>
-            {!compact && effBalance !== undefined && (
-              <span className="flex min-w-0 items-center gap-1 text-gray-500">
-                {balanceControls}
-              </span>
-            )}
+            {!compact && balanceLabel}
           </>
         }
       >
@@ -421,7 +457,7 @@ export function SwapWidget({
         chip={chipFor(getAsset)}
         chipRight={
           compact && availableRaw !== null ? (
-            <span>{commas(Math.round(availableRaw / SATS))} in pool</span>
+            <span>{commas(Math.round(availableRaw / SATS))} available</span>
           ) : undefined
         }
         footer={
@@ -429,7 +465,7 @@ export function SwapWidget({
             <span>≈ {usdFmt(getUsd ?? 0)}</span>
             {!compact && availableRaw !== null && (
               <span className="text-gray-500">
-                {commas(Math.round(availableRaw / SATS))} in pool
+                {commas(Math.round(availableRaw / SATS))} available
               </span>
             )}
           </>

@@ -167,9 +167,10 @@ export function LiquidityWidget({
         txid: compose.txid,
         kind: "pool",
         label: `${tab === "add" ? "Add" : "Remove"} ${asset}/XCP liquidity`,
+        address: address ?? undefined,
       });
     }
-  }, [compose.status, compose.txid, tab, asset]);
+  }, [compose.status, compose.txid, tab, asset, address]);
 
 
   const insufficientToken =

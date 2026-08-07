@@ -189,6 +189,7 @@ export function useDispenseRouter() {
             txid,
             kind: "dispense",
             label: `Load ${leg.units * (leg.dispenser.give_quantity / 1e8)} XCP via ${shortAddress(leg.dispenser.source)}`,
+            address: address ?? undefined,
           });
         } catch (e) {
           patch(i, {

@@ -121,9 +121,10 @@ export function TradePanel({
         txid: compose.txid,
         kind: "order",
         label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — ${tab} order`,
+        address: address ?? undefined,
       });
     }
-  }, [compose.status, compose.txid, side, asset, tab]);
+  }, [compose.status, compose.txid, side, asset, tab, address]);
 
 
   const staleQuote = isValidating || amountRaw !== debouncedRaw;

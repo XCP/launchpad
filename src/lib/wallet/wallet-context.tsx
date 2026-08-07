@@ -42,6 +42,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const connectingRef = useRef(false)
   const disconnectingRef = useRef(false)
   const walletRef = useRef<XcpWallet | null>(null)
+  // Mirrors `address` for event handlers, which must compare the current
+  // account without reaching into a state updater (updaters stay pure).
+  const addressRef = useRef<string | null>(null)
 
   // Detect wallet, subscribe to events, and auto-reconnect
   useEffect(() => {
@@ -50,10 +53,15 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     const onAccountsChanged = (accounts: string[]) => {
       if (cancelled) return
       if (accounts.length === 0) {
-        setAddress((prev) => prev === null ? prev : null)
+        addressRef.current = null
+        setAddress(null)
+        setConnectionProof(null)
         setStatus('disconnected')
       } else {
-        setAddress((prev) => prev === accounts[0] ? prev : accounts[0])
+        // A proof attests to one address — a switch invalidates it.
+        if (addressRef.current !== accounts[0]) setConnectionProof(null)
+        addressRef.current = accounts[0]
+        setAddress(accounts[0])
         setStatus('connected')
         setConnectError(null)
         storageSet(STORAGE_KEY, '1')
@@ -62,7 +70,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
     const onDisconnect = () => {
       if (cancelled) return
+      addressRef.current = null
       setAddress(null)
+      setConnectionProof(null)
       setStatus('disconnected')
       storageRemove(STORAGE_KEY)
     }
@@ -83,6 +93,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           const accounts = await wallet.getAccounts()
           if (cancelled) return
           if (accounts.length > 0) {
+            addressRef.current = accounts[0]
             setAddress(accounts[0])
             setStatus('connected')
           }
@@ -143,6 +154,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       // Abort if disconnect was called while we were waiting
       if (disconnectingRef.current) return
       if (accounts.length > 0) {
+        addressRef.current = accounts[0]
         setAddress(accounts[0])
         setConnectionProof(proof)
         setStatus('connected')
@@ -166,6 +178,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         console.warn('[wallet] disconnect failed:', e)
       }
     }
+    addressRef.current = null
     setAddress(null)
     setConnectionProof(null)
     setStatus('disconnected')

@@ -37,9 +37,10 @@ export function MintPanel({
         txid: compose.txid,
         kind: "mint",
         label: `Mint ${(clampedLots * 1000).toLocaleString()} ${asset}`,
+        address: address ?? undefined,
       });
     }
-  }, [compose.status, compose.txid, clampedLots, asset]);
+  }, [compose.status, compose.txid, clampedLots, asset, address]);
 
 
   if (compose.status === "confirmed") {

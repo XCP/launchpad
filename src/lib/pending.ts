@@ -19,6 +19,9 @@ export interface PendingItem {
   kind: PendingKind;
   label: string;
   addedAt: number;
+  /** The address that broadcast this — items follow their account, not
+   *  the browser. Absent only on legacy rows, which age out in 48h. */
+  address?: string;
   /** Resolved state, set by the dock's poller. */
   resolved?: string;
   /** What this action spends, for optimistic balance display. */
@@ -83,12 +86,15 @@ export function dismissPending(txid: string) {
  * for phantom subtractions, even if every mempool check fails.
  */
 const SUBTRACT_MS = 60 * 60 * 1000;
-export function pendingSpentRaw(asset: string): number {
+export function pendingSpentRaw(asset: string, address?: string | null): number {
   const now = Date.now();
   return readPending()
     .filter(
       (i) =>
-        !i.resolved && i.giveAsset === asset && now - i.addedAt < SUBTRACT_MS,
+        !i.resolved &&
+        i.giveAsset === asset &&
+        (!i.address || !address || i.address === address) &&
+        now - i.addedAt < SUBTRACT_MS,
     )
     .reduce((s, i) => s + (i.giveRaw ?? 0), 0);
 }
