@@ -86,19 +86,21 @@ export function XcpBridge({
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
-        <Tabs
-          value={direction}
-          onValueChange={(v) => {
-            if (v !== direction) flip();
-          }}
-        >
-          <SegmentedList className="w-64">
-            <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
-            <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
-          </SegmentedList>
-        </Tabs>
-        <DispenseSettingsGear />
+      <div className="mb-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
+        <div className="flex items-center justify-between">
+          <Tabs
+            value={direction}
+            onValueChange={(v) => {
+              if (v !== direction) flip();
+            }}
+          >
+            <SegmentedList className="w-64">
+              <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
+              <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
+            </SegmentedList>
+          </Tabs>
+          <DispenseSettingsGear />
+        </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         {direction === "load" ? (
@@ -186,6 +188,15 @@ function LoadCard({
   customFee: number;
 }) {
   const { address, status: walletStatus, connect } = useWallet();
+  const { data: btcBalanceSats } = useSWR(
+    address ? [address, "btc-balance"] : null,
+    async ([addr]) => {
+      const r = await fetchJson(`https://mempool.space/api/address/${addr}`);
+      const c = r.chain_stats;
+      return (c?.funded_txo_sum ?? 0) - (c?.spent_txo_sum ?? 0);
+    },
+    { refreshInterval: 60_000 },
+  );
   const router = useDispenseRouter();
   const [routeIdx, setRouteIdx] = useState(0);
   // Independent-field pattern: whichever side was typed last drives; the
@@ -332,7 +343,7 @@ function LoadCard({
         <div className="text-sm font-semibold text-gray-900">
           {allDone
             ? `${commas(totalXcp)} XCP incoming`
-            : `Loading ${commas(totalXcp)} XCP · ${router.legs.length} route${
+            : `Buying ${commas(totalXcp)} XCP · ${router.legs.length} route${
                 router.legs.length === 1 ? "" : "s"
               }`}
         </div>
@@ -443,7 +454,7 @@ function LoadCard({
       ? "Enter an amount"
       : armed && plan.length > 1
         ? `Sign ${plan.length} transactions`
-        : `Load ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
+        : `Buy ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
 
   return (
     <div className="contents">
@@ -451,7 +462,7 @@ function LoadCard({
       {/* You receive · Counterparty — XCP always first */}
       <Well
         focusable
-        label="You receive · Counterparty"
+        label="You receive"
         topRight={
           <span className="flex items-center gap-1">
             {presets.map((p) => (
@@ -490,7 +501,7 @@ function LoadCard({
                 Math.abs(snapped - typedXcp) > 1e-9 && (
                   <span className="text-amber-600">
                     {" "}
-                    · snaps to {commas(snapped)} ({commas(unitXcp)}-XCP units)
+                    · adjusts to {commas(snapped)}
                   </span>
                 )}
             </span>
@@ -521,17 +532,24 @@ function LoadCard({
       {/* You send · Bitcoin */}
       <Well
         focusable
-        label="You send · Bitcoin"
+        label="You send"
         chip={<BtcChip />}
         footer={
-          <span>
-            {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
-            {lastEdited === "btc" &&
-              typedBtcSats > 0 &&
-              typedBtcSats !== btcSats && (
-                <span className="text-amber-600"> · sends exactly {fmtBtc(btcSats)}</span>
-              )}
-          </span>
+          <>
+            <span>
+              {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
+              {lastEdited === "btc" &&
+                typedBtcSats > 0 &&
+                typedBtcSats !== btcSats && (
+                  <span className="text-amber-600"> · exact cost {fmtBtc(btcSats)}</span>
+                )}
+            </span>
+            {btcBalanceSats !== undefined && (
+              <span className="text-gray-500">
+                Balance: {fmtBtc(btcBalanceSats)}
+              </span>
+            )}
+          </>
         }
       >
         <AmountInput
@@ -697,8 +715,8 @@ function LoadCard({
           </>
         )}
         <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
-          Non-custodial: the protocol vends automatically when your BTC
-          confirms. A dispense is a purchase — no refund path.
+          XCP arrives automatically when your BTC confirms. Purchases are
+          final.
         </p>
       </div>
 
@@ -862,7 +880,7 @@ function UnloadCard({
       <div className="rounded-3xl border border-amber-200 bg-white p-6 text-sm text-gray-700">
         <p className="flex items-center gap-2">
           <span className="size-2 animate-pulse rounded-full bg-amber-500" />
-          <span className="font-semibold">Unload closing</span>
+          <span className="font-semibold">Sale closing</span>
         </p>
         <p className="mt-2">
           It can still sell until{" "}
@@ -916,7 +934,7 @@ function UnloadCard({
         ? "Insufficient XCP balance"
         : escrowRaw < SATS
           ? "Minimum 1 XCP"
-          : `Unload ${commas(escrowRaw / SATS)} XCP`;
+          : `Sell ${commas(escrowRaw / SATS)} XCP`;
 
   return (
     <div className="contents">
@@ -925,7 +943,7 @@ function UnloadCard({
       <div className="mt-1">
         <Well
           focusable
-          label="Your price · sats per XCP"
+          label="Price · sats per XCP"
           topRight={
             marketSats ? (
               <span className="flex items-center gap-1">
@@ -997,7 +1015,7 @@ function UnloadCard({
       {/* You send · Counterparty */}
       <Well
         focusable
-        label="You send · Counterparty"
+        label="You sell"
         topRight={
           balance !== undefined && balance > 0 ? (
             <span className="flex items-center gap-1">
@@ -1056,8 +1074,8 @@ function UnloadCard({
 
       {/* You receive · Bitcoin */}
       <Well
-        label="You receive · Bitcoin"
-        topRight={<span>as it sells, at your price</span>}
+        label="You receive"
+        topRight={<span>paid as it sells</span>}
         chip={<BtcChip />}
         footer={
           <span>
@@ -1100,9 +1118,8 @@ function UnloadCard({
           </button>
         )}
         <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
-          Sells 1 XCP at a time from your own on-chain dispenser — no
-          counterparty, no custody. Closing takes ~5 blocks and returns the
-          rest.
+          Your own on-chain dispenser, selling 1 XCP at a time. Close it
+          anytime — unsold XCP returns after ~5 blocks.
         </p>
       </div>
     </div>
@@ -1169,7 +1186,7 @@ function RouteBook({
                       {commas(t * (r.give_quantity / SATS))} of{" "}
                     </span>
                   ) : null}
-                  {commas(r.give_remaining / SATS)} XCP
+                  {Math.round(r.give_remaining / SATS).toLocaleString()} XCP
                 </span>
               </span>
             </li>
@@ -1278,7 +1295,7 @@ function SellRow({
             {Math.round(r.price).toLocaleString()}{" "}
             <span className="font-normal text-gray-400">sats</span>
           </span>
-          <span className="text-gray-500">{commas(r.give_remaining / SATS)} XCP</span>
+          <span className="text-gray-500">{Math.round(r.give_remaining / SATS).toLocaleString()} XCP</span>
         </span>
       </button>
     </li>

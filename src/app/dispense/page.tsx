@@ -21,10 +21,6 @@ export default async function GetXcpPage() {
     <div className="mx-auto max-w-lg space-y-6 lg:max-w-3xl">
       <XcpBridge dispensers={dispensers} btcUsd={btcUsd} xcpUsd={xcpUsd} />
 
-      <p className="text-center text-xs text-gray-400">
-        0.01 XCP mints a 1,000-token lot · 10 XCP is a full max mint · refunded
-        launches return XCP
-      </p>
     </div>
   );
 }
