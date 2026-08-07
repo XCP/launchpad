@@ -453,9 +453,32 @@ function LoadCard({
         focusable
         label="You receive · Counterparty"
         topRight={
-          xcpBalance !== undefined && (
-            <span>Balance: {commas(xcpBalance / SATS)}</span>
-          )
+          <span className="flex items-center gap-1">
+            {presets.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                disabled={!p.available}
+                title={
+                  p.available ? undefined : "This route doesn't have that much left"
+                }
+                onClick={() => {
+                  setXcpAmount(String(p.k * unitXcp));
+                  setLastEdited("xcp");
+                  setArmed(false);
+                }}
+                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                  !p.available
+                    ? "cursor-not-allowed border-gray-100 text-gray-300"
+                    : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
+                      ? "border-purple-400 bg-white text-purple-600"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </span>
         }
         chip={<XcpChip />}
         footer={
@@ -471,32 +494,11 @@ function LoadCard({
                   </span>
                 )}
             </span>
-            <span className="flex items-center gap-1">
-              {presets.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  disabled={!p.available}
-                  title={
-                    p.available ? undefined : "This route doesn't have that much left"
-                  }
-                  onClick={() => {
-                    setXcpAmount(String(p.k * unitXcp));
-                    setLastEdited("xcp");
-                    setArmed(false);
-                  }}
-                  className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                    !p.available
-                      ? "cursor-not-allowed border-gray-100 text-gray-300"
-                      : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
-                        ? "border-purple-400 bg-white text-purple-600"
-                        : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </span>
+            {xcpBalance !== undefined && (
+              <span className="text-gray-500">
+                Balance: {commas(xcpBalance / SATS)}
+              </span>
+            )}
           </>
         }
       >
@@ -919,64 +921,6 @@ function UnloadCard({
   return (
     <div className="contents">
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
-      {/* You send · Counterparty */}
-      <Well
-        focusable
-        label="You send · Counterparty"
-        topRight={
-          balance !== undefined && (
-            <button
-              type="button"
-              className="hover:text-gray-700 hover:underline"
-              onClick={() =>
-                setEscrow((balance / SATS).toFixed(8).replace(/\.?0+$/, ""))
-              }
-            >
-              Balance: {commas(balance / SATS)}
-            </button>
-          )
-        }
-        chip={<XcpChip />}
-        footer={
-          <span>
-            {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
-          </span>
-        }
-      >
-        <AmountInput
-          value={escrow}
-          onChange={setEscrow}
-          ariaLabel="XCP to unload"
-          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-            insufficient ? "text-red-600" : "text-gray-900"
-          }`}
-        />
-      </Well>
-
-      <FlipNotch onFlip={onFlip} flips={flips} />
-
-      {/* You receive · Bitcoin */}
-      <Well
-        label="You receive · Bitcoin"
-        topRight={<span>as it sells, at your price</span>}
-        chip={<BtcChip />}
-        footer={
-          <span>
-            {btcUsd && btcIfSold > 0 && `≈ ${usdFmt(btcIfSold * btcUsd)} if fully sold`}
-          </span>
-        }
-      >
-        <div
-          className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-            btcIfSold > 0 ? "text-gray-900" : "text-gray-300"
-          }`}
-        >
-          {btcIfSold > 0
-            ? `≤ ${btcIfSold.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`
-            : "0"}
-        </div>
-      </Well>
-
       {/* Price well — same grammar as the limit form's price */}
       <div className="mt-1">
         <Well
@@ -1049,6 +993,88 @@ function UnloadCard({
           />
         </Well>
       </div>
+
+      {/* You send · Counterparty */}
+      <Well
+        focusable
+        label="You send · Counterparty"
+        topRight={
+          balance !== undefined && balance > 0 ? (
+            <span className="flex items-center gap-1">
+              {[25, 50, 75, 100].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() =>
+                    setEscrow(
+                      (Math.floor((balance * p) / 100) / SATS)
+                        .toFixed(8)
+                        .replace(/\.?0+$/, ""),
+                    )
+                  }
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  {p === 100 ? "Max" : `${p}%`}
+                </button>
+              ))}
+            </span>
+          ) : undefined
+        }
+        chip={<XcpChip />}
+        footer={
+          <>
+            <span>
+              {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
+            </span>
+            {balance !== undefined && (
+              <button
+                type="button"
+                className={`min-w-0 truncate hover:text-purple-600 ${
+                  insufficient ? "text-red-600" : "text-gray-500"
+                }`}
+                onClick={() =>
+                  setEscrow((balance / SATS).toFixed(8).replace(/\.?0+$/, ""))
+                }
+              >
+                Balance: {commas(balance / SATS)}
+              </button>
+            )}
+          </>
+        }
+      >
+        <AmountInput
+          value={escrow}
+          onChange={setEscrow}
+          ariaLabel="XCP to unload"
+          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+            insufficient ? "text-red-600" : "text-gray-900"
+          }`}
+        />
+      </Well>
+
+      <FlipNotch onFlip={onFlip} flips={flips} />
+
+      {/* You receive · Bitcoin */}
+      <Well
+        label="You receive · Bitcoin"
+        topRight={<span>as it sells, at your price</span>}
+        chip={<BtcChip />}
+        footer={
+          <span>
+            {btcUsd && btcIfSold > 0 && `≈ ${usdFmt(btcIfSold * btcUsd)} if fully sold`}
+          </span>
+        }
+      >
+        <div
+          className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
+            btcIfSold > 0 ? "text-gray-900" : "text-gray-300"
+          }`}
+        >
+          {btcIfSold > 0
+            ? `≤ ${btcIfSold.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`
+            : "0"}
+        </div>
+      </Well>
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
