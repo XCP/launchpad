@@ -15,7 +15,7 @@ import { FlipNotch } from "@/components/ui/flip-notch";
 import { GearPopover } from "@/components/ui/popover";
 import { Well } from "@/components/ui/well";
 import { fetchBalance, fetchJson } from "@/lib/client";
-import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import { commas, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import {
   pendingSpentRaw,
@@ -65,7 +65,6 @@ export function SwapWidget({
   const [customSlippage, setCustomSlippage] = useState("");
   const [customExpiration, setCustomExpiration] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [rateInverted, setRateInverted] = useState(false);
   const [flips, setFlips] = useState(0);
   const [priceMoved, setPriceMoved] = useState(false);
@@ -262,6 +261,17 @@ export function SwapWidget({
     </span>
   );
 
+  // "Available: X" mirrors the balance grammar; whole numbers up to a
+  // million, then compact (22.5M) — depth, not a digit-counting exercise.
+  const availableUnits =
+    availableRaw !== null ? Math.round(availableRaw / SATS) : null;
+  const availableLabel = availableUnits !== null && (
+    <span>
+      Available:{" "}
+      {availableUnits >= 1e6 ? compactFmt(availableUnits) : commas(availableUnits)}
+    </span>
+  );
+
   const balanceLabel = effBalance !== undefined && (
     <button
       type="button"
@@ -336,10 +346,9 @@ export function SwapWidget({
             ? `${side === "buy" ? "Buy" : "Sell"} anyway`
             : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
 
-  return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-2">
-      {/* Settings row */}
-      <div className="flex items-center justify-end px-2 pb-1 pt-0.5">
+  // Settings live on the rate line, not a header of their own — the card
+  // opens straight into the wells.
+  const settingsPopover = (
         <GearPopover
           active={customSlip > 0 || expiration !== MARKET_EXPIRATION}
           label="Swap settings"
@@ -416,8 +425,29 @@ export function SwapWidget({
             impossible; better ones refund the difference.
           </div>
         </GearPopover>
-      </div>
+  );
 
+  // Buy-well header: the live slippage setting in a pill cut like the
+  // sell-well presets, with the gear beside it — settings read where
+  // they apply, and the rate line below keeps a single icon.
+  const slippageControl = (
+    <span className="flex items-center gap-1.5">
+      <span
+        title="Max slippage"
+        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
+          customSlip > 0 || expiration !== MARKET_EXPIRATION
+            ? "border-purple-300 bg-purple-50 text-purple-700"
+            : "border-gray-200 bg-white text-gray-500"
+        }`}
+      >
+        {slippage}% slip
+      </span>
+      {settingsPopover}
+    </span>
+  );
+
+  return (
+    <div className="rounded-3xl border border-gray-200 bg-white p-2">
       {/* Sell well — inset follows focus; balance row swaps to presets on hover */}
       <Well
         focusable
@@ -454,19 +484,14 @@ export function SwapWidget({
       <Well
         layout={compact ? "stack" : "row"}
         label="Buy"
+        topRight={slippageControl}
         chip={chipFor(getAsset)}
-        chipRight={
-          compact && availableRaw !== null ? (
-            <span>{commas(Math.round(availableRaw / SATS))} available</span>
-          ) : undefined
-        }
+        chipRight={compact ? availableLabel || undefined : undefined}
         footer={
           <>
             <span>≈ {usdFmt(getUsd ?? 0)}</span>
-            {!compact && availableRaw !== null && (
-              <span className="text-gray-500">
-                {commas(Math.round(availableRaw / SATS))} available
-              </span>
+            {!compact && availableLabel && (
+              <span className="text-gray-500">{availableLabel}</span>
             )}
           </>
         }
@@ -485,95 +510,75 @@ export function SwapWidget({
         </div>
       </Well>
 
-      {/* Rate line + expandable details */}
+      {/* Rate line — price impact named and signed beside the quote ring,
+          gray until it matters. The receipt below is always open once a
+          quote is live: no toggle to hunt for, and Min received is the
+          guarantee row, digit-for-digit what the wallet will show. */}
       {rateText && (
-        <div className="px-2 pt-2">
-          <div className="flex items-center justify-between text-xs">
-            <button
-              type="button"
-              onClick={() => setRateInverted((v) => !v)}
-              title="Invert rate"
-              className="text-gray-600 hover:text-gray-900"
-            >
-              {rateText}
-              {rateBaseUsd !== null && (
-                <span className="text-gray-400"> ({usdFmt(rateBaseUsd)})</span>
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDetailsOpen((v) => !v)}
-              aria-label="Trade details"
-              className="flex items-center gap-1.5 text-gray-400 hover:text-gray-600"
-            >
-              {impact >= 3 && (
-                <span
-                  className={`font-medium ${impact >= 5 ? "text-red-600" : "text-amber-600"}`}
-                >
-                  {impact.toFixed(1)}%
-                </span>
-              )}
+      <div className="px-2 pt-2">
+        <div className="flex h-6 items-center justify-between text-xs">
+          <button
+            type="button"
+            onClick={() => setRateInverted((v) => !v)}
+            title="Invert rate"
+            className="text-gray-600 hover:text-gray-900"
+          >
+            {rateText}
+            {rateBaseUsd !== null && (
+              <span className="text-gray-400"> ({usdFmt(rateBaseUsd)})</span>
+            )}
+          </button>
+          <span className="flex items-center gap-2">
+            {outRaw > 0 && (
+              <span
+                className={
+                  impact >= 5
+                    ? "font-medium text-red-600"
+                    : impact >= 3
+                      ? "font-medium text-amber-600"
+                      : "text-gray-400"
+                }
+              >
+                Price impact {impact > 0 ? "−" : ""}
+                {impact.toFixed(1)}%
+              </span>
+            )}
+            {rateText && (
               <QuoteRing
                 periodMs={QUOTE_REFRESH_MS}
                 lastUpdated={lastQuoteAt}
                 fetching={staleQuote}
               />
-              <span
-                aria-hidden
-                className="inline-block transition-transform duration-100"
-                style={{ transform: detailsOpen ? "rotate(180deg)" : "none" }}
-              >
-                ▾
-              </span>
-            </button>
-          </div>
-          {detailsOpen && (
-            <dl className="mt-2 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
-              <div className="flex justify-between">
-                <dt>Min received</dt>
-                <dd className="font-medium text-gray-700">
-                  {commas(minReceivedRaw / SATS)} {getAsset}
-                </dd>
-              </div>
-              {impact >= 0.5 && (
-                <div className="flex justify-between">
-                  <dt>Price impact</dt>
-                  <dd
-                    className={
-                      impact >= 5
-                        ? "font-medium text-red-600"
-                        : impact >= 3
-                          ? "font-medium text-amber-600"
-                          : ""
-                    }
-                  >
-                    {impact.toFixed(2)}%
-                  </dd>
-                </div>
-              )}
-              <div className="flex justify-between">
-                <dt>Max slippage</dt>
-                <dd>{slippage}%</dd>
-              </div>
-              <div className="flex justify-between">
-                <dt>Route</dt>
-                <dd>
-                  {quote!.pool_output > 0 && quote!.book_output > 0
-                    ? "Pool + order book"
-                    : quote!.pool_output > 0
-                      ? "Pool"
-                      : "Order book"}
-                </dd>
-              </div>
-              {quote!.fee_bps !== undefined && quote!.pool_output > 0 && (
-                <div className="flex justify-between">
-                  <dt>LP fee</dt>
-                  <dd>{(quote!.fee_bps / 100).toFixed(2)}%</dd>
-                </div>
-              )}
-            </dl>
-          )}
+            )}
+          </span>
         </div>
+        {quote && outRaw > 0 && (
+          <dl className="mt-1 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+            <div className="flex justify-between">
+              <dt>Min received</dt>
+              <dd className="font-medium tabular-nums text-gray-700">
+                {(minReceivedRaw / SATS).toFixed(8)} {getAsset}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>Route</dt>
+              <dd>
+                {quote.pool_output > 0 && quote.book_output > 0
+                  ? "Pool + order book"
+                  : quote.pool_output > 0
+                    ? "Pool"
+                    : "Order book"}
+              </dd>
+            </div>
+            {quote.fee_bps !== undefined && quote.pool_output > 0 && (
+              <div className="flex justify-between">
+                <dt>LP fee</dt>
+                <dd>{(quote.fee_bps / 100).toFixed(2)}%</dd>
+              </div>
+            )}
+          </dl>
+        )}
+      </div>
       )}
 
       <div className="px-0.5 pb-0.5 pt-3">
@@ -618,21 +623,6 @@ export function SwapWidget({
               busy={busy}
               onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
             />
-          </div>
-        )}
-        {ready && minReceivedRaw > 0 && (
-          <div className="mt-1.5 px-1.5 text-[11px]">
-            <div className="flex items-center justify-between text-gray-600">
-              <span>You receive at least</span>
-              <span className="font-medium tabular-nums">
-                {(minReceivedRaw / SATS).toFixed(8)} {getAsset}
-              </span>
-            </div>
-            <p className="mt-0.5 text-gray-400">
-              Your wallet will show this exact guaranteed minimum. If the
-              pool can&apos;t deliver at least this much, the transaction
-              fails and you keep your {giveAsset}.
-            </p>
           </div>
         )}
       </div>
