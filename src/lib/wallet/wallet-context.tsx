@@ -197,48 +197,22 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setConnecting(true)
     setConnectError(null)
     try {
-      // The approval can land in the wallet while OUR promise dies: connect
-      // is non-replayable in the extension's port layer, so a service-worker
-      // restart or bfcache port drop rejects the page's promise even though
-      // the approval was persisted. And a cold worker can mistake an
-      // unlocked wallet for locked, hanging the promise entirely. So while
-      // connect() is in flight, a probe polls the passive xcp_accounts —
-      // whichever signal lands first wins.
-      let settled = false
-      const probe = (async (): Promise<ConnectResult | null> => {
-        while (!settled && !disconnectingRef.current) {
-          await sleep(2000)
-          if (settled || disconnectingRef.current) break
-          try {
-            const accounts = await wallet.getAccounts()
-            if (accounts.length > 0) return { accounts, proof: null }
-          } catch {
-            // keep probing
-          }
-        }
-        return null
-      })()
-
-      const connectPromise = wallet.connect()
-      // Mark handled so a late rejection (after the probe wins) is not an
-      // unhandled-rejection crash.
-      connectPromise.catch(() => {})
-
+      // Transport recovery is the SDK's job: connect shares signing's
+      // durableRequest retry, and the extension persists the approval so
+      // a retry after the user clicked resolves with no second popup.
+      // This layer only owns one backstop — if both attempts died but the
+      // approval landed anyway, a single passive xcp_accounts check (plus
+      // the extension's connect-time accountsChanged emit) picks it up.
       let result: ConnectResult | null = null
       try {
-        result = await Promise.race([connectPromise, probe])
+        result = await wallet.connect()
       } catch (e) {
         const code = (e as { code?: number })?.code
         if (code === 4001) throw e // genuine denial — surface it
-        // Transient shape (4900 port death, masked -32603, timeout): give
-        // the probe a bounded window, then retry once — a retry after a
-        // persisted approval resolves instantly with no second popup.
-        result = await Promise.race([probe, sleep(8000).then(() => null)])
-        if (!result || result.accounts.length === 0) {
-          result = await wallet.connect()
-        }
-      } finally {
-        settled = true
+        await sleep(1500)
+        const accounts = await wallet.getAccounts().catch(() => [])
+        if (accounts.length === 0) throw e
+        result = { accounts, proof: null }
       }
 
       if (disconnectingRef.current) return
