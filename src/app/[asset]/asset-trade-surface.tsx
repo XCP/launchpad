@@ -47,7 +47,7 @@ export function AssetTradeSurface({
       ) : mode === "liquidity" ? (
         <LiquidityWidget assets={[asset]} xcpUsd={xcpUsd} />
       ) : (
-        <TradePanel asset={asset} only="limit" />
+        <TradePanel asset={asset} xcpUsd={xcpUsd} />
       )}
     </SwapSettingsProvider>
   );

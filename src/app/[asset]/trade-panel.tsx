@@ -3,49 +3,41 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
+import { AssetChip } from "@/components/asset-chip";
+import { ConnectButton } from "@/components/connect-button";
 import { OrderTracker } from "@/components/order-tracker";
-import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { CTA } from "@/components/ui/button";
+import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { QuoteRing } from "@/components/quote-ring";
-import { commas, price as formatPrice } from "@/lib/format";
-import { useDebounced } from "@/lib/use-debounced";
+import { Well } from "@/components/ui/well";
+import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { useSwapSettings } from "@/app/swap/swap-settings";
 
 /**
- * Trading for graduated launches, built on the one primitive Counterparty
- * has: the DEX order. Matching runs once, when a NEW order confirms —
- * pool and book interleaved, best price first. So:
- *  - Market = an order at the quoted output minus slippage, expiring in one
- *    block: it fills at confirmation or the remainder refunds next block.
- *  - Limit  = the same message at your price. If it's priced through the
- *    pool it fills on confirmation; otherwise it RESTS until a counter-order
- *    takes it — the pool never auto-fills a resting order.
-
+ * The limit panel, built on the one primitive Counterparty has: the DEX
+ * order at YOUR price. If it's priced through the pool it fills when it
+ * confirms; otherwise it RESTS until a counter-order takes it — the pool
+ * never auto-fills a resting order. Same grammar as the swap card:
+ * Buy | Sell pill tabs, wells with corner labels, always-open receipt.
  */
 
 const SATS = 1e8;
-const MARKET_EXPIRATION = 1; // fills at confirmation, or refunds next block
-const QUOTE_REFRESH_MS = 10_000;
+const ORDER_VBYTES = 250;
 const LIMIT_EXPIRATIONS = [
   { blocks: 144, label: "~1 day" },
   { blocks: 1000, label: "~1 week" },
   { blocks: 5000, label: "~5 weeks" },
 ];
-const SLIPPAGES = [0.5, 1, 2];
-
-interface Quote {
-  estimated_output: number;
-  pool_output: number;
-  book_output: number;
-  price_impact: number;
-  fee_bps?: number;
-  pool_exists: boolean;
-}
+/** Price nudges off the pool spot: buyers bid under, sellers ask over. */
+const PRICE_PRESETS = [1, 5, 10];
+const fmtPriceInput = (x: number) => x.toFixed(8).replace(/\.?0+$/, "");
+const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
 interface PoolInfo {
   asset_a: string;
@@ -56,60 +48,47 @@ interface PoolInfo {
 
 export function TradePanel({
   asset,
-  only,
+  xcpUsd = null,
 }: {
   asset: string;
-  /** Pin to one tab and drop the chrome — for embedding in AssetTradeSurface. */
-  only?: "limit";
+  xcpUsd?: number | null;
 }) {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
-  const [tab, setTab] = useState<"market" | "limit">(only ?? "market");
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [amount, setAmount] = useState(""); // human units of the GIVE asset
-  const [slippage, setSlippage] = useState(1);
-  const [priceMoved, setPriceMoved] = useState(false);
-  const [lastQuoteAt, setLastQuoteAt] = useState<number | null>(null);
   const [limitPrice, setLimitPrice] = useState(""); // XCP per token
   const [limitAmount, setLimitAmount] = useState(""); // tokens
   const [expiration, setExpiration] = useState(1000);
 
-  const giveAsset = side === "buy" ? "XCP" : asset;
-  const getAsset = side === "buy" ? asset : "XCP";
-  const amountRaw = Math.round((parseFloat(amount) || 0) * SATS);
-  const debouncedRaw = useDebounced(amountRaw, 250);
-
-  const quoteUrl =
-    tab === "market" && debouncedRaw > 0
-      ? `${COUNTERPARTY_API_BASE}/pools/${giveAsset}/${getAsset}/quote?quantity=${debouncedRaw}`
-      : null;
-  const {
-    data: quote,
-    isValidating,
-    mutate: mutateQuote,
-  } = useSWR<Quote>(
-    quoteUrl,
-    (url: string) => fetchJson(url).then((d) => d.result),
-    {
-      refreshInterval: QUOTE_REFRESH_MS,
-      keepPreviousData: true,
-      onSuccess: () => setLastQuoteAt(Date.now()),
-    },
+  const { customFee, medianFeeRate } = useSwapSettings();
+  const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
+  const { data: btcUsd } = useSWR(
+    "btc-usd",
+    () =>
+      fetchJson("https://mempool.space/api/v1/prices").then(
+        (d: { USD: number }) => d.USD,
+      ),
+    { refreshInterval: 60_000 },
   );
 
   const { data: pool } = useSWR<PoolInfo | null>(
-    tab === "limit" ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP` : null,
+    `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP`,
     (url: string) => fetchJson(url).then((d) => d.result ?? null),
-    { refreshInterval: 30_000 },
+    { refreshInterval: 60_000 },
   );
   const spot = pool
     ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) /
       (pool.asset_a === asset ? pool.reserve_a : pool.reserve_b)
     : null;
 
-  const { data: balance } = useSWR(
-    address ? [address, giveAsset, "balance"] : null,
+  const { data: tokenBalance } = useSWR(
+    address && asset ? [address, asset, "limit-token-balance"] : null,
     ([addr, a]) => fetchBalance(addr, a),
+    { refreshInterval: 30_000 },
+  );
+  const { data: xcpBalance } = useSWR(
+    address ? [address, "XCP", "limit-xcp-balance"] : null,
+    ([addr]) => fetchBalance(addr, "XCP"),
     { refreshInterval: 30_000 },
   );
 
@@ -120,49 +99,26 @@ export function TradePanel({
       registerPending({
         txid: compose.txid,
         kind: "order",
-        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — ${tab} order`,
+        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — limit order`,
         address: address ?? undefined,
       });
     }
-  }, [compose.status, compose.txid, side, asset, tab, address]);
-
-
-  const staleQuote = isValidating || amountRaw !== debouncedRaw;
-  const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;
-  const minReceivedRaw = Math.floor(outRaw * (1 - slippage / 100));
-  const impact = quote?.price_impact ?? 0;
-  const insufficient =
-    balance !== undefined && amountRaw > 0 && amountRaw > balance;
-  const marketReady = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
-
-  const submitMarket = async () => {
-    if (!marketReady || !quote || !quoteUrl) return;
-    let fresh = quote;
-    try {
-      fresh = (await fetchJson(quoteUrl)).result as Quote;
-      mutateQuote(fresh, { revalidate: false });
-      setLastQuoteAt(Date.now());
-      if (fresh.estimated_output < quote.estimated_output * 0.99) {
-        setPriceMoved(true);
-        return;
-      }
-    } catch {
-      // fall back to the polled quote
-    }
-    setPriceMoved(false);
-    compose.composeOrder({
-      give_asset: giveAsset,
-      give_quantity: amountRaw,
-      get_asset: getAsset,
-      get_quantity: Math.floor(fresh.estimated_output * (1 - slippage / 100)),
-      expiration: MARKET_EXPIRATION,
-    });
-  };
+  }, [compose.status, compose.txid, side, asset, address]);
 
   const limitPriceNum = parseFloat(limitPrice) || 0;
   const limitAmountRaw = Math.round((parseFloat(limitAmount) || 0) * SATS);
   const limitTotalRaw = Math.round(limitAmountRaw * limitPriceNum);
-  const limitReady = limitPriceNum > 0 && limitAmountRaw > 0 && limitTotalRaw > 0 && !busy;
+  // The give side must be covered: XCP for a buy, tokens for a sell.
+  const giveBalance = side === "buy" ? xcpBalance : tokenBalance;
+  const giveNeeded = side === "buy" ? limitTotalRaw : limitAmountRaw;
+  const insufficient =
+    giveBalance !== undefined && giveNeeded > 0 && giveNeeded > giveBalance;
+  const limitReady =
+    limitPriceNum > 0 &&
+    limitAmountRaw > 0 &&
+    limitTotalRaw > 0 &&
+    !busy &&
+    !insufficient;
   // Priced through the pool = fills at confirmation; otherwise it rests.
   const limitFillsNow =
     spot !== null && limitPriceNum > 0
@@ -170,6 +126,17 @@ export function TradePanel({
         ? limitPriceNum >= spot
         : limitPriceNum <= spot
       : null;
+  const priceDelta =
+    spot !== null && spot > 0 && limitPriceNum > 0
+      ? (limitPriceNum / spot - 1) * 100
+      : null;
+  // Max amount the give balance affords at this price.
+  const maxAmountRaw =
+    side === "sell"
+      ? (tokenBalance ?? 0)
+      : limitPriceNum > 0
+        ? Math.floor((xcpBalance ?? 0) / limitPriceNum)
+        : 0;
 
   const submitLimit = () => {
     if (!limitReady) return;
@@ -181,6 +148,7 @@ export function TradePanel({
             get_asset: asset,
             get_quantity: limitAmountRaw,
             expiration,
+            fee_rate: customFee > 0 ? customFee : undefined,
           }
         : {
             give_asset: asset,
@@ -188,345 +156,273 @@ export function TradePanel({
             get_asset: "XCP",
             get_quantity: limitTotalRaw,
             expiration,
+            fee_rate: customFee > 0 ? customFee : undefined,
           },
     );
   };
 
-  if (compose.status === "confirmed") {
-    return (
-      <ConfirmCard
-        title="Order broadcast"
-        onReset={() => compose.reset()}
-        resetLabel="Trade again"
-      >
-        <p className="mt-1 text-green-700">
-          <TxLink txid={compose.txid} />
-        </p>
-        <OrderTracker
-          txHash={compose.txid}
-          busy={busy}
-          onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
-        />
-      </ConfirmCard>
-    );
-  }
-
-  const marketLabel = busy
-    ? busyLabel(compose.status)
-    : amountRaw === 0
-      ? "Enter an amount"
-      : insufficient
-        ? `Insufficient ${giveAsset} balance`
-        : outRaw === 0
-          ? staleQuote
-            ? "Fetching quote…"
-            : "Insufficient liquidity"
-          : impact >= 5
-            ? `${side === "buy" ? "Buy" : "Sell"} anyway`
-            : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
+  const buttonLabel = busy
+    ? compose.status === "composing"
+      ? "Composing…"
+      : compose.status === "signing"
+        ? "Confirm in wallet…"
+        : "Broadcasting…"
+    : limitPriceNum === 0
+      ? "Enter a price"
+      : limitAmountRaw === 0
+        ? "Enter an amount"
+        : insufficient
+          ? `Insufficient ${side === "buy" ? "XCP" : asset} balance`
+          : `Place limit ${side}`;
 
   return (
-    <div
-      className={
-        only
-          ? "rounded-3xl border border-gray-200 bg-white p-4"
-          : "rounded-lg border border-gray-200 bg-white p-5"
-      }
-    >
-      {!only && (
-      <div className="flex items-center gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium">
-        {(["market", "limit"] as const).map((t) => (
+    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+      {/* Buy | Sell — same pill row as liquidity's Add | Remove */}
+      <div className="flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
+        {(["buy", "sell"] as const).map((s) => (
           <button
-            key={t}
+            key={s}
             type="button"
-            onClick={() => setTab(t)}
-            className={`flex-1 rounded-md px-3 py-1.5 capitalize ${
-              tab === t ? "bg-white text-gray-900 shadow-sm" : "text-gray-500 hover:text-gray-700"
+            onClick={() => setSide(s)}
+            className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
+              side === s
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t}
+            {s}
           </button>
         ))}
       </div>
-      )}
 
-      {(
-        <div className="mt-3 flex gap-2 text-sm font-medium">
-          <button
-            type="button"
-            onClick={() => setSide("buy")}
-            className={`flex-1 rounded-md border px-3 py-1.5 ${
-              side === "buy"
-                ? "border-green-600 bg-green-50 text-green-700"
-                : "border-gray-300 text-gray-500"
-            }`}
-          >
-            Buy {asset}
-          </button>
-          <button
-            type="button"
-            onClick={() => setSide("sell")}
-            className={`flex-1 rounded-md border px-3 py-1.5 ${
-              side === "sell"
-                ? "border-red-500 bg-red-50 text-red-700"
-                : "border-gray-300 text-gray-500"
-            }`}
-          >
-            Sell {asset}
-          </button>
-        </div>
-      )}
-
-      {tab === "market" && (
-        <div className="mt-3 space-y-3">
-          <div>
-            <label htmlFor="trade-amount" className="flex justify-between text-xs text-gray-500">
-              <span>{side === "buy" ? "You pay (XCP)" : `You sell (${asset})`}</span>
-              {balance !== undefined && (
+      {/* Price well — presets nudge off the pool spot */}
+      <div className="mt-2">
+        <Well
+          focusable
+          label={`Price · XCP per ${asset}`}
+          topRight={
+            spot !== null ? (
+              <span className="flex items-center gap-1">
                 <button
                   type="button"
-                  className="underline"
-                  onClick={() => setAmount(String(balance / SATS))}
+                  onClick={() => setLimitPrice(fmtPriceInput(spot))}
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                 >
-                  max {commas(balance / SATS)}
+                  Market
                 </button>
-              )}
-            </label>
-            <div className="mt-1 rounded-md border border-gray-300 transition-colors focus-within:border-purple-500">
-              <AmountInput
-                id="trade-amount"
-                value={amount}
-                onChange={(v) => {
-                  setAmount(v);
-                  setPriceMoved(false);
-                }}
-                className={`block w-full bg-transparent p-2.5 outline-none ${
-                  insufficient ? "text-red-600" : ""
-                }`}
-              />
-            </div>
-          </div>
-          {quote && amountRaw > 0 && (
-            <dl className="space-y-1 rounded-md bg-gray-50 p-3 text-xs text-gray-600">
-              <div className="flex justify-between">
-                <dt>You receive (est.)</dt>
-                <dd
-                  className="font-semibold text-gray-900"
-                  style={{
-                    filter: staleQuote ? "grayscale(1)" : "none",
-                    opacity: staleQuote ? 0.4 : 1,
-                    transition: staleQuote ? "none" : "opacity 250ms ease-in-out",
-                  }}
-                >
-                  {commas(outRaw / SATS)} {getAsset}
-                </dd>
-              </div>
-              <div className="flex justify-between">
-                <dt title="Enforced by the order itself — every fill must beat this rate">
-                  Min received
-                </dt>
-                <dd className="font-medium">{commas(minReceivedRaw / SATS)} {getAsset}</dd>
-              </div>
-              {impact >= 0.5 && (
-                <div className="flex justify-between">
-                  <dt>Price impact</dt>
-                  <dd
+                {PRICE_PRESETS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() =>
+                      setLimitPrice(
+                        fmtPriceInput(
+                          spot * (1 + (side === "buy" ? -p : p) / 100),
+                        ),
+                      )
+                    }
+                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  >
+                    {side === "buy" ? "−" : "+"}
+                    {p}%
+                  </button>
+                ))}
+              </span>
+            ) : undefined
+          }
+          footer={
+            <>
+              <span>
+                {priceDelta !== null && Math.abs(priceDelta) >= 0.1 ? (
+                  <span
                     className={
-                      impact >= 5
-                        ? "font-semibold text-red-600"
-                        : impact >= 3
-                          ? "font-medium text-amber-600"
-                          : ""
+                      limitFillsNow ? "text-green-700" : "text-gray-500"
                     }
                   >
-                    {impact.toFixed(2)}%
-                  </dd>
-                </div>
+                    {priceDelta > 0 ? "+" : ""}
+                    {priceDelta.toFixed(1)}% vs pool
+                  </span>
+                ) : (
+                  <span>&nbsp;</span>
+                )}
+              </span>
+              {spot !== null && (
+                <button
+                  type="button"
+                  className="text-gray-500 hover:text-purple-600"
+                  onClick={() => setLimitPrice(fmtPriceInput(spot))}
+                >
+                  Pool: {formatPrice(spot)}
+                </button>
               )}
+            </>
+          }
+        >
+          <AmountInput
+            value={limitPrice}
+            onChange={setLimitPrice}
+            placeholder={spot ? formatPrice(spot) : "0"}
+            ariaLabel={`Limit price in XCP per ${asset}`}
+            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          />
+        </Well>
+      </div>
+
+      {/* Amount well */}
+      <div className="mt-1">
+        <Well
+          focusable
+          label="Amount"
+          topRight={
+            maxAmountRaw > 0 ? (
+              <span className="flex items-center gap-1">
+                {([25, 50, 75, 100] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() =>
+                      setLimitAmount(
+                        fmtAmount(Math.floor((maxAmountRaw * p) / 100) / SATS),
+                      )
+                    }
+                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  >
+                    {p === 100 ? "Max" : `${p}%`}
+                  </button>
+                ))}
+              </span>
+            ) : undefined
+          }
+          chip={<AssetChip asset={asset} />}
+          footer={
+            <>
+              <span>
+                ≈{" "}
+                {usdFmt(
+                  xcpUsd && limitTotalRaw > 0
+                    ? (limitTotalRaw / SATS) * xcpUsd
+                    : 0,
+                )}
+              </span>
+              {giveBalance !== undefined && (
+                <button
+                  type="button"
+                  className={`min-w-0 truncate hover:text-purple-600 ${
+                    insufficient ? "text-red-600" : "text-gray-500"
+                  }`}
+                  onClick={() => {
+                    if (maxAmountRaw > 0)
+                      setLimitAmount(fmtAmount(maxAmountRaw / SATS));
+                  }}
+                >
+                  Balance: {commas(giveBalance / SATS)}{" "}
+                  {side === "buy" ? "XCP" : ""}
+                </button>
+              )}
+            </>
+          }
+        >
+          <AmountInput
+            value={limitAmount}
+            onChange={setLimitAmount}
+            ariaLabel={`Amount of ${asset}`}
+            className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+              insufficient ? "text-red-600" : "text-gray-900"
+            }`}
+          />
+        </Well>
+      </div>
+
+      {/* Receipt — always open once price and amount exist */}
+      {limitPriceNum > 0 && limitAmountRaw > 0 && (
+        <div className="px-2 pt-2">
+          <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+            <div className="flex justify-between">
+              <dt>Total</dt>
+              <dd className="font-medium tabular-nums text-gray-700">
+                {commas(limitTotalRaw / SATS)} XCP
+              </dd>
+            </div>
+            {spot !== null && (
               <div className="flex justify-between">
-                <dt>Route</dt>
-                <dd className="flex items-center gap-1.5">
-                  {quote.pool_output > 0 && quote.book_output > 0
-                    ? "pool + order book"
-                    : quote.pool_output > 0
-                      ? "pool"
-                      : "order book"}
-                  <QuoteRing
-                    periodMs={QUOTE_REFRESH_MS}
-                    lastUpdated={lastQuoteAt}
-                    fetching={staleQuote}
-                  />
+                <dt>Fills</dt>
+                <dd
+                  className={limitFillsNow ? "font-medium text-green-700" : ""}
+                >
+                  {limitFillsNow
+                    ? "at confirmation — priced through the pool"
+                    : "rests on the book until a counter-order takes it"}
                 </dd>
               </div>
-              {quote.fee_bps !== undefined && (
-                <div className="flex justify-between">
-                  <dt>LP fee</dt>
-                  <dd>{quote.fee_bps} bps</dd>
-                </div>
-              )}
-            </dl>
-          )}
-          <div className="flex items-center gap-2 text-xs text-gray-500">
-            <span>Max slippage</span>
-            {SLIPPAGES.map((s) => (
-              <button
-                key={s}
-                type="button"
-                onClick={() => setSlippage(s)}
-                className={`rounded-full border px-2 py-0.5 ${
-                  slippage === s
-                    ? "border-purple-600 bg-purple-50 text-purple-700"
-                    : "border-gray-300"
-                }`}
-              >
-                {s}%
-              </button>
-            ))}
-          </div>
-          {priceMoved && (
-            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-              Quote moved — numbers updated. Press again to trade at the new
-              price.
-            </p>
-          )}
-          <TradeButton
-            walletStatus={walletStatus}
-            connect={connect}
-            disabled={!marketReady}
-            danger={impact >= 5 && marketReady}
-            label={marketLabel ?? ""}
-            onClick={submitMarket}
-          />
+            )}
+            <div className="flex items-center justify-between">
+              <dt>Expires</dt>
+              <dd>
+                <select
+                  value={expiration}
+                  onChange={(e) => setExpiration(Number(e.target.value))}
+                  className="rounded-lg border border-gray-200 px-1.5 py-0.5 text-xs"
+                  aria-label="Order expiration"
+                >
+                  {LIMIT_EXPIRATIONS.map((x) => (
+                    <option key={x.blocks} value={x.blocks}>
+                      {x.label}
+                    </option>
+                  ))}
+                </select>
+              </dd>
+            </div>
+            {feeRate !== null && (
+              <div className="flex justify-between">
+                <dt>TX fee</dt>
+                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                  {feeRate} sat/vB
+                  {btcUsd !== undefined && (
+                    <span className="text-gray-400">
+                      {" "}
+                      (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
+                    </span>
+                  )}
+                </dd>
+              </div>
+            )}
+          </dl>
         </div>
       )}
 
-      {tab === "limit" && (
-        <div className="mt-3 space-y-3">
-          <div className={only ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}>
-            <div>
-              <label htmlFor="limit-price" className="text-xs text-gray-500">
-                Price (XCP per {asset})
-              </label>
-              <div className="mt-1 rounded-md border border-gray-300 transition-colors focus-within:border-purple-500">
-                <AmountInput
-                  id="limit-price"
-                  value={limitPrice}
-                  onChange={setLimitPrice}
-                  placeholder={spot ? formatPrice(spot) : "0.0000223"}
-                  className="block w-full bg-transparent p-2.5 text-sm outline-none"
-                />
-              </div>
-            </div>
-            <div>
-              <label htmlFor="limit-amount" className="text-xs text-gray-500">
-                Amount ({asset})
-              </label>
-              <div className="mt-1 rounded-md border border-gray-300 transition-colors focus-within:border-purple-500">
-                <AmountInput
-                  id="limit-amount"
-                  value={limitAmount}
-                  onChange={setLimitAmount}
-                  className="block w-full bg-transparent p-2.5 text-sm outline-none"
-                />
-              </div>
-            </div>
-          </div>
-          {spot !== null && (
-            <p className="text-xs text-gray-500">
-              Pool price: <span className="font-medium">{formatPrice(spot)}</span>
-              {limitFillsNow !== null && (
-                <span className={limitFillsNow ? " text-green-700" : ""}>
-                  {limitFillsNow
-                    ? " · fills at confirmation"
-                    : " · rests until a counter-order takes it — the pool never auto-fills a resting order"}
-                </span>
-              )}
-            </p>
-          )}
-          <div className="flex items-center justify-between text-xs text-gray-500">
-            <span>
-              Total:{" "}
-              <span className="font-semibold text-gray-900">
-                {commas(limitTotalRaw / SATS)} XCP
-              </span>
-            </span>
-            <span className="flex items-center gap-1">
-              Expires
-              <select
-                value={expiration}
-                onChange={(e) => setExpiration(Number(e.target.value))}
-                className="rounded border border-gray-300 p-1"
-              >
-                {LIMIT_EXPIRATIONS.map((x) => (
-                  <option key={x.blocks} value={x.blocks}>
-                    {x.label}
-                  </option>
-                ))}
-              </select>
-            </span>
-          </div>
-          <TradeButton
-            walletStatus={walletStatus}
-            connect={connect}
-            disabled={!limitReady}
-            label={busyLabel(compose.status) ?? `Place limit ${side}`}
-            onClick={submitLimit}
-          />
-        </div>
-      )}
-
-      {compose.status === "error" && (
-          <ErrorBanner className="mt-3">{compose.error}</ErrorBanner>
+      <div className="px-0.5 pb-0.5 pt-3">
+        {compose.status === "error" && (
+          <ErrorBanner className="mb-2">{compose.error}</ErrorBanner>
         )}
+        {walletStatus !== "connected" ? (
+          <ConnectButton />
+        ) : (
+          <CTA disabled={!limitReady} onClick={submitLimit}>
+            {buttonLabel}
+          </CTA>
+        )}
+        {compose.status === "confirmed" && (
+          <div className="mt-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-green-800">
+                Order broadcast — <TxLink txid={compose.txid} />
+              </span>
+              <button
+                type="button"
+                onClick={compose.reset}
+                className="text-xs text-green-800 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+            <OrderTracker
+              txHash={compose.txid}
+              busy={busy}
+              onCancel={(hash) => compose.composeCancel({ offer_hash: hash })}
+            />
+          </div>
+        )}
+      </div>
     </div>
-  );
-}
-
-function busyLabel(status: string): string | null {
-  if (status === "composing") return "Composing…";
-  if (status === "signing") return "Confirm in wallet…";
-  if (status === "broadcasting") return "Broadcasting…";
-  return null;
-}
-
-function TradeButton({
-  walletStatus,
-  connect,
-  disabled,
-  danger,
-  label,
-  onClick,
-}: {
-  walletStatus: string;
-  connect: () => void;
-  disabled: boolean;
-  danger?: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  if (walletStatus !== "connected") {
-    return (
-      <button
-        type="button"
-        onClick={connect}
-        className="w-full rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
-      >
-        {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-      </button>
-    );
-  }
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={onClick}
-      className={`w-full rounded-md px-5 py-2.5 font-medium text-white disabled:cursor-not-allowed ${
-        danger
-          ? "bg-red-600 hover:bg-red-500"
-          : "bg-purple-600 hover:bg-purple-500 disabled:bg-gray-200 disabled:text-gray-400"
-      }`}
-    >
-      {label}
-    </button>
   );
 }

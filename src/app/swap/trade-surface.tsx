@@ -63,7 +63,7 @@ export function TradeSurface({
             />
             <span>/ XCP</span>
           </div>
-          <TradePanel key={limitAsset} asset={limitAsset} only="limit" />
+          <TradePanel key={limitAsset} asset={limitAsset} xcpUsd={xcpUsd} />
           <TokenSelectModal
             open={limitSelectorOpen}
             onClose={() => setLimitSelectorOpen(false)}
