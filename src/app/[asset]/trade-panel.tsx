@@ -173,33 +173,55 @@ export function TradePanel({
   // remainder rests. (Resting book orders could also fill you; with
   // today's empty books the pool is the honest reference.)
   const POOL_FEE = 0.005;
-  // The book matches fee-free, so a resting counter-order can fill you at
-  // a price the pool can't. Book reference for this side:
+  // Book reference for this side (the book matches fee-free).
   const bookRef = side === "buy" ? bestAsk : bestBid;
-  const crossesBook =
-    bookRef !== null &&
-    limitPriceNum > 0 &&
-    (side === "buy" ? limitPriceNum >= bookRef : limitPriceNum <= bookRef);
-  const crossesPool =
-    spot !== null &&
-    limitPriceNum > 0 &&
-    (side === "buy"
-      ? limitPriceNum >= spot * (1 + POOL_FEE)
-      : limitPriceNum <= spot * (1 - POOL_FEE));
-  const inFeeBand =
-    spot !== null &&
-    limitPriceNum > 0 &&
-    !crossesPool &&
-    (side === "buy" ? limitPriceNum >= spot : limitPriceNum <= spot);
-  const fillState: "crosses" | "feeband" | "rests" | null =
-    limitPriceNum > 0 && (spot !== null || bookRef !== null)
-      ? crossesPool || crossesBook
-        ? "crosses"
-        : inFeeBand
-          ? "feeband"
-          : "rests"
+
+  // Quantitative fill forecast: how many tokens the market can deliver AT
+  // your limit, right now. Pool part is closed-form on the constant-product
+  // curve with the 50 bps in-curve fee — matching takes pool liquidity
+  // until the marginal price reaches your limit:
+  //   buy:  x XCP in until marginal = P  →  x = (√(P·Rt·Rx·(1−f)) − Rx)/(1−f)
+  //   sell: y tok in until marginal = P  →  y = (√(Rx·Rt·(1−f)/P) − Rt)/(1−f)
+  // Book part sums resting counter-orders priced within your limit. An
+  // estimate (state moves every block), hence the ~.
+  const fillableTokensRaw = (() => {
+    if (limitPriceNum <= 0) return 0;
+    let fillable = 0;
+    if (pool && spot !== null) {
+      const Rx = pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b;
+      const Rt = pool.asset_a === asset ? pool.reserve_a : pool.reserve_b;
+      const f = POOL_FEE;
+      if (side === "buy") {
+        const x =
+          (Math.sqrt(limitPriceNum * Rt * Rx * (1 - f)) - Rx) / (1 - f);
+        if (x > 0) {
+          const xe = x * (1 - f);
+          fillable += (Rt * xe) / (Rx + xe);
+        }
+      } else {
+        const y =
+          (Math.sqrt((Rx * Rt * (1 - f)) / limitPriceNum) - Rt) / (1 - f);
+        if (y > 0) fillable += y;
+      }
+    }
+    for (const o of bookOrders ?? []) {
+      if (side === "buy") {
+        // Counter asks: they give the token; take those at or under your price.
+        if (o.give_asset === asset && o.give_price <= limitPriceNum)
+          fillable += o.give_remaining;
+      } else {
+        // Counter bids: they give XCP for the token at or over your price.
+        if (o.give_asset === "XCP" && o.get_price >= limitPriceNum)
+          fillable += o.get_remaining;
+      }
+    }
+    return Math.max(0, Math.floor(fillable));
+  })();
+  const fillPct =
+    limitAmountRaw > 0
+      ? Math.min(100, Math.round((fillableTokensRaw / limitAmountRaw) * 100))
       : null;
-  const limitFillsNow = fillState === "crosses";
+  const limitFillsNow = fillPct !== null && fillPct > 0;
   const priceDelta =
     spot !== null && spot > 0 && limitPriceNum > 0
       ? (limitPriceNum / spot - 1) * 100
@@ -516,21 +538,19 @@ export function TradePanel({
                   : `${(limitTotalRaw / SATS).toFixed(8)} XCP`}
               </dd>
             </div>
-            {fillState !== null && (
+            {fillPct !== null && (
               <div className="flex justify-between">
-                <dt>Fills</dt>
+                <dt title="What the pool and book can deliver at your limit right now — the rest rests as an open order until taken or expired">
+                  Fills now
+                </dt>
                 <dd
                   className={limitFillsNow ? "font-medium text-green-700" : ""}
                 >
-                  {fillState === "crosses"
-                    ? crossesBook && !crossesPool
-                      ? `at confirmation — crosses the book's best ${
-                          side === "buy" ? "ask" : "bid"
-                        }`
-                      : "up to your price at confirmation — any remainder rests"
-                    : fillState === "feeband"
-                      ? "likely rests — inside the pool's 0.5% fee"
-                      : "rests on the book until a counter-order takes it"}
+                  {fillPct >= 100
+                    ? "~100% at confirmation"
+                    : fillPct === 0
+                      ? "0% — rests until a counter-order takes it"
+                      : `~${fillPct}% · remainder rests at your limit`}
                 </dd>
               </div>
             )}
