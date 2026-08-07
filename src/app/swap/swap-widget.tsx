@@ -384,46 +384,17 @@ export function SwapWidget({
         chipRight={
           compact && effBalance !== undefined ? balanceControls : undefined
         }
-        topRight={
-          !compact &&
-          effBalance !== undefined && (
-            <>
-              <button
-                type="button"
-                className="group-focus-within:hidden group-hover:hidden"
-                onClick={() => setAmount(fmtAmount(effBalance! / SATS))}
-              >
-                Balance: {commas(effBalance! / SATS)}
-                {balance !== undefined && balance > effBalance! && (
-                  <span className="text-gray-400">
-                    {" "}
-                    · {commas((balance - effBalance!) / SATS)} pending
-                  </span>
-                )}
-              </button>
-              <span className="hidden items-center gap-1 group-focus-within:flex group-hover:flex">
-                {effBalance! > 0 ? (
-                  PRESETS.map((p) => (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() =>
-                        setAmount(fmtAmount(Math.floor((effBalance! * p) / 100) / SATS))
-                      }
-                      className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
-                    >
-                      {p === 100 ? "Max" : `${p}%`}
-                    </button>
-                  ))
-                ) : (
-                  <span>Balance: 0</span>
-                )}
-              </span>
-            </>
-          )
-        }
         chip={giveAsset === "XCP" ? <XcpChip /> : tokenChip}
-        footer={<span>≈ {usdFmt(giveUsd ?? 0)}</span>}
+        footer={
+          <>
+            <span>≈ {usdFmt(giveUsd ?? 0)}</span>
+            {!compact && effBalance !== undefined && (
+              <span className="flex min-w-0 items-center gap-1 text-gray-500">
+                {balanceControls}
+              </span>
+            )}
+          </>
+        }
       >
         <AmountInput
           value={amount}
@@ -450,7 +421,16 @@ export function SwapWidget({
             <span>{commas(availableRaw / SATS)} in pool</span>
           ) : undefined
         }
-        footer={<span>≈ {usdFmt(getUsd ?? 0)}</span>}
+        footer={
+          <>
+            <span>≈ {usdFmt(getUsd ?? 0)}</span>
+            {!compact && availableRaw !== null && (
+              <span className="text-gray-500">
+                {commas(availableRaw / SATS)} in pool
+              </span>
+            )}
+          </>
+        }
       >
         <div
           className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
