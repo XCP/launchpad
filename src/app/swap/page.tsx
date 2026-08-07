@@ -60,15 +60,6 @@ export default async function SwapPage() {
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Swap</h1>
-        <p className="mt-2 text-sm text-gray-600">
-          XCP on one side, a graduated XCP-69 launch on the other.
-          {legacy.length > 0 &&
-            " Until the first launch graduates, classic Counterparty pools like PEPECASH stand in."}
-        </p>
-      </div>
-
       {assets.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
           No launches have graduated yet. The first sell-out seeds the first
