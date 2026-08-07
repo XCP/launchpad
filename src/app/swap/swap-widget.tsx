@@ -420,7 +420,7 @@ export function SwapWidget({
         chip={getAsset === "XCP" ? <XcpChip /> : tokenChip}
         chipRight={
           compact && availableRaw !== null ? (
-            <span>{commas(availableRaw / SATS)} in pool</span>
+            <span>{commas(Math.round(availableRaw / SATS))} in pool</span>
           ) : undefined
         }
         footer={
@@ -428,7 +428,7 @@ export function SwapWidget({
             <span>≈ {usdFmt(getUsd ?? 0)}</span>
             {!compact && availableRaw !== null && (
               <span className="text-gray-500">
-                {commas(availableRaw / SATS)} in pool
+                {commas(Math.round(availableRaw / SATS))} in pool
               </span>
             )}
           </>

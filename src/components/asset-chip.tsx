@@ -8,7 +8,7 @@ import { TokenImage } from "@/components/token-image";
  * across any pair (3 to 12 chars), content left-aligned within.
  */
 const SHELL =
-  "flex w-36 shrink-0 items-center justify-start gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm";
+  "flex w-44 shrink-0 items-center justify-start gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm";
 
 export function AssetChip({
   asset,
