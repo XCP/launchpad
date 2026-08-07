@@ -154,6 +154,7 @@ export async function fetchOriginalDeadline(txHash: string): Promise<number | nu
  * `price` is the API's computed sats per whole XCP.
  */
 export interface Dispenser {
+  tx_hash: string;
   source: string;
   give_quantity: number;
   give_remaining: number;
