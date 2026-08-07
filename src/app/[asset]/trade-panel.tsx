@@ -368,157 +368,157 @@ export function TradePanel({
         </Well>
       </div>
 
-      {/* Amount well — the token leg; the chip is the pair selector on /swap */}
-      <div className="mt-1">
-        <Well
-          focusable
-          label="Amount"
-          topRight={
-            side === "sell" && (tokenBalance ?? 0) > 0 ? (
-              <span className="flex items-center gap-1">
-                {([25, 50, 75, 100] as const).map((p) => (
+      {/* The pair, as give/get wells. Position is stable: the well you
+          SPEND from is always second, carrying the presets and the
+          emphasized balance — its asset swaps with Buy/Sell instead of
+          the controls jumping between wells. */}
+      {(() => {
+        const presetsFor = (base: number, apply: (v: string) => void) => (
+          <span className="flex items-center gap-1">
+            {([25, 50, 75, 100] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() =>
+                  apply(fmtAmount(Math.floor((base * p) / 100) / SATS))
+                }
+                className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+              >
+                {p === 100 ? "Max" : `${p}%`}
+              </button>
+            ))}
+          </span>
+        );
+        const tokenWell = (
+          <Well
+            focusable
+            label="Amount"
+            topRight={
+              side === "sell" && (tokenBalance ?? 0) > 0
+                ? presetsFor(tokenBalance ?? 0, (v) => {
+                    setEditField("amount");
+                    setAmountStr(v);
+                  })
+                : undefined
+            }
+            chip={<AssetChip asset={asset} onClick={onOpenSelector} />}
+            footer={
+              <>
+                <span>
+                  ≈{" "}
+                  {usdFmt(
+                    xcpUsd && limitTotalRaw > 0
+                      ? (limitTotalRaw / SATS) * xcpUsd
+                      : 0,
+                  )}
+                </span>
+                {tokenBalance !== undefined && (
                   <button
-                    key={p}
                     type="button"
+                    className={`min-w-0 truncate hover:text-purple-600 ${
+                      insufficientToken ? "text-red-600" : "text-gray-500"
+                    }`}
                     onClick={() => {
                       setEditField("amount");
-                      setAmountStr(
-                        fmtAmount(
-                          Math.floor(((tokenBalance ?? 0) * p) / 100) / SATS,
-                        ),
-                      );
+                      setAmountStr(fmtAmount(tokenBalance / SATS));
                     }}
-                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                   >
-                    {p === 100 ? "Max" : `${p}%`}
+                    Balance: {commas(tokenBalance / SATS)}
                   </button>
-                ))}
-              </span>
-            ) : undefined
-          }
-          chip={<AssetChip asset={asset} onClick={onOpenSelector} />}
-          footer={
-            <>
-              <span>
-                ≈{" "}
-                {usdFmt(
-                  xcpUsd && limitTotalRaw > 0
-                    ? (limitTotalRaw / SATS) * xcpUsd
-                    : 0,
                 )}
-              </span>
-              {tokenBalance !== undefined && (
-                <button
-                  type="button"
-                  className={`min-w-0 truncate hover:text-purple-600 ${
-                    insufficientToken ? "text-red-600" : "text-gray-500"
-                  }`}
-                  onClick={() => {
-                    setEditField("amount");
-                    setAmountStr(fmtAmount(tokenBalance / SATS));
-                  }}
-                >
-                  Balance: {commas(tokenBalance / SATS)}
-                </button>
-              )}
-            </>
-          }
-        >
-          <AmountInput
-            value={
-              editField === "amount"
-                ? amountStr
-                : limitAmountRaw > 0
-                  ? fmtAmount(limitAmountRaw / SATS)
-                  : ""
+              </>
             }
-            onChange={(v) => {
-              setEditField("amount");
-              setAmountStr(v);
-            }}
-            ariaLabel={`Amount of ${asset}`}
-            className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-              insufficientToken ? "text-red-600" : "text-gray-900"
-            }`}
-          />
-        </Well>
-      </div>
-
-      {/* Total well — the XCP leg, equally editable through the price */}
-      <div className="mt-1">
-        <Well
-          focusable
-          label="Total"
-          topRight={
-            side === "buy" && (xcpBalance ?? 0) > 0 ? (
-              <span className="flex items-center gap-1">
-                {([25, 50, 75, 100] as const).map((p) => (
+          >
+            <AmountInput
+              value={
+                editField === "amount"
+                  ? amountStr
+                  : limitAmountRaw > 0
+                    ? fmtAmount(limitAmountRaw / SATS)
+                    : ""
+              }
+              onChange={(v) => {
+                setEditField("amount");
+                setAmountStr(v);
+              }}
+              ariaLabel={`Amount of ${asset}`}
+              className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+                insufficientToken ? "text-red-600" : "text-gray-900"
+              }`}
+            />
+          </Well>
+        );
+        const xcpWell = (
+          <Well
+            focusable
+            label="Total"
+            topRight={
+              side === "buy" && (xcpBalance ?? 0) > 0
+                ? presetsFor(xcpBalance ?? 0, (v) => {
+                    setEditField("total");
+                    setTotalStr(v);
+                  })
+                : undefined
+            }
+            chip={<AssetChip asset="XCP" />}
+            footer={
+              <>
+                <span>
+                  ≈{" "}
+                  {usdFmt(
+                    xcpUsd && limitTotalRaw > 0
+                      ? (limitTotalRaw / SATS) * xcpUsd
+                      : 0,
+                  )}
+                </span>
+                {xcpBalance !== undefined && (
                   <button
-                    key={p}
                     type="button"
+                    className={`min-w-0 truncate hover:text-purple-600 ${
+                      insufficientXcp ? "text-red-600" : "text-gray-500"
+                    }`}
                     onClick={() => {
                       setEditField("total");
-                      setTotalStr(
-                        fmtAmount(
-                          Math.floor(((xcpBalance ?? 0) * p) / 100) / SATS,
-                        ),
-                      );
+                      setTotalStr(fmtAmount(xcpBalance / SATS));
                     }}
-                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                   >
-                    {p === 100 ? "Max" : `${p}%`}
+                    Balance: {commas(xcpBalance / SATS)}
                   </button>
-                ))}
-              </span>
-            ) : undefined
-          }
-          chip={<AssetChip asset="XCP" />}
-          footer={
-            <>
-              <span>
-                ≈{" "}
-                {usdFmt(
-                  xcpUsd && limitTotalRaw > 0
-                    ? (limitTotalRaw / SATS) * xcpUsd
-                    : 0,
                 )}
-              </span>
-              {xcpBalance !== undefined && (
-                <button
-                  type="button"
-                  className={`min-w-0 truncate hover:text-purple-600 ${
-                    insufficientXcp ? "text-red-600" : "text-gray-500"
-                  }`}
-                  onClick={() => {
-                    setEditField("total");
-                    setTotalStr(fmtAmount(xcpBalance / SATS));
-                  }}
-                >
-                  Balance: {commas(xcpBalance / SATS)}
-                </button>
-              )}
-            </>
-          }
-        >
-          <AmountInput
-            value={
-              editField === "total"
-                ? totalStr
-                : limitTotalRaw > 0
-                  ? fmtAmount(limitTotalRaw / SATS)
-                  : ""
+              </>
             }
-            onChange={(v) => {
-              setEditField("total");
-              setTotalStr(v);
-            }}
-            ariaLabel="Total in XCP"
-            className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-              insufficientXcp ? "text-red-600" : "text-gray-900"
-            }`}
-          />
-        </Well>
-      </div>
+          >
+            <AmountInput
+              value={
+                editField === "total"
+                  ? totalStr
+                  : limitTotalRaw > 0
+                    ? fmtAmount(limitTotalRaw / SATS)
+                    : ""
+              }
+              onChange={(v) => {
+                setEditField("total");
+                setTotalStr(v);
+              }}
+              ariaLabel="Total in XCP"
+              className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+                insufficientXcp ? "text-red-600" : "text-gray-900"
+              }`}
+            />
+          </Well>
+        );
+        return side === "buy" ? (
+          <>
+            <div className="mt-1">{tokenWell}</div>
+            <div className="mt-1">{xcpWell}</div>
+          </>
+        ) : (
+          <>
+            <div className="mt-1">{xcpWell}</div>
+            <div className="mt-1">{tokenWell}</div>
+          </>
+        );
+      })()}
 
       {/* Receipt — always open once price and amount exist */}
       {limitPriceNum > 0 && limitAmountRaw > 0 && (
