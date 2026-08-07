@@ -1,16 +1,16 @@
 import { fetchXcpUsd } from "@/lib/api/price";
 import { fetchTradeableAssets } from "@/lib/tradeable";
-import { TradeSurface } from "./trade-surface";
+import { LimitSurface } from "./limit-surface";
 
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Swap — xcp.fun",
+  title: "Limit — xcp.fun",
   description:
-    "Swap XCP against graduated XCP-69 launches. Every pair trades against permanently locked liquidity — pool and order book, best price first.",
+    "Place limit orders on graduated XCP-69 launches. Your price is enforced by the order itself — fills through the pool at confirmation or rests on the book.",
 };
 
-export default async function SwapPage() {
+export default async function LimitPage() {
   const [assets, xcpUsd] = await Promise.all([
     fetchTradeableAssets(),
     fetchXcpUsd(),
@@ -24,7 +24,7 @@ export default async function SwapPage() {
           pool — and it becomes tradeable here in the same block.
         </p>
       ) : (
-        <TradeSurface assets={assets} xcpUsd={xcpUsd} />
+        <LimitSurface assets={assets} xcpUsd={xcpUsd} />
       )}
     </div>
   );
