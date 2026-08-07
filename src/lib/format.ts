@@ -1,9 +1,24 @@
 /** Display helpers. Raw satoshi quantities in, human strings out. */
 
+import {
+  approx,
+  formatExact,
+  type RawLike,
+  rawToDecimalString,
+} from "@/lib/numeric";
+
 const SATS = 1e8;
 
-export function fromSats(raw: number | null | undefined): number {
-  return (raw ?? 0) / SATS;
+/**
+ * Raw units as a whole-unit number.
+ *
+ * Lossy above 2^53 raw units (~90M of a divisible asset) and deliberately so:
+ * the callers are progress bars, USD estimates, chart geometry and {@link
+ * compact}, where a double is the honest answer. Anything a person reads
+ * digit-for-digit goes through {@link commasRaw}, which never converts.
+ */
+export function fromSats(raw: RawLike | null | undefined): number {
+  return approx(raw) / SATS;
 }
 
 /**
@@ -11,9 +26,13 @@ export function fromSats(raw: number | null | undefined): number {
  * quantities are ×1e8 raw, indivisible ones are whole units already. XCP-69
  * assets are always divisible; this matters for the non-conforming
  * fairminters shown in relaxed mode.
+ *
+ * A number, because every caller hands the result to {@link compact}, which
+ * abbreviates to three significant figures — a precision a double clears by a
+ * wide margin even at the u64 ceiling.
  */
-export function tokenQty(raw: number | null | undefined, divisible: boolean): number {
-  return divisible ? fromSats(raw) : (raw ?? 0);
+export function tokenQty(raw: RawLike | null | undefined, divisible: boolean): number {
+  return divisible ? fromSats(raw) : approx(raw);
 }
 
 /** 1234567.89 → "1.23M"; keeps small numbers plain. */
@@ -27,8 +46,27 @@ export function compact(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
+/** Grouped display of a number that has already been divided down. */
 export function commas(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 8 });
+}
+
+/**
+ * Grouped display of a RAW quantity — the exact counterpart to `commas(x / 1e8)`.
+ *
+ * The division happens in integer arithmetic and the resulting decimal string
+ * reaches Intl untouched. That last part is the whole trick: Intl formats a
+ * decimal string exactly and a number only as precisely as a double allows, so
+ * a display path must never convert on the way to the formatter. PEPECASH's
+ * supply reads 995,269,147.11111111 through the string and 995,269,147.111111
+ * through the double.
+ *
+ * Pass `decimals: 0` for an indivisible asset, whose raw units are whole units.
+ */
+export function commasRaw(raw: RawLike | null | undefined, decimals = 8): string {
+  return formatExact(rawToDecimalString(raw, decimals), {
+    maximumFractionDigits: Math.max(decimals, 0),
+  });
 }
 
 /** Sub-cent-safe price formatting with significant digits. */

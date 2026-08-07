@@ -15,6 +15,7 @@ import {
   tokenQty,
   usd,
 } from "@/lib/format";
+import { big } from "@/lib/numeric";
 import {
   type Fairminter,
   isXcp69,
@@ -22,6 +23,7 @@ import {
   launchPhase,
   openingMultiple,
   saleProgress,
+  saleTarget,
   windowIsExact,
   XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
@@ -52,7 +54,7 @@ export default async function HomePage() {
       listed.map(async (fm) => {
         const closed = fm.status === "closed";
         const [pool, originalDeadline] = await Promise.all([
-          closed && (fm.pool_quantity ?? 0) > 0
+          closed && big(fm.pool_quantity) > 0n
             ? fetchPool(fm.asset)
             : Promise.resolve(null),
           // Closed rows can't prove their composed window (rewritten on
@@ -62,12 +64,12 @@ export default async function HomePage() {
         const conforming =
           isXcp69(fm) && (!closed || windowIsExact(fm, originalDeadline));
         // Same fixed supply everywhere, so XCP depth IS the value ranking:
-        // deepest pool = highest price = most fees compounded in.
-        const xcpDepth = pool
-          ? pool.asset_a === "XCP"
-            ? pool.reserve_a
-            : pool.reserve_b
-          : 0;
+        // deepest pool = highest price = most fees compounded in. Exact,
+        // because it is a sort key: two pools within a rounding error of each
+        // other should not swap places between renders.
+        const xcpDepth = big(
+          pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
+        );
         return { fm, phase: launchPhase(fm, pool !== null), conforming, xcpDepth };
       }),
     )
@@ -81,7 +83,7 @@ export default async function HomePage() {
   // Featured: graduated first, ranked by pool depth, top 8.
   const graduated = phased
     .filter((p) => p.phase === "graduated")
-    .sort((a, b) => b.xcpDepth - a.xcpDepth)
+    .sort((a, b) => (b.xcpDepth === a.xcpDepth ? 0 : b.xcpDepth > a.xcpDepth ? 1 : -1))
     .slice(0, 8);
 
   return (
@@ -161,11 +163,11 @@ function Section({
 }: {
   title: string;
   empty: string;
-  items: { fm: Fairminter; conforming: boolean; xcpDepth: number }[];
+  items: { fm: Fairminter; conforming: boolean; xcpDepth: bigint }[];
   render: (item: {
     fm: Fairminter;
     conforming: boolean;
-    xcpDepth: number;
+    xcpDepth: bigint;
   }) => React.ReactNode;
 }) {
   if (items.length === 0 && !empty) return null;
@@ -283,8 +285,8 @@ function MintingCard({
       }
     >
       {compact(tokenQty(fm.earned_quantity, fm.divisible))} of{" "}
-      {fm.soft_cap > 0 || fm.hard_cap > 0
-        ? compact(tokenQty(fm.soft_cap > 0 ? fm.soft_cap : fm.hard_cap, fm.divisible))
+      {big(fm.soft_cap) > 0n || big(fm.hard_cap) > 0n
+        ? compact(tokenQty(saleTarget(fm), fm.divisible))
         : "∞"}{" "}
       minted · by {shortAddress(fm.source)}
     </CardShell>
@@ -321,7 +323,7 @@ function GraduatedCard({
 }: {
   fm: Fairminter;
   conforming: boolean;
-  xcpDepth: number;
+  xcpDepth: bigint;
   xcpUsd: number | null;
 }) {
   const multiple = openingMultiple(fm);
@@ -330,7 +332,7 @@ function GraduatedCard({
       fm={fm}
       conforming={conforming}
       headline={
-        xcpDepth > 0
+        xcpDepth > 0n
           ? `${compact(fromSats(xcpDepth))} XCP deep`
           : multiple
             ? `${multiple.toFixed(2)}× at open`
@@ -338,7 +340,7 @@ function GraduatedCard({
       }
       chip={<Chip tone="green">graduated</Chip>}
     >
-      {xcpDepth > 0 ? (
+      {xcpDepth > 0n ? (
         <>
           Sold out · liquidity locked forever
           {xcpUsd ? ` · ≈ ${usd(fromSats(xcpDepth) * xcpUsd)}` : ""}
@@ -360,7 +362,7 @@ function RefundedCard({ fm, conforming }: { fm: Fairminter; conforming: boolean 
       chip={<Chip tone="gray">refunded</Chip>}
     >
       {compact(fromSats(fm.paid_quantity))} XCP{" "}
-      {(fm.pool_quantity ?? 0) > 0 ? "refunded by the protocol" : "collected"}
+      {big(fm.pool_quantity) > 0n ? "refunded by the protocol" : "collected"}
     </CardShell>
   );
 }

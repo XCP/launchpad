@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { compact, shortAddress, tokenQty } from "@/lib/format";
+import { big, parseJsonLossless, type Raw, ratio, sumRaw } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 /**
@@ -19,11 +20,11 @@ import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 interface PendingMint {
   txHash: string;
   source: string;
-  quantity: number;
+  quantity: Raw;
 }
 
 interface Live {
-  earned: number;
+  earned: Raw;
   pending: PendingMint[];
 }
 
@@ -32,7 +33,7 @@ interface MempoolEvent {
   params: {
     fairminter_tx_hash?: string;
     source?: string;
-    earn_quantity?: number;
+    earn_quantity?: Raw;
     status?: string;
   };
 }
@@ -47,8 +48,12 @@ async function fetchLive(fairminterTxHash: string): Promise<Live> {
     }),
   ]);
   if (!fmRes.ok || !memRes.ok) throw new Error("live fetch failed");
-  const earned = (await fmRes.json()).result?.earned_quantity ?? 0;
-  const events: MempoolEvent[] = (await memRes.json()).result ?? [];
+  // Lossless on both: earned_quantity is what the whole bar is a fraction of.
+  const earned: Raw =
+    parseJsonLossless<{ result?: { earned_quantity?: Raw } }>(await fmRes.text())
+      .result?.earned_quantity ?? 0;
+  const events: MempoolEvent[] =
+    parseJsonLossless<{ result?: MempoolEvent[] }>(await memRes.text()).result ?? [];
   const pending = events
     .filter(
       (e) =>
@@ -71,8 +76,8 @@ export function LiveProgress({
   divisible,
 }: {
   fairminterTxHash: string;
-  initialEarned: number;
-  target: number;
+  initialEarned: Raw;
+  target: Raw;
   allOrNothing: boolean;
   divisible: boolean;
 }) {
@@ -83,10 +88,11 @@ export function LiveProgress({
   });
   const earned = data?.earned ?? initialEarned;
   const pending = data?.pending ?? [];
-  const pendingSum = pending.reduce((sum, p) => sum + p.quantity, 0);
-  const confirmedPct = target > 0 ? Math.min(100, (earned / target) * 100) : 0;
-  const pendingPct =
-    target > 0 ? Math.min(100 - confirmedPct, (pendingSum / target) * 100) : 0;
+  // Exact sum, then a percentage: the operands are 64-bit quantities, the
+  // result is a fraction of a progress bar.
+  const pendingSum = sumRaw(pending.map((p) => p.quantity));
+  const confirmedPct = Math.min(100, ratio(earned, target) * 100);
+  const pendingPct = Math.min(100 - confirmedPct, ratio(pendingSum, target) * 100);
 
   return (
     <>
@@ -94,7 +100,7 @@ export function LiveProgress({
         <span className="text-lg font-bold">{confirmedPct.toFixed(1)}%</span>
         <span className="text-sm text-gray-500">
           {compact(tokenQty(earned, divisible))} /{" "}
-          {target > 0 ? compact(tokenQty(target, divisible)) : "∞"}
+          {big(target) > 0n ? compact(tokenQty(target, divisible)) : "∞"}
           {allOrNothing ? " · sells out or refunds" : ""}
         </span>
       </div>
@@ -116,7 +122,7 @@ export function LiveProgress({
           )}
         </div>
       </div>
-      {pendingSum > 0 && (
+      {pendingSum > 0n && (
         <div className="mt-2 text-xs text-gray-500">
           <p>
             +{pendingPct.toFixed(1)}% in the mempool — {pending.length}{" "}

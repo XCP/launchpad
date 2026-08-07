@@ -11,6 +11,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 import {
   generateLpAssetName,
   XCP69,
+  XCP69_EXACT,
   XCP69_MIN_PARTICIPANTS,
   XCP69_OPENING_MULTIPLE,
   XCP69_RAISE_SATS,
@@ -158,17 +159,21 @@ export default function CreatePage() {
       }
 
       // 3b. Standard compose → sign → broadcast through the wallet.
+      // The exact constants, not the doubles: HARD_CAP is 10^16, above the
+      // range where a number identifies a single integer. It happens to print
+      // its true digits today, but a launch's terms are not a thing to leave
+      // resting on that.
       compose.composeFairminter({
         asset: name,
-        price: XCP69.PRICE,
-        quantity_by_price: XCP69.QUANTITY_BY_PRICE,
-        hard_cap: XCP69.HARD_CAP,
-        soft_cap: XCP69.SOFT_CAP,
+        price: XCP69_EXACT.PRICE,
+        quantity_by_price: XCP69_EXACT.QUANTITY_BY_PRICE,
+        hard_cap: XCP69_EXACT.HARD_CAP,
+        soft_cap: XCP69_EXACT.SOFT_CAP,
         start_block: startBlock,
         soft_cap_deadline_block: startBlock + XCP69.DEADLINE_BLOCKS,
-        max_mint_per_tx: XCP69.MAX_MINT_PER_TX,
-        max_mint_per_address: XCP69.MAX_MINT_PER_ADDRESS,
-        pool_quantity: XCP69.POOL_QUANTITY,
+        max_mint_per_tx: XCP69_EXACT.MAX_MINT_PER_TX,
+        max_mint_per_address: XCP69_EXACT.MAX_MINT_PER_ADDRESS,
+        pool_quantity: XCP69_EXACT.POOL_QUANTITY,
         lp_asset: generateLpAssetName(),
         description: upload.json_url,
         ...(feeRate ? { fee_rate: feeRate } : {}),

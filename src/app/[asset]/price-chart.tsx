@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { PoolSnapshot } from "@/lib/api/counterparty";
 import { price as formatPrice, usd } from "@/lib/format";
+import { big, ratio } from "@/lib/numeric";
 import { XCP69 } from "@/lib/xcp69";
 
 /** Mint price in XCP per token — the structural reference line. */
@@ -40,13 +41,22 @@ export function PriceChart({
   const [hover, setHover] = useState<Point | null>(null);
 
   const { points, path, area, yTicks, minPrice, maxPrice } = useMemo(() => {
-    const usable = history.filter((s) => s.reserve_a > 0 && s.reserve_b > 0);
+    const usable = history.filter(
+      (s) => big(s.reserve_a) > 0n && big(s.reserve_b) > 0n,
+    );
     const prices = usable.map((s) => {
       // sort_pair puts the pair in lexical order; XCP may be either side.
       const tokenIsA = s.asset_a === asset;
-      const tokenReserve = tokenIsA ? s.reserve_a : s.reserve_b;
-      const xcpReserve = tokenIsA ? s.reserve_b : s.reserve_a;
-      return { price: xcpReserve / tokenReserve, block: s.block_index };
+      // A price is a small number and the chart is 720px wide, so a double is
+      // plenty — but the reserves it comes from are 64-bit quantities, so the
+      // division has to be exact before the result narrows.
+      return {
+        price: ratio(
+          tokenIsA ? s.reserve_b : s.reserve_a,
+          tokenIsA ? s.reserve_a : s.reserve_b,
+        ),
+        block: s.block_index,
+      };
     });
     if (prices.length === 0) {
       return { points: [], path: "", area: "", yTicks: [], minPrice: 0, maxPrice: 0 };

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
+import { approx, ratio } from "@/lib/numeric";
 import { type Fairminter, XCP69 } from "@/lib/xcp69";
 import { LaunchView } from "./launch-view";
 
@@ -99,10 +100,15 @@ function fabricate(realProps: RealProps, phase: Phase): RealProps {
     : { ...realProps.fm };
   const real = { ...realProps, fm: fmBase, conforming: true };
   const fm = real.fm;
-  const qbp = fm.quantity_by_price;
-  const mintPrice = fm.price / qbp;
-  const softCap = fm.soft_cap;
-  const poolQty = fm.pool_quantity || XCP69.POOL_QUANTITY;
+  // Plain numbers for the rest of the simulation. These are the standard's own
+  // constants (lot size 1e11, soft cap 6.9e15) or borrowed from a record that
+  // already matched them — all comfortably inside the exact range, and the
+  // output is a fabricated tape for the design preview rather than anything
+  // anyone signs.
+  const qbp = approx(fm.quantity_by_price);
+  const mintPrice = ratio(fm.price, fm.quantity_by_price);
+  const softCap = approx(fm.soft_cap);
+  const poolQty = approx(fm.pool_quantity) || XCP69.POOL_QUANTITY;
 
   if (phase === "scheduled") {
     return {

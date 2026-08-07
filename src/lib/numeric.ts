@@ -31,6 +31,13 @@
  */
 export type Raw = number | string;
 
+/**
+ * A raw quantity in any of its exact forms — as it arrived, or as this module
+ * hands it back. What display helpers accept, so a caller never has to narrow
+ * an exact bigint back to something lossier just to render it.
+ */
+export type RawLike = Raw | bigint;
+
 /** Raw units per whole unit of a divisible asset. */
 export const SATS_PER_UNIT = 100_000_000n;
 
@@ -119,7 +126,7 @@ export function parseJsonLossless<T = unknown>(text: string): T {
  * path must not explode on one. Callers that need a number pick their own
  * default — the old xcp.fun rendered NaN from exactly this.
  */
-export function toBigInt(value: Raw | bigint | null | undefined): bigint | null {
+export function toBigInt(value: RawLike | null | undefined): bigint | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "bigint") return value;
   if (typeof value === "number") {
@@ -136,7 +143,7 @@ export function toBigInt(value: Raw | bigint | null | undefined): bigint | null 
 }
 
 /** A raw quantity as an exact bigint, substituting zero for anything unreadable. */
-export function big(value: Raw | bigint | null | undefined): bigint {
+export function big(value: RawLike | null | undefined): bigint {
   return toBigInt(value) ?? 0n;
 }
 
@@ -148,20 +155,20 @@ export function big(value: Raw | bigint | null | undefined): bigint {
  * preserved digits instead keeps the predicate the exact-equality test the
  * standard says it is.
  */
-export function rawEquals(value: Raw | bigint | null | undefined, expected: bigint): boolean {
+export function rawEquals(value: RawLike | null | undefined, expected: bigint): boolean {
   const exact = toBigInt(value);
   return exact !== null && exact === expected;
 }
 
 /** Exact sum. The counterpart to `+`, which is where accumulators lose digits. */
-export function sumRaw(values: Iterable<Raw | bigint | null | undefined>): bigint {
+export function sumRaw(values: Iterable<RawLike | null | undefined>): bigint {
   let total = 0n;
   for (const value of values) total += big(value);
   return total;
 }
 
 /** The larger of two raw quantities, exactly. */
-export function maxRaw(a: Raw | bigint | null | undefined, b: Raw | bigint | null | undefined): bigint {
+export function maxRaw(a: RawLike | null | undefined, b: RawLike | null | undefined): bigint {
   const left = big(a);
   const right = big(b);
   return left >= right ? left : right;
@@ -182,7 +189,7 @@ export function maxRaw(a: Raw | bigint | null | undefined, b: Raw | bigint | nul
  * Trailing zeros are trimmed: 4 renders as "4", not "4.00000000".
  */
 export function rawToDecimalString(
-  value: Raw | bigint | null | undefined,
+  value: RawLike | null | undefined,
   decimals = 8,
 ): string {
   const exact = big(value);
@@ -220,7 +227,7 @@ export function formatExact(
  * Named for what it does. Reach for it deliberately, never as a way to quiet a
  * type error on a value that is about to be composed into a transaction.
  */
-export function approx(value: Raw | bigint | null | undefined): number {
+export function approx(value: RawLike | null | undefined): number {
   if (typeof value === "number") return value;
   return Number(big(value));
 }
@@ -234,8 +241,8 @@ export function approx(value: Raw | bigint | null | undefined): number {
  * 10^12 keeps twelve significant figures, far beyond what any of this renders.
  */
 export function ratio(
-  numerator: Raw | bigint | null | undefined,
-  denominator: Raw | bigint | null | undefined,
+  numerator: RawLike | null | undefined,
+  denominator: RawLike | null | undefined,
 ): number {
   const bottom = big(denominator);
   if (bottom === 0n) return 0;

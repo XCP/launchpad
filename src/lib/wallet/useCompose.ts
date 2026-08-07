@@ -3,7 +3,20 @@
 import { useRef, useState } from 'react'
 import { useWallet } from './wallet-context'
 import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
+import { quantityParam } from '@/lib/numeric'
 import { COUNTERPARTY_API_BASE } from '@/utils/constants'
+
+/**
+ * A value a compose parameter can carry. `bigint` and `string` are how a
+ * caller states a quantity larger than a double holds exactly.
+ */
+type ComposeValue = string | number | bigint
+
+/**
+ * A quantity a caller supplies. `bigint` is how you state one larger than a
+ * double holds exactly; `number` is refused past 2^53 rather than rounded.
+ */
+type Quantity = number | bigint
 
 const UTXO_REGEX = /^[a-f0-9]{64}:\d+$/
 
@@ -63,18 +76,36 @@ export async function fetchPriorityFeeRate(): Promise<number> {
   }
 }
 
-/** Call Counterparty compose endpoint */
+/**
+ * Call Counterparty compose endpoint.
+ *
+ * Every quantity the user will sign for passes through the loop below, which
+ * makes this the one place worth gating. `String(v)` on a double is wrong twice
+ * over for a 64-bit quantity: past 2^53 the digits it prints belong to an
+ * integer nobody chose, and past 1e21 it prints exponent notation the API
+ * cannot read as a quantity at all. Either way the wallet would show — and the
+ * user would sign — an order for an amount they never asked for, so
+ * quantityParam refuses instead. Non-numeric parameters (asset names, the
+ * description URL, the 'true'/'false' flags) are strings and pass through
+ * untouched.
+ */
 async function composeRequest(
   path: string,
   type: string,
-  params: Record<string, string | number>,
+  params: Record<string, ComposeValue>,
   extraParams?: Record<string, string>,
   feeRateOverride?: number,
 ): Promise<string> {
   const feeRate = feeRateOverride ?? (await fetchMedianFeeRate())
   const qp = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
-    qp.set(k, String(v))
+    try {
+      qp.set(k, quantityParam(v))
+    } catch (e) {
+      throw new Error(
+        `${k}: ${e instanceof Error ? e.message : 'unusable value'}`,
+      )
+    }
   }
   if (extraParams) {
     for (const [k, v] of Object.entries(extraParams)) qp.set(k, v)
@@ -123,7 +154,7 @@ export function useCompose() {
 
   const execute = (
     type: string,
-    params: Record<string, string | number>,
+    params: Record<string, ComposeValue>,
     feeRateOverride?: number,
   ): void => {
     if (!address) {
@@ -145,7 +176,7 @@ export function useCompose() {
     )
   }
 
-  const executeUtxo = (utxo: string, type: string, params: Record<string, string | number>): void => {
+  const executeUtxo = (utxo: string, type: string, params: Record<string, ComposeValue>): void => {
     if (!address) {
       setState({ status: 'error', txid: null, error: 'Wallet not connected' })
       return
@@ -159,9 +190,9 @@ export function useCompose() {
 
   const composeOrder = (params: {
     give_asset: string
-    give_quantity: number
+    give_quantity: Quantity
     get_asset: string
-    get_quantity: number
+    get_quantity: Quantity
     expiration?: number
     /** sat/vB override; defaults to the next-block median at compose time. */
     fee_rate?: number
@@ -176,9 +207,9 @@ export function useCompose() {
 
   const composeDispenser = (params: {
     asset: string
-    give_quantity: number
-    escrow_quantity: number
-    mainchainrate: number
+    give_quantity: Quantity
+    escrow_quantity: Quantity
+    mainchainrate: Quantity
     status?: number
   }) => execute('dispenser', {
     asset: params.asset,
@@ -190,7 +221,7 @@ export function useCompose() {
 
   const composeDispense = (params: {
     dispenser: string
-    quantity: number
+    quantity: Quantity
   }) => execute('dispense', {
     dispenser: params.dispenser,
     quantity: params.quantity,
@@ -198,7 +229,7 @@ export function useCompose() {
 
   const composeAttach = (params: {
     asset: string
-    quantity: number
+    quantity: Quantity
   }) => execute('attach', {
     asset: params.asset,
     quantity: params.quantity,
@@ -207,9 +238,9 @@ export function useCompose() {
   const composePoolDeposit = (params: {
     asset_a: string
     asset_b: string
-    quantity_a: number
-    quantity_b: number
-    min_lp_quantity?: number
+    quantity_a: Quantity
+    quantity_b: Quantity
+    min_lp_quantity?: Quantity
     lp_asset?: string
     /** sat/vB override; defaults to the next-block median at compose time. */
     fee_rate?: number
@@ -224,9 +255,9 @@ export function useCompose() {
 
   const composePoolWithdraw = (params: {
     lp_asset: string
-    quantity: number
-    min_quantity_a?: number
-    min_quantity_b?: number
+    quantity: Quantity
+    min_quantity_a?: Quantity
+    min_quantity_b?: Quantity
     /** sat/vB override; defaults to the next-block median at compose time. */
     fee_rate?: number
   }) => execute('poolwithdraw', {
@@ -251,15 +282,15 @@ export function useCompose() {
    */
   const composeFairminter = (params: {
     asset: string
-    price: number
-    quantity_by_price: number
-    hard_cap: number
-    soft_cap: number
+    price: Quantity
+    quantity_by_price: Quantity
+    hard_cap: Quantity
+    soft_cap: Quantity
     start_block: number
     soft_cap_deadline_block: number
-    max_mint_per_tx: number
-    max_mint_per_address: number
-    pool_quantity: number
+    max_mint_per_tx: Quantity
+    max_mint_per_address: Quantity
+    pool_quantity: Quantity
     lp_asset: string
     description: string
     fee_rate?: number
@@ -286,7 +317,7 @@ export function useCompose() {
   }, params.fee_rate)
 
   /** Mint from a fairminter; quantity is raw earn units (whole lots). */
-  const composeFairmint = (params: { asset: string; quantity: number }) =>
+  const composeFairmint = (params: { asset: string; quantity: Quantity }) =>
     execute('fairmint', {
       asset: params.asset,
       quantity: params.quantity,

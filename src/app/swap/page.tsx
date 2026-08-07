@@ -4,6 +4,7 @@ import {
   fetchPool,
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
+import { big } from "@/lib/numeric";
 import { isXcp69, windowIsExact } from "@/lib/xcp69";
 import { SHOW_NONCONFORMING } from "@/utils/constants";
 import { TradeSurface } from "./trade-surface";
@@ -32,7 +33,7 @@ export default async function SwapPage() {
   // Tradeable = graduated XCP-69: conforming (incl. the exact-window event
   // check for closed records) with a live pool. One leg is always XCP.
   const closedPoolFms = fairminters.filter(
-    (fm) => fm.status === "closed" && (fm.pool_quantity ?? 0) > 0,
+    (fm) => fm.status === "closed" && big(fm.pool_quantity) > 0n,
   );
   const withPools = await Promise.all(
     closedPoolFms.map(async (fm) => {

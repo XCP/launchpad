@@ -4,12 +4,14 @@ import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
   blocksEta,
   commas,
+  commasRaw,
   compact,
   fromSats,
   price as formatPrice,
   shortAddress,
   usd,
 } from "@/lib/format";
+import { big, maxRaw, ratio } from "@/lib/numeric";
 import {
   type Fairminter,
   isHouseLpName,
@@ -60,41 +62,42 @@ export function LaunchView({
   const progress = saleProgress(fm);
   // sort_pair orders the pool lexically — XCP can sit on either side.
   const xcpIsA = pool?.asset_a === "XCP";
-  const poolXcp = pool
-    ? Number(
-        (xcpIsA ? pool.reserve_a_normalized : pool.reserve_b_normalized) ??
-          fromSats(xcpIsA ? pool.reserve_a : pool.reserve_b),
-      )
-    : 0;
-  const poolTokens = pool
-    ? Number(
-        (xcpIsA ? pool.reserve_b_normalized : pool.reserve_a_normalized) ??
-          fromSats(xcpIsA ? pool.reserve_b : pool.reserve_a),
-      )
-    : 0;
+  // From the raw reserves, not the `_normalized` strings: those are computed
+  // API-side in Python floats and can be off in the last place, and reading
+  // one back with Number() re-rounds it a second time. The raw integer is the
+  // authoritative field and fromSats divides it exactly.
+  const poolXcpRaw = pool ? (xcpIsA ? pool.reserve_a : pool.reserve_b) : 0;
+  const poolTokensRaw = pool ? (xcpIsA ? pool.reserve_b : pool.reserve_a) : 0;
+  // Doubles from here down: everything below is a ratio, a percentage or a USD
+  // estimate. A pool reserve is ~3e15 raw at XCP-69 scale, well inside exact.
+  const poolXcp = fromSats(poolXcpRaw);
+  const poolTokens = fromSats(poolTokensRaw);
 
-  // Organic-look aggregates — the survival predictors as UI.
-  const byAddress = new Map<string, number>();
+  // Organic-look aggregates — the survival predictors as UI. Summed as exact
+  // integers: a per-address total is the shape that quietly drifts once the
+  // mints add up, and it is the number the "Top address" concentration claim
+  // rests on.
+  const byAddress = new Map<string, bigint>();
   for (const m of mints) {
-    byAddress.set(m.source, (byAddress.get(m.source) ?? 0) + m.earn_quantity);
+    byAddress.set(m.source, (byAddress.get(m.source) ?? 0n) + big(m.earn_quantity));
   }
   const participants = byAddress.size;
   const topShare =
-    fm.earned_quantity && byAddress.size > 0
-      ? Math.max(...byAddress.values()) / fm.earned_quantity
+    byAddress.size > 0
+      ? ratio([...byAddress.values()].reduce(maxRaw, 0n), fm.earned_quantity)
       : 0;
 
   // "How's it doing" numbers (graduated): spot from the pool, change over
   // the available history, multiple vs the fixed mint price.
-  const mintPrice =
-    fm.quantity_by_price > 0 ? fm.price / fm.quantity_by_price : 0;
+  const mintPrice = ratio(fm.price, fm.quantity_by_price);
   const spot = poolTokens > 0 ? poolXcp / poolTokens : 0;
   const first = priceHistory[0];
-  const firstPrice =
-    first && first.reserve_a > 0 && first.reserve_b > 0
-      ? (first.asset_a === "XCP" ? first.reserve_a : first.reserve_b) /
-        (first.asset_a === "XCP" ? first.reserve_b : first.reserve_a)
-      : 0;
+  const firstPrice = first
+    ? ratio(
+        first.asset_a === "XCP" ? first.reserve_a : first.reserve_b,
+        first.asset_a === "XCP" ? first.reserve_b : first.reserve_a,
+      )
+    : 0;
   const change = firstPrice > 0 && spot > 0 ? (spot / firstPrice - 1) * 100 : null;
   const multiple = mintPrice > 0 && spot > 0 ? spot / mintPrice : null;
   const supplyTokens = fromSats(fm.hard_cap);
@@ -187,7 +190,7 @@ export function LaunchView({
         ? [
             [
               "Raised",
-              `${commas(fromSats(fm.paid_quantity))} XCP${
+              `${commasRaw(fm.paid_quantity)} XCP${
                 xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""
               }`,
             ],
@@ -221,7 +224,7 @@ export function LaunchView({
               ["Participants", String(participants)],
               [
                 phase === "refunded" ? "Returned" : "Raised",
-                `${commas(fromSats(fm.paid_quantity))} XCP`,
+                `${commasRaw(fm.paid_quantity)} XCP`,
               ],
               ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
             ];
@@ -321,7 +324,7 @@ export function LaunchView({
       <div className="min-w-0 space-y-4">
       {phase === "minting" && (
         <>
-          {(fm.pool_quantity ?? 0) > 0 && (
+          {big(fm.pool_quantity) > 0n && (
             <div className="rounded-2xl border border-purple-200 bg-purple-50 p-3 text-sm text-purple-900">
               <strong>
                 {compact(fromSats(saleTarget(fm)))} minted, or everyone is
@@ -337,7 +340,7 @@ export function LaunchView({
               fairminterTxHash={fm.tx_hash}
               initialEarned={fm.earned_quantity ?? 0}
               target={saleTarget(fm)}
-              allOrNothing={(fm.pool_quantity ?? 0) > 0}
+              allOrNothing={big(fm.pool_quantity) > 0n}
               divisible={fm.divisible}
             />
           </div>
@@ -363,7 +366,7 @@ export function LaunchView({
           <p className="mt-1.5 text-sm text-gray-600">
             Reached {(progress * 100).toFixed(1)}% with {participants} of the
             69 addresses a sellout requires. Every one of the{" "}
-            {commas(fromSats(fm.paid_quantity))} XCP escrowed was returned by
+            {commasRaw(fm.paid_quantity)} XCP escrowed was returned by
             the protocol and the unsold supply destroyed. Nobody was left
             holding a dead token — this is what the guarantee is for.
           </p>

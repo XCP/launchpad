@@ -1,4 +1,5 @@
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { parseJsonLossless, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
 
 interface Paginated<T> {
@@ -12,7 +13,10 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
     next: { revalidate },
   });
   if (!res.ok) throw new Error(`Counterparty API ${res.status}: ${path}`);
-  return res.json() as Promise<T>;
+  // Not res.json(): JSON.parse rounds any integer above 2^53-1 while parsing,
+  // so a 64-bit quantity loses digits before this function returns and nothing
+  // downstream can recover them. Oversized integers arrive as strings instead.
+  return parseJsonLossless<T>(await res.text());
 }
 
 /**
@@ -57,9 +61,9 @@ export interface Fairmint {
   source: string;
   fairminter_tx_hash: string;
   asset: string;
-  earn_quantity: number;
-  paid_quantity: number;
-  commission: number;
+  earn_quantity: Raw;
+  paid_quantity: Raw;
+  commission: Raw;
   status: string;
 }
 
@@ -77,8 +81,8 @@ export async function fetchFairmints(
 export interface Pool {
   asset_a: string;
   asset_b: string;
-  reserve_a: number;
-  reserve_b: number;
+  reserve_a: Raw;
+  reserve_b: Raw;
   lp_asset: string;
   reserve_a_normalized?: string;
   reserve_b_normalized?: string;
@@ -94,8 +98,8 @@ export interface PoolSnapshot {
   tx_index: number;
   asset_a: string;
   asset_b: string;
-  reserve_a: number;
-  reserve_b: number;
+  reserve_a: Raw;
+  reserve_b: Raw;
 }
 
 export async function fetchPoolPriceHistory(
@@ -152,6 +156,11 @@ export async function fetchOriginalDeadline(txHash: string): Promise<number | nu
  * safely client-side) and single-unit only (give_quantity of exactly 1 XCP)
  * so quantities read one-XCP-at-a-time and the presets land exactly.
  * `price` is the API's computed sats per whole XCP.
+ *
+ * Plain numbers, unlike the fairminter and pool records: every field here is
+ * bounded by XCP's own supply (~2.6M, so 2.6e14 raw) or by a Bitcoin sat
+ * amount, both an order of magnitude clear of 2^53. Nothing arrives as a
+ * string, so nothing needs the exact path.
  */
 export interface Dispenser {
   source: string;

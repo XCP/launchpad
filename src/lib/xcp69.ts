@@ -6,7 +6,17 @@
  * have no `_normalized` siblings in the API, so all standard math stays raw.
  */
 
-/** Fairminter record fields the standard cares about (raw units). */
+import { big, type Raw, ratio, rawEquals } from "@/lib/numeric";
+
+/**
+ * Fairminter record fields the standard cares about.
+ *
+ * The quantities are {@link Raw}, not `number`: they are unsigned 64-bit
+ * integers, and the ones past 2^53 reach us as strings so their digits survive
+ * parsing (see lib/numeric.ts). Block indices and tx_index stay numbers —
+ * heights are counts, nowhere near the boundary, and treating them as money
+ * would only obscure which values actually need care.
+ */
 export interface Fairminter {
   tx_hash: string;
   tx_index: number;
@@ -15,31 +25,39 @@ export interface Fairminter {
   asset: string;
   asset_longname: string | null;
   description: string;
-  price: number;
-  quantity_by_price: number;
-  hard_cap: number;
-  soft_cap: number;
+  price: Raw;
+  quantity_by_price: Raw;
+  hard_cap: Raw;
+  soft_cap: Raw;
   soft_cap_deadline_block: number;
   start_block: number;
   end_block: number;
   burn_payment: boolean;
-  max_mint_per_tx: number;
-  max_mint_per_address: number | null;
-  premint_quantity: number;
-  minted_asset_commission_int: number | null;
+  max_mint_per_tx: Raw;
+  max_mint_per_address: Raw | null;
+  premint_quantity: Raw;
+  minted_asset_commission_int: Raw | null;
   lock_description: boolean;
   lock_quantity: boolean;
   divisible: boolean;
-  pool_quantity: number | null;
+  pool_quantity: Raw | null;
   lp_asset: string | null;
   status: string;
-  earned_quantity: number | null;
-  paid_quantity: number | null;
+  earned_quantity: Raw | null;
+  paid_quantity: Raw | null;
   confirmed?: boolean;
 }
 
 export const XCP69 = {
-  /** 100M supply */
+  /**
+   * 100M supply.
+   *
+   * Note for anyone doing arithmetic with this: 10^16 is above 2^53, so it is
+   * not a safe integer. It is exactly representable (its factors of 5 fit the
+   * mantissa) and so prints its true digits, but the integers either side of
+   * it do not exist as doubles. Use {@link XCP69_EXACT}.HARD_CAP to compare or
+   * to compose.
+   */
   HARD_CAP: 10_000_000_000_000_000,
   /** 69M public sale — reaching it IS selling out (all-or-nothing) */
   SOFT_CAP: 6_900_000_000_000_000,
@@ -54,6 +72,28 @@ export const XCP69 = {
   MAX_MINT_PER_TX: 100_000_000_000_000,
   /** Mint window: soft_cap_deadline_block − start_block, exactly (~7 days) */
   DEADLINE_BLOCKS: 1_000,
+} as const;
+
+/**
+ * The same constants as exact integers — what conformance is actually tested
+ * against, and what the create flow composes.
+ *
+ * The doubles above are convenient for the arithmetic the UI does with them
+ * (lot counts, mint price, opening multiple: all small results). They are not
+ * safe to compare a 64-bit record against, because HARD_CAP sits where the
+ * gap between representable integers is 2: a fairminter composed with a hard
+ * cap one raw unit off the standard parses onto the standard's exact value and
+ * would pass an `===` check. The standard says exact equality, so the check
+ * has to see the digits.
+ */
+export const XCP69_EXACT = {
+  HARD_CAP: 10_000_000_000_000_000n,
+  SOFT_CAP: 6_900_000_000_000_000n,
+  POOL_QUANTITY: 3_100_000_000_000_000n,
+  QUANTITY_BY_PRICE: 100_000_000_000n,
+  PRICE: 1_000_000n,
+  MAX_MINT_PER_ADDRESS: 100_000_000_000_000n,
+  MAX_MINT_PER_TX: 100_000_000_000_000n,
 } as const;
 
 /**
@@ -108,15 +148,15 @@ export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;
 export function isXcp69(fm: Fairminter): boolean {
   return (
     (fm.status === "pending" || fm.status === "open" || fm.status === "closed") &&
-    fm.pool_quantity === XCP69.POOL_QUANTITY &&
-    fm.soft_cap === XCP69.SOFT_CAP &&
-    fm.hard_cap === XCP69.HARD_CAP &&
-    fm.quantity_by_price === XCP69.QUANTITY_BY_PRICE &&
-    fm.price === XCP69.PRICE &&
-    fm.max_mint_per_address === XCP69.MAX_MINT_PER_ADDRESS &&
-    fm.max_mint_per_tx === XCP69.MAX_MINT_PER_TX &&
-    fm.premint_quantity === 0 &&
-    (fm.minted_asset_commission_int ?? 0) === 0 &&
+    rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY) &&
+    rawEquals(fm.soft_cap, XCP69_EXACT.SOFT_CAP) &&
+    rawEquals(fm.hard_cap, XCP69_EXACT.HARD_CAP) &&
+    rawEquals(fm.quantity_by_price, XCP69_EXACT.QUANTITY_BY_PRICE) &&
+    rawEquals(fm.price, XCP69_EXACT.PRICE) &&
+    rawEquals(fm.max_mint_per_address, XCP69_EXACT.MAX_MINT_PER_ADDRESS) &&
+    rawEquals(fm.max_mint_per_tx, XCP69_EXACT.MAX_MINT_PER_TX) &&
+    rawEquals(fm.premint_quantity, 0n) &&
+    rawEquals(fm.minted_asset_commission_int ?? 0, 0n) &&
     fm.lock_quantity &&
     fm.lock_description &&
     fm.divisible &&
@@ -161,29 +201,38 @@ export type LaunchPhase = "scheduled" | "minting" | "graduated" | "refunded";
 export function launchPhase(fm: Fairminter, hasPool: boolean): LaunchPhase {
   if (fm.status === "pending") return "scheduled";
   if (fm.status === "open") return "minting";
-  if ((fm.pool_quantity ?? 0) > 0) return hasPool ? "graduated" : "refunded";
-  if (fm.soft_cap > 0 && (fm.earned_quantity ?? 0) < fm.soft_cap) return "refunded";
+  if (big(fm.pool_quantity) > 0n) return hasPool ? "graduated" : "refunded";
+  if (big(fm.soft_cap) > 0n && big(fm.earned_quantity) < big(fm.soft_cap))
+    return "refunded";
   return "graduated";
 }
 
 /**
  * Record-driven sale target: pool fairminters are all-or-nothing at soft cap;
  * others (non-standard, shown in relaxed mode) fall back to hard cap.
+ *
+ * Raw, and passed straight through rather than converted: the caller may be
+ * about to render it, and a fairminter in relaxed mode can carry a hard cap of
+ * 9,223,372,036,854,775,807.
  */
-export function saleTarget(fm: Fairminter): number {
-  return fm.soft_cap > 0 ? fm.soft_cap : fm.hard_cap;
+export function saleTarget(fm: Fairminter): Raw {
+  return big(fm.soft_cap) > 0n ? fm.soft_cap : fm.hard_cap;
 }
 
-/** Sale progress in [0, 1]; earned_quantity is null before the first mint. */
+/**
+ * Sale progress in [0, 1]; earned_quantity is null before the first mint.
+ *
+ * A fraction, so a double holds it comfortably — but both operands are 64-bit
+ * quantities, so the division itself has to be exact before the result narrows.
+ */
 export function saleProgress(fm: Fairminter): number {
-  const target = saleTarget(fm);
-  return target > 0 ? (fm.earned_quantity ?? 0) / target : 0;
+  return ratio(fm.earned_quantity, saleTarget(fm));
 }
 
 /** Pool opening multiple over mint price, from the record; null if no pool. */
 export function openingMultiple(fm: Fairminter): number | null {
-  if (!fm.pool_quantity || fm.pool_quantity <= 0 || fm.soft_cap <= 0) return null;
-  return fm.soft_cap / fm.pool_quantity;
+  if (big(fm.pool_quantity) <= 0n || big(fm.soft_cap) <= 0n) return null;
+  return ratio(fm.soft_cap, fm.pool_quantity);
 }
 
 /**
