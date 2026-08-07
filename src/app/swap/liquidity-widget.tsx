@@ -176,6 +176,19 @@ export function LiquidityWidget({
     : 0;
   // Spot rate from reserves — no endpoint computes it (verified in source).
   const spotRate = reserveToken > 0 ? reserveXcp / reserveToken : null;
+  // The largest deposit you can actually make: bounded by BOTH balances
+  // through the pool ratio (the XCP leg must also cover any protocol gas).
+  // Presets mean "% of what you can do", not "% of one balance".
+  const maxDepositRaw =
+    reserveXcp > 0
+      ? Math.min(
+          tokenBalance ?? 0,
+          Math.floor(
+            (Math.max(0, (xcpBalance ?? 0) - (gasFee ?? 0)) * reserveToken) /
+              reserveXcp,
+          ),
+        )
+      : (tokenBalance ?? 0);
   const pctFmt = (x: number) =>
     x >= 100 ? "100%" : x >= 0.01 ? `${x.toFixed(2)}%` : "<0.01%";
   const lpToRemove = Math.floor(((lpBalance ?? 0) * pct) / 100);
@@ -330,7 +343,7 @@ export function LiquidityWidget({
             focusable
             label="Deposit"
             topRight={
-              tokenBalance !== undefined && tokenBalance > 0 ? (
+              maxDepositRaw > 0 ? (
                 <span className="flex items-center gap-1">
                   {PRESETS.map((p) => (
                     <button
@@ -339,7 +352,9 @@ export function LiquidityWidget({
                       onClick={() => {
                         setEditSide("token");
                         setTokenAmount(
-                          fmtAmount(Math.floor((tokenBalance * p) / 100) / SATS),
+                          fmtAmount(
+                            Math.floor((maxDepositRaw * p) / 100) / SATS,
+                          ),
                         );
                       }}
                       className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
@@ -368,7 +383,7 @@ export function LiquidityWidget({
                     }`}
                     onClick={() => {
                       setEditSide("token");
-                      setTokenAmount(fmtAmount(tokenBalance / SATS));
+                      setTokenAmount(fmtAmount(maxDepositRaw / SATS));
                     }}
                   >
                     Balance: {commas(tokenBalance / SATS)}
@@ -417,8 +432,22 @@ export function LiquidityWidget({
                         insufficientXcp ? "text-red-600" : "text-gray-500"
                       }`}
                       onClick={() => {
+                        // Fill the largest affordable XCP leg — bounded by
+                        // the token side through the ratio, minus gas.
                         setEditSide("xcp");
-                        setXcpAmount(fmtAmount(xcpBalance / SATS));
+                        setXcpAmount(
+                          fmtAmount(
+                            Math.min(
+                              Math.max(0, xcpBalance - (gasFee ?? 0)),
+                              reserveToken > 0
+                                ? Math.floor(
+                                    ((tokenBalance ?? 0) * reserveXcp) /
+                                      reserveToken,
+                                  )
+                                : xcpBalance,
+                            ) / SATS,
+                          ),
+                        );
                       }}
                     >
                       Balance: {commas(xcpBalance / SATS)}
