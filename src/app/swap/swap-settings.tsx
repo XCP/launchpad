@@ -279,10 +279,6 @@ export function SwapSettingsGear() {
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
         The Bitcoin miner fee. Default tracks the next-block median.
       </p>
-      <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
-        Min received is enforced by the order itself — worse fills are
-        impossible; better ones refund the difference.
-      </div>
     </GearPopover>
   );
 }
