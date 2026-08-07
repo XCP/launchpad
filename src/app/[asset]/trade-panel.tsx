@@ -41,6 +41,16 @@ interface PoolInfo {
   reserve_b: number;
 }
 
+interface BookOrder {
+  give_asset: string;
+  give_remaining: number;
+  get_remaining: number;
+  /** XCP per token when giving the token (an ask). */
+  give_price: number;
+  /** XCP per token when giving XCP (a bid). */
+  get_price: number;
+}
+
 export function TradePanel({
   asset,
   xcpUsd = null,
@@ -81,6 +91,26 @@ export function TradePanel({
     ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) /
       (pool.asset_a === asset ? pool.reserve_a : pool.reserve_b)
     : null;
+
+  // The resting book: best counter-order beats the pool with no fee. One
+  // page covers today's books; revisit pagination if depth ever grows.
+  const { data: bookOrders } = useSWR<BookOrder[]>(
+    `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP?status=open&limit=1000`,
+    (url: string) => fetchJson(url).then((d) => d.result ?? []),
+    { refreshInterval: 60_000 },
+  );
+  const bestAsk = (bookOrders ?? [])
+    .filter((o) => o.give_asset === asset && o.give_remaining > 0)
+    .reduce<number | null>(
+      (m, o) => (m === null || o.give_price < m ? o.give_price : m),
+      null,
+    );
+  const bestBid = (bookOrders ?? [])
+    .filter((o) => o.give_asset === "XCP" && o.give_remaining > 0)
+    .reduce<number | null>(
+      (m, o) => (m === null || o.get_price > m ? o.get_price : m),
+      null,
+    );
 
   const { data: tokenBalance } = useSWR(
     address && asset ? [address, asset, "limit-token-balance"] : null,
@@ -135,13 +165,41 @@ export function TradePanel({
     limitTotalRaw > 0 &&
     !busy &&
     !insufficient;
-  // Priced through the pool = fills at confirmation; otherwise it rests.
-  const limitFillsNow =
-    spot !== null && limitPriceNum > 0
-      ? side === "buy"
-        ? limitPriceNum >= spot
-        : limitPriceNum <= spot
+  // Fill forecast vs the pool. The pool's 50 bps fee is charged in-curve,
+  // so the executable marginal price starts ~0.5% worse than the reserve
+  // midpoint: an order must be priced THROUGH the fee band to actually
+  // take pool liquidity. Matching is bounded by your own limit, so a
+  // crossing order fills until the curve reaches your price — any
+  // remainder rests. (Resting book orders could also fill you; with
+  // today's empty books the pool is the honest reference.)
+  const POOL_FEE = 0.005;
+  // The book matches fee-free, so a resting counter-order can fill you at
+  // a price the pool can't. Book reference for this side:
+  const bookRef = side === "buy" ? bestAsk : bestBid;
+  const crossesBook =
+    bookRef !== null &&
+    limitPriceNum > 0 &&
+    (side === "buy" ? limitPriceNum >= bookRef : limitPriceNum <= bookRef);
+  const crossesPool =
+    spot !== null &&
+    limitPriceNum > 0 &&
+    (side === "buy"
+      ? limitPriceNum >= spot * (1 + POOL_FEE)
+      : limitPriceNum <= spot * (1 - POOL_FEE));
+  const inFeeBand =
+    spot !== null &&
+    limitPriceNum > 0 &&
+    !crossesPool &&
+    (side === "buy" ? limitPriceNum >= spot : limitPriceNum <= spot);
+  const fillState: "crosses" | "feeband" | "rests" | null =
+    limitPriceNum > 0 && (spot !== null || bookRef !== null)
+      ? crossesPool || crossesBook
+        ? "crosses"
+        : inFeeBand
+          ? "feeband"
+          : "rests"
       : null;
+  const limitFillsNow = fillState === "crosses";
   const priceDelta =
     spot !== null && spot > 0 && limitPriceNum > 0
       ? (limitPriceNum / spot - 1) * 100
@@ -255,15 +313,26 @@ export function TradePanel({
                   <span>&nbsp;</span>
                 )}
               </span>
-              {spot !== null && (
-                <button
-                  type="button"
-                  className="text-gray-500 hover:text-purple-600"
-                  onClick={() => setLimitPrice(fmtPriceInput(spot))}
-                >
-                  Pool: {formatPrice(spot)}
-                </button>
-              )}
+              <span className="flex items-center gap-2">
+                {spot !== null && (
+                  <button
+                    type="button"
+                    className="text-gray-500 hover:text-purple-600"
+                    onClick={() => setLimitPrice(fmtPriceInput(spot))}
+                  >
+                    Pool: {formatPrice(spot)}
+                  </button>
+                )}
+                {bookRef !== null && (
+                  <button
+                    type="button"
+                    className="text-gray-500 hover:text-purple-600"
+                    onClick={() => setLimitPrice(fmtPriceInput(bookRef))}
+                  >
+                    {side === "buy" ? "Ask" : "Bid"}: {formatPrice(bookRef)}
+                  </button>
+                )}
+              </span>
             </>
           }
         >
@@ -433,15 +502,35 @@ export function TradePanel({
       {limitPriceNum > 0 && limitAmountRaw > 0 && (
         <div className="px-2 pt-2">
           <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
-            {spot !== null && (
+            <div className="flex justify-between">
+              <dt
+                title={`Enforced by the order itself — a better fill refunds the difference in ${
+                  side === "buy" ? "XCP" : asset
+                }`}
+              >
+                Min received
+              </dt>
+              <dd className="font-medium tabular-nums text-gray-700">
+                {side === "buy"
+                  ? `${(limitAmountRaw / SATS).toFixed(8)} ${asset}`
+                  : `${(limitTotalRaw / SATS).toFixed(8)} XCP`}
+              </dd>
+            </div>
+            {fillState !== null && (
               <div className="flex justify-between">
                 <dt>Fills</dt>
                 <dd
                   className={limitFillsNow ? "font-medium text-green-700" : ""}
                 >
-                  {limitFillsNow
-                    ? "at confirmation — priced through the pool"
-                    : "rests on the book until a counter-order takes it"}
+                  {fillState === "crosses"
+                    ? crossesBook && !crossesPool
+                      ? `at confirmation — crosses the book's best ${
+                          side === "buy" ? "ask" : "bid"
+                        }`
+                      : "up to your price at confirmation — any remainder rests"
+                    : fillState === "feeband"
+                      ? "likely rests — inside the pool's 0.5% fee"
+                      : "rests on the book until a counter-order takes it"}
                 </dd>
               </div>
             )}
