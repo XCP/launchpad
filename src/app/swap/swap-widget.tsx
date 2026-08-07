@@ -25,13 +25,16 @@ import {
   subscribePending,
 } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
-import { useCompose } from "@/lib/wallet/useCompose";
+import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 
 const SATS = 1e8;
 /** Market orders live one block: match at confirmation or refund next block. */
 const MARKET_EXPIRATION = 1;
+/** Typical composed order size (1–2 inputs, OP_RETURN, change) for the
+ *  TX-fee estimate; the true size is known only after compose. */
+const ORDER_VBYTES = 250;
 const QUOTE_REFRESH_MS = 10_000;
 const SLIPPAGE_PRESETS = [0.5, 1, 2];
 const PRESETS = [25, 50, 75, 100] as const;
@@ -64,6 +67,7 @@ export function SwapWidget({
   const [slippagePreset, setSlippagePreset] = useState(1);
   const [customSlippage, setCustomSlippage] = useState("");
   const [customExpiration, setCustomExpiration] = useState("");
+  const [customFeeRate, setCustomFeeRate] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [rateInverted, setRateInverted] = useState(false);
   const [flips, setFlips] = useState(0);
@@ -76,6 +80,23 @@ export function SwapWidget({
     5000,
     Math.max(1, Math.round(parseFloat(customExpiration)) || MARKET_EXPIRATION),
   );
+
+  // The Bitcoin cost of pressing the button: next-block median by default,
+  // user-overridable. Total is an estimate — the composed size varies with
+  // UTXO count — but the rate is exactly what compose will pay.
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+    refreshInterval: 30_000,
+  });
+  const { data: btcUsd } = useSWR(
+    "btc-usd",
+    () =>
+      fetchJson("https://mempool.space/api/v1/prices").then(
+        (d: { USD: number }) => d.USD,
+      ),
+    { refreshInterval: 60_000 },
+  );
+  const customFee = Math.min(Math.round(parseFloat(customFeeRate) || 0), 500);
+  const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
 
   const giveAsset = side === "buy" ? "XCP" : asset;
   const getAsset = side === "buy" ? asset : "XCP";
@@ -221,6 +242,7 @@ export function SwapWidget({
       get_asset: getAsset,
       get_quantity: Math.floor(fresh.estimated_output * (1 - slippage / 100)),
       expiration,
+      fee_rate: customFee > 0 ? customFee : undefined,
     });
   };
 
@@ -350,7 +372,9 @@ export function SwapWidget({
   // opens straight into the wells.
   const settingsPopover = (
         <GearPopover
-          active={customSlip > 0 || expiration !== MARKET_EXPIRATION}
+          active={
+            customSlip > 0 || expiration !== MARKET_EXPIRATION || customFee > 0
+          }
           label="Swap settings"
           small
         >
@@ -421,6 +445,28 @@ export function SwapWidget({
             How long an unfilled remainder rests before auto-refund.{" "}
             {MARKET_EXPIRATION} = fill at confirmation or refund next block.
           </p>
+          <div className="mt-3 flex items-center justify-between">
+            <span className="text-xs font-medium text-gray-500">TX fee</span>
+            <span
+              className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+                customFee > 0
+                  ? "border-purple-600 bg-purple-50"
+                  : "border-gray-200"
+              }`}
+            >
+              <AmountInput
+                value={customFeeRate}
+                onChange={setCustomFeeRate}
+                placeholder={medianFeeRate ? String(medianFeeRate) : "…"}
+                ariaLabel="Bitcoin fee rate in sats per vbyte"
+                className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+              />
+              <span className="text-xs text-gray-400">sat/vB</span>
+            </span>
+          </div>
+          <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+            The Bitcoin miner fee. Default tracks the next-block median.
+          </p>
           <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
             Min received is enforced by the order itself — worse fills are
             impossible; better ones refund the difference.
@@ -436,9 +482,7 @@ export function SwapWidget({
       <span
         title="Max slippage"
         className={
-          customSlip > 0 || expiration !== MARKET_EXPIRATION
-            ? "font-medium text-purple-600"
-            : "text-gray-500"
+          customSlip > 0 ? "font-medium text-purple-600" : "text-gray-500"
         }
       >
         Slippage: {slippage}%
@@ -573,6 +617,20 @@ export function SwapWidget({
               <div className="flex justify-between">
                 <dt>LP fee</dt>
                 <dd>{(quote.fee_bps / 100).toFixed(2)}%</dd>
+              </div>
+            )}
+            {feeRate !== null && (
+              <div className="flex justify-between">
+                <dt>TX fee</dt>
+                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                  {feeRate} sat/vB
+                  {btcUsd !== undefined && (
+                    <span className="text-gray-400">
+                      {" "}
+                      (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
+                    </span>
+                  )}
+                </dd>
               </div>
             )}
           </dl>

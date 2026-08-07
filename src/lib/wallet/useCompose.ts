@@ -19,11 +19,12 @@ export type ComposeState =
 
 const INITIAL_STATE: ComposeState = { status: 'idle', txid: null, error: null }
 
-/** Fetch next-block median fee rate from mempool.space (cached 30s) */
+/** Fetch next-block median fee rate from mempool.space (cached 30s).
+ *  Exported so surfaces can show the rate a compose will actually pay. */
 let cachedFeeRate: number | null = null
 let feeRateTimestamp = 0
 
-async function getFeeRate(): Promise<number> {
+export async function fetchMedianFeeRate(): Promise<number> {
   const now = Date.now()
   if (cachedFeeRate && now - feeRateTimestamp < 30_000) return cachedFeeRate
   try {
@@ -58,7 +59,7 @@ export async function fetchPriorityFeeRate(): Promise<number> {
     fastFeeTimestamp = now
     return cachedFastFee
   } catch {
-    return (await getFeeRate()) + 2
+    return (await fetchMedianFeeRate()) + 2
   }
 }
 
@@ -70,7 +71,7 @@ async function composeRequest(
   extraParams?: Record<string, string>,
   feeRateOverride?: number,
 ): Promise<string> {
-  const feeRate = feeRateOverride ?? (await getFeeRate())
+  const feeRate = feeRateOverride ?? (await fetchMedianFeeRate())
   const qp = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
     qp.set(k, String(v))
@@ -162,6 +163,8 @@ export function useCompose() {
     get_asset: string
     get_quantity: number
     expiration?: number
+    /** sat/vB override; defaults to the next-block median at compose time. */
+    fee_rate?: number
   }) => execute('order', {
     give_asset: params.give_asset,
     give_quantity: params.give_quantity,
@@ -169,7 +172,7 @@ export function useCompose() {
     get_quantity: params.get_quantity,
     expiration: params.expiration ?? 5000,
     fee_required: 0,
-  })
+  }, params.fee_rate)
 
   const composeDispenser = (params: {
     asset: string
