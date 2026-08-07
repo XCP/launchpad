@@ -14,6 +14,7 @@ export function Well({
   chip,
   footer,
   focusable = false,
+  layout = "row",
   children,
 }: {
   label: ReactNode;
@@ -21,6 +22,13 @@ export function Well({
   chip?: ReactNode;
   footer?: ReactNode;
   focusable?: boolean;
+  /**
+   * "row" puts the chip beside the amount (wide surfaces); "stack" gives
+   * the amount the full width and drops the chip to its own bottom row —
+   * the pons pattern for tight rails, where a long asset name beside the
+   * input squeezes the number it exists to serve.
+   */
+  layout?: "row" | "stack";
   children: ReactNode;
 }) {
   return (
@@ -35,14 +43,21 @@ export function Well({
         <span>{label}</span>
         {topRight}
       </div>
-      <div className="mt-1 flex items-center justify-between gap-3">
-        {children}
-        {chip}
-      </div>
+      {layout === "row" ? (
+        <div className="mt-1 flex items-center justify-between gap-3">
+          {children}
+          {chip}
+        </div>
+      ) : (
+        <div className="mt-1">{children}</div>
+      )}
       {footer !== undefined && (
         <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
           {footer}
         </div>
+      )}
+      {layout === "stack" && chip !== undefined && (
+        <div className="mt-2 flex items-center">{chip}</div>
       )}
     </div>
   );

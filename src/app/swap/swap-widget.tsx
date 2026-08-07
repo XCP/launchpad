@@ -49,9 +49,12 @@ const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 export function SwapWidget({
   assets,
   xcpUsd,
+  compact = false,
 }: {
   assets: string[];
   xcpUsd: number | null;
+  /** Tight-rail mode (asset-page sidebar): wells stack the chip below. */
+  compact?: boolean;
 }) {
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
@@ -316,6 +319,7 @@ export function SwapWidget({
       {/* Sell well — inset follows focus; balance row swaps to presets on hover */}
       <Well
         focusable
+        layout={compact ? "stack" : "row"}
         label="Sell"
         topRight={
           effBalance !== undefined && (
@@ -374,6 +378,7 @@ export function SwapWidget({
 
       {/* Buy well */}
       <Well
+        layout={compact ? "stack" : "row"}
         label="Buy"
         chip={getAsset === "XCP" ? <XcpChip /> : tokenChip}
         footer={<span>{getUsd !== null && `≈ ${usdFmt(getUsd)}`}</span>}

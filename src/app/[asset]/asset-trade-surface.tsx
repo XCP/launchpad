@@ -31,7 +31,7 @@ export function AssetTradeSurface({
         </SegmentedList>
       </Tabs>
       {mode === "swap" ? (
-        <SwapWidget assets={[asset]} xcpUsd={xcpUsd} />
+        <SwapWidget assets={[asset]} xcpUsd={xcpUsd} compact />
       ) : mode === "liquidity" ? (
         <LiquidityWidget assets={[asset]} xcpUsd={xcpUsd} />
       ) : (
