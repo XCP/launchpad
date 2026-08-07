@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "check": "tsc --noEmit && eslint",
+    "check": "tsc --noEmit && eslint && npm run check:numeric",
+    "check:numeric": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-numeric.mjs",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
     "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
