@@ -14,7 +14,15 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { fetchBalance, fetchJson } from "@/lib/client";
-import { commas, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import { commasRaw, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import {
+  approx,
+  parseUnitsToRaw,
+  percentOf,
+  type Raw,
+  ratio,
+  reduceByPercent,
+} from "@/lib/numeric";
 import { useDebounced } from "@/lib/use-debounced";
 import {
   pendingSpentRaw,
@@ -38,9 +46,10 @@ const QUOTE_REFRESH_MS = 60_000;
 const PRESETS = [25, 50, 75, 100] as const;
 
 interface Quote {
-  estimated_output: number;
-  pool_output: number;
-  book_output: number;
+  estimated_output: Raw;
+  pool_output: Raw;
+  book_output: Raw;
+  /** A percentage, not a quantity — small by construction. */
   price_impact: number;
   fee_bps?: number;
 }
@@ -95,7 +104,12 @@ export function SwapWidget({
 
   const giveAsset = side === "buy" ? "XCP" : asset;
   const getAsset = side === "buy" ? asset : "XCP";
-  const amountRaw = Math.round((parseFloat(amount) || 0) * SATS);
+  // Read from the typed digits, not `parseFloat(amount) * 1e8`: selling a whole
+  // 100M-supply XCP-69 bag is 10^16 raw, past where a double picks out a single
+  // integer. The number beside it drives the UI (widths, SWR keys, USD), where
+  // an approximation is what is wanted anyway.
+  const amountExact = parseUnitsToRaw(amount) ?? 0n;
+  const amountRaw = approx(amountExact);
   const debouncedRaw = useDebounced(amountRaw, 250);
 
   const quoteUrl =
@@ -141,8 +155,8 @@ export function SwapWidget({
   // varies too fast to sum honestly client-side).
   const { data: poolInfo } = useSWR<{
     asset_a: string;
-    reserve_a: number;
-    reserve_b: number;
+    reserve_a: Raw;
+    reserve_b: Raw;
   } | null>(
     asset ? [asset, "swap-pool-reserves"] : null,
     () =>
@@ -162,10 +176,11 @@ export function SwapWidget({
     : null;
 
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
-  const outRaw = quote && amountRaw > 0 ? quote.estimated_output : 0;
-  const out = outRaw / SATS;
+  const outRaw: Raw = quote && amountRaw > 0 ? quote.estimated_output : 0;
+  const out = approx(outRaw) / SATS;
   const amountHuman = amountRaw / SATS;
-  const minReceivedRaw = Math.floor(outRaw * (1 - slippage / 100));
+  // The guarantee row, and the value consensus checks the fill against.
+  const minReceivedRaw = reduceByPercent(outRaw, slippage);
   const impact = quote?.price_impact ?? 0;
   const insufficient =
     effBalance !== undefined && amountRaw > 0 && amountRaw > effBalance;
@@ -175,7 +190,7 @@ export function SwapWidget({
   // by roughly this trade's own impact, so Auto tolerates that and no
   // more — floored at 0.5% (pool fee territory), capped at 5%.
   const neededSlippage =
-    quote && outRaw > 0
+    quote && approx(outRaw) > 0
       ? Math.min(5, Math.max(0.5, Math.ceil(impact * 10) / 10))
       : 1;
   useEffect(() => {
@@ -195,7 +210,7 @@ export function SwapWidget({
     }
   }, [compose.status, compose.txid, side, asset, giveAsset, amountRaw, address]);
 
-  const ready = amountRaw > 0 && outRaw > 0 && !busy && !insufficient;
+  const ready = amountRaw > 0 && approx(outRaw) > 0 && !busy && !insufficient;
 
   // USD on BOTH sides, derived through the XCP leg of the trade.
   const xcpLeg = side === "buy" ? amountHuman : out;
@@ -234,7 +249,7 @@ export function SwapWidget({
       fresh = (await fetchJson(quoteUrl)).result as Quote;
       mutateQuote(fresh, { revalidate: false });
       setLastQuoteAt(Date.now());
-      if (fresh.estimated_output < quote.estimated_output * 0.99) {
+      if (ratio(fresh.estimated_output, quote.estimated_output) < 0.99) {
         setPriceMoved(true);
         return;
       }
@@ -244,9 +259,9 @@ export function SwapWidget({
     setPriceMoved(false);
     compose.composeOrder({
       give_asset: giveAsset,
-      give_quantity: amountRaw,
+      give_quantity: amountExact,
       get_asset: getAsset,
-      get_quantity: Math.floor(fresh.estimated_output * (1 - slippage / 100)),
+      get_quantity: reduceByPercent(fresh.estimated_output, slippage),
       expiration,
       fee_rate: customFee > 0 ? customFee : undefined,
     });
@@ -279,7 +294,7 @@ export function SwapWidget({
           key={p}
           type="button"
           onClick={() =>
-            setAmount(fmtAmount(Math.floor((effBalance * p) / 100) / SATS))
+            setAmount(fmtAmount(approx(percentOf(effBalance, p)) / SATS))
           }
           className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
         >
@@ -292,11 +307,13 @@ export function SwapWidget({
   // "Available: X" mirrors the balance grammar; whole numbers up to a
   // million, then compact (22.5M) — depth, not a digit-counting exercise.
   const availableUnits =
-    availableRaw !== null ? Math.round(availableRaw / SATS) : null;
+    availableRaw !== null ? Math.round(approx(availableRaw) / SATS) : null;
   const availableLabel = availableUnits !== null && (
     <span>
       Available:{" "}
-      {availableUnits >= 1e6 ? compactFmt(availableUnits) : commas(availableUnits)}
+      {availableUnits >= 1e6
+        ? compactFmt(availableUnits)
+        : availableUnits.toLocaleString("en-US")}
     </span>
   );
 
@@ -306,11 +323,11 @@ export function SwapWidget({
       className="min-w-0 truncate text-gray-500 hover:text-purple-600"
       onClick={() => setAmount(fmtAmount(effBalance / SATS))}
     >
-      Balance: {commas(effBalance / SATS)}
+      Balance: {commasRaw(effBalance)}
       {balance !== undefined && balance > effBalance && (
         <span className="text-gray-400">
           {" "}
-          · {commas((balance - effBalance) / SATS)} pending
+          · {commasRaw(balance - effBalance)} pending
         </span>
       )}
     </button>
@@ -325,11 +342,11 @@ export function SwapWidget({
         className="group-hover/bal:hidden"
         onClick={() => setAmount(fmtAmount(effBalance / SATS))}
       >
-        Balance: {commas(effBalance / SATS)}
+        Balance: {commasRaw(effBalance)}
         {balance !== undefined && balance > effBalance && (
           <span className="text-gray-400">
             {" "}
-            · {commas((balance - effBalance) / SATS)} pending
+            · {commasRaw(balance - effBalance)} pending
           </span>
         )}
       </button>
@@ -340,7 +357,7 @@ export function SwapWidget({
               key={p}
               type="button"
               onClick={() =>
-                setAmount(fmtAmount(Math.floor((effBalance * p) / 100) / SATS))
+                setAmount(fmtAmount(approx(percentOf(effBalance, p)) / SATS))
               }
               className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
             >
@@ -364,7 +381,7 @@ export function SwapWidget({
       ? "Enter an amount"
       : insufficient
         ? `Insufficient ${giveAsset} balance`
-        : outRaw === 0
+        : approx(outRaw) === 0
           ? staleQuote
             ? "Fetching quote…"
             : availableRaw
@@ -450,7 +467,7 @@ export function SwapWidget({
             transition: staleQuote ? "none" : "opacity 250ms ease-in-out",
           }}
         >
-          {out > 0 ? commas(out) : "0"}
+          {approx(outRaw) > 0 ? commasRaw(outRaw) : "0"}
         </div>
       </Well>
 
@@ -473,7 +490,7 @@ export function SwapWidget({
             )}
           </button>
           <span className="flex items-center gap-2">
-            {outRaw > 0 && (
+            {approx(outRaw) > 0 && (
               <span
                 className={
                   impact >= 5
@@ -496,25 +513,25 @@ export function SwapWidget({
             )}
           </span>
         </div>
-        {quote && outRaw > 0 && (
+        {quote && approx(outRaw) > 0 && (
           <dl className="mt-1 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
             <div className="flex justify-between">
               <dt>Min received</dt>
               <dd className="font-medium tabular-nums text-gray-700">
-                {(minReceivedRaw / SATS).toFixed(8)} {getAsset}
+                {commasRaw(minReceivedRaw)} {getAsset}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt>Route</dt>
               <dd>
-                {quote.pool_output > 0 && quote.book_output > 0
+                {approx(quote.pool_output) > 0 && approx(quote.book_output) > 0
                   ? "Pool + order book"
-                  : quote.pool_output > 0
+                  : approx(quote.pool_output) > 0
                     ? "Pool"
                     : "Order book"}
               </dd>
             </div>
-            {quote.fee_bps !== undefined && quote.pool_output > 0 && (
+            {quote.fee_bps !== undefined && approx(quote.pool_output) > 0 && (
               <div className="flex justify-between">
                 <dt>LP fee</dt>
                 <dd>{(quote.fee_bps / 100).toFixed(2)}%</dd>

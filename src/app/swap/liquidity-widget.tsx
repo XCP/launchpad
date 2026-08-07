@@ -10,7 +10,18 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
-import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import { commasRaw, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import {
+  approx,
+  big,
+  bigMax,
+  bigMin,
+  parseUnitsToRaw,
+  percentOf,
+  type Raw,
+  ratio,
+  reduceByPercent,
+} from "@/lib/numeric";
 import { useDebounced } from "@/lib/use-debounced";
 import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
@@ -29,8 +40,8 @@ const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 interface PoolInfo {
   asset_a: string;
   asset_b: string;
-  reserve_a: number;
-  reserve_b: number;
+  reserve_a: Raw;
+  reserve_b: Raw;
   lp_asset: string;
 }
 
@@ -38,18 +49,18 @@ interface DepositQuote {
   first_deposit: boolean;
   asset_a: string;
   asset_b: string;
-  quantity_a_required: number | null;
-  quantity_b_required: number | null;
-  quantity_minted_estimate: number | null;
+  quantity_a_required: Raw | null;
+  quantity_b_required: Raw | null;
+  quantity_minted_estimate: Raw | null;
 }
 
 interface WithdrawQuote {
   pool_exists: boolean;
   asset_a?: string;
   asset_b?: string;
-  quantity_a_estimate?: number;
-  quantity_b_estimate?: number;
-  supply?: number;
+  quantity_a_estimate?: Raw;
+  quantity_b_estimate?: Raw;
+  supply?: Raw;
 }
 
 /**
@@ -80,7 +91,6 @@ export function LiquidityWidget({
   const [selectorOpen, setSelectorOpen] = useState(false);
 
   const { lqSlippage, customFee, medianFeeRate } = useSwapSettings();
-  const tolerance = lqSlippage / 100;
   const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
   const { data: btcUsd } = useSWR(
     "btc-usd",
@@ -98,7 +108,10 @@ export function LiquidityWidget({
   );
 
   const amount = editSide === "token" ? tokenAmount : xcpAmount;
-  const amountRaw = Math.round((parseFloat(amount) || 0) * SATS);
+  // Exact from the typed digits; the number beside it drives the UI and the
+  // quote URL, where the value is a request parameter rather than a signature.
+  const amountExact = parseUnitsToRaw(amount) ?? 0n;
+  const amountRaw = approx(amountExact);
   const debouncedRaw = useDebounced(amountRaw, 250);
   // The quote's `quantity` is the FIRST asset in the URL path (verified in
   // counterparty-core queries.get_pool_quote_deposit) — flip the pair to
@@ -113,16 +126,20 @@ export function LiquidityWidget({
     { refreshInterval: 60_000, keepPreviousData: true },
   );
   const depStale = depFetching || amountRaw !== debouncedRaw;
-  const depTokenRaw = depositQuote
+  const depTokenRaw: Raw = depositQuote
     ? (depositQuote.asset_a === asset
         ? depositQuote.quantity_a_required
         : depositQuote.quantity_b_required) ?? 0
     : 0;
-  const depXcpRaw = depositQuote
+  const depXcpRaw: Raw = depositQuote
     ? (depositQuote.asset_a === "XCP"
         ? depositQuote.quantity_a_required
         : depositQuote.quantity_b_required) ?? 0
     : 0;
+  // Doubles for the readiness checks and the USD line; the exact values above
+  // are what gets deposited.
+  const depTokenNum = approx(depTokenRaw);
+  const depXcpNum = approx(depXcpRaw);
 
   const { data: tokenBalance } = useSWR(
     address && asset ? [address, asset, "lq-token-balance"] : null,
@@ -163,36 +180,31 @@ export function LiquidityWidget({
     (url: string) => fetchJson(url).then((d) => d.result),
     { refreshInterval: 60_000 },
   );
-  const lpSupply = poolMeta?.supply ?? 0;
-  const reserveToken = pool
-    ? pool.asset_a === asset
-      ? pool.reserve_a
-      : pool.reserve_b
-    : 0;
-  const reserveXcp = pool
-    ? pool.asset_a === "XCP"
-      ? pool.reserve_a
-      : pool.reserve_b
-    : 0;
+  const lpSupply = big(poolMeta?.supply);
+  const reserveToken = big(
+    pool ? (pool.asset_a === asset ? pool.reserve_a : pool.reserve_b) : 0,
+  );
+  const reserveXcp = big(
+    pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
+  );
   // Spot rate from reserves — no endpoint computes it (verified in source).
-  const spotRate = reserveToken > 0 ? reserveXcp / reserveToken : null;
+  // A rate, so a double, from an exact division.
+  const spotRate = reserveToken > 0n ? ratio(reserveXcp, reserveToken) : null;
   // The largest deposit you can actually make: bounded by BOTH balances
   // through the pool ratio (the XCP leg must also cover any protocol gas).
   // Presets mean "% of what you can do", not "% of one balance".
   const maxDepositRaw =
-    reserveXcp > 0
-      ? Math.min(
-          tokenBalance ?? 0,
-          Math.floor(
-            (Math.max(0, (xcpBalance ?? 0) - (gasFee ?? 0)) * reserveToken) /
-              reserveXcp,
-          ),
+    reserveXcp > 0n
+      ? bigMin(
+          big(tokenBalance ?? 0),
+          (bigMax(0n, big(xcpBalance ?? 0) - big(gasFee ?? 0)) * reserveToken) /
+            reserveXcp,
         )
-      : (tokenBalance ?? 0);
+      : big(tokenBalance ?? 0);
   const pctFmt = (x: number) =>
     x >= 100 ? "100%" : x >= 0.01 ? `${x.toFixed(2)}%` : "<0.01%";
-  const lpToRemove = Math.floor(((lpBalance ?? 0) * pct) / 100);
-  const debouncedLp = useDebounced(lpToRemove, 250);
+  const lpToRemove = percentOf(lpBalance ?? 0, pct);
+  const debouncedLp = useDebounced(approx(lpToRemove), 250);
 
   const { data: withdrawQuote } = useSWR<WithdrawQuote>(
     tab === "remove" && asset && debouncedLp > 0
@@ -201,12 +213,12 @@ export function LiquidityWidget({
     (url: string) => fetchJson(url).then((d) => d.result),
     { refreshInterval: 60_000, keepPreviousData: true },
   );
-  const outTokenRaw = withdrawQuote
+  const outTokenRaw: Raw = withdrawQuote
     ? (withdrawQuote.asset_a === asset
         ? withdrawQuote.quantity_a_estimate
         : withdrawQuote.quantity_b_estimate) ?? 0
     : 0;
-  const outXcpRaw = withdrawQuote
+  const outXcpRaw: Raw = withdrawQuote
     ? (withdrawQuote.asset_a === "XCP"
         ? withdrawQuote.quantity_a_estimate
         : withdrawQuote.quantity_b_estimate) ?? 0
@@ -225,7 +237,7 @@ export function LiquidityWidget({
     }
   }, [compose.status, compose.txid, tab, asset, address]);
 
-  const needTokenRaw = editSide === "token" ? amountRaw : depTokenRaw;
+  const needTokenRaw = editSide === "token" ? amountRaw : depTokenNum;
   const insufficientToken =
     tokenBalance !== undefined &&
     needTokenRaw > 0 &&
@@ -233,29 +245,30 @@ export function LiquidityWidget({
   // The XCP leg must cover the deposit plus any XCP gas fee.
   const insufficientXcp =
     xcpBalance !== undefined &&
-    depXcpRaw > 0 &&
-    depXcpRaw + (gasFee ?? 0) > xcpBalance;
+    depXcpNum > 0 &&
+    depXcpNum + (gasFee ?? 0) > xcpBalance;
 
   const addReady =
     tab === "add" &&
     amountRaw > 0 &&
-    depTokenRaw > 0 &&
-    depXcpRaw > 0 &&
+    depTokenNum > 0 &&
+    depXcpNum > 0 &&
     !busy &&
     !insufficientToken &&
     !insufficientXcp &&
     !depositQuote?.first_deposit;
-  const removeReady = tab === "remove" && lpToRemove > 0 && !busy;
+  const removeReady = tab === "remove" && lpToRemove > 0n && !busy;
 
   const submitAdd = () => {
     if (!addReady || !depositQuote) return;
     compose.composePoolDeposit({
       asset_a: asset,
       asset_b: "XCP",
-      quantity_a: depTokenRaw,
-      quantity_b: depXcpRaw,
-      min_lp_quantity: Math.floor(
-        (depositQuote.quantity_minted_estimate ?? 0) * (1 - tolerance),
+      quantity_a: big(depTokenRaw),
+      quantity_b: big(depXcpRaw),
+      min_lp_quantity: reduceByPercent(
+        depositQuote.quantity_minted_estimate,
+        lqSlippage,
       ),
       fee_rate: customFee > 0 ? customFee : undefined,
     });
@@ -266,12 +279,8 @@ export function LiquidityWidget({
     compose.composePoolWithdraw({
       lp_asset: pool.lp_asset,
       quantity: lpToRemove,
-      min_quantity_a: Math.floor(
-        (withdrawQuote?.quantity_a_estimate ?? 0) * (1 - tolerance),
-      ),
-      min_quantity_b: Math.floor(
-        (withdrawQuote?.quantity_b_estimate ?? 0) * (1 - tolerance),
-      ),
+      min_quantity_a: reduceByPercent(withdrawQuote?.quantity_a_estimate, lqSlippage),
+      min_quantity_b: reduceByPercent(withdrawQuote?.quantity_b_estimate, lqSlippage),
       fee_rate: customFee > 0 ? customFee : undefined,
     });
   };
@@ -288,12 +297,12 @@ export function LiquidityWidget({
           ? "Insufficient XCP balance"
           : depositQuote?.first_deposit
             ? "Pool is empty"
-            : depStale && depXcpRaw === 0
+            : depStale && depXcpNum === 0
               ? "Fetching quote…"
               : "Add liquidity";
 
   // Both legs are worth the same by construction; USD comes off the XCP leg.
-  const legUsd = xcpUsd && depXcpRaw > 0 ? (depXcpRaw / SATS) * xcpUsd : null;
+  const legUsd = xcpUsd && depXcpNum > 0 ? (depXcpNum / SATS) * xcpUsd : null;
 
   const txFeeRow = feeRate !== null && (
     <div className="flex justify-between">
@@ -313,7 +322,7 @@ export function LiquidityWidget({
   const gasRow = (gasFee ?? 0) > 0 && (
     <div className="flex justify-between">
       <dt>Protocol gas fee</dt>
-      <dd>{commas((gasFee ?? 0) / SATS)} XCP</dd>
+      <dd>{commasRaw(gasFee ?? 0)} XCP</dd>
     </div>
   );
 
@@ -352,9 +361,7 @@ export function LiquidityWidget({
                       onClick={() => {
                         setEditSide("token");
                         setTokenAmount(
-                          fmtAmount(
-                            Math.floor((maxDepositRaw * p) / 100) / SATS,
-                          ),
+                          fmtAmount(approx(percentOf(maxDepositRaw, p)) / SATS),
                         );
                       }}
                       className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
@@ -383,10 +390,10 @@ export function LiquidityWidget({
                     }`}
                     onClick={() => {
                       setEditSide("token");
-                      setTokenAmount(fmtAmount(maxDepositRaw / SATS));
+                      setTokenAmount(fmtAmount(approx(maxDepositRaw) / SATS));
                     }}
                   >
-                    Balance: {commas(tokenBalance / SATS)}
+                    Balance: {commasRaw(tokenBalance)}
                   </button>
                 )}
               </>
@@ -396,8 +403,8 @@ export function LiquidityWidget({
               value={
                 editSide === "token"
                   ? tokenAmount
-                  : depTokenRaw > 0
-                    ? fmtAmount(depTokenRaw / SATS)
+                  : depTokenNum > 0
+                    ? fmtAmount(depTokenNum / SATS)
                     : ""
               }
               onChange={(v) => {
@@ -437,20 +444,20 @@ export function LiquidityWidget({
                         setEditSide("xcp");
                         setXcpAmount(
                           fmtAmount(
-                            Math.min(
-                              Math.max(0, xcpBalance - (gasFee ?? 0)),
-                              reserveToken > 0
-                                ? Math.floor(
-                                    ((tokenBalance ?? 0) * reserveXcp) /
-                                      reserveToken,
-                                  )
-                                : xcpBalance,
+                            approx(
+                              bigMin(
+                                bigMax(0n, big(xcpBalance) - big(gasFee ?? 0)),
+                                reserveToken > 0n
+                                  ? (big(tokenBalance ?? 0) * reserveXcp) /
+                                      reserveToken
+                                  : big(xcpBalance),
+                              ),
                             ) / SATS,
                           ),
                         );
                       }}
                     >
-                      Balance: {commas(xcpBalance / SATS)}
+                      Balance: {commasRaw(xcpBalance)}
                     </button>
                   )}
                 </>
@@ -460,8 +467,8 @@ export function LiquidityWidget({
                 value={
                   editSide === "xcp"
                     ? xcpAmount
-                    : depXcpRaw > 0
-                      ? fmtAmount(depXcpRaw / SATS)
+                    : depXcpNum > 0
+                      ? fmtAmount(depXcpNum / SATS)
                       : ""
                 }
                 onChange={(v) => {
@@ -510,7 +517,7 @@ export function LiquidityWidget({
                 <div className="flex justify-between">
                   <dt>LP minted (est.)</dt>
                   <dd className="font-medium tabular-nums text-gray-700">
-                    {commas((depositQuote.quantity_minted_estimate ?? 0) / SATS)}
+                    {commasRaw(depositQuote.quantity_minted_estimate)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
@@ -518,23 +525,23 @@ export function LiquidityWidget({
                     Min LP · slippage {lqSlippage}%
                   </dt>
                   <dd className="tabular-nums">
-                    {commas(
-                      Math.floor(
-                        (depositQuote.quantity_minted_estimate ?? 0) *
-                          (1 - tolerance),
-                      ) / SATS,
+                    {commasRaw(
+                      reduceByPercent(
+                        depositQuote.quantity_minted_estimate,
+                        lqSlippage,
+                      ),
                     )}
                   </dd>
                 </div>
-                {lpSupply > 0 && (
+                {lpSupply > 0n && (
                   <div className="flex justify-between">
                     <dt>Share of pool</dt>
                     <dd className="tabular-nums">
                       {pctFmt(
-                        ((depositQuote.quantity_minted_estimate ?? 0) /
-                          (lpSupply +
-                            (depositQuote.quantity_minted_estimate ?? 0))) *
-                          100,
+                        ratio(
+                          depositQuote.quantity_minted_estimate,
+                          lpSupply + big(depositQuote.quantity_minted_estimate),
+                        ) * 100,
                       )}
                     </dd>
                   </div>
@@ -546,22 +553,17 @@ export function LiquidityWidget({
           )}
 
           {/* Your position — context while adding to an existing stake */}
-          {(lpBalance ?? 0) > 0 && lpSupply > 0 && (
+          {(lpBalance ?? 0) > 0 && lpSupply > 0n && (
             <p className="px-2 pt-2 text-xs text-gray-500">
               Your position:{" "}
               <span className="font-medium text-gray-700">
-                {commas(
-                  Math.floor(((lpBalance ?? 0) * reserveToken) / lpSupply) /
-                    SATS,
-                )}{" "}
+                {commasRaw((big(lpBalance ?? 0) * reserveToken) / lpSupply)}{" "}
                 {asset}
                 {" + "}
-                {commas(
-                  Math.floor(((lpBalance ?? 0) * reserveXcp) / lpSupply) / SATS,
-                )}{" "}
+                {commasRaw((big(lpBalance ?? 0) * reserveXcp) / lpSupply)}{" "}
                 XCP
               </span>{" "}
-              · {pctFmt(((lpBalance ?? 0) / lpSupply) * 100)} of the pool
+              · {pctFmt(ratio(lpBalance ?? 0, lpSupply) * 100)} of the pool
             </p>
           )}
           <p className="px-2 pt-2 text-xs text-gray-500">
@@ -608,33 +610,33 @@ export function LiquidityWidget({
               <div className="flex justify-between">
                 <dt>Your LP balance</dt>
                 <dd className="font-medium tabular-nums text-gray-700">
-                  {commas((lpBalance ?? 0) / SATS)}
+                  {commasRaw(lpBalance ?? 0)}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt>You receive (est.)</dt>
                 <dd className="text-right font-medium tabular-nums text-gray-700">
-                  {commas(outTokenRaw / SATS)} {asset}
+                  {commasRaw(outTokenRaw)} {asset}
                   <br />
-                  {commas(outXcpRaw / SATS)} XCP
-                  {xcpUsd && outXcpRaw > 0 ? (
+                  {commasRaw(outXcpRaw)} XCP
+                  {xcpUsd && approx(outXcpRaw) > 0 ? (
                     <span className="font-normal text-gray-400">
                       {" "}
-                      (≈{usdFmt((outXcpRaw / SATS) * xcpUsd)})
+                      (≈{usdFmt((approx(outXcpRaw) / SATS) * xcpUsd)})
                     </span>
                   ) : null}
                 </dd>
               </div>
-              {outTokenRaw > 0 && (
+              {approx(outTokenRaw) > 0 && (
                 <div className="flex justify-between">
                   <dt title="Below this the transaction is void — nothing is debited">
                     Min received · slippage {lqSlippage}%
                   </dt>
                   <dd className="text-right tabular-nums">
-                    {commas(Math.floor(outTokenRaw * (1 - tolerance)) / SATS)}{" "}
+                    {commasRaw(reduceByPercent(outTokenRaw, lqSlippage))}{" "}
                     {asset}
                     <br />
-                    {commas(Math.floor(outXcpRaw * (1 - tolerance)) / SATS)} XCP
+                    {commasRaw(reduceByPercent(outXcpRaw, lqSlippage))} XCP
                   </dd>
                 </div>
               )}
@@ -667,7 +669,7 @@ export function LiquidityWidget({
                 ? compose.status === "signing"
                   ? "Confirm in wallet…"
                   : "Working…"
-                : lpToRemove === 0
+                : lpToRemove === 0n
                   ? (lpBalance ?? 0) === 0
                     ? "No LP in this pool"
                     : "Choose an amount"

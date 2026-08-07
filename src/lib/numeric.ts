@@ -167,6 +167,33 @@ export function sumRaw(values: Iterable<RawLike | null | undefined>): bigint {
   return total;
 }
 
+/**
+ * Comparator for sorting raw quantities, largest first.
+ *
+ * `b - a` is the usual idiom and the wrong one here: subtracting two 64-bit
+ * quantities as doubles can return zero for values that differ, which makes a
+ * leaderboard's order depend on the sort's implementation rather than on the
+ * numbers.
+ */
+export function compareRawDesc(
+  a: RawLike | null | undefined,
+  b: RawLike | null | undefined,
+): number {
+  const left = big(a);
+  const right = big(b);
+  return left === right ? 0 : left > right ? -1 : 1;
+}
+
+/** `Math.min` for exact quantities, which `Math.min` itself cannot take. */
+export function bigMin(a: bigint, b: bigint): bigint {
+  return a <= b ? a : b;
+}
+
+/** `Math.max` for exact quantities. */
+export function bigMax(a: bigint, b: bigint): bigint {
+  return a >= b ? a : b;
+}
+
 /** The larger of two raw quantities, exactly. */
 export function maxRaw(a: RawLike | null | undefined, b: RawLike | null | undefined): bigint {
   const left = big(a);
@@ -248,6 +275,64 @@ export function ratio(
   if (bottom === 0n) return 0;
   const SCALE = 1_000_000_000_000n;
   return Number((big(numerator) * SCALE) / bottom) / 1e12;
+}
+
+/* ------------------------------------------------------------------ */
+/* Display → raw                                                       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * A typed amount as exact raw units, or null when the text is not a number.
+ *
+ * The obvious `Math.round(parseFloat(input) * 1e8)` is fine for the amounts
+ * people usually type and wrong for the ones this site invites. An XCP-69
+ * token has a 100M supply, so "sell everything" is 100000000 — 10^16 raw,
+ * past where a double identifies a single integer. Reading the digits instead
+ * of multiplying a float means the quantity that gets signed is the quantity
+ * that was typed, at any size.
+ *
+ * Extra decimals are truncated rather than rounded: the result is a quantity
+ * someone is about to spend, and rounding it up would spend more than they
+ * asked for.
+ */
+export function parseUnitsToRaw(input: string, decimals = 8): bigint | null {
+  const trimmed = input.trim();
+  if (trimmed === "") return null;
+  const match = /^(-?)(\d*)(?:\.(\d*))?$/.exec(trimmed);
+  if (!match || (match[2] === "" && (match[3] ?? "") === "")) return null;
+  const [, sign, whole, fraction = ""] = match;
+  const scaled = `${whole || "0"}${fraction.slice(0, decimals).padEnd(decimals, "0")}`;
+  const value = BigInt(scaled);
+  return sign === "-" ? -value : value;
+}
+
+/**
+ * A quantity reduced by a slippage tolerance, rounded down.
+ *
+ * The floor is deliberate and so is the exactness: this produces a `min_*`
+ * parameter, the figure consensus checks the fill against and the one shown to
+ * the user as their guarantee. A value drifting upward by a rounding error is a
+ * transaction that voids for no reason; drifting downward is a worse fill than
+ * was promised.
+ *
+ * Tolerance is a percentage and may carry one decimal (the Auto setting
+ * computes tenths), so it converts through basis points.
+ */
+export function reduceByPercent(
+  value: RawLike | null | undefined,
+  percent: number,
+): bigint {
+  const bps = BigInt(Math.round(Math.min(Math.max(percent, 0), 100) * 100));
+  return (big(value) * (10_000n - bps)) / 10_000n;
+}
+
+/**
+ * A raw quantity scaled by a percentage, rounded down. The preset buttons —
+ * 25%, 50%, Max — where the source is a balance that can be any size.
+ */
+export function percentOf(value: RawLike | null | undefined, percent: number): bigint {
+  const bps = BigInt(Math.round(percent * 100));
+  return (big(value) * bps) / 10_000n;
 }
 
 /* ------------------------------------------------------------------ */

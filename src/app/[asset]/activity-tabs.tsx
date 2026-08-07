@@ -4,13 +4,13 @@ import { useState } from "react";
 import useSWR from "swr";
 import type { Fairmint } from "@/lib/api/counterparty";
 import {
-  commas,
+  commasRaw,
   compact,
-  fromSats,
   price as formatPrice,
   shortAddress,
   tokenQty,
 } from "@/lib/format";
+import { big, compareRawDesc, type Raw, ratio, sumRaw } from "@/lib/numeric";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
@@ -20,19 +20,18 @@ import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { Identicon } from "./launch-view";
 
 const PER_PAGE = 25;
-const SATS = 1e8;
 
 interface HolderRow {
   address: string;
-  quantity: number;
+  quantity: Raw;
 }
 
 interface TradeRow {
   key: string;
   block: number;
   buy: boolean;
-  tokenRaw: number;
-  xcpRaw: number;
+  tokenRaw: Raw;
+  xcpRaw: Raw;
   addr: string;
   via: "pool" | "book";
   txHash: string;
@@ -42,9 +41,9 @@ interface OpenOrder {
   tx_hash: string;
   give_asset: string;
   get_asset: string;
-  give_quantity: number;
-  get_quantity: number;
-  give_remaining: number;
+  give_quantity: Raw;
+  get_quantity: Raw;
+  give_remaining: Raw;
   expire_index: number | null;
 }
 
@@ -79,19 +78,25 @@ export function ActivityTabs({
       ? `${COUNTERPARTY_API_BASE}/assets/${asset}/balances?limit=1000`
       : null,
     async (url: string) => {
-      const rows: { address: string | null; utxo: string | null; quantity: number }[] =
+      const rows: { address: string | null; utxo: string | null; quantity: Raw }[] =
         (await fetchJson(url)).result ?? [];
       return rows
-        .filter((r) => r.quantity > 0)
+        .filter((r) => big(r.quantity) > 0n)
         .map((r) => ({
           address: r.address ?? (r.utxo ? `utxo:${r.utxo.slice(0, 12)}…` : "—"),
           quantity: r.quantity,
         }))
-        .sort((a, b) => b.quantity - a.quantity);
+        // Not `b.quantity - a.quantity`: this list is arbitrary legacy assets,
+        // where a holding can exceed 2^53, and subtracting two of those as
+        // doubles returns zero for values that differ.
+        .sort((a, b) => compareRawDesc(a.quantity, b.quantity));
     },
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
-  const holderTotal = holders?.reduce((s, h) => s + h.quantity, 0) ?? 0;
+  // Every percentage in the tab is a fraction of this, and it is a sum over
+  // every holder of the asset — PEPECASH's would be 9.95e16, an order of
+  // magnitude past what a `+` accumulator can carry.
+  const holderTotal = sumRaw(holders?.map((h) => h.quantity) ?? []);
 
   // Trades: pool fills + completed book fills, one tape, newest first.
   const { data: trades } = useSWR<TradeRow[]>(
@@ -111,8 +116,8 @@ export function ActivityTabs({
           block_index: number;
           source: string;
           forward_asset: string;
-          forward_quantity: number;
-          backward_quantity: number;
+          forward_quantity: Raw;
+          backward_quantity: Raw;
         }) => ({
           key: `p-${r.tx_hash}`,
           block: r.block_index,
@@ -133,8 +138,8 @@ export function ActivityTabs({
           tx1_address: string;
           block_index: number;
           forward_asset: string;
-          forward_quantity: number;
-          backward_quantity: number;
+          forward_quantity: Raw;
+          backward_quantity: Raw;
         }) => ({
           key: `o-${r.id}`,
           block: r.block_index,
@@ -253,7 +258,7 @@ export function ActivityTabs({
                   <span className="text-gray-900">
                     {compact(tokenQty(m.earn_quantity, divisible))}{" "}
                     <span className="text-gray-400">
-                      ({commas(fromSats(m.paid_quantity))} XCP)
+                      ({commasRaw(m.paid_quantity)} XCP)
                     </span>
                   </span>
                   <a
@@ -281,7 +286,6 @@ export function ActivityTabs({
             <ul className="divide-y divide-gray-100">
               {trades.slice(from, from + PER_PAGE).map((t) => {
                 const tokens = tokenQty(t.tokenRaw, divisible);
-                const xcp = t.xcpRaw / SATS;
                 return (
                   <li
                     key={t.key}
@@ -305,9 +309,13 @@ export function ActivityTabs({
                       </a>
                     </span>
                     <span className="text-right text-gray-900">
-                      {commas(xcp)} XCP{" "}
+                      {commasRaw(t.xcpRaw)} XCP{" "}
                       <span className="text-gray-400">
-                        ({formatPrice(tokens > 0 ? xcp / tokens : 0)} ea · {t.via})
+                        (
+                        {formatPrice(
+                          ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8),
+                        )}{" "}
+                        ea · {t.via})
                       </span>
                     </span>
                     <a
@@ -335,7 +343,7 @@ export function ActivityTabs({
           <>
             <ul className="divide-y divide-gray-100">
               {holders.slice(from, from + PER_PAGE).map((h, i) => {
-                const pct = holderTotal > 0 ? (h.quantity / holderTotal) * 100 : 0;
+                const pct = ratio(h.quantity, holderTotal) * 100;
                 const isUtxo = h.address.startsWith("utxo:");
                 return (
                   <li
@@ -397,7 +405,7 @@ export function ActivityTabs({
                 const isBuy = o.get_asset === asset;
                 const tokens = isBuy ? o.get_quantity : o.give_quantity;
                 const xcp = isBuy ? o.give_quantity : o.get_quantity;
-                const filled = 1 - o.give_remaining / o.give_quantity;
+                const filled = 1 - ratio(o.give_remaining, o.give_quantity);
                 return (
                   <li
                     key={o.tx_hash}
@@ -413,7 +421,7 @@ export function ActivityTabs({
                       >
                         {isBuy ? "Buy" : "Sell"}
                       </span>{" "}
-                      {commas(tokens / SATS)} @ {formatPrice(xcp / tokens)}
+                      {commasRaw(tokens)} @ {formatPrice(ratio(xcp, tokens))}
                       <span className="ml-2 text-xs text-gray-500">
                         {(filled * 100).toFixed(0)}% filled ·{" "}
                         {o.expire_index === null

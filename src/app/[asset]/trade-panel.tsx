@@ -10,7 +10,15 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
-import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import { commasRaw, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import {
+  approx,
+  parseUnitsToRaw,
+  percentOf,
+  type Raw,
+  ratio,
+  SATS_PER_UNIT,
+} from "@/lib/numeric";
 import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
@@ -37,14 +45,14 @@ const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 interface PoolInfo {
   asset_a: string;
   asset_b: string;
-  reserve_a: number;
-  reserve_b: number;
+  reserve_a: Raw;
+  reserve_b: Raw;
 }
 
 interface BookOrder {
   give_asset: string;
-  give_remaining: number;
-  get_remaining: number;
+  give_remaining: Raw;
+  get_remaining: Raw;
   /** XCP per token when giving the token (an ask). */
   give_price: number;
   /** XCP per token when giving XCP (a bid). */
@@ -87,9 +95,12 @@ export function TradePanel({
     (url: string) => fetchJson(url).then((d) => d.result ?? null),
     { refreshInterval: 60_000 },
   );
+  // A price, so a double — but from an exact division of the reserves.
   const spot = pool
-    ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) /
-      (pool.asset_a === asset ? pool.reserve_a : pool.reserve_b)
+    ? ratio(
+        pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b,
+        pool.asset_a === asset ? pool.reserve_a : pool.reserve_b,
+      )
     : null;
 
   // The resting book: best counter-order beats the pool with no fee. One
@@ -100,13 +111,13 @@ export function TradePanel({
     { refreshInterval: 60_000 },
   );
   const bestAsk = (bookOrders ?? [])
-    .filter((o) => o.give_asset === asset && o.give_remaining > 0)
+    .filter((o) => o.give_asset === asset && approx(o.give_remaining) > 0)
     .reduce<number | null>(
       (m, o) => (m === null || o.give_price < m ? o.give_price : m),
       null,
     );
   const bestBid = (bookOrders ?? [])
-    .filter((o) => o.give_asset === "XCP" && o.give_remaining > 0)
+    .filter((o) => o.give_asset === "XCP" && approx(o.give_remaining) > 0)
     .reduce<number | null>(
       (m, o) => (m === null || o.get_price > m ? o.get_price : m),
       null,
@@ -137,16 +148,32 @@ export function TradePanel({
   }, [compose.status, compose.txid, side, asset, address]);
 
   const limitPriceNum = parseFloat(limitPrice) || 0;
-  const limitAmountRaw =
+  // Both sides of the order in exact integers, all the way to the compose.
+  //
+  // The price is a decimal the user typed, so read it as one — at 8 places it
+  // is itself an integer, and then Amount × Price ÷ 1e8 is integer arithmetic
+  // with nothing to round. That matters because these two numbers ARE the
+  // order: give_quantity and get_quantity, the pair consensus enforces and the
+  // wallet displays. `Math.round(parseFloat(amountStr) * 1e8)` was fine for the
+  // amounts people usually type and wrong for the ones this site invites — a
+  // whole 100M-supply bag is 10^16 raw, past where a double picks out a single
+  // integer, and past 1e21 `String` would have written it in exponent notation
+  // the compose endpoint cannot read at all.
+  const priceExact = parseUnitsToRaw(limitPrice) ?? 0n;
+  const typedAmountExact = parseUnitsToRaw(amountStr) ?? 0n;
+  const typedTotalExact = parseUnitsToRaw(totalStr) ?? 0n;
+  const limitAmountExact =
     editField === "amount"
-      ? Math.round((parseFloat(amountStr) || 0) * SATS)
-      : limitPriceNum > 0
-        ? Math.round(((parseFloat(totalStr) || 0) * SATS) / limitPriceNum)
-        : 0;
-  const limitTotalRaw =
+      ? typedAmountExact
+      : priceExact > 0n
+        ? (typedTotalExact * SATS_PER_UNIT) / priceExact
+        : 0n;
+  const limitTotalExact =
     editField === "total"
-      ? Math.round((parseFloat(totalStr) || 0) * SATS)
-      : Math.round(limitAmountRaw * limitPriceNum);
+      ? typedTotalExact
+      : (limitAmountExact * priceExact) / SATS_PER_UNIT;
+  const limitAmountRaw = approx(limitAmountExact);
+  const limitTotalRaw = approx(limitTotalExact);
   // The give side must be covered: XCP (Total) for a buy, tokens for a sell.
   const insufficientToken =
     side === "sell" &&
@@ -188,8 +215,10 @@ export function TradePanel({
     if (limitPriceNum <= 0) return 0;
     let fillable = 0;
     if (pool && spot !== null) {
-      const Rx = pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b;
-      const Rt = pool.asset_a === asset ? pool.reserve_a : pool.reserve_b;
+      // Doubles from here: a closed-form curve solve with a square root in it
+      // is an estimate by nature, and it is labelled "~" on screen.
+      const Rx = approx(pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b);
+      const Rt = approx(pool.asset_a === asset ? pool.reserve_a : pool.reserve_b);
       const f = POOL_FEE;
       if (side === "buy") {
         const x =
@@ -208,11 +237,11 @@ export function TradePanel({
       if (side === "buy") {
         // Counter asks: they give the token; take those at or under your price.
         if (o.give_asset === asset && o.give_price <= limitPriceNum)
-          fillable += o.give_remaining;
+          fillable += approx(o.give_remaining);
       } else {
         // Counter bids: they give XCP for the token at or over your price.
         if (o.give_asset === "XCP" && o.get_price >= limitPriceNum)
-          fillable += o.get_remaining;
+          fillable += approx(o.get_remaining);
       }
     }
     return Math.max(0, Math.floor(fillable));
@@ -233,17 +262,17 @@ export function TradePanel({
       side === "buy"
         ? {
             give_asset: "XCP",
-            give_quantity: limitTotalRaw,
+            give_quantity: limitTotalExact,
             get_asset: asset,
-            get_quantity: limitAmountRaw,
+            get_quantity: limitAmountExact,
             expiration: limitExpiration,
             fee_rate: customFee > 0 ? customFee : undefined,
           }
         : {
             give_asset: asset,
-            give_quantity: limitAmountRaw,
+            give_quantity: limitAmountExact,
             get_asset: "XCP",
-            get_quantity: limitTotalRaw,
+            get_quantity: limitTotalExact,
             expiration: limitExpiration,
             fee_rate: customFee > 0 ? customFee : undefined,
           },
@@ -398,7 +427,7 @@ export function TradePanel({
                             setEditField("amount");
                             setAmountStr(
                               fmtAmount(
-                                Math.floor((maxAffordableRaw * p) / 100) / SATS,
+                                approx(percentOf(maxAffordableRaw, p)) / SATS,
                               ),
                             );
                           }}
@@ -432,7 +461,7 @@ export function TradePanel({
                           setAmountStr(fmtAmount(tokenBalance / SATS));
                         }}
                       >
-                        Balance: {commas(tokenBalance / SATS)}
+                        Balance: {commasRaw(tokenBalance)}
                       </button>
                     )}
                   </>
@@ -483,7 +512,7 @@ export function TradePanel({
                           setTotalStr(fmtAmount(xcpBalance / SATS));
                         }}
                       >
-                        Balance: {commas(xcpBalance / SATS)}
+                        Balance: {commasRaw(xcpBalance)}
                       </button>
                     )}
                   </>
@@ -526,8 +555,8 @@ export function TradePanel({
               </dt>
               <dd className="font-medium tabular-nums text-gray-700">
                 {side === "buy"
-                  ? `${(limitAmountRaw / SATS).toFixed(8)} ${asset}`
-                  : `${(limitTotalRaw / SATS).toFixed(8)} XCP`}
+                  ? `${commasRaw(limitAmountExact)} ${asset}`
+                  : `${commasRaw(limitTotalExact)} XCP`}
               </dd>
             </div>
             {fillPct !== null && (
