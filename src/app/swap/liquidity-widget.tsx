@@ -14,13 +14,14 @@ import { commasRaw, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import {
   approx,
   big,
-  bigMax,
-  bigMin,
+  maxRaw,
+  minRaw,
   parseUnitsToRaw,
   percentOf,
   type Raw,
   ratio,
   reduceByPercent,
+  SATS,
 } from "@/lib/numeric";
 import { useDebounced } from "@/lib/use-debounced";
 import { registerPending } from "@/lib/pending";
@@ -31,7 +32,6 @@ import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { useSwapSettings } from "./swap-settings";
 
-const SATS = 1e8;
 /** Pool tx size for the TX-fee estimate; true size known after compose. */
 const POOL_VBYTES = 250;
 const PRESETS = [25, 50, 75, 100] as const;
@@ -108,8 +108,8 @@ export function LiquidityWidget({
   );
 
   const amount = editSide === "token" ? tokenAmount : xcpAmount;
-  // Exact from the typed digits; the number beside it drives the UI and the
-  // quote URL, where the value is a request parameter rather than a signature.
+  // Parse the typed digits exactly; the double beside it feeds UI and the
+  // quote URL only.
   const amountExact = parseUnitsToRaw(amount) ?? 0n;
   const amountRaw = approx(amountExact);
   const debouncedRaw = useDebounced(amountRaw, 250);
@@ -195,9 +195,9 @@ export function LiquidityWidget({
   // Presets mean "% of what you can do", not "% of one balance".
   const maxDepositRaw =
     reserveXcp > 0n
-      ? bigMin(
+      ? minRaw(
           big(tokenBalance ?? 0),
-          (bigMax(0n, big(xcpBalance ?? 0) - big(gasFee ?? 0)) * reserveToken) /
+          (maxRaw(0n, big(xcpBalance ?? 0) - big(gasFee ?? 0)) * reserveToken) /
             reserveXcp,
         )
       : big(tokenBalance ?? 0);
@@ -445,8 +445,8 @@ export function LiquidityWidget({
                         setXcpAmount(
                           fmtAmount(
                             approx(
-                              bigMin(
-                                bigMax(0n, big(xcpBalance) - big(gasFee ?? 0)),
+                              minRaw(
+                                maxRaw(0n, big(xcpBalance) - big(gasFee ?? 0)),
                                 reserveToken > 0n
                                   ? (big(tokenBalance ?? 0) * reserveXcp) /
                                       reserveToken

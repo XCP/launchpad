@@ -18,6 +18,7 @@ import {
   type Raw,
   ratio,
   SATS_PER_UNIT,
+  SATS,
 } from "@/lib/numeric";
 import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
@@ -35,7 +36,6 @@ import { LIMIT_EXPIRATIONS, useSwapSettings } from "@/app/swap/swap-settings";
  * Buy | Sell pill tabs, wells with corner labels, always-open receipt.
  */
 
-const SATS = 1e8;
 const ORDER_VBYTES = 250;
 /** Price nudges off the pool spot: buyers bid under, sellers ask over. */
 const PRICE_PRESETS = [1, 5, 10];

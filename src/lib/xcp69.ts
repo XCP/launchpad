@@ -9,13 +9,9 @@
 import { big, type Raw, ratio, rawEquals } from "@/lib/numeric";
 
 /**
- * Fairminter record fields the standard cares about.
- *
- * The quantities are {@link Raw}, not `number`: they are unsigned 64-bit
- * integers, and the ones past 2^53 reach us as strings so their digits survive
- * parsing (see lib/numeric.ts). Block indices and tx_index stay numbers —
- * heights are counts, nowhere near the boundary, and treating them as money
- * would only obscure which values actually need care.
+ * Fairminter record fields the standard cares about. Quantities are
+ * {@link Raw} (u64; values past 2^53 arrive as strings — see lib/numeric.ts).
+ * Block indices stay numbers: counts, nowhere near the boundary.
  */
 export interface Fairminter {
   tx_hash: string;
@@ -50,13 +46,8 @@ export interface Fairminter {
 
 export const XCP69 = {
   /**
-   * 100M supply.
-   *
-   * Note for anyone doing arithmetic with this: 10^16 is above 2^53, so it is
-   * not a safe integer. It is exactly representable (its factors of 5 fit the
-   * mantissa) and so prints its true digits, but the integers either side of
-   * it do not exist as doubles. Use {@link XCP69_EXACT}.HARD_CAP to compare or
-   * to compose.
+   * 100M supply. 10^16 is exactly representable but above 2^53 — the
+   * integers beside it are not. Compare/compose via {@link XCP69_EXACT}.
    */
   HARD_CAP: 10_000_000_000_000_000,
   /** 69M public sale — reaching it IS selling out (all-or-nothing) */
@@ -75,16 +66,10 @@ export const XCP69 = {
 } as const;
 
 /**
- * The same constants as exact integers — what conformance is actually tested
- * against, and what the create flow composes.
- *
- * The doubles above are convenient for the arithmetic the UI does with them
- * (lot counts, mint price, opening multiple: all small results). They are not
- * safe to compare a 64-bit record against, because HARD_CAP sits where the
- * gap between representable integers is 2: a fairminter composed with a hard
- * cap one raw unit off the standard parses onto the standard's exact value and
- * would pass an `===` check. The standard says exact equality, so the check
- * has to see the digits.
+ * The standard's constants as exact integers — what conformance tests
+ * against and what the create flow composes. At HARD_CAP's magnitude the
+ * double gap is 2, so an off-by-one record would pass an `===` check on the
+ * parsed numbers; exact equality requires the digits.
  */
 export const XCP69_EXACT = {
   HARD_CAP: 10_000_000_000_000_000n,
@@ -221,9 +206,7 @@ export function saleTarget(fm: Fairminter): Raw {
 
 /**
  * Sale progress in [0, 1]; earned_quantity is null before the first mint.
- *
- * A fraction, so a double holds it comfortably — but both operands are 64-bit
- * quantities, so the division itself has to be exact before the result narrows.
+ * The fraction fits a double; the operands do not, so divide exactly first.
  */
 export function saleProgress(fm: Fairminter): number {
   return ratio(fm.earned_quantity, saleTarget(fm));

@@ -5,31 +5,22 @@ import {
   formatExact,
   type RawLike,
   rawToDecimalString,
+  SATS,
 } from "@/lib/numeric";
 
-const SATS = 1e8;
 
 /**
- * Raw units as a whole-unit number.
- *
- * Lossy above 2^53 raw units (~90M of a divisible asset) and deliberately so:
- * the callers are progress bars, USD estimates, chart geometry and {@link
- * compact}, where a double is the honest answer. Anything a person reads
- * digit-for-digit goes through {@link commasRaw}, which never converts.
+ * Raw units as a whole-unit number. Lossy above 2^53 raw units; only for
+ * approximate consumers (progress bars, USD estimates, {@link compact}).
+ * Digit-exact display goes through {@link commasRaw}.
  */
 export function fromSats(raw: RawLike | null | undefined): number {
   return approx(raw) / SATS;
 }
 
 /**
- * Token-quantity display that respects the asset's divisibility: divisible
- * quantities are ×1e8 raw, indivisible ones are whole units already. XCP-69
- * assets are always divisible; this matters for the non-conforming
- * fairminters shown in relaxed mode.
- *
- * A number, because every caller hands the result to {@link compact}, which
- * abbreviates to three significant figures — a precision a double clears by a
- * wide margin even at the u64 ceiling.
+ * Whole-unit number respecting divisibility (divisible = ×1e8 raw). Only for
+ * approximate consumers such as {@link compact}.
  */
 export function tokenQty(raw: RawLike | null | undefined, divisible: boolean): number {
   return divisible ? fromSats(raw) : approx(raw);
@@ -52,16 +43,10 @@ export function commas(n: number): string {
 }
 
 /**
- * Grouped display of a RAW quantity — the exact counterpart to `commas(x / 1e8)`.
- *
- * The division happens in integer arithmetic and the resulting decimal string
- * reaches Intl untouched. That last part is the whole trick: Intl formats a
- * decimal string exactly and a number only as precisely as a double allows, so
- * a display path must never convert on the way to the formatter. PEPECASH's
- * supply reads 995,269,147.11111111 through the string and 995,269,147.111111
- * through the double.
- *
- * Pass `decimals: 0` for an indivisible asset, whose raw units are whole units.
+ * Grouped display of a RAW quantity — the exact counterpart of
+ * `commas(x / 1e8)`. Divides in integer arithmetic and hands the decimal
+ * string to Intl unconverted, which formats strings exactly but numbers only
+ * to double precision. Pass `decimals: 0` for indivisible assets.
  */
 export function commasRaw(raw: RawLike | null | undefined, decimals = 8): string {
   return formatExact(rawToDecimalString(raw, decimals), {

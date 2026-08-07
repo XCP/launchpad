@@ -12,7 +12,7 @@ import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
 import { commas, commasRaw, compact, shortAddress, usd as usdFmt } from "@/lib/format";
-import { approx, parseUnitsToRaw } from "@/lib/numeric";
+import { SATS, approx, parseUnitsToRaw } from "@/lib/numeric";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -25,7 +25,6 @@ import {
   type PlannedLeg,
 } from "./use-dispense-router";
 
-const SATS = 1e8;
 /** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
 const TOKENS_PER_XCP = XCP69.QUANTITY_BY_PRICE / XCP69.PRICE;
 

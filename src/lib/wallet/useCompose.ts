@@ -6,16 +6,10 @@ import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
 import { quantityParam } from '@/lib/numeric'
 import { COUNTERPARTY_API_BASE } from '@/utils/constants'
 
-/**
- * A value a compose parameter can carry. `bigint` and `string` are how a
- * caller states a quantity larger than a double holds exactly.
- */
+/** A compose parameter value; bigint/string carry quantities beyond 2^53. */
 type ComposeValue = string | number | bigint
 
-/**
- * A quantity a caller supplies. `bigint` is how you state one larger than a
- * double holds exactly; `number` is refused past 2^53 rather than rounded.
- */
+/** A caller-supplied quantity; numbers past 2^53 are refused, not rounded. */
 type Quantity = number | bigint
 
 const UTXO_REGEX = /^[a-f0-9]{64}:\d+$/
@@ -77,17 +71,10 @@ export async function fetchPriorityFeeRate(): Promise<number> {
 }
 
 /**
- * Call Counterparty compose endpoint.
- *
- * Every quantity the user will sign for passes through the loop below, which
- * makes this the one place worth gating. `String(v)` on a double is wrong twice
- * over for a 64-bit quantity: past 2^53 the digits it prints belong to an
- * integer nobody chose, and past 1e21 it prints exponent notation the API
- * cannot read as a quantity at all. Either way the wallet would show — and the
- * user would sign — an order for an amount they never asked for, so
- * quantityParam refuses instead. Non-numeric parameters (asset names, the
- * description URL, the 'true'/'false' flags) are strings and pass through
- * untouched.
+ * Call Counterparty compose endpoint. Every quantity the user signs passes
+ * through this loop, so serialization is gated by quantityParam: String() on
+ * an unsafe double would put wrong digits (or exponent notation) into the
+ * transaction. Non-numeric params are strings and pass through unchanged.
  */
 async function composeRequest(
   path: string,

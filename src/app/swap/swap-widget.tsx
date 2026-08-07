@@ -17,12 +17,13 @@ import { fetchBalance, fetchJson } from "@/lib/client";
 import { commasRaw, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import {
   approx,
-  bigMax,
+  maxRaw,
   parseUnitsToRaw,
   percentOf,
   type Raw,
   ratio,
   reduceByPercent,
+  SATS,
 } from "@/lib/numeric";
 import { useDebounced } from "@/lib/use-debounced";
 import {
@@ -38,7 +39,6 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { useSwapSettings } from "./swap-settings";
 
-const SATS = 1e8;
 /** Typical composed order size (1–2 inputs, OP_RETURN, change) for the
  *  TX-fee estimate; the true size is known only after compose. */
 const ORDER_VBYTES = 250;
@@ -105,10 +105,8 @@ export function SwapWidget({
 
   const giveAsset = side === "buy" ? "XCP" : asset;
   const getAsset = side === "buy" ? asset : "XCP";
-  // Read from the typed digits, not `parseFloat(amount) * 1e8`: selling a whole
-  // 100M-supply XCP-69 bag is 10^16 raw, past where a double picks out a single
-  // integer. The number beside it drives the UI (widths, SWR keys, USD), where
-  // an approximation is what is wanted anyway.
+  // Parse the typed digits exactly (a full XCP-69 bag is 10^16 raw, past
+  // double precision); the double beside it feeds UI-only paths.
   const amountExact = parseUnitsToRaw(amount) ?? 0n;
   const amountRaw = approx(amountExact);
   const debouncedRaw = useDebounced(amountRaw, 250);
@@ -149,7 +147,7 @@ export function SwapWidget({
   );
   const effBalance =
     balance !== undefined
-      ? bigMax(0n, balance - pendingSpentRaw(giveAsset, address))
+      ? maxRaw(0n, balance - pendingSpentRaw(giveAsset, address))
       : undefined;
 
   // What the market holds of the buy asset — the pool reserve (the book
