@@ -564,11 +564,6 @@ export function LiquidityWidget({
               · {pctFmt(((lpBalance ?? 0) / lpSupply) * 100)} of the pool
             </p>
           )}
-          <p className="px-2 pt-2 text-xs text-gray-500">
-            Amounts are maximums — the largest proportional deposit is taken
-            and any excess never leaves your wallet. Your LP earns the 50 bps
-            fee on every swap.
-          </p>
         </div>
       ) : (
         <div className="mt-2 space-y-2">
