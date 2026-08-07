@@ -432,16 +432,16 @@ export function SwapWidget({
   // sell-well presets, with the gear beside it — settings read where
   // they apply, and the rate line below keeps a single icon.
   const slippageControl = (
-    <span className="flex items-center gap-1.5">
+    <span className="flex items-center gap-1">
       <span
         title="Max slippage"
-        className={`min-w-9 rounded-md border px-1.5 py-0.5 text-center text-[10px] font-medium ${
+        className={
           customSlip > 0 || expiration !== MARKET_EXPIRATION
-            ? "border-purple-300 bg-purple-50 text-purple-700"
-            : "border-gray-200 bg-white text-gray-500"
-        }`}
+            ? "font-medium text-purple-600"
+            : "text-gray-500"
+        }
       >
-        {slippage}%
+        Slippage: {slippage}%
       </span>
       {settingsPopover}
     </span>
