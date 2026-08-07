@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { LiquidityWidget } from "./liquidity-widget";
-import { SwapSettingsGear, SwapSettingsProvider } from "./swap-settings";
+import {
+  LiquiditySettingsGear,
+  SwapSettingsGear,
+  SwapSettingsProvider,
+} from "./swap-settings";
 import { SwapWidget } from "./swap-widget";
 
 /** Swap | Liquidity, side by side — one surface for the whole pool.
@@ -29,7 +33,7 @@ export function TradeSurface({
             ))}
           </SegmentedList>
         </Tabs>
-        {mode === "swap" && <SwapSettingsGear />}
+        {mode === "swap" ? <SwapSettingsGear /> : <LiquiditySettingsGear />}
       </div>
       {mode === "swap" ? (
         <SwapWidget assets={assets} xcpUsd={xcpUsd} />

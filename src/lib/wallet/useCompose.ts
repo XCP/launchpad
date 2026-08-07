@@ -211,6 +211,8 @@ export function useCompose() {
     quantity_b: number
     min_lp_quantity?: number
     lp_asset?: string
+    /** sat/vB override; defaults to the next-block median at compose time. */
+    fee_rate?: number
   }) => execute('pooldeposit', {
     asset_a: params.asset_a,
     asset_b: params.asset_b,
@@ -218,19 +220,21 @@ export function useCompose() {
     quantity_b: params.quantity_b,
     min_lp_quantity: params.min_lp_quantity ?? 0,
     ...(params.lp_asset ? { lp_asset: params.lp_asset } : {}),
-  })
+  }, params.fee_rate)
 
   const composePoolWithdraw = (params: {
     lp_asset: string
     quantity: number
     min_quantity_a?: number
     min_quantity_b?: number
+    /** sat/vB override; defaults to the next-block median at compose time. */
+    fee_rate?: number
   }) => execute('poolwithdraw', {
     lp_asset: params.lp_asset,
     quantity: params.quantity,
     min_quantity_a: params.min_quantity_a ?? 0,
     min_quantity_b: params.min_quantity_b ?? 0,
-  })
+  }, params.fee_rate)
 
   const composeDetach = (utxo: string) => executeUtxo(utxo, 'detach', {})
 

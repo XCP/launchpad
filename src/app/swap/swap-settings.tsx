@@ -15,6 +15,10 @@ import { fetchMedianFeeRate } from "@/lib/wallet/useCompose";
 /** Market orders live one block: match at confirmation or refund next block. */
 export const MARKET_EXPIRATION = 1;
 const SLIPPAGE_PRESETS = [0.5, 1, 2];
+/** Liquidity slippage is looser by convention — deposits drift with every
+ *  pool trade, and a breach is benign (void tx, nothing debited). */
+const LQ_SLIPPAGE_PRESETS = [0.5, 1, 2.5];
+const LQ_DEFAULT_SLIPPAGE = 2.5;
 
 /**
  * Swap settings lifted out of the widget so the gear can live beside the
@@ -37,11 +41,18 @@ interface SwapSettingsValue {
   medianFeeRate: number | undefined;
   autoValue: number;
   setAutoValue: (v: number) => void;
+  /** Liquidity's own slippage channel (looser defaults). */
+  lqSlippagePreset: number;
+  setLqSlippagePreset: (v: number) => void;
+  lqCustomSlippage: string;
+  setLqCustomSlippage: (v: string) => void;
   /** Derived */
   customSlip: number;
   slippage: number;
   expiration: number;
   customFee: number;
+  lqCustomSlip: number;
+  lqSlippage: number;
 }
 
 const SwapSettingsContext = createContext<SwapSettingsValue | null>(null);
@@ -60,6 +71,8 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
   const [customExpiration, setCustomExpiration] = useState("");
   const [customFeeRate, setCustomFeeRate] = useState("");
   const [autoValue, setAutoValue] = useState(1);
+  const [lqSlippagePreset, setLqSlippagePreset] = useState(LQ_DEFAULT_SLIPPAGE);
+  const [lqCustomSlippage, setLqCustomSlippage] = useState("");
 
   const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
     refreshInterval: 30_000,
@@ -77,6 +90,8 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
       Math.max(1, Math.round(parseFloat(customExpiration)) || MARKET_EXPIRATION),
     );
     const customFee = Math.min(Math.round(parseFloat(customFeeRate) || 0), 500);
+    const lqCustomSlip = Math.min(parseFloat(lqCustomSlippage) || 0, 50);
+    const lqSlippage = lqCustomSlip > 0 ? lqCustomSlip : lqSlippagePreset;
     return {
       slippageAuto,
       setSlippageAuto,
@@ -91,10 +106,16 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
       medianFeeRate,
       autoValue,
       setAutoValue,
+      lqSlippagePreset,
+      setLqSlippagePreset,
+      lqCustomSlippage,
+      setLqCustomSlippage,
       customSlip,
       slippage,
       expiration,
       customFee,
+      lqCustomSlip,
+      lqSlippage,
     };
   }, [
     slippageAuto,
@@ -104,6 +125,8 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
     customFeeRate,
     medianFeeRate,
     autoValue,
+    lqSlippagePreset,
+    lqCustomSlippage,
   ]);
 
   return (
@@ -247,6 +270,79 @@ export function SwapSettingsGear() {
         Min received is enforced by the order itself — worse fills are
         impossible; better ones refund the difference.
       </div>
+    </GearPopover>
+  );
+}
+
+/** The gear for the Liquidity tab — its own looser slippage, shared TX fee. */
+export function LiquiditySettingsGear() {
+  const s = useSwapSettings();
+  return (
+    <GearPopover
+      active={s.lqCustomSlip > 0 || s.customFee > 0}
+      label="Liquidity settings"
+    >
+      <div className="text-xs font-medium text-gray-500">Max slippage</div>
+      <div className="mt-2 flex items-center gap-1.5">
+        {LQ_SLIPPAGE_PRESETS.map((p) => (
+          <button
+            key={p}
+            type="button"
+            onClick={() => {
+              s.setLqSlippagePreset(p);
+              s.setLqCustomSlippage("");
+            }}
+            className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+              s.lqSlippage === p && s.lqCustomSlip === 0
+                ? "border-purple-600 bg-purple-50 text-purple-700"
+                : "border-gray-200 text-gray-600 hover:border-gray-300"
+            }`}
+          >
+            {p}%
+          </button>
+        ))}
+        <div
+          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+            s.lqCustomSlip > 0
+              ? "border-purple-600 bg-purple-50"
+              : "border-gray-200"
+          }`}
+        >
+          <AmountInput
+            value={s.lqCustomSlippage}
+            onChange={s.setLqCustomSlippage}
+            placeholder="5"
+            ariaLabel="Custom liquidity slippage percent"
+            className="w-8 bg-transparent text-right text-xs font-medium outline-none"
+          />
+          <span className="text-xs text-gray-400">%</span>
+        </div>
+      </div>
+      <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+        If the pool moves past this before confirmation, the whole
+        transaction is void — nothing is debited; only the miner fee is
+        spent.
+      </p>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+            s.customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          }`}
+        >
+          <AmountInput
+            value={s.customFeeRate}
+            onChange={s.setCustomFeeRate}
+            placeholder={s.medianFeeRate ? String(s.medianFeeRate) : "…"}
+            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+          />
+          <span className="text-xs text-gray-400">sat/vB</span>
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+        The Bitcoin miner fee. Default tracks the next-block median.
+      </p>
     </GearPopover>
   );
 }

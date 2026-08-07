@@ -3,13 +3,12 @@
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
-import { TokenImage } from "@/components/token-image";
+import { AssetChip } from "@/components/asset-chip";
 import { TokenSelectModal } from "@/components/token-select-modal";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
-import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
+import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
-import { GearPopover } from "@/components/ui/popover";
 import { Well } from "@/components/ui/well";
 import { commas, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
@@ -19,16 +18,13 @@ import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { useSwapSettings } from "./swap-settings";
 
 const SATS = 1e8;
-/**
- * Liquidity slippage is looser than swap slippage by industry convention
- * (deposits/withdrawals drift with every pool trade), and a breach here is
- * benign: the transaction is simply invalid — nothing debited, no XCP gas
- * charged, only the BTC miner fee spent.
- */
-const SLIPPAGE_PRESETS = [0.5, 1, 2.5];
-const DEFAULT_SLIPPAGE = 2.5;
+/** Pool tx size for the TX-fee estimate; true size known after compose. */
+const POOL_VBYTES = 250;
+const PRESETS = [25, 50, 75, 100] as const;
+const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
 interface PoolInfo {
   asset_a: string;
@@ -59,7 +55,8 @@ interface WithdrawQuote {
 /**
  * Liquidity on top of the locked floor: the launch LP is burned forever;
  * anything YOU add mints LP to your address, earns the 50 bps swap fee,
- * and withdraws whenever you like.
+ * and withdraws whenever you like. Same grammar as the swap card: wells
+ * with corner labels, an always-open receipt, settings in the tab-row gear.
  */
 export function LiquidityWidget({
   assets,
@@ -75,12 +72,18 @@ export function LiquidityWidget({
   const [amount, setAmount] = useState(""); // token units, add tab
   const [pct, setPct] = useState(25); // remove tab
   const [selectorOpen, setSelectorOpen] = useState(false);
-  const [slippagePreset, setSlippagePreset] = useState(DEFAULT_SLIPPAGE);
-  const [customSlippage, setCustomSlippage] = useState("");
 
-  const customSlip = Math.min(parseFloat(customSlippage) || 0, 50);
-  const slippage = customSlip > 0 ? customSlip : slippagePreset;
-  const tolerance = slippage / 100;
+  const { lqSlippage, customFee, medianFeeRate } = useSwapSettings();
+  const tolerance = lqSlippage / 100;
+  const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
+  const { data: btcUsd } = useSWR(
+    "btc-usd",
+    () =>
+      fetchJson("https://mempool.space/api/v1/prices").then(
+        (d: { USD: number }) => d.USD,
+      ),
+    { refreshInterval: 60_000 },
+  );
 
   const { data: pool } = useSWR<PoolInfo | null>(
     asset ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP` : null,
@@ -95,7 +98,7 @@ export function LiquidityWidget({
       ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/deposit?quantity=${debouncedRaw}`
       : null,
     (url: string) => fetchJson(url).then((d) => d.result),
-    { refreshInterval: 15_000, keepPreviousData: true },
+    { refreshInterval: 60_000, keepPreviousData: true },
   );
   const depStale = depFetching || amountRaw !== debouncedRaw;
   const depTokenRaw = depositQuote
@@ -146,7 +149,7 @@ export function LiquidityWidget({
       ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/withdraw?quantity=${debouncedLp}`
       : null,
     (url: string) => fetchJson(url).then((d) => d.result),
-    { refreshInterval: 15_000, keepPreviousData: true },
+    { refreshInterval: 60_000, keepPreviousData: true },
   );
   const outTokenRaw = withdrawQuote
     ? (withdrawQuote.asset_a === asset
@@ -171,7 +174,6 @@ export function LiquidityWidget({
       });
     }
   }, [compose.status, compose.txid, tab, asset, address]);
-
 
   const insufficientToken =
     tokenBalance !== undefined && amountRaw > 0 && amountRaw > tokenBalance;
@@ -202,6 +204,7 @@ export function LiquidityWidget({
       min_lp_quantity: Math.floor(
         (depositQuote.quantity_minted_estimate ?? 0) * (1 - tolerance),
       ),
+      fee_rate: customFee > 0 ? customFee : undefined,
     });
   };
 
@@ -216,22 +219,9 @@ export function LiquidityWidget({
       min_quantity_b: Math.floor(
         (withdrawQuote?.quantity_b_estimate ?? 0) * (1 - tolerance),
       ),
+      fee_rate: customFee > 0 ? customFee : undefined,
     });
   };
-
-  if (compose.status === "confirmed") {
-    return (
-      <ConfirmCard
-        title={tab === "add" ? "Deposit broadcast" : "Withdrawal broadcast"}
-        onReset={compose.reset}
-        resetLabel="Done"
-      >
-        <p className="mt-1 text-green-700">
-          Settles when it confirms. <TxLink txid={compose.txid} />
-        </p>
-      </ConfirmCard>
-    );
-  }
 
   const addLabel = busy
     ? compose.status === "signing"
@@ -249,172 +239,164 @@ export function LiquidityWidget({
               ? "Fetching quote…"
               : "Add liquidity";
 
+  // Both legs are worth the same by construction; USD comes off the XCP leg.
+  const legUsd = xcpUsd && depXcpRaw > 0 ? (depXcpRaw / SATS) * xcpUsd : null;
+
+  const txFeeRow = feeRate !== null && (
+    <div className="flex justify-between">
+      <dt>TX fee</dt>
+      <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+        {feeRate} sat/vB
+        {btcUsd !== undefined && (
+          <span className="text-gray-400">
+            {" "}
+            (~{usdFmt(((feeRate * POOL_VBYTES) / SATS) * btcUsd)})
+          </span>
+        )}
+      </dd>
+    </div>
+  );
+
+  const gasRow = (gasFee ?? 0) > 0 && (
+    <div className="flex justify-between">
+      <dt>Protocol gas fee</dt>
+      <dd>{commas((gasFee ?? 0) / SATS)} XCP</dd>
+    </div>
+  );
+
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
-      <div className="p-2">
-        <div className="relative flex items-center gap-2">
-          {assets.length === 1 ? (
-            <div className="flex min-w-0 flex-1 items-center gap-3 p-2 pr-3">
-              <TokenImage
-                asset={asset}
-                className="size-10 rounded-full bg-gray-100 object-cover"
-              />
-              <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-900">
-                {asset} / XCP pool
-              </span>
-            </div>
-          ) : (
+      <div className="flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
+        {(["add", "remove"] as const).map((t) => (
           <button
+            key={t}
             type="button"
-            onClick={() => setSelectorOpen(true)}
-            className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-gray-200 bg-white p-2 pr-3 transition-all hover:border-gray-300 hover:shadow-sm active:scale-[0.99]"
+            onClick={() => setTab(t)}
+            className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
+              tab === t
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
           >
-            <TokenImage
-              asset={asset}
-              className="size-10 rounded-full bg-gray-100 object-cover"
-            />
-            <span className="min-w-0 flex-1 truncate text-left text-sm font-semibold text-gray-900">
-              {asset} / XCP pool
-            </span>
-            <span aria-hidden className="text-xs text-gray-400">
-              ▾
-            </span>
+            {t}
           </button>
-          )}
-          <GearPopover active={customSlip > 0} label="Liquidity settings">
-                <div className="text-xs font-medium text-gray-500">
-                  Max slippage
-                </div>
-                <div className="mt-2 flex items-center gap-1.5">
-                  {SLIPPAGE_PRESETS.map((s) => (
+        ))}
+      </div>
+
+      {tab === "add" ? (
+        <div className="mt-2">
+          {/* Token well — corner grammar: presets top-right, balance bottom-right */}
+          <Well
+            focusable
+            label="Deposit"
+            topRight={
+              tokenBalance !== undefined && tokenBalance > 0 ? (
+                <span className="flex items-center gap-1">
+                  {PRESETS.map((p) => (
                     <button
-                      key={s}
+                      key={p}
                       type="button"
-                      onClick={() => {
-                        setSlippagePreset(s);
-                        setCustomSlippage("");
-                      }}
-                      className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
-                        slippage === s && customSlip === 0
-                          ? "border-purple-600 bg-purple-50 text-purple-700"
-                          : "border-gray-200 text-gray-600 hover:border-gray-300"
-                      }`}
+                      onClick={() =>
+                        setAmount(
+                          fmtAmount(Math.floor((tokenBalance * p) / 100) / SATS),
+                        )
+                      }
+                      className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                     >
-                      {s}%
+                      {p === 100 ? "Max" : `${p}%`}
                     </button>
                   ))}
-                  <div
-                    className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                      customSlip > 0
-                        ? "border-purple-600 bg-purple-50"
-                        : "border-gray-200"
-                    }`}
-                  >
-                    <AmountInput
-                      value={customSlippage}
-                      onChange={setCustomSlippage}
-                      placeholder="5"
-                      ariaLabel="Custom slippage percent"
-                      className="w-8 bg-transparent text-right text-xs font-medium outline-none"
-                    />
-                    <span className="text-xs text-gray-400">%</span>
-                  </div>
-                </div>
-                <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
-                  If the pool moves past this before confirmation, the whole
-                  transaction is void — nothing is debited; only the miner fee
-                  is spent.
-                </div>
-          </GearPopover>
-        </div>
-
-        <div className="mt-3 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
-          {(["add", "remove"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTab(t)}
-              className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
-                tab === t
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
-
-        {tab === "add" ? (
-          <div className="mt-3 space-y-3">
-            <Well
-              focusable
-              label={<label htmlFor="lq-amount">{asset} to deposit</label>}
-              topRight={
-                tokenBalance !== undefined && (
+                </span>
+              ) : undefined
+            }
+            chip={
+              assets.length > 1 ? (
+                <AssetChip asset={asset} onClick={() => setSelectorOpen(true)} />
+              ) : (
+                <AssetChip asset={asset} />
+              )
+            }
+            footer={
+              <>
+                <span>≈ {usdFmt(legUsd ?? 0)}</span>
+                {tokenBalance !== undefined && (
                   <button
                     type="button"
-                    className="hover:text-gray-700 hover:underline"
-                    onClick={() =>
-                      setAmount(
-                        (tokenBalance / SATS).toFixed(8).replace(/\.?0+$/, ""),
-                      )
-                    }
+                    className={`min-w-0 truncate hover:text-purple-600 ${
+                      insufficientToken ? "text-red-600" : "text-gray-500"
+                    }`}
+                    onClick={() => setAmount(fmtAmount(tokenBalance / SATS))}
                   >
                     Balance: {commas(tokenBalance / SATS)}
                   </button>
-                )
+                )}
+              </>
+            }
+          >
+            <AmountInput
+              value={amount}
+              onChange={setAmount}
+              ariaLabel={`Amount of ${asset} to deposit`}
+              className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+                insufficientToken ? "text-red-600" : "text-gray-900"
+              }`}
+            />
+          </Well>
+
+          {/* Paired XCP well — derived, display-only */}
+          <div className="mt-1">
+            <Well
+              label="Paired XCP"
+              chip={<AssetChip asset="XCP" />}
+              footer={
+                <>
+                  <span>≈ {usdFmt(legUsd ?? 0)}</span>
+                  {xcpBalance !== undefined && (
+                    <span
+                      className={
+                        insufficientXcp ? "text-red-600" : "text-gray-500"
+                      }
+                    >
+                      Balance: {commas(xcpBalance / SATS)}
+                    </span>
+                  )}
+                </>
               }
             >
-              <AmountInput
-                id="lq-amount"
-                value={amount}
-                onChange={setAmount}
-                className={`w-full min-w-0 bg-transparent text-2xl font-semibold outline-none placeholder:text-gray-300 ${
-                  insufficientToken ? "text-red-600" : "text-gray-900"
+              <div
+                className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
+                  depXcpRaw > 0
+                    ? insufficientXcp
+                      ? "text-red-600"
+                      : "text-gray-900"
+                    : "text-gray-300"
                 }`}
-              />
-            </Well>
-            {depositQuote && amountRaw > 0 && !depositQuote.first_deposit && (
-              <dl
-                className="space-y-1 rounded-2xl bg-gray-50 p-3 text-xs text-gray-600"
                 style={{
-                  filter: depStale ? "grayscale(1)" : "none",
-                  opacity: depStale ? 0.5 : 1,
+                  filter: depStale && depXcpRaw > 0 ? "grayscale(1)" : "none",
+                  opacity: depStale && depXcpRaw > 0 ? 0.4 : 1,
                   transition: depStale ? "none" : "opacity 250ms ease-in-out",
                 }}
               >
-                <div className="flex justify-between">
-                  <dt>Paired XCP (max)</dt>
-                  <dd
-                    className={`font-semibold ${insufficientXcp ? "text-red-600" : "text-gray-900"}`}
-                  >
-                    {commas(depXcpRaw / SATS)} XCP
-                    {xcpUsd ? (
-                      <span className="font-normal text-gray-400">
-                        {" "}
-                        (≈{usdFmt((depXcpRaw / SATS) * xcpUsd)})
-                      </span>
-                    ) : null}
-                  </dd>
-                </div>
-                {xcpBalance !== undefined && (
-                  <div className="flex justify-between">
-                    <dt>Your XCP</dt>
-                    <dd>{commas(xcpBalance / SATS)}</dd>
-                  </div>
-                )}
+                {depXcpRaw > 0 ? commas(depXcpRaw / SATS) : "0"}
+              </div>
+            </Well>
+          </div>
+
+          {/* Receipt — always open once a quote is live */}
+          {depositQuote && amountRaw > 0 && !depositQuote.first_deposit && (
+            <div className="px-2 pt-2">
+              <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
                 <div className="flex justify-between">
                   <dt>LP minted (est.)</dt>
-                  <dd className="font-semibold text-gray-900">
+                  <dd className="font-medium tabular-nums text-gray-700">
                     {commas((depositQuote.quantity_minted_estimate ?? 0) / SATS)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt title="Below this the transaction is void — nothing is debited">
-                    Min LP · slippage {slippage}%
+                    Min LP · slippage {lqSlippage}%
                   </dt>
-                  <dd>
+                  <dd className="tabular-nums">
                     {commas(
                       Math.floor(
                         (depositQuote.quantity_minted_estimate ?? 0) *
@@ -423,63 +405,61 @@ export function LiquidityWidget({
                     )}
                   </dd>
                 </div>
-                {(gasFee ?? 0) > 0 && (
-                  <div className="flex justify-between">
-                    <dt>Protocol gas fee</dt>
-                    <dd>{commas((gasFee ?? 0) / SATS)} XCP</dd>
-                  </div>
-                )}
+                {gasRow}
+                {txFeeRow}
               </dl>
-            )}
-            <p className="px-1 text-xs text-gray-500">
-              Amounts are maximums — the largest proportional deposit is taken
-              and any excess never leaves your wallet. Your LP earns the 50 bps
-              fee on every swap.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-3 space-y-3">
-            <div className="rounded-2xl bg-gray-50 p-4">
-              <div className="flex items-baseline justify-between text-xs text-gray-500">
-                <span>Amount to remove</span>
-                <span className="text-3xl font-bold text-gray-900">{pct}%</span>
-              </div>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={pct}
-                onChange={(e) => setPct(Number(e.target.value))}
-                className="ui-slider mt-2 w-full"
-                aria-label="Percent of LP to remove"
-              />
-              <div className="mt-2 flex items-center gap-2">
-                {[25, 50, 75, 100].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => setPct(p)}
-                    className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium ${
-                      pct === p
-                        ? "border-purple-600 bg-purple-50 text-purple-700"
-                        : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
-                    }`}
-                  >
-                    {p === 100 ? "Max" : `${p}%`}
-                  </button>
-                ))}
-              </div>
             </div>
-            <dl className="space-y-1 rounded-2xl bg-gray-50 p-3 text-xs text-gray-600">
+          )}
+          <p className="px-2 pt-2 text-xs text-gray-500">
+            Amounts are maximums — the largest proportional deposit is taken
+            and any excess never leaves your wallet. Your LP earns the 50 bps
+            fee on every swap.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-2 space-y-2">
+          <div className="rounded-2xl bg-gray-50 p-4">
+            <div className="flex items-baseline justify-between text-xs text-gray-500">
+              <span>Amount to remove</span>
+              <span className="text-3xl font-bold text-gray-900">{pct}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={pct}
+              onChange={(e) => setPct(Number(e.target.value))}
+              className="ui-slider mt-2 w-full"
+              aria-label="Percent of LP to remove"
+            />
+            <div className="mt-2 flex items-center gap-2">
+              {PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setPct(p)}
+                  className={`flex-1 rounded-lg border px-3 py-1.5 text-xs font-medium ${
+                    pct === p
+                      ? "border-purple-600 bg-purple-50 text-purple-700"
+                      : "border-gray-300 bg-white text-gray-600 hover:border-gray-400"
+                  }`}
+                >
+                  {p === 100 ? "Max" : `${p}%`}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="px-2">
+            <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
               <div className="flex justify-between">
                 <dt>Your LP balance</dt>
-                <dd className="font-semibold text-gray-900">
+                <dd className="font-medium tabular-nums text-gray-700">
                   {commas((lpBalance ?? 0) / SATS)}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt>You receive (est.)</dt>
-                <dd className="text-right font-semibold text-gray-900">
+                <dd className="text-right font-medium tabular-nums text-gray-700">
                   {commas(outTokenRaw / SATS)} {asset}
                   <br />
                   {commas(outXcpRaw / SATS)} XCP
@@ -494,9 +474,9 @@ export function LiquidityWidget({
               {outTokenRaw > 0 && (
                 <div className="flex justify-between">
                   <dt title="Below this the transaction is void — nothing is debited">
-                    Min received · slippage {slippage}%
+                    Min received · slippage {lqSlippage}%
                   </dt>
-                  <dd className="text-right">
+                  <dd className="text-right tabular-nums">
                     {commas(Math.floor(outTokenRaw * (1 - tolerance)) / SATS)}{" "}
                     {asset}
                     <br />
@@ -504,29 +484,26 @@ export function LiquidityWidget({
                   </dd>
                 </div>
               )}
-              {(gasFee ?? 0) > 0 && (
-                <div className="flex justify-between">
-                  <dt>Protocol gas fee</dt>
-                  <dd>{commas((gasFee ?? 0) / SATS)} XCP</dd>
-                </div>
-              )}
+              {gasRow}
+              {txFeeRow}
             </dl>
-            <p className="px-1 text-xs text-gray-500">
-              Only liquidity you added can leave — the launch liquidity is
-              burned and stays forever.
-            </p>
           </div>
-        )}
+          <p className="px-2 text-xs text-gray-500">
+            Only liquidity you added can leave — the launch liquidity is
+            burned and stays forever.
+          </p>
+        </div>
+      )}
 
+      <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
-          <ErrorBanner className="mt-3">{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2">{compose.error}</ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (
-          <ConnectButton className="mt-3" />
+          <ConnectButton />
         ) : (
           <CTA
-            className="mt-3"
             disabled={tab === "add" ? !addReady : !removeReady}
             onClick={tab === "add" ? submitAdd : submitRemove}
           >
@@ -542,6 +519,26 @@ export function LiquidityWidget({
                     : "Choose an amount"
                   : "Remove liquidity"}
           </CTA>
+        )}
+        {compose.status === "confirmed" && (
+          <div className="mt-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-green-800">
+                {tab === "add" ? "Deposit" : "Withdrawal"} broadcast —{" "}
+                <TxLink txid={compose.txid} />
+              </span>
+              <button
+                type="button"
+                onClick={compose.reset}
+                className="text-xs text-green-800 underline"
+              >
+                Dismiss
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-green-700">
+              Settles when it confirms — usually the next block.
+            </p>
+          </div>
         )}
       </div>
 
