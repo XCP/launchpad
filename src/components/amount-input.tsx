@@ -27,6 +27,7 @@ export function AmountInput({
   placeholder = "0",
   ariaLabel,
   className,
+  style,
   disabled,
 }: {
   value: string;
@@ -35,6 +36,8 @@ export function AmountInput({
   placeholder?: string;
   ariaLabel?: string;
   className?: string;
+  /** For transient visual states (e.g. graying a derived value while stale). */
+  style?: React.CSSProperties;
   disabled?: boolean;
 }) {
   return (
@@ -54,6 +57,7 @@ export function AmountInput({
       placeholder={placeholder}
       aria-label={ariaLabel}
       className={className}
+      style={style}
       disabled={disabled}
     />
   );

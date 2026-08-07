@@ -10,7 +10,7 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
-import { commas, usd as usdFmt } from "@/lib/format";
+import { commas, price as formatPrice, usd as usdFmt } from "@/lib/format";
 import { useDebounced } from "@/lib/use-debounced";
 import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
@@ -69,7 +69,13 @@ export function LiquidityWidget({
   const compose = useCompose();
   const [asset, setAsset] = useState(assets[0] ?? "");
   const [tab, setTab] = useState<"add" | "remove">("add");
-  const [amount, setAmount] = useState(""); // token units, add tab
+  // Bidirectional add: edit either leg and the other derives at the pool
+  // ratio — consensus clamps every deposit to the current ratio, so you
+  // don't get to pick one (if you don't like the price, place an order).
+  const [tokenAmount, setTokenAmount] = useState("");
+  const [xcpAmount, setXcpAmount] = useState("");
+  const [editSide, setEditSide] = useState<"token" | "xcp">("token");
+  const [rateInverted, setRateInverted] = useState(false);
   const [pct, setPct] = useState(25); // remove tab
   const [selectorOpen, setSelectorOpen] = useState(false);
 
@@ -91,11 +97,17 @@ export function LiquidityWidget({
     { refreshInterval: 30_000 },
   );
 
+  const amount = editSide === "token" ? tokenAmount : xcpAmount;
   const amountRaw = Math.round((parseFloat(amount) || 0) * SATS);
   const debouncedRaw = useDebounced(amountRaw, 250);
+  // The quote's `quantity` is the FIRST asset in the URL path (verified in
+  // counterparty-core queries.get_pool_quote_deposit) — flip the pair to
+  // quote by whichever side is being edited. Response assets are canonical.
   const { data: depositQuote, isValidating: depFetching } = useSWR<DepositQuote>(
     tab === "add" && asset && debouncedRaw > 0
-      ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/deposit?quantity=${debouncedRaw}`
+      ? `${COUNTERPARTY_API_BASE}/pools/${
+          editSide === "token" ? `${asset}/XCP` : `XCP/${asset}`
+        }/quote/deposit?quantity=${debouncedRaw}`
       : null,
     (url: string) => fetchJson(url).then((d) => d.result),
     { refreshInterval: 60_000, keepPreviousData: true },
@@ -141,6 +153,31 @@ export function LiquidityWidget({
     ([addr, lp]) => fetchBalance(addr, lp),
     { refreshInterval: 30_000 },
   );
+
+  // LP supply + reserves in one request (a withdraw quote for 1 LP unit) —
+  // the cheapest supply source; powers pool share and your-position rows.
+  const { data: poolMeta } = useSWR<WithdrawQuote>(
+    asset && pool
+      ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/quote/withdraw?quantity=1`
+      : null,
+    (url: string) => fetchJson(url).then((d) => d.result),
+    { refreshInterval: 60_000 },
+  );
+  const lpSupply = poolMeta?.supply ?? 0;
+  const reserveToken = pool
+    ? pool.asset_a === asset
+      ? pool.reserve_a
+      : pool.reserve_b
+    : 0;
+  const reserveXcp = pool
+    ? pool.asset_a === "XCP"
+      ? pool.reserve_a
+      : pool.reserve_b
+    : 0;
+  // Spot rate from reserves — no endpoint computes it (verified in source).
+  const spotRate = reserveToken > 0 ? reserveXcp / reserveToken : null;
+  const pctFmt = (x: number) =>
+    x >= 100 ? "100%" : x >= 0.01 ? `${x.toFixed(2)}%` : "<0.01%";
   const lpToRemove = Math.floor(((lpBalance ?? 0) * pct) / 100);
   const debouncedLp = useDebounced(lpToRemove, 250);
 
@@ -175,8 +212,11 @@ export function LiquidityWidget({
     }
   }, [compose.status, compose.txid, tab, asset, address]);
 
+  const needTokenRaw = editSide === "token" ? amountRaw : depTokenRaw;
   const insufficientToken =
-    tokenBalance !== undefined && amountRaw > 0 && amountRaw > tokenBalance;
+    tokenBalance !== undefined &&
+    needTokenRaw > 0 &&
+    needTokenRaw > tokenBalance;
   // The XCP leg must cover the deposit plus any XCP gas fee.
   const insufficientXcp =
     xcpBalance !== undefined &&
@@ -296,11 +336,12 @@ export function LiquidityWidget({
                     <button
                       key={p}
                       type="button"
-                      onClick={() =>
-                        setAmount(
+                      onClick={() => {
+                        setEditSide("token");
+                        setTokenAmount(
                           fmtAmount(Math.floor((tokenBalance * p) / 100) / SATS),
-                        )
-                      }
+                        );
+                      }}
                       className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                     >
                       {p === 100 ? "Max" : `${p}%`}
@@ -325,7 +366,10 @@ export function LiquidityWidget({
                     className={`min-w-0 truncate hover:text-purple-600 ${
                       insufficientToken ? "text-red-600" : "text-gray-500"
                     }`}
-                    onClick={() => setAmount(fmtAmount(tokenBalance / SATS))}
+                    onClick={() => {
+                      setEditSide("token");
+                      setTokenAmount(fmtAmount(tokenBalance / SATS));
+                    }}
                   >
                     Balance: {commas(tokenBalance / SATS)}
                   </button>
@@ -334,57 +378,105 @@ export function LiquidityWidget({
             }
           >
             <AmountInput
-              value={amount}
-              onChange={setAmount}
+              value={
+                editSide === "token"
+                  ? tokenAmount
+                  : depTokenRaw > 0
+                    ? fmtAmount(depTokenRaw / SATS)
+                    : ""
+              }
+              onChange={(v) => {
+                setEditSide("token");
+                setTokenAmount(v);
+              }}
               ariaLabel={`Amount of ${asset} to deposit`}
               className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
                 insufficientToken ? "text-red-600" : "text-gray-900"
               }`}
+              style={
+                editSide === "xcp" && depStale
+                  ? { filter: "grayscale(1)", opacity: 0.4 }
+                  : undefined
+              }
             />
           </Well>
 
-          {/* Paired XCP well — derived, display-only */}
+          {/* XCP well — the other leg, equally editable */}
           <div className="mt-1">
             <Well
+              focusable
               label="Paired XCP"
               chip={<AssetChip asset="XCP" />}
               footer={
                 <>
                   <span>≈ {usdFmt(legUsd ?? 0)}</span>
                   {xcpBalance !== undefined && (
-                    <span
-                      className={
+                    <button
+                      type="button"
+                      className={`min-w-0 truncate hover:text-purple-600 ${
                         insufficientXcp ? "text-red-600" : "text-gray-500"
-                      }
+                      }`}
+                      onClick={() => {
+                        setEditSide("xcp");
+                        setXcpAmount(fmtAmount(xcpBalance / SATS));
+                      }}
                     >
                       Balance: {commas(xcpBalance / SATS)}
-                    </span>
+                    </button>
                   )}
                 </>
               }
             >
-              <div
-                className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-                  depXcpRaw > 0
-                    ? insufficientXcp
-                      ? "text-red-600"
-                      : "text-gray-900"
-                    : "text-gray-300"
-                }`}
-                style={{
-                  filter: depStale && depXcpRaw > 0 ? "grayscale(1)" : "none",
-                  opacity: depStale && depXcpRaw > 0 ? 0.4 : 1,
-                  transition: depStale ? "none" : "opacity 250ms ease-in-out",
+              <AmountInput
+                value={
+                  editSide === "xcp"
+                    ? xcpAmount
+                    : depXcpRaw > 0
+                      ? fmtAmount(depXcpRaw / SATS)
+                      : ""
+                }
+                onChange={(v) => {
+                  setEditSide("xcp");
+                  setXcpAmount(v);
                 }}
-              >
-                {depXcpRaw > 0 ? commas(depXcpRaw / SATS) : "0"}
-              </div>
+                ariaLabel="Amount of XCP to deposit"
+                className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
+                  insufficientXcp ? "text-red-600" : "text-gray-900"
+                }`}
+                style={
+                  editSide === "token" && depStale
+                    ? { filter: "grayscale(1)", opacity: 0.4 }
+                    : undefined
+                }
+              />
             </Well>
           </div>
 
+          {/* Rate line — pool spot from reserves, tap to invert */}
+          {spotRate !== null && (
+            <div className="flex h-6 items-center px-2 pt-2 text-xs">
+              <button
+                type="button"
+                onClick={() => setRateInverted((v) => !v)}
+                title="Invert rate"
+                className="text-gray-600 hover:text-gray-900"
+              >
+                {rateInverted
+                  ? `1 XCP = ${formatPrice(1 / spotRate)} ${asset}`
+                  : `1 ${asset} = ${formatPrice(spotRate)} XCP`}
+                {xcpUsd && (
+                  <span className="text-gray-400">
+                    {" "}
+                    ({usdFmt(rateInverted ? xcpUsd : spotRate * xcpUsd)})
+                  </span>
+                )}
+              </button>
+            </div>
+          )}
+
           {/* Receipt — always open once a quote is live */}
           {depositQuote && amountRaw > 0 && !depositQuote.first_deposit && (
-            <div className="px-2 pt-2">
+            <div className="px-2">
               <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
                 <div className="flex justify-between">
                   <dt>LP minted (est.)</dt>
@@ -405,10 +497,43 @@ export function LiquidityWidget({
                     )}
                   </dd>
                 </div>
+                {lpSupply > 0 && (
+                  <div className="flex justify-between">
+                    <dt>Share of pool</dt>
+                    <dd className="tabular-nums">
+                      {pctFmt(
+                        ((depositQuote.quantity_minted_estimate ?? 0) /
+                          (lpSupply +
+                            (depositQuote.quantity_minted_estimate ?? 0))) *
+                          100,
+                      )}
+                    </dd>
+                  </div>
+                )}
                 {gasRow}
                 {txFeeRow}
               </dl>
             </div>
+          )}
+
+          {/* Your position — context while adding to an existing stake */}
+          {(lpBalance ?? 0) > 0 && lpSupply > 0 && (
+            <p className="px-2 pt-2 text-xs text-gray-500">
+              Your position:{" "}
+              <span className="font-medium text-gray-700">
+                {commas(
+                  Math.floor(((lpBalance ?? 0) * reserveToken) / lpSupply) /
+                    SATS,
+                )}{" "}
+                {asset}
+                {" + "}
+                {commas(
+                  Math.floor(((lpBalance ?? 0) * reserveXcp) / lpSupply) / SATS,
+                )}{" "}
+                XCP
+              </span>{" "}
+              · {pctFmt(((lpBalance ?? 0) / lpSupply) * 100)} of the pool
+            </p>
           )}
           <p className="px-2 pt-2 text-xs text-gray-500">
             Amounts are maximums — the largest proportional deposit is taken
@@ -552,7 +677,8 @@ export function LiquidityWidget({
         rowLabel={(a) => `${a} / XCP`}
         onSelect={(a) => {
           setAsset(a);
-          setAmount("");
+          setTokenAmount("");
+          setXcpAmount("");
         }}
       />
     </div>
