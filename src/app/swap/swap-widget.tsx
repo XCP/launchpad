@@ -233,18 +233,17 @@ export function SwapWidget({
 
   // On a single-asset surface (the asset page) the chip is identity, not a
   // control — no chevron, no modal.
-  const tokenChip =
-    assets.length === 1 ? (
-      <AssetChip asset={asset} />
-    ) : (
-      <AssetChip asset={asset} onClick={() => setSelectorOpen(true)} />
-    );
+  const tokenChip = compact ? (
+    <AssetChip asset={asset} />
+  ) : (
+    <AssetChip asset={asset} onClick={() => setSelectorOpen(true)} />
+  );
 
   const balanceControls = effBalance !== undefined && (
-    <>
+    <span className="group/bal flex min-w-0 items-center gap-1">
       <button
         type="button"
-        className="group-focus-within:hidden group-hover:hidden"
+        className="group-hover/bal:hidden"
         onClick={() => setAmount(fmtAmount(effBalance / SATS))}
       >
         Balance: {commas(effBalance / SATS)}
@@ -255,7 +254,7 @@ export function SwapWidget({
           </span>
         )}
       </button>
-      <span className="hidden items-center gap-1 group-focus-within:flex group-hover:flex">
+      <span className="hidden items-center gap-1 group-hover/bal:flex">
         {effBalance > 0 ? (
           PRESETS.map((p) => (
             <button
@@ -273,7 +272,7 @@ export function SwapWidget({
           <span>Balance: 0</span>
         )}
       </span>
-    </>
+    </span>
   );
 
   const buttonLabel = busy
@@ -600,7 +599,7 @@ export function SwapWidget({
         )}
       </div>
 
-      {assets.length > 1 && (
+      {!compact && (
         <TokenSelectModal
           open={selectorOpen}
           onClose={() => setSelectorOpen(false)}
