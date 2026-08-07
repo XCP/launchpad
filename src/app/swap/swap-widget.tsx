@@ -352,6 +352,7 @@ export function SwapWidget({
         <GearPopover
           active={customSlip > 0 || expiration !== MARKET_EXPIRATION}
           label="Swap settings"
+          small
         >
           <div className="text-xs font-medium text-gray-500">Max slippage</div>
           <div className="mt-2 flex items-center gap-1.5">
@@ -434,13 +435,13 @@ export function SwapWidget({
     <span className="flex items-center gap-1.5">
       <span
         title="Max slippage"
-        className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium ${
+        className={`min-w-9 rounded-md border px-1.5 py-0.5 text-center text-[10px] font-medium ${
           customSlip > 0 || expiration !== MARKET_EXPIRATION
             ? "border-purple-300 bg-purple-50 text-purple-700"
             : "border-gray-200 bg-white text-gray-500"
         }`}
       >
-        {slippage}% slip
+        {slippage}%
       </span>
       {settingsPopover}
     </span>
@@ -484,15 +485,13 @@ export function SwapWidget({
       <Well
         layout={compact ? "stack" : "row"}
         label="Buy"
-        topRight={slippageControl}
+        topRight={compact ? slippageControl : availableLabel || undefined}
         chip={chipFor(getAsset)}
         chipRight={compact ? availableLabel || undefined : undefined}
         footer={
           <>
             <span>≈ {usdFmt(getUsd ?? 0)}</span>
-            {!compact && availableLabel && (
-              <span className="text-gray-500">{availableLabel}</span>
-            )}
+            {!compact && slippageControl}
           </>
         }
       >
