@@ -100,11 +100,7 @@ function fabricate(realProps: RealProps, phase: Phase): RealProps {
     : { ...realProps.fm };
   const real = { ...realProps, fm: fmBase, conforming: true };
   const fm = real.fm;
-  // Plain numbers for the rest of the simulation. These are the standard's own
-  // constants (lot size 1e11, soft cap 6.9e15) or borrowed from a record that
-  // already matched them — all comfortably inside the exact range, and the
-  // output is a fabricated tape for the design preview rather than anything
-  // anyone signs.
+  // Plain numbers: standard constants inside the exact range, preview-only.
   const qbp = approx(fm.quantity_by_price);
   const mintPrice = ratio(fm.price, fm.quantity_by_price);
   const softCap = approx(fm.soft_cap);

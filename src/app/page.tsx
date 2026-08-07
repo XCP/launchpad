@@ -64,9 +64,8 @@ export default async function HomePage() {
         const conforming =
           isXcp69(fm) && (!closed || windowIsExact(fm, originalDeadline));
         // Same fixed supply everywhere, so XCP depth IS the value ranking:
-        // deepest pool = highest price = most fees compounded in. Exact,
-        // because it is a sort key: two pools within a rounding error of each
-        // other should not swap places between renders.
+        // Exact sort key: near-equal pools must not swap places between
+        // renders.
         const xcpDepth = big(
           pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
         );

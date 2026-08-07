@@ -86,16 +86,12 @@ export function ActivityTabs({
           address: r.address ?? (r.utxo ? `utxo:${r.utxo.slice(0, 12)}…` : "—"),
           quantity: r.quantity,
         }))
-        // Not `b.quantity - a.quantity`: this list is arbitrary legacy assets,
-        // where a holding can exceed 2^53, and subtracting two of those as
-        // doubles returns zero for values that differ.
+        // Not `b.quantity - a.quantity`: legacy holdings can exceed 2^53.
         .sort((a, b) => compareRawDesc(a.quantity, b.quantity));
     },
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
-  // Every percentage in the tab is a fraction of this, and it is a sum over
-  // every holder of the asset — PEPECASH's would be 9.95e16, an order of
-  // magnitude past what a `+` accumulator can carry.
+  // Exact sum: totals over all holders can exceed 2^53 (PEPECASH ~9.95e16).
   const holderTotal = sumRaw(holders?.map((h) => h.quantity) ?? []);
 
   // Trades: pool fills + completed book fills, one tape, newest first.

@@ -95,7 +95,7 @@ export function TradePanel({
     (url: string) => fetchJson(url).then((d) => d.result ?? null),
     { refreshInterval: 60_000 },
   );
-  // A price, so a double — but from an exact division of the reserves.
+  // A price: a double, from exact division of the reserves.
   const spot = pool
     ? ratio(
         pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b,
@@ -148,17 +148,9 @@ export function TradePanel({
   }, [compose.status, compose.txid, side, asset, address]);
 
   const limitPriceNum = parseFloat(limitPrice) || 0;
-  // Both sides of the order in exact integers, all the way to the compose.
-  //
-  // The price is a decimal the user typed, so read it as one — at 8 places it
-  // is itself an integer, and then Amount × Price ÷ 1e8 is integer arithmetic
-  // with nothing to round. That matters because these two numbers ARE the
-  // order: give_quantity and get_quantity, the pair consensus enforces and the
-  // wallet displays. `Math.round(parseFloat(amountStr) * 1e8)` was fine for the
-  // amounts people usually type and wrong for the ones this site invites — a
-  // whole 100M-supply bag is 10^16 raw, past where a double picks out a single
-  // integer, and past 1e21 `String` would have written it in exponent notation
-  // the compose endpoint cannot read at all.
+  // Exact integers end to end: price at 8 places is itself an integer, so
+  // Amount × Price ÷ 1e8 rounds nothing, and these two values ARE the
+  // give/get quantities consensus enforces.
   const priceExact = parseUnitsToRaw(limitPrice) ?? 0n;
   const typedAmountExact = parseUnitsToRaw(amountStr) ?? 0n;
   const typedTotalExact = parseUnitsToRaw(totalStr) ?? 0n;
@@ -215,8 +207,7 @@ export function TradePanel({
     if (limitPriceNum <= 0) return 0;
     let fillable = 0;
     if (pool && spot !== null) {
-      // Doubles from here: a closed-form curve solve with a square root in it
-      // is an estimate by nature, and it is labelled "~" on screen.
+      // Doubles: the curve solve is an estimate by nature (shown as "~").
       const Rx = approx(pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b);
       const Rt = approx(pool.asset_a === asset ? pool.reserve_a : pool.reserve_b);
       const f = POOL_FEE;

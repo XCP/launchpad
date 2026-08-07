@@ -1,22 +1,14 @@
 /**
- * Exact integer handling for Counterparty quantities.
- *
- * Quantities are unsigned 64-bit integers; JavaScript numbers are exact only
- * to 2^53-1, and JSON.parse rounds larger literals before application code
- * runs. Observed on this site: TTTTTAAAAAA's hard_cap 9223372036854775807
- * parses to ...776000, and XCP-69's own 10^16 hard cap sits above the safe
- * range (ulp 2) — so a non-conforming value can parse onto the standard's
- * exact value and defeat the isXcp69 equality check.
- *
- * BigInt, not a decimal library: every protocol value is an integer, and
- * BigInt is native and exact. Ratios and percentages are small by
- * construction and stay doubles.
+ * Exact integer handling for Counterparty quantities (unsigned 64-bit).
+ * Doubles are exact only to 2^53-1 and JSON.parse rounds larger literals
+ * during parsing; XCP-69's 10^16 hard cap sits above that line, so equality
+ * checks and compose parameters must see exact digits. BigInt throughout;
+ * ratios and percentages are small by construction and stay doubles.
  */
 
 /**
- * A raw quantity as it arrives from {@link parseJsonLossless}: `number`
- * within the safe range, `string` (all digits intact) above it. The union
- * makes the compiler reject bare arithmetic like `total + row.quantity`.
+ * A raw quantity as parsed: `number` within the safe range, `string` above
+ * it. The union makes the compiler reject bare arithmetic on quantities.
  */
 export type Raw = number | string;
 
@@ -41,10 +33,8 @@ const RATIO_SCALE_NUM = 1e12;
 /* -------------------------------------------------------------------- */
 
 /**
- * Rewrite integer literals outside the double-safe range as quoted strings.
- * Walks the text (not a regex) so digits inside string literals are never
- * touched. Fractions and exponents are left alone: they were never exact
- * integers, so quoting would change meaning rather than preserve it.
+ * Quote integer literals outside the double-safe range. Walks the text so
+ * digits inside string literals are untouched; fractions/exponents pass.
  */
 export function quoteUnsafeIntegers(text: string): string {
   let out = "";
@@ -94,10 +84,7 @@ export function quoteUnsafeIntegers(text: string): string {
   return out;
 }
 
-/**
- * JSON.parse with integers above 2^53-1 preserved as strings. Throws exactly
- * as JSON.parse does on malformed input.
- */
+/** JSON.parse with integers above 2^53-1 preserved as strings. */
 export function parseJsonLossless<T = unknown>(text: string): T {
   return JSON.parse(quoteUnsafeIntegers(text)) as T;
 }
@@ -107,16 +94,13 @@ export function parseJsonLossless<T = unknown>(text: string): T {
 /* -------------------------------------------------------------------- */
 
 /**
- * Exact bigint from a raw quantity, or null for non-integers, unsafe
- * doubles, and null/undefined (the API returns null quantities on
- * fairminters with no mints).
+ * Exact bigint, or null for non-integers, unsafe doubles, and null/undefined
+ * (the API returns null quantities on fairminters with no mints).
  */
 export function toBigInt(value: RawLike | null | undefined): bigint | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "bigint") return value;
   if (typeof value === "number") {
-    if (!Number.isInteger(value)) return null;
-    // An unsafe double no longer identifies a single integer.
     if (!Number.isSafeInteger(value)) return null;
     return BigInt(value);
   }
@@ -131,9 +115,8 @@ export function big(value: RawLike | null | undefined): bigint {
 }
 
 /**
- * Exact equality against a known constant. Required by isXcp69: the
- * standard's 10^16 hard cap is above the safe range, so `===` on parsed
- * numbers would accept off-by-one records.
+ * Exact equality against a known constant; `===` on parsed doubles would
+ * accept off-by-one records at 10^16 magnitudes.
  */
 export function rawEquals(value: RawLike | null | undefined, expected: bigint): boolean {
   const exact = toBigInt(value);
@@ -147,10 +130,7 @@ export function sumRaw(values: Iterable<RawLike | null | undefined>): bigint {
   return total;
 }
 
-/**
- * Sort comparator, largest first. The `b - a` idiom can return 0 for 64-bit
- * quantities that differ.
- */
+/** Sort comparator, largest first; `b - a` can return 0 for u64s that differ. */
 export function compareRawDesc(
   a: RawLike | null | undefined,
   b: RawLike | null | undefined,
@@ -179,10 +159,9 @@ export function maxRaw(a: RawLike | null | undefined, b: RawLike | null | undefi
 /* -------------------------------------------------------------------- */
 
 /**
- * Exact decimal string of a raw quantity divided by 10^decimals, trailing
- * zeros trimmed. Stays a string end to end: Intl.NumberFormat formats a
- * decimal string exactly but a number only to double precision (PEPECASH's
- * supply: 995,269,147.11111111 from the string, ...1111112 from the number).
+ * Exact decimal string of a raw quantity / 10^decimals, trailing zeros
+ * trimmed. String end to end: Intl formats strings exactly, numbers only to
+ * double precision.
  */
 export function rawToDecimalString(
   value: RawLike | null | undefined,
@@ -200,8 +179,8 @@ export function rawToDecimalString(
 }
 
 /**
- * Digit grouping for an exact decimal string. Intl's V3 format() accepts a
- * string; the bundled lib types predate that, hence the signature cast.
+ * Digit grouping for an exact decimal string. Intl's format() accepts a
+ * string; the bundled lib types predate that, hence the cast.
  */
 export function formatExact(
   decimal: string,
@@ -214,9 +193,8 @@ export function formatExact(
 }
 
 /**
- * Raw quantity as a double, for paths where an approximation is correct:
- * chart geometry, progress fractions, USD estimates. Never for a value that
- * will be composed into a transaction.
+ * Raw quantity as a double — only for approximate paths (charts, progress,
+ * USD), never for a value that will be composed.
  */
 export function approx(value: RawLike | null | undefined): number {
   if (typeof value === "number") return value;
@@ -224,9 +202,8 @@ export function approx(value: RawLike | null | undefined): number {
 }
 
 /**
- * Ratio of two raw quantities as a double. The operands may exceed double
- * range but the ratio is small by construction; scaling by {@link RATIO_SCALE}
- * keeps 12 significant figures through the bigint division.
+ * Ratio of two raw quantities as a double; scaled through bigint division so
+ * oversized operands keep 12 significant figures.
  */
 export function ratio(
   numerator: RawLike | null | undefined,
@@ -242,10 +219,9 @@ export function ratio(
 /* -------------------------------------------------------------------- */
 
 /**
- * Typed amount → exact raw units, or null when the text is not a number.
- * Reads the digits instead of `Math.round(parseFloat(s) * 1e8)`: a whole
- * XCP-69 bag is 10^16 raw, past double precision. Extra decimals truncate
- * (never round up a quantity someone is about to spend).
+ * Typed amount → exact raw units, or null if not a number. Reads digits
+ * rather than parseFloat (10^16 raw exceeds double precision); extra
+ * decimals truncate, never round up.
  */
 export function parseUnitsToRaw(input: string, decimals = 8): bigint | null {
   const trimmed = input.trim();
@@ -259,10 +235,9 @@ export function parseUnitsToRaw(input: string, decimals = 8): bigint | null {
 }
 
 /**
- * Quantity reduced by a slippage percentage, floored. Produces min_*
- * parameters — the figure consensus checks fills against — so the result
- * must be exact and must not round upward. Converts through basis points
- * because tolerances carry one decimal (Auto computes tenths).
+ * Quantity reduced by a slippage percentage, floored — produces the min_*
+ * parameters consensus checks fills against. Basis points, since tolerances
+ * carry one decimal.
  */
 export function reduceByPercent(
   value: RawLike | null | undefined,
@@ -283,11 +258,9 @@ export function percentOf(value: RawLike | null | undefined, percent: number): b
 /* -------------------------------------------------------------------- */
 
 /**
- * Exact decimal digits for a compose query parameter. Last gate before a
- * value becomes a signed transaction: String() on an unsafe double prints
- * digits of an integer nobody chose, and past 1e21 prints exponent notation
- * the API cannot parse — so unsafe numbers throw instead. Strings and
- * bigints pass through; both carry exact digits.
+ * Exact decimal digits for a compose query parameter — the last gate before
+ * signing. Unsafe doubles throw (String() would print wrong digits or
+ * exponent notation); strings and bigints pass through.
  */
 export function quantityParam(value: string | number | bigint): string {
   if (typeof value === "bigint") return value.toString();

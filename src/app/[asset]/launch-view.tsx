@@ -62,21 +62,15 @@ export function LaunchView({
   const progress = saleProgress(fm);
   // sort_pair orders the pool lexically — XCP can sit on either side.
   const xcpIsA = pool?.asset_a === "XCP";
-  // From the raw reserves, not the `_normalized` strings: those are computed
-  // API-side in Python floats and can be off in the last place, and reading
-  // one back with Number() re-rounds it a second time. The raw integer is the
-  // authoritative field and fromSats divides it exactly.
+  // Raw reserves, not `_normalized`: the normalized strings are API-side
+  // float artifacts; the raw integer is authoritative.
   const poolXcpRaw = pool ? (xcpIsA ? pool.reserve_a : pool.reserve_b) : 0;
   const poolTokensRaw = pool ? (xcpIsA ? pool.reserve_b : pool.reserve_a) : 0;
-  // Doubles from here down: everything below is a ratio, a percentage or a USD
-  // estimate. A pool reserve is ~3e15 raw at XCP-69 scale, well inside exact.
+  // Doubles below: ratios, percentages, USD estimates (reserves ~3e15 raw).
   const poolXcp = fromSats(poolXcpRaw);
   const poolTokens = fromSats(poolTokensRaw);
 
-  // Organic-look aggregates — the survival predictors as UI. Summed as exact
-  // integers: a per-address total is the shape that quietly drifts once the
-  // mints add up, and it is the number the "Top address" concentration claim
-  // rests on.
+  // Per-address totals summed exactly; the concentration stat reads them.
   const byAddress = new Map<string, bigint>();
   for (const m of mints) {
     byAddress.set(m.source, (byAddress.get(m.source) ?? 0n) + big(m.earn_quantity));

@@ -13,9 +13,8 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
     next: { revalidate },
   });
   if (!res.ok) throw new Error(`Counterparty API ${res.status}: ${path}`);
-  // Not res.json(): JSON.parse rounds any integer above 2^53-1 while parsing,
-  // so a 64-bit quantity loses digits before this function returns and nothing
-  // downstream can recover them. Oversized integers arrive as strings instead.
+  // Not res.json(): JSON.parse rounds integers above 2^53-1; oversized
+  // integers arrive as strings instead.
   return parseJsonLossless<T>(await res.text());
 }
 
