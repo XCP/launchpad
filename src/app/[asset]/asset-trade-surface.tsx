@@ -23,13 +23,13 @@ export function AssetTradeSurface({
   asset: string;
   xcpUsd: number | null;
 }) {
-  const [mode, setMode] = useState<"swap" | "liquidity" | "limit">("swap");
+  const [mode, setMode] = useState<"swap" | "limit" | "liquidity">("swap");
   return (
     <SwapSettingsProvider>
       <div className="mb-4 flex items-center justify-between gap-2">
         <Tabs value={mode} onValueChange={(v) => setMode(v as typeof mode)}>
           <SegmentedList className="w-full max-w-md">
-            {(["swap", "liquidity", "limit"] as const).map((m) => (
+            {(["swap", "limit", "liquidity"] as const).map((m) => (
               <SegmentedTrigger key={m} value={m}>
                 {m}
               </SegmentedTrigger>
