@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
-import { AssetChip, XcpChip } from "@/components/asset-chip";
+import { AssetChip } from "@/components/asset-chip";
 import { ConnectButton } from "@/components/connect-button";
 import { OrderTracker } from "@/components/order-tracker";
 import { QuoteRing } from "@/components/quote-ring";
@@ -231,13 +231,15 @@ export function SwapWidget({
     setPriceMoved(false);
   };
 
-  // On a single-asset surface (the asset page) the chip is identity, not a
-  // control — no chevron, no modal.
-  const tokenChip = compact ? (
-    <AssetChip asset={asset} />
-  ) : (
-    <AssetChip asset={asset} onClick={() => setSelectorOpen(true)} />
-  );
+  // Every ticker is a dropdown on the swap page — the XCP side included;
+  // both open the same pair selector. On a single-asset surface (the asset
+  // page) the chip is identity, not a control — no chevron, no modal.
+  const chipFor = (a: string) =>
+    compact ? (
+      <AssetChip asset={a} />
+    ) : (
+      <AssetChip asset={a} onClick={() => setSelectorOpen(true)} />
+    );
 
   const balanceControls = effBalance !== undefined && (
     <span className="group/bal flex min-w-0 items-center gap-1">
@@ -385,7 +387,7 @@ export function SwapWidget({
         chipRight={
           compact && effBalance !== undefined ? balanceControls : undefined
         }
-        chip={giveAsset === "XCP" ? <XcpChip /> : tokenChip}
+        chip={chipFor(giveAsset)}
         footer={
           <>
             <span>≈ {usdFmt(giveUsd ?? 0)}</span>
@@ -416,7 +418,7 @@ export function SwapWidget({
       <Well
         layout={compact ? "stack" : "row"}
         label="Buy"
-        chip={getAsset === "XCP" ? <XcpChip /> : tokenChip}
+        chip={chipFor(getAsset)}
         chipRight={
           compact && availableRaw !== null ? (
             <span>{commas(Math.round(availableRaw / SATS))} in pool</span>

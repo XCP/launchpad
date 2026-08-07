@@ -4,11 +4,11 @@ import { TokenImage } from "@/components/token-image";
 
 /**
  * One pill for every asset, XCP and BTC included — real icons, not letter
- * badges. Fixed width sized for a 12-character name so pills are identical
- * across any pair (3 to 12 chars), content left-aligned within.
+ * badges. Pills hug their content (Radiant/Uniswap convention) with a cap
+ * so a runaway subasset name truncates instead of crushing the amount.
  */
 const SHELL =
-  "flex w-44 shrink-0 items-center justify-start gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm";
+  "flex max-w-44 shrink-0 items-center justify-start gap-2 rounded-full border border-gray-200 bg-white py-1.5 pl-2 pr-3 shadow-sm";
 
 export function AssetChip({
   asset,
