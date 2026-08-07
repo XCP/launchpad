@@ -180,13 +180,15 @@ export function useCompose() {
     escrow_quantity: number
     mainchainrate: number
     status?: number
+    /** sat/vB override; defaults to the next-block median at compose time. */
+    fee_rate?: number
   }) => execute('dispenser', {
     asset: params.asset,
     give_quantity: params.give_quantity,
     escrow_quantity: params.escrow_quantity,
     mainchainrate: params.mainchainrate,
     status: params.status ?? 0,
-  })
+  }, params.fee_rate)
 
   const composeDispense = (params: {
     dispenser: string

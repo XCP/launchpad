@@ -207,7 +207,7 @@ export function useDispenseRouter() {
     }
   };
 
-  const start = async (planned: PlannedLeg[]) => {
+  const start = async (planned: PlannedLeg[], feeRateOverride?: number) => {
     if (!address || planned.length === 0 || runningRef.current) return;
     setPlanError(null);
     setPhase("running");
@@ -222,7 +222,7 @@ export function useDispenseRouter() {
     sync();
 
     try {
-      feeRateRef.current = await fetchPriorityFeeRate();
+      feeRateRef.current = feeRateOverride ?? (await fetchPriorityFeeRate());
       const utxos = await fetchConfirmedUtxos(address);
       const reserve = feeRateRef.current * FEE_VBYTES;
       const totalNeeded = planned.reduce((s, l) => s + l.btcSats + reserve, 0);

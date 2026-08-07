@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
@@ -15,6 +15,14 @@ import { commas, compact, shortAddress, usd as usdFmt } from "@/lib/format";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { GearPopover } from "@/components/ui/popover";
+import { fetchMedianFeeRate } from "@/lib/wallet/useCompose";
+import {
+  readSettings,
+  readSettingsServer,
+  subscribeSettings,
+  updateSettings,
+} from "@/app/swap/trade-settings-store";
 import { XCP69 } from "@/lib/xcp69";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
@@ -61,6 +69,15 @@ export function XcpBridge({
   xcpUsd: number | null;
 }) {
   const [direction, setDirection] = useState<"load" | "unload">("load");
+  const settings = useSyncExternalStore(
+    subscribeSettings,
+    readSettings,
+    readSettingsServer,
+  );
+  const customFee = Math.min(
+    Math.round(parseFloat(settings.customFeeRate) || 0),
+    500,
+  );
   const [flips, setFlips] = useState(0);
   const flip = () => {
     setFlips((f) => f + 1);
@@ -69,17 +86,20 @@ export function XcpBridge({
 
   return (
     <div>
-      <Tabs
-        value={direction}
-        onValueChange={(v) => {
-          if (v !== direction) flip();
-        }}
-      >
-        <SegmentedList className="mb-4 w-64">
-          <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
-          <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
-        </SegmentedList>
-      </Tabs>
+      <div className="mb-4 flex items-center justify-between">
+        <Tabs
+          value={direction}
+          onValueChange={(v) => {
+            if (v !== direction) flip();
+          }}
+        >
+          <SegmentedList className="w-64">
+            <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
+            <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
+          </SegmentedList>
+        </Tabs>
+        <DispenseSettingsGear />
+      </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         {direction === "load" ? (
           <LoadCard
@@ -88,6 +108,7 @@ export function XcpBridge({
             xcpUsd={xcpUsd}
             onFlip={flip}
             flips={flips}
+            customFee={customFee}
           />
         ) : (
           <UnloadCard
@@ -96,10 +117,52 @@ export function XcpBridge({
             xcpUsd={xcpUsd}
             onFlip={flip}
             flips={flips}
+            customFee={customFee}
           />
         )}
       </div>
     </div>
+  );
+}
+
+/** TX fee for both directions — routing budgets it, composes pay it. */
+function DispenseSettingsGear() {
+  const settings = useSyncExternalStore(
+    subscribeSettings,
+    readSettings,
+    readSettingsServer,
+  );
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+    refreshInterval: 30_000,
+  });
+  const customFee = Math.min(
+    Math.round(parseFloat(settings.customFeeRate) || 0),
+    500,
+  );
+  return (
+    <GearPopover active={customFee > 0} label="Dispense settings">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+            customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          }`}
+        >
+          <AmountInput
+            value={settings.customFeeRate}
+            onChange={(v) => updateSettings({ customFeeRate: v })}
+            placeholder={medianFeeRate ? String(medianFeeRate) : "…"}
+            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+          />
+          <span className="text-xs text-gray-400">sat/vB</span>
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+        The Bitcoin miner fee. Default tracks the next-block priority rate —
+        dispense purchases should confirm promptly.
+      </p>
+    </GearPopover>
   );
 }
 
@@ -113,12 +176,14 @@ function LoadCard({
   xcpUsd,
   onFlip,
   flips,
+  customFee,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
   xcpUsd: number | null;
   onFlip: () => void;
   flips: number;
+  customFee: number;
 }) {
   const { address, status: walletStatus, connect } = useWallet();
   const router = useDispenseRouter();
@@ -621,7 +686,7 @@ function LoadCard({
                   return;
                 }
                 setArmed(false);
-                router.start(plan);
+                router.start(plan, customFee > 0 ? customFee : undefined);
               }}
               className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
             >
@@ -704,12 +769,14 @@ function UnloadCard({
   xcpUsd,
   onFlip,
   flips,
+  customFee,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
   xcpUsd: number | null;
   onFlip: () => void;
   flips: number;
+  customFee: number;
 }) {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
@@ -759,6 +826,7 @@ function UnloadCard({
       escrow_quantity: escrowRaw,
       mainchainrate: priceSats,
       status: 0,
+      fee_rate: customFee > 0 ? customFee : undefined,
     });
 
   const close = () =>
@@ -909,44 +977,77 @@ function UnloadCard({
         </div>
       </Well>
 
-      {/* Price row */}
-      <div className="px-2 pt-2">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-gray-500">Your price</span>
-          <span className="flex items-center gap-2">
-            <span
-              className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                parseFloat(price) > 0 ? "border-purple-300" : "border-gray-200"
-              }`}
-            >
-              <AmountInput
-                value={price}
-                onChange={setPrice}
-                placeholder={marketSats ? String(marketSats) : "0"}
-                ariaLabel="Price in sats per XCP"
-                className="w-16 bg-transparent text-right text-xs font-medium outline-none"
-              />
-              <span className="ml-1 text-gray-400">sats/XCP</span>
-            </span>
-            {vsMarket !== null && (
-              <span
-                className={
-                  Math.abs(vsMarket) < 0.5
-                    ? "font-medium text-gray-500"
-                    : vsMarket > 0
-                      ? "font-medium text-green-600"
-                      : "font-medium text-amber-600"
-                }
-              >
-                {Math.abs(vsMarket) < 0.5
-                  ? "at market"
-                  : vsMarket > 0
-                    ? `+${vsMarket.toFixed(0)}% premium`
-                    : `−${Math.abs(vsMarket).toFixed(0)}% · sells fast`}
+      {/* Price well — same grammar as the limit form's price */}
+      <div className="mt-1">
+        <Well
+          focusable
+          label="Your price · sats per XCP"
+          topRight={
+            marketSats ? (
+              <span className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPrice(String(marketSats))}
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  Market
+                </button>
+                {[1, 5, 10].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() =>
+                      setPrice(String(Math.round(marketSats * (1 + p / 100))))
+                    }
+                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  >
+                    +{p}%
+                  </button>
+                ))}
               </span>
-            )}
-          </span>
-        </div>
+            ) : undefined
+          }
+          footer={
+            <>
+              <span>
+                {vsMarket !== null && Math.abs(vsMarket) >= 0.5 ? (
+                  <span
+                    className={
+                      vsMarket > 0
+                        ? "font-medium text-green-600"
+                        : "font-medium text-amber-600"
+                    }
+                  >
+                    {vsMarket > 0
+                      ? `+${vsMarket.toFixed(0)}% premium`
+                      : `−${Math.abs(vsMarket).toFixed(0)}% · sells fast`}
+                  </span>
+                ) : vsMarket !== null ? (
+                  <span>at market</span>
+                ) : (
+                  <span>&nbsp;</span>
+                )}
+              </span>
+              {marketSats && (
+                <button
+                  type="button"
+                  className="text-gray-500 hover:text-purple-600"
+                  onClick={() => setPrice(String(marketSats))}
+                >
+                  Market: {marketSats.toLocaleString()}
+                </button>
+              )}
+            </>
+          }
+        >
+          <AmountInput
+            value={price}
+            onChange={setPrice}
+            placeholder={marketSats ? String(marketSats) : "0"}
+            ariaLabel="Price in sats per XCP"
+            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          />
+        </Well>
       </div>
 
       <div className="px-0.5 pb-0.5 pt-3">
@@ -982,6 +1083,7 @@ function UnloadCard({
     <SellBook
       open={dispensers}
       yourPriceSats={priceSats}
+      yourEscrowXcp={escrowRaw / SATS}
       active={escrowRaw > 0 || (parseFloat(price) || 0) > 0}
       onPick={(sats) => setPrice(String(sats))}
     />
@@ -1069,17 +1171,21 @@ function RouteBook({
 function SellBook({
   open,
   yourPriceSats,
+  yourEscrowXcp,
   active,
   onPick,
 }: {
   open: Dispenser[];
   yourPriceSats: number;
+  yourEscrowXcp: number;
   active: boolean;
   onPick: (sats: number) => void;
 }) {
   const rows = open.slice(0, 10);
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
-  const rank = yourPriceSats > 0 ? open.filter((r) => r.price < yourPriceSats).length : 0;
+  // Equal prices sell before you (earlier tx_index vends first), so a
+  // matched price slots you below the incumbents.
+  const rank = yourPriceSats > 0 ? open.filter((r) => r.price <= yourPriceSats).length : 0;
   const markerAt = Math.min(rank, rows.length);
   const youRow = active && yourPriceSats > 0 && (
     <li
@@ -1092,7 +1198,7 @@ function SellBook({
           <span className="font-normal text-amber-600">sats</span>
         </span>
         <span className="font-medium text-amber-700">
-          you · #{rank + 1} of {open.length + 1}
+          {yourEscrowXcp > 0 ? `you · ${commas(yourEscrowXcp)} XCP` : "you"}
         </span>
       </span>
     </li>
