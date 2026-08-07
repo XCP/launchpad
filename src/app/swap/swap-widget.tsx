@@ -289,7 +289,9 @@ export function SwapWidget({
         : outRaw === 0
           ? staleQuote
             ? "Fetching quote…"
-            : "Insufficient liquidity"
+            : availableRaw
+              ? "Amount too small — rounds to 0"
+              : "Insufficient liquidity"
           : impact >= 5
             ? `${side === "buy" ? "Buy" : "Sell"} anyway`
             : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
