@@ -1210,15 +1210,17 @@ function RouteBook({
                   {Math.round(r.price).toLocaleString()}{" "}
                   <span className="font-normal text-gray-400">sats</span>
                 </span>
-                <span className="text-gray-500">
-                  {t ? (
-                    <span className="font-semibold text-purple-700">
-                      {commas(t * (r.give_quantity / SATS))} of{" "}
-                    </span>
-                  ) : null}
-                  {Math.round(r.give_remaining / SATS).toLocaleString()} XCP
+                <span className="flex items-center gap-2">
+                  <span className="text-gray-500">
+                    {t ? (
+                      <span className="font-semibold text-purple-700">
+                        {commas(t * (r.give_quantity / SATS))} of{" "}
+                      </span>
+                    ) : null}
+                    {Math.round(r.give_remaining / SATS).toLocaleString()} XCP
+                  </span>
+                  <ExplorerLink txHash={r.tx_hash} />
                 </span>
-                <ExplorerLink txHash={r.tx_hash} />
               </span>
             </li>
           );
