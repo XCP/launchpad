@@ -309,9 +309,15 @@ function LoadCard({
     for (const sub of subsets) {
       if (forced && !sub.some((i) => routes[i].source === forced.source)) continue;
       if (sub.reduce((s, i) => s + caps[i], 0) < n) continue;
-      const order = [...sub].sort(
-        (x, y) => routes[x].satoshirate - routes[y].satoshirate,
-      );
+      // A forced route fills FIRST — otherwise a cheaper route absorbs the
+      // whole order and the user's pick silently drops out of the plan.
+      const order = [...sub].sort((x, y) => {
+        if (forced) {
+          if (routes[x].source === forced.source) return -1;
+          if (routes[y].source === forced.source) return 1;
+        }
+        return routes[x].satoshirate - routes[y].satoshirate;
+      });
       let left = n;
       const legs: PlannedLeg[] = [];
       for (const i of order) {
@@ -621,7 +627,9 @@ function LoadCard({
                     onClick={() => setRouteOpen(true)}
                     className="font-medium text-purple-600 hover:underline"
                   >
-                    {shortAddress(d.source)} · cheapest of {open.length} ▾
+                    {forced
+                      ? `${shortAddress(d.source)} · your pick ▾`
+                      : `cheapest of ${open.length} ▾`}
                   </button>
                 )}
               </dd>
@@ -639,7 +647,7 @@ function LoadCard({
             </div>
             <div className="flex justify-between">
               <dt>Arrival</dt>
-              <dd>next block after your BTC confirms</dd>
+              <dd>next block after BTC confirms</dd>
             </div>
           </dl>
         )}
@@ -1103,16 +1111,13 @@ function UnloadCard({
               </dt>
               <dd className="font-medium tabular-nums text-gray-700">
                 {queueAheadXcp > 0
-                  ? `${queueAheadXcp.toLocaleString()} XCP is priced ahead of you`
-                  : "you are first at this price"}
+                  ? `${queueAheadXcp.toLocaleString()} XCP ahead of you`
+                  : "first at this price"}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt>Vends</dt>
-              <dd>
-                1 XCP per purchase · up to {wholeEscrow.toLocaleString()}{" "}
-                purchases
-              </dd>
+              <dd>{wholeEscrow.toLocaleString()} × 1 XCP</dd>
             </div>
             {sellFeeRate !== null && (
               <div className="flex justify-between">
@@ -1130,7 +1135,7 @@ function UnloadCard({
             )}
             <div className="flex justify-between">
               <dt>Close</dt>
-              <dd>anytime · unsold XCP returns after ~5 blocks</dd>
+              <dd>returns unsold after ~5 blocks</dd>
             </div>
           </dl>
         </div>
