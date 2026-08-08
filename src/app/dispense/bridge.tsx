@@ -11,7 +11,7 @@ import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
-import { commas, compact, shortAddress, usd as usdFmt } from "@/lib/format";
+import { commas, shortAddress, usd as usdFmt } from "@/lib/format";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -23,7 +23,6 @@ import {
   subscribeSettings,
   updateSettings,
 } from "@/app/swap/trade-settings-store";
-import { XCP69 } from "@/lib/xcp69";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import {
@@ -34,7 +33,6 @@ import {
 
 const SATS = 1e8;
 /** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
-const TOKENS_PER_XCP = XCP69.QUANTITY_BY_PRICE / XCP69.PRICE;
 
 /**
  * Dispenser addresses with a dispense already pending in the mempool: a
@@ -231,7 +229,6 @@ function LoadCard({
   const [btcAmount, setBtcAmount] = useState("");
   const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
   const [routeOpen, setRouteOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [armed, setArmed] = useState(false);
 
   const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
@@ -590,7 +587,7 @@ function LoadCard({
         />
       </Well>
 
-      {/* Rate + route details */}
+      {/* Rate line + always-open receipt (the house grammar) */}
       <div className="px-2 pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600">
@@ -606,38 +603,19 @@ function LoadCard({
               </span>
             )}
           </span>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen((v) => !v)}
-            aria-label="Route details"
-            className="flex items-center gap-1 text-gray-400 hover:text-gray-600"
-          >
-            <span
-              aria-hidden
-              className="inline-block transition-transform duration-100"
-              style={{ transform: detailsOpen ? "rotate(180deg)" : "none" }}
-            >
-              ▾
-            </span>
-          </button>
         </div>
-        {detailsOpen && (
+        {plan.length > 0 && snapped > 0 && (
           <dl className="mt-2 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
-            {plan.length > 1 ? (
-              plan.map((leg, i) => (
-                <div key={leg.dispenser.source} className="flex justify-between">
-                  <dt>{i === 0 ? `Routes (${plan.length} txs)` : ""}</dt>
-                  <dd>
-                    {commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
-                    · {Math.round(leg.dispenser.price).toLocaleString()} sats ·{" "}
-                    {shortAddress(leg.dispenser.source)}
-                  </dd>
-                </div>
-              ))
-            ) : (
-              <div className="flex justify-between">
-                <dt>Route</dt>
-                <dd>
+            <div className="flex justify-between">
+              <dt>Routes</dt>
+              <dd>
+                {plan.length > 1 ? (
+                  `${plan.length} txs · ${plan
+                    .map((leg) =>
+                      commas(leg.units * (leg.dispenser.give_quantity / SATS)),
+                    )
+                    .join(" + ")} XCP`
+                ) : (
                   <button
                     type="button"
                     onClick={() => setRouteOpen(true)}
@@ -645,45 +623,24 @@ function LoadCard({
                   >
                     {shortAddress(d.source)} · cheapest of {open.length} ▾
                   </button>
-                </dd>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <dt>Depth</dt>
-              <dd>
-                {commas(capacity * unitXcp)} XCP across up to {MAX_LEGS} of{" "}
-                {open.length} route{open.length === 1 ? "" : "s"}
+                )}
               </dd>
             </div>
-            {plan.length > 0 && (
-              <div className="flex justify-between">
-                <dt title="Each route is its own Bitcoin transaction — the router weighs this against cheaper but shallower routes">
-                  Network fees · {plan.length} tx{plan.length === 1 ? "" : "s"}
-                </dt>
-                <dd>
-                  ~{(plan.length * legFeeSats).toLocaleString()} sats
-                  {btcUsd
-                    ? ` (≈${usdFmt(((plan.length * legFeeSats) / SATS) * btcUsd)})`
-                    : ""}
-                </dd>
-              </div>
-            )}
+            <div className="flex justify-between">
+              <dt title="Each route is its own Bitcoin transaction — the router weighs this against cheaper but shallower routes">
+                TX fees{plan.length > 1 ? ` · ${plan.length} txs` : ""}
+              </dt>
+              <dd>
+                ~{(plan.length * legFeeSats).toLocaleString()} sats
+                {btcUsd
+                  ? ` (≈${usdFmt(((plan.length * legFeeSats) / SATS) * btcUsd)})`
+                  : ""}
+              </dd>
+            </div>
             <div className="flex justify-between">
               <dt>Arrival</dt>
               <dd>next block after your BTC confirms</dd>
             </div>
-            {snapped > 0 && (
-              <div className="flex justify-between">
-                <dt>Mints</dt>
-                <dd>{compact(snapped * TOKENS_PER_XCP)} tokens of any launch</dd>
-              </div>
-            )}
-            {hiddenCount > 0 && (
-              <div className="flex justify-between">
-                <dt>Hidden routes</dt>
-                <dd>{hiddenCount} with a purchase pending in the mempool</dd>
-              </div>
-            )}
           </dl>
         )}
       </div>
@@ -868,6 +825,18 @@ function UnloadCard({
 
   const busy = isBusy(compose.status);
   const ready = escrowRaw >= SATS && priceSats > 0 && !busy && !existing && !insufficient;
+
+  // Inventory priced at-or-under yours — what must sell before your first
+  // vend (ties go to earlier tx_index, so equal prices count as ahead).
+  const queueAheadXcp = Math.round(
+    dispensers
+      .filter((r) => priceSats > 0 && r.price <= priceSats)
+      .reduce((sum, r) => sum + r.give_remaining, 0) / SATS,
+  );
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+    refreshInterval: 30_000,
+  });
+  const sellFeeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
 
   const openDispenser = () =>
     compose.composeDispenser({
@@ -1123,6 +1092,49 @@ function UnloadCard({
             : "0"}
         </div>
       </Well>
+
+      {/* Always-open receipt — the house grammar */}
+      {escrowRaw >= SATS && priceSats > 0 && (
+        <div className="px-2 pt-2">
+          <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+            <div className="flex justify-between">
+              <dt title="Inventory priced at or under yours — at the same price, earlier dispensers vend first">
+                Queue
+              </dt>
+              <dd className="font-medium tabular-nums text-gray-700">
+                {queueAheadXcp > 0
+                  ? `${queueAheadXcp.toLocaleString()} XCP is priced ahead of you`
+                  : "you are first at this price"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>Vends</dt>
+              <dd>
+                1 XCP per purchase · up to {wholeEscrow.toLocaleString()}{" "}
+                purchases
+              </dd>
+            </div>
+            {sellFeeRate !== null && (
+              <div className="flex justify-between">
+                <dt>TX fee</dt>
+                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                  {sellFeeRate} sat/vB
+                  {btcUsd !== null && (
+                    <span className="text-gray-400">
+                      {" "}
+                      (~{usdFmt(((sellFeeRate * 250) / SATS) * btcUsd)})
+                    </span>
+                  )}
+                </dd>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <dt>Close</dt>
+              <dd>anytime · unsold XCP returns after ~5 blocks</dd>
+            </div>
+          </dl>
+        </div>
+      )}
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
