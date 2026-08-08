@@ -161,9 +161,24 @@ export function MintPanel({
             <>
               <span>≈ {usdFmt(xcpUsd && costXcp > 0 ? costXcp * xcpUsd : 0)}</span>
               {xcpBalance !== undefined && (
-                <span className={insufficient ? "text-red-600" : "text-gray-500"}>
+                <button
+                  type="button"
+                  className={`min-w-0 truncate hover:text-purple-600 ${
+                    insufficient ? "text-red-600" : "text-gray-500"
+                  }`}
+                  onClick={() =>
+                    setTokens(
+                      String(
+                        Math.min(
+                          MAX_LOTS,
+                          Math.floor(xcpBalance / XCP69.PRICE),
+                        ) * TOKENS_PER_LOT,
+                      ),
+                    )
+                  }
+                >
                   Balance: {commas(xcpBalance / SATS)}
-                </span>
+                </button>
               )}
             </>
           }
