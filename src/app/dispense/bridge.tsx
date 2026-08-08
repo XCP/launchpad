@@ -8,7 +8,6 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
-import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
 import { commas, shortAddress, usd as usdFmt } from "@/lib/format";
@@ -222,13 +221,11 @@ function LoadCard({
     { refreshInterval: 60_000 },
   );
   const router = useDispenseRouter();
-  const [routeIdx, setRouteIdx] = useState(0);
   // Independent-field pattern: whichever side was typed last drives; the
   // other derives. No dead fields — start from either end of the bridge.
   const [xcpAmount, setXcpAmount] = useState("");
   const [btcAmount, setBtcAmount] = useState("");
   const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
-  const [routeOpen, setRouteOpen] = useState(false);
   const [armed, setArmed] = useState(false);
 
   const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
@@ -254,9 +251,7 @@ function LoadCard({
   );
   const legFeeSats = Math.max(1, feeRec?.halfHourFee ?? 3) * 300;
 
-  const pick = Math.min(routeIdx, Math.max(open.length - 1, 0));
-  const d = open[pick];
-  const forced = pick !== 0 && d ? d : null; // user explicitly chose a route
+  const d = open[0];
   const unitXcp = d ? d.give_quantity / SATS : 1;
   const capsAll = open.map((r) =>
     Math.max(0, Math.floor(r.give_remaining / r.give_quantity)),
@@ -307,17 +302,10 @@ function LoadCard({
     let best: PlannedLeg[] = [];
     let bestCost = Infinity;
     for (const sub of subsets) {
-      if (forced && !sub.some((i) => routes[i].source === forced.source)) continue;
       if (sub.reduce((s, i) => s + caps[i], 0) < n) continue;
-      // A forced route fills FIRST — otherwise a cheaper route absorbs the
-      // whole order and the user's pick silently drops out of the plan.
-      const order = [...sub].sort((x, y) => {
-        if (forced) {
-          if (routes[x].source === forced.source) return -1;
-          if (routes[y].source === forced.source) return 1;
-        }
-        return routes[x].satoshirate - routes[y].satoshirate;
-      });
+      const order = [...sub].sort(
+        (x, y) => routes[x].satoshirate - routes[y].satoshirate,
+      );
       let left = n;
       const legs: PlannedLeg[] = [];
       for (const i of order) {
@@ -622,15 +610,10 @@ function LoadCard({
                     )
                     .join(" + ")} XCP`
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => setRouteOpen(true)}
-                    className="font-medium text-purple-600 hover:underline"
-                  >
-                    {forced
-                      ? `${shortAddress(d.source)} · your pick ▾`
-                      : `cheapest of ${open.length} ▾`}
-                  </button>
+                  <span>
+                    {shortAddress(plan[0]!.dispenser.source)} · cheapest of{" "}
+                    {open.length}
+                  </span>
                 )}
               </dd>
             </div>
@@ -711,51 +694,6 @@ function LoadCard({
         </p>
       </div>
 
-      <Dialog
-        open={routeOpen}
-        onOpenChange={(o) => !o && setRouteOpen(false)}
-        title="Choose a route"
-      >
-            <div className="max-h-[45vh] overflow-y-auto">
-              {open.map((disp, i) => (
-                <button
-                  key={disp.source}
-                  type="button"
-                  onClick={() => {
-                    setRouteIdx(i);
-                    setRouteOpen(false);
-                  }}
-                  className={`flex h-14 w-full items-center justify-between gap-3 rounded-xl px-3 text-left transition-colors hover:bg-gray-50 ${
-                    disp.source === d.source ? "bg-purple-50/60" : ""
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-gray-900">
-                      {Math.round(disp.price).toLocaleString()} sats/XCP
-                      {btcUsd && (
-                        <span className="font-normal text-gray-400">
-                          {" "}
-                          ({usdFmt((disp.price / SATS) * btcUsd)})
-                        </span>
-                      )}
-                    </span>
-                    <span className="block truncate text-xs text-gray-400">
-                      {shortAddress(disp.source)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs text-gray-500">
-                    {commas(disp.give_remaining / SATS)} XCP left
-                  </span>
-                </button>
-              ))}
-            </div>
-            {hiddenCount > 0 && (
-              <p className="px-3 pb-1 pt-2 text-[11px] text-gray-400">
-                {hiddenCount} route{hiddenCount === 1 ? "" : "s"} hidden — a
-                purchase is pending in the mempool.
-              </p>
-            )}
-      </Dialog>
     </div>
     <RouteBook open={open} plan={plan} hiddenCount={hiddenCount} />
     </div>
