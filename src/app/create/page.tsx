@@ -40,8 +40,11 @@ type NameCheck =
  * conformance, so the shortest option still leaves hours of headroom for
  * the transaction to confirm.
  */
+// Six blocks is the floor: a 1-block lead is a coin flip on block timing —
+// one slow block and the launch confirms past its start, permanently
+// non-conforming with the name spent (observed live on the first test
+// launch). Anyone who wants a next-block start can compose it themselves.
 const PREANNOUNCE_OPTIONS: { blocks: number; label: string; priority?: boolean }[] = [
-  { blocks: 1, label: "next block (~10 min)", priority: true },
   { blocks: 6, label: "~1 hour", priority: true },
   { blocks: 36, label: "~6 hours" },
   { blocks: 144, label: "~1 day" },
