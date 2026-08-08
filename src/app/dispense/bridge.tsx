@@ -1071,10 +1071,6 @@ function UnloadCard({
                 </dd>
               </div>
             )}
-            <div className="flex justify-between">
-              <dt>Close</dt>
-              <dd>returns unsold after ~5 blocks</dd>
-            </div>
           </dl>
         </div>
       )}
