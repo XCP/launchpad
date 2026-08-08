@@ -637,10 +637,6 @@ export function LiquidityWidget({
               {txFeeRow}
             </dl>
           </div>
-          <p className="px-2 text-xs text-gray-500">
-            Only liquidity you added can leave — the launch liquidity is
-            burned and stays forever.
-          </p>
         </div>
       )}
 
