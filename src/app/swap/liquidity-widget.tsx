@@ -608,14 +608,13 @@ export function LiquidityWidget({
               </div>
               <div className="flex justify-between">
                 <dt>You receive (est.)</dt>
-                <dd className="text-right font-medium tabular-nums text-gray-700">
-                  {commas(outTokenRaw / SATS)} {asset}
-                  <br />
+                <dd className="font-medium tabular-nums text-gray-700">
+                  {commas(outTokenRaw / SATS)} {asset} +{" "}
                   {commas(outXcpRaw / SATS)} XCP
                   {xcpUsd && outXcpRaw > 0 ? (
                     <span className="font-normal text-gray-400">
                       {" "}
-                      (≈{usdFmt((outXcpRaw / SATS) * xcpUsd)})
+                      (≈{usdFmt(2 * (outXcpRaw / SATS) * xcpUsd)})
                     </span>
                   ) : null}
                 </dd>
@@ -625,10 +624,9 @@ export function LiquidityWidget({
                   <dt title="Below this the transaction is void — nothing is debited">
                     Min received · slippage {lqSlippage}%
                   </dt>
-                  <dd className="text-right tabular-nums">
+                  <dd className="tabular-nums">
                     {commas(Math.floor(outTokenRaw * (1 - tolerance)) / SATS)}{" "}
-                    {asset}
-                    <br />
+                    {asset} +{" "}
                     {commas(Math.floor(outXcpRaw * (1 - tolerance)) / SATS)} XCP
                   </dd>
                 </div>
