@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { AmountInput } from "@/components/amount-input";
 import { AssetChip } from "@/components/asset-chip";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
@@ -138,10 +137,16 @@ export function MintPanel({
           </>
         }
       >
-        <AmountInput
-          value={tokens}
-          onChange={setTokens}
-          ariaLabel={`${asset} to mint`}
+        {/* Integer-only, so the input can carry real digit grouping —
+            unlike decimal AmountInputs, where a comma means a decimal point. */}
+        <input
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          value={typedTokens > 0 ? typedTokens.toLocaleString("en-US") : tokens}
+          onChange={(e) => setTokens(e.target.value.replace(/[^0-9]/g, ""))}
+          placeholder="0"
+          aria-label={`${asset} to mint`}
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
         />
       </Well>
