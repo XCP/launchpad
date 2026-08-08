@@ -970,7 +970,7 @@ function UnloadCard({
     <div className="contents">
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
       {/* Price well — same grammar as the limit form's price */}
-      <div className="mt-1">
+      <div>
         <Well
           focusable
           label="Price · sats per XCP"
@@ -1147,10 +1147,7 @@ function UnloadCard({
             {buttonLabel}
           </button>
         )}
-        <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
-          Your own on-chain dispenser, selling 1 XCP at a time. Close it
-          anytime — unsold XCP returns after ~5 blocks.
-        </p>
+
       </div>
     </div>
     <SellBook
