@@ -1,4 +1,4 @@
-import { metadataImageUrl } from "@/lib/metadata";
+import { METADATA_ORIGIN } from "@/lib/metadata";
 
 /**
  * Clean permanent URL for the 48x48 icon: /icon/<ASSET>. Performs the
@@ -12,7 +12,7 @@ export async function GET(
   { params }: { params: Promise<{ asset: string }> },
 ) {
   const { asset } = await params;
-  const source = metadataImageUrl(asset.toUpperCase());
+  const source = `${METADATA_ORIGIN}/i/${asset.toUpperCase()}`;
   const init = {
     cf: {
       image: { format: "auto", fit: "cover", width: 48, height: 48 },

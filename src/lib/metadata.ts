@@ -6,8 +6,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
  * they are the production domain regardless of where the app runs today.
  */
 export const METADATA_ORIGIN = "https://xcp.fun";
-export const metadataJsonUrl = (asset: string) => `${METADATA_ORIGIN}/j/${asset}.json`;
-export const metadataImageUrl = (asset: string) => `${METADATA_ORIGIN}/i/${asset}`;
+export const metadataJsonUrl = (asset: string) => `${METADATA_ORIGIN}/${asset}.json`;
+export const metadataImageUrl = (asset: string) => `${METADATA_ORIGIN}/full/${asset}`;
 
 /**
  * True 48x48 icon at a clean permanent URL; the /icon route performs the
