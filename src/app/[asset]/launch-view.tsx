@@ -250,11 +250,9 @@ export function LaunchView({
             <ArtLightbox asset={asset} />
             <div className="min-w-0 flex-1">
               <div className="flex items-start gap-2">
-                <h1 className="min-w-0 flex-1 text-2xl font-extrabold leading-tight tracking-tight sm:text-[1.7rem]">
-                  {asset}{" "}
-                  <span className="ml-0.5 align-[0.35em]">
-                    <StatusPill phase={phase} hasPool={pool !== null} />
-                  </span>
+                <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                  {asset}
+                  <StatusPill phase={phase} hasPool={pool !== null} />
                 </h1>
                 {isUrlDescription && (
                   <HostedSocials url={fm.description} asset={asset} />
