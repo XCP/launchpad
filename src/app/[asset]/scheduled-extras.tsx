@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -88,15 +89,31 @@ export function ScheduledPulse({
   startBlock,
   deadlineBlock,
   initialHeight,
+  mintForm,
 }: {
   asset: string;
   startBlock: number;
   deadlineBlock: number;
   initialHeight: number;
+  /** Shown in the countdown's place once minting is effectively open. */
+  mintForm?: ReactNode;
 }) {
   const height = useChainHeight(startBlock, initialHeight);
   const remaining = Math.max(startBlock - height, 0);
   const open = remaining <= 0;
+  // A transaction broadcast while the tip is start_block − 1 can only
+  // confirm at start_block or later, which is exactly what consensus
+  // requires — so the form opens a block early rather than a block late.
+  const mintable = height >= startBlock - 1;
+  const router = useRouter();
+  useEffect(() => {
+    if (!mintable) return;
+    // Counterparty has to parse the block before the record flips to open,
+    // so ask again until the server agrees and this view is replaced.
+    const id = setInterval(() => router.refresh(), 20_000);
+    router.refresh();
+    return () => clearInterval(id);
+  }, [mintable, router]);
 
   useEffect(() => {
     const previous = document.title;
@@ -153,6 +170,15 @@ export function ScheduledPulse({
     const id = setInterval(update, 30_000);
     return () => clearInterval(id);
   }, []);
+
+  if (mintable && mintForm) {
+    return (
+      <div className="mt-6">
+        <div className={`mb-3 text-center ${LABEL}`}>minting is open</div>
+        {mintForm}
+      </div>
+    );
+  }
 
   return (
     <div className="mt-8">
@@ -802,20 +828,20 @@ export function IssuerLine({ source }: { source: string }) {
             {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
           </div>
         </div>
-        <a
-          href={`https://xcp.io/address/${source}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-3 block text-xs font-medium text-purple-600 hover:underline"
-        >
-          View on explorer ↗
-        </a>
         {typeof score === "number" && tier && (
           <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
             Track record {Math.round(score)}/100 ({tier}) — observed on-chain
             reputation from the XCP.io explorer, not an endorsement.
           </p>
         )}
+        <a
+          href={`https://xcp.io/address/${source}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-2 block text-xs font-medium text-purple-600 hover:underline"
+        >
+          View on explorer ↗
+        </a>
       </HoverCard>
       <CopyButton value={source} />
     </span>

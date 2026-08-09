@@ -112,9 +112,9 @@ export function LaunchView({
   const supplyTokens = fromSats(fm.hard_cap);
   const mcapUsd = xcpUsd && spot > 0 ? spot * supplyTokens * xcpUsd : null;
 
-  const hasAside =
-    (phase === "minting" && conforming) ||
-    (phase === "graduated" && pool !== null);
+  // Minting now renders as a poster (above); the terminal layout is for
+  // launches with a market to look at.
+  const hasAside = phase === "graduated" && pool !== null;
 
   /* Header right: the one number that answers "how's it doing?" */
   const headline =
@@ -228,15 +228,18 @@ export function LaunchView({
   // there is nothing to tabulate. Identity and issuer up top, a living
   // countdown (block wall + heartbeat) in the middle, the standard's fixed
   // terms and a CTA at the bottom. Built to be bookmarked and shared.
-  if (phase === "scheduled") {
+  if (phase === "scheduled" || (phase === "minting" && conforming)) {
+    const minting = phase === "minting";
     const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
     const blocksLeft = fm.start_block - blockHeight;
     // "opens in now" is what blocksEta returns at the boundary, where the
     // record is still pending but the chain has caught up.
     const shareHeadline =
-      blocksLeft > 0
-        ? `minting opens in ${blocksEta(blocksLeft)}`
-        : "minting opens this block";
+      phase === "minting"
+        ? `${(saleProgress(fm) * 100).toFixed(0)}% minted`
+        : blocksLeft > 0
+          ? `minting opens in ${blocksEta(blocksLeft)}`
+          : "minting opens this block";
     // Only a conforming launch has the standard's terms to advertise.
     const shareSubline = conforming
       ? "0.01 XCP / 1,000 · sells out or refunds"
@@ -307,14 +310,30 @@ export function LaunchView({
             hasProse && <LaunchDescription text={prose} />
           )}
 
-          <ScheduledPulse
-            asset={asset}
-            startBlock={fm.start_block}
-            deadlineBlock={fm.soft_cap_deadline_block}
-            initialHeight={blockHeight}
-          />
+          {minting ? (
+            <div className="mt-6">
+              <div className="mb-4">
+                <LiveProgress
+                  fairminterTxHash={fm.tx_hash}
+                  initialEarned={fm.earned_quantity ?? 0}
+                  target={saleTarget(fm)}
+                  allOrNothing={big(fm.pool_quantity) > 0n}
+                  divisible={fm.divisible}
+                />
+              </div>
+              <MintPanel asset={asset} xcpUsd={xcpUsd} />
+            </div>
+          ) : (
+            <ScheduledPulse
+              asset={asset}
+              startBlock={fm.start_block}
+              deadlineBlock={fm.soft_cap_deadline_block}
+              initialHeight={blockHeight}
+              mintForm={<MintPanel asset={asset} xcpUsd={xcpUsd} />}
+            />
+          )}
 
-          {conforming && (
+          {conforming && !minting && (
             <Link
               href="/dispense"
               className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
@@ -323,6 +342,13 @@ export function LaunchView({
             </Link>
           )}
         </div>
+
+        {/* Who has minted so far — the sale's own tape, under the card. */}
+        {minting && (
+          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-2">
+            <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
+          </div>
+        )}
       </div>
     );
   }
@@ -389,9 +415,6 @@ export function LaunchView({
       {/* Aside first (pons grammar): do I want in, do I want out */}
       {hasAside && (
         <aside className="mb-4 min-w-0 space-y-4 lg:mb-0">
-          {phase === "minting" && conforming && (
-            <MintPanel asset={asset} xcpUsd={xcpUsd} />
-          )}
           {phase === "graduated" && pool && conforming && (
             <AssetTradeSurface asset={asset} xcpUsd={xcpUsd} />
           )}
