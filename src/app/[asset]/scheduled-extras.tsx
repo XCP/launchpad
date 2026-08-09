@@ -7,6 +7,7 @@ import { TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
+import { useCoarsePointer } from "@/lib/use-coarse-pointer";
 import { useDenomination, setDenomination } from "@/lib/denomination";
 import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
 import { METADATA_ORIGIN } from "@/lib/metadata";
@@ -723,6 +724,7 @@ export function IssuerLine({ source }: { source: string }) {
   // card; the summary is already in flight for the chips, so reading it
   // here costs nothing.
   const [armed, setArmed] = useState(false);
+  const coarse = useCoarsePointer();
   const summary = useAddressSummary(source);
   const firstSeen = useFirstSeen(summary?.first_block);
   const { data: rep } = useSWR(
@@ -747,16 +749,25 @@ export function IssuerLine({ source }: { source: string }) {
     <span className="mt-1 inline-block text-[13px] text-gray-500 tabular-nums">
       by{" "}
       <HoverCard
+        touch={coarse}
         onArm={() => setArmed(true)}
         trigger={
-          <a
-            href={`https://xcp.io/address/${source}`}
-            target="_blank"
-            rel="noreferrer"
-            className={`rounded hover:text-purple-600 hover:underline ${FOCUS}`}
-          >
-            {shortAddress(source)}
-          </a>
+          coarse ? (
+            // A tap can't hover, so it opens the card instead of leaving the
+            // page; the explorer link lives inside it.
+            <button type="button" className={`rounded underline-offset-2 ${FOCUS}`}>
+              {shortAddress(source)}
+            </button>
+          ) : (
+            <a
+              href={`https://xcp.io/address/${source}`}
+              target="_blank"
+              rel="noreferrer"
+              className={`rounded underline-offset-2 hover:underline ${FOCUS}`}
+            >
+              {shortAddress(source)}
+            </a>
+          )
         }
       >
         <div className="grid grid-cols-2 gap-2">
@@ -791,6 +802,14 @@ export function IssuerLine({ source }: { source: string }) {
             {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
           </div>
         </div>
+        <a
+          href={`https://xcp.io/address/${source}`}
+          target="_blank"
+          rel="noreferrer"
+          className="mt-3 block text-xs font-medium text-purple-600 hover:underline"
+        >
+          View on explorer ↗
+        </a>
         {typeof score === "number" && tier && (
           <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
             Track record {Math.round(score)}/100 ({tier}) — observed on-chain
@@ -974,7 +993,7 @@ export function AnnouncedAgo({
       href={`https://xcp.io/tx/${txHash}`}
       target="_blank"
       rel="noreferrer"
-      className="ml-2 text-[13px] text-gray-400 hover:text-purple-600 hover:underline"
+      className="ml-2 text-[13px] text-gray-400 underline-offset-2 hover:underline"
     >
       {unconfirmed ? "unconfirmed" : timeAgo(at!)}
     </a>
