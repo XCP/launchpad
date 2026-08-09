@@ -12,12 +12,22 @@ import type { ReactNode } from "react";
 export function HoverCard({
   trigger,
   children,
+  onArm,
 }: {
   trigger: ReactNode;
   children: ReactNode;
+  /** Fires the first time the card is about to open, so the consumer can
+   *  defer its fetching until someone actually asks for the preview. */
+  onArm?: () => void;
 }) {
   return (
-    <H.Root openDelay={120} closeDelay={120}>
+    <H.Root
+      openDelay={120}
+      closeDelay={120}
+      onOpenChange={(open) => {
+        if (open) onArm?.();
+      }}
+    >
       <H.Trigger asChild>{trigger}</H.Trigger>
       <H.Portal>
         <H.Content

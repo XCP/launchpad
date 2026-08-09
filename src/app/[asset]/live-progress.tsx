@@ -77,8 +77,10 @@ export function LiveProgress({
   divisible: boolean;
 }) {
   // Until the first poll resolves, render exactly what the server rendered.
+  // Two requests per tick, one of them a 1,000-event mempool scan — 10s
+  // still feels live for a mint that fills over hours, at half the load.
   const { data } = useSWR(fairminterTxHash, fetchLive, {
-    refreshInterval: 6000,
+    refreshInterval: 10_000,
     revalidateOnFocus: true,
   });
   const earned = data?.earned ?? initialEarned;

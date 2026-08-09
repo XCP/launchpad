@@ -45,8 +45,11 @@ function useChainHeight(startBlock: number, initialHeight: number) {
           d.result.counterparty_height,
       ),
     {
+      // Blocks land every ~10 minutes; poll like it, and only tighten to
+      // 30s inside the final dozen blocks where seconds start to matter.
       refreshInterval: (latest) =>
-        startBlock - (latest ?? initialHeight) <= 12 ? 30_000 : 120_000,
+        startBlock - (latest ?? initialHeight) <= 12 ? 30_000 : 180_000,
+      revalidateOnFocus: true,
       fallbackData: initialHeight,
     },
   );
@@ -89,7 +92,7 @@ export function ScheduledPulse({
       fetchJson("https://mempool.space/api/v1/blocks") as Promise<
         { height: number; timestamp: number }[]
       >,
-    { refreshInterval: 60_000 },
+    { refreshInterval: 120_000 },
   );
   const tip = recent?.[0] ?? null;
   // Left of the divider: blocks that exist, newest against the line.
@@ -368,6 +371,8 @@ export function IssuerChips({
   source: string;
   currentAsset: string;
 }) {
+  // First-timers get a different second chip: what they've issued outside
+  // the standard says whether they're new on-chain or just new here.
   const { data } = useSWR(
     ["issuer-history", source, currentAsset],
     async () => {
@@ -380,10 +385,10 @@ export function IssuerChips({
         .filter((r) => r.asset !== currentAsset && isXcp69(r))
         .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0));
       const closed = prior.filter((r) => r.status === "closed");
-      // Pool existence is the launched-vs-refunded oracle; a handful of
-      // extra calls, so cap at the 8 most recent.
+      // Pool existence is the launched-vs-refunded oracle; one call each,
+      // so judge only the four most recent.
       const pools = await Promise.all(
-        closed.slice(0, 8).map((r) =>
+        closed.slice(0, 4).map((r) =>
           fetchJson(
             `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(r.asset)}/XCP`,
           )
@@ -392,10 +397,6 @@ export function IssuerChips({
         ),
       );
       const last = prior[0];
-      // First-timers get a different second chip: what they have issued
-      // outside the standard says whether they are new on-chain or new here.
-      const issued =
-        prior.length === 0 ? await issuedCount(source).catch(() => null) : null;
       return {
         prior: prior.length,
         judged: pools.length,
@@ -403,11 +404,11 @@ export function IssuerChips({
         last: last?.block_time
           ? { asset: last.asset, at: last.block_time }
           : null,
-        issued,
       };
     },
     { revalidateOnFocus: false },
   );
+  const issued = useIssuedCount(data && data.prior === 0 ? source : null);
   if (!data) return null;
 
   const chip =
@@ -431,12 +432,11 @@ export function IssuerChips({
           last launch {timeAgo(data.last.at)} · {data.last.asset}
         </Link>
       )}
-      {data.prior === 0 && data.issued && data.issued.count > 0 && (
+      {data.prior === 0 && issued && issued.count > 0 && (
         <span className={chip}>
-          {commas(data.issued.count)}
-          {data.issued.capped ? "+" : ""}{" "}
-          {data.issued.count === 1 && !data.issued.capped ? "asset" : "assets"}{" "}
-          issued
+          {commas(issued.count)}
+          {issued.capped ? "+" : ""}{" "}
+          {issued.count === 1 && !issued.capped ? "asset" : "assets"} issued
         </span>
       )}
     </div>
@@ -456,7 +456,17 @@ interface AddressSummary {
 }
 
 /** Assets ever issued from an address — the explorer returns one row per
- *  asset, so a capped page plus its cursor is an exact count or a floor. */
+ *  asset, so a capped page plus its cursor is an exact count or a floor.
+ *  Shared through SWR so the chips and the hover card cost one request. */
+function useIssuedCount(source: string | null) {
+  const { data } = useSWR(
+    source ? ["issued-count", source] : null,
+    () => issuedCount(source!).catch(() => null),
+    { revalidateOnFocus: false },
+  );
+  return data ?? null;
+}
+
 async function issuedCount(source: string) {
   const CAP = 100;
   const d = (await fetchJson(
@@ -502,10 +512,13 @@ function CopyButton({ value }: { value: string }) {
  * goes to the explorer, so touch users lose only the preview.
  */
 export function IssuerLine({ source }: { source: string }) {
+  // The card's three calls are worth making only for someone who asks for
+  // it — arm them on first hover or focus, then SWR keeps the answer.
+  const [armed, setArmed] = useState(false);
   const { data } = useSWR(
-    ["issuer-card", source],
+    armed ? ["issuer-card", source] : null,
     async () => {
-      const [summary, rep, issued] = await Promise.all([
+      const [summary, rep] = await Promise.all([
         (fetchJson(`${XCPIO_API}/addresses/${source}/summary`) as Promise<{
           result: AddressSummary | null;
         }>)
@@ -516,7 +529,6 @@ export function IssuerLine({ source }: { source: string }) {
         }>)
           .then((d) => d.result ?? null)
           .catch(() => null),
-        issuedCount(source).catch(() => null),
       ]);
       // first_block is a height; the block record carries the real time
       // (600s-average estimates drift by months at this scale).
@@ -527,7 +539,7 @@ export function IssuerLine({ source }: { source: string }) {
             .then((d) => d.result.block_time)
             .catch(() => null)
         : null;
-      return { summary, rep, issued, firstSeen };
+      return { summary, rep, firstSeen };
     },
     { revalidateOnFocus: false },
   );
@@ -535,7 +547,7 @@ export function IssuerLine({ source }: { source: string }) {
   const xcp = data?.summary?.xcp;
   const xcpNum = xcp === null || xcp === undefined ? null : Number(xcp);
   const held = data?.summary?.assets;
-  const issued = data?.issued;
+  const issued = useIssuedCount(armed ? source : null);
   const score = data?.rep?.track_record?.score;
   const tier = data?.rep?.track_record?.tier;
 
@@ -543,6 +555,7 @@ export function IssuerLine({ source }: { source: string }) {
     <span className="mt-1 inline-block text-[13px] text-gray-500 tabular-nums">
       by{" "}
       <HoverCard
+        onArm={() => setArmed(true)}
         trigger={
           <a
             href={`https://xcp.io/address/${source}`}
