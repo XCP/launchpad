@@ -383,7 +383,6 @@ export function LaunchView({
       )}
 
       {/* The receipt — consensus guarantees as chips; expand to verify */}
-      {conforming && <Guarantees fm={fm} />}
 
       {/* Issuer-only metadata curation; renders nothing for everyone else */}
       <EditPanel asset={asset} issuer={fm.source} />
@@ -393,66 +392,6 @@ export function LaunchView({
       </div>
       </div>
     </div>
-  );
-}
-
-/**
- * The inversion of a memecoin launchpad's "Audit" box: where those detect
- * rug vectors heuristically after the fact, XCP-69 forbids them by
- * consensus. Chips up front, the full receipt one click away.
- */
-function Guarantees({ fm }: { fm: Fairminter }) {
-  const announcedLead =
-    fm.start_block > 0 && fm.block_index < fm.start_block
-      ? `announced on-chain ${(fm.start_block - fm.block_index).toLocaleString()} blocks before minting could open`
-      : "announced on-chain before minting could open";
-  const rows: [string, string][] = [
-    ["No premine", "0 tokens existed before the launch — consensus rejects the XCP-69 shape on any asset with prior supply, and premint is pinned to zero"],
-    ["No commission", "0% of any mint is skimmed to the creator"],
-    ["No sniping", announcedLead + " — early mints are rejected by consensus"],
-    ["No bundling past the cap", "10 XCP per address, enforced per-address by consensus"],
-    ["No creator take", "100% of raised XCP becomes pool liquidity at close"],
-    ["No rug", "LP tokens are minted to the unspendable address — liquidity can never be withdrawn"],
-  ];
-  return (
-    <details className="group rounded-2xl border border-gray-200 bg-white">
-      <summary className="flex cursor-pointer flex-wrap items-center gap-1.5 p-3 [&::-webkit-details-marker]:hidden">
-        {rows.map(([claim, how]) => (
-          <Hint key={claim} content={how}>
-            <span
-              tabIndex={0}
-              className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800"
-            >
-              <span aria-hidden>✓</span>
-              {claim}
-            </span>
-          </Hint>
-        ))}
-        <span className="ml-auto whitespace-nowrap text-xs text-gray-400 transition-transform group-open:rotate-180">
-          ▾
-        </span>
-      </summary>
-      <div className="border-t border-gray-100 p-4">
-        <p className="text-xs text-gray-500">
-          Not platform policy — protocol consensus. Every row is verifiable
-          against any Counterparty node from this launch&apos;s on-chain
-          record.
-        </p>
-        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          {rows.map(([claim, how]) => (
-            <div key={claim} className="flex gap-2 rounded-md bg-gray-50 p-2.5">
-              <span aria-hidden className="font-semibold text-green-600">
-                ✓
-              </span>
-              <div>
-                <dt className="text-sm font-medium text-gray-900">{claim}</dt>
-                <dd className="mt-0.5 text-xs text-gray-600">{how}</dd>
-              </div>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </details>
   );
 }
 
