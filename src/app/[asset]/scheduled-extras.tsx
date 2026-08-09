@@ -16,6 +16,8 @@ import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import {
   type Fairminter,
   isXcp69,
+  windowIsExact,
+  xcp69Params,
   XCP69,
   XCP69_RAISE_SATS,
 } from "@/lib/xcp69";
@@ -562,15 +564,37 @@ export function IssuerChips({
         `${COUNTERPARTY_API_BASE}/addresses/${source}/fairminters?limit=100&verbose=true`,
       )) as { result: (Fairminter & { block_time?: number })[] };
       // Only launches held to this standard count, so "2nd launch" means the
-      // second XCP-69 one. Parameters only: the timing clauses need each
-      // launch's creation event, which would be a request per row.
-      const prior = (d.result ?? [])
-        .filter(
-          (r) =>
-            r.asset !== currentAsset &&
-            isXcp69(r, r.status === "pending" ? undefined : r.start_block - 1),
-        )
-        .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0));
+      // second XCP-69 one. Parameters are readable from the row; the timing
+      // clauses need each launch's creation event, because a row that has
+      // opened no longer reports the block it was announced in.
+      const shaped = (d.result ?? [])
+        .filter((r) => r.asset !== currentAsset && xcp69Params(r))
+        .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0))
+        .slice(0, 8);
+      const verdicts = await Promise.all(
+        shaped.map(async (r) => {
+          if (r.status === "pending")
+            return isXcp69(r, undefined) ? r : null;
+          const event = (await fetchJson(
+            `${COUNTERPARTY_API_BASE}/transactions/${r.tx_hash}/events/NEW_FAIRMINTER`,
+          ).catch(() => null)) as {
+            result?: {
+              block_index: number;
+              params: { soft_cap_deadline_block: number };
+            }[];
+          } | null;
+          const created = event?.result?.[0];
+          if (!created) return null;
+          const conforms =
+            isXcp69(r, created.block_index) &&
+            (r.status !== "closed" ||
+              windowIsExact(r, created.params.soft_cap_deadline_block));
+          return conforms ? r : null;
+        }),
+      );
+      const prior = verdicts.filter(
+        (r): r is (typeof shaped)[number] => r !== null,
+      );
       const closed = prior.filter((r) => r.status === "closed");
       // Pool existence is the launched-vs-refunded oracle; one call each,
       // so judge only the four most recent.

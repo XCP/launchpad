@@ -162,7 +162,9 @@ export async function fetchOriginalRecord(
       block_index: number;
       params: { soft_cap_deadline_block: number };
     }[];
-  }>(`/transactions/${txHash}/events/NEW_FAIRMINTER`, 3600);
+    // Append-only: a launch's creation event never changes, so this is
+    // asked once per launch rather than once an hour per launch.
+  }>(`/transactions/${txHash}/events/NEW_FAIRMINTER`, 31_536_000);
   const event = data.result?.[0];
   return {
     deadline: event?.params?.soft_cap_deadline_block ?? null,

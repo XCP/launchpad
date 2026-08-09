@@ -41,10 +41,14 @@ export default async function HomePage() {
     fetchXcpUsd(),
   ]);
 
+  // Parameters only here — the timing clauses need each launch's creation
+  // event, which is fetched below for exactly these rows. Filtering on the
+  // full predicate would reject every launch that has already opened, since
+  // its row no longer reports the block it was announced in.
   const listed = fairminters.filter((fm) =>
     SHOW_NONCONFORMING
       ? Boolean(fm.asset) && !fm.status.startsWith("invalid")
-      : isXcp69(fm),
+      : xcp69Params(fm),
   );
 
   // Newest first; the pool row is the graduated-vs-refunded oracle, only

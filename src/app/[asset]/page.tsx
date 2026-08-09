@@ -71,7 +71,10 @@ export default async function LaunchPage({
 
   const fairminters = await fetchFairmintersByAsset(asset);
   const fm =
-    fairminters.find(isXcp69) ??
+    // Selection is by parameters only: the timing clauses need the creation
+    // event, fetched below. (Also, `find(isXcp69)` would hand the array index
+    // in as announceBlock.)
+    fairminters.find((f) => xcp69Params(f)) ??
     (SHOW_NONCONFORMING
       ? fairminters.find((f) => !f.status.startsWith("invalid"))
       : undefined);

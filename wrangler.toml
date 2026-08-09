@@ -23,3 +23,9 @@ binding = "ASSETS"
 [[r2_buckets]]
 binding = "METADATA"
 bucket_name = "launchpad-metadata"
+
+# Next's data/route cache. The binding name is fixed by the adapter's
+# r2-incremental-cache override; renaming it turns caching back off silently.
+[[r2_buckets]]
+binding = "NEXT_INC_CACHE_R2_BUCKET"
+bucket_name = "launchpad-inc-cache"
