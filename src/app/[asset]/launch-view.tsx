@@ -243,6 +243,9 @@ export function LaunchView({
   // terms and a CTA at the bottom. Built to be bookmarked and shared.
   if (phase === "scheduled") {
     const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
+    const prose = (fm.description ?? "").trim();
+    const hasProse =
+      prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
     return (
       <div className="mx-auto max-w-2xl">
         <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
@@ -266,14 +269,39 @@ export function LaunchView({
             </div>
           </div>
 
-          {fm.description &&
-            (isUrlDescription ? (
-              <HostedDescription url={fm.description} />
-            ) : (
-              <p className="mt-5 border-y border-gray-100 py-4 text-sm leading-relaxed text-gray-600">
+          {conforming && (
+            <dl className="mt-5 grid grid-cols-2 gap-3 border-y border-gray-100 py-4 sm:grid-cols-4">
+              {(
+                [
+                  ["Price", "0.01 XCP / 1,000"],
+                  ["Per address", "10 XCP · 1M max"],
+                  ["Target", "690 XCP or refund"],
+                  ["Supply", "100M · 31M pool"],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                    {label}
+                  </dt>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+
+          {/* Only real prose earns the space: a URL is machine metadata, and
+              a one-word "description" is noise the poster reads better without. */}
+          {isUrlDescription ? (
+            <HostedDescription url={fm.description} />
+          ) : (
+            hasProse && (
+              <p className="mt-4 text-sm leading-relaxed text-gray-600">
                 {fm.description}
               </p>
-            ))}
+            )
+          )}
 
           <ScheduledPulse
             asset={asset}
@@ -283,33 +311,12 @@ export function LaunchView({
           />
 
           {conforming && (
-            <>
-              <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4">
-                {(
-                  [
-                    ["Price", "0.01 XCP / 1,000"],
-                    ["Per address", "10 XCP · 1M max"],
-                    ["Target", "690 XCP or refund"],
-                    ["Supply", "100M · 31M pool"],
-                  ] as const
-                ).map(([label, value]) => (
-                  <div key={label}>
-                    <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                      {label}
-                    </dt>
-                    <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                      {value}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-              <Link
-                href="/dispense"
-                className="mt-5 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
-              >
-                Get XCP before it opens
-              </Link>
-            </>
+            <Link
+              href="/dispense"
+              className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+            >
+              Get XCP before it opens
+            </Link>
           )}
         </div>
       </div>
