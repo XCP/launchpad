@@ -67,9 +67,9 @@ export function ActivityTabs({
 }) {
   const { address } = useWallet();
   const compose = useCompose();
-  const [tab, setTab] = useState<"mints" | "trades" | "holders" | "orders">(
-    "mints",
-  );
+  const [tab, setTab] = useState<
+    "mints" | "minters" | "trades" | "holders" | "orders"
+  >(minting ? "minters" : "mints");
   const [pageParam, setPage] = useState(1);
   const setParams = (t: typeof tab, p: number) => {
     setTab(t);
@@ -172,23 +172,60 @@ export function ActivityTabs({
   );
   const busy = isBusy(compose.status);
 
+  // One row per address: what they hold of this sale, what they paid, and
+  // how many times they came back. Exact sums — a whale near the per-address
+  // cap is the number this table exists to show.
+  const minters = (() => {
+    const byAddress = new Map<
+      string,
+      { source: string; earned: Raw[]; paid: Raw[]; mints: number }
+    >();
+    for (const m of mints) {
+      const row = byAddress.get(m.source) ?? {
+        source: m.source,
+        earned: [],
+        paid: [],
+        mints: 0,
+      };
+      row.earned.push(m.earn_quantity);
+      row.paid.push(m.paid_quantity);
+      row.mints += 1;
+      byAddress.set(m.source, row);
+    }
+    return [...byAddress.values()]
+      .map((r) => ({
+        source: r.source,
+        earned: sumRaw(r.earned),
+        paid: sumRaw(r.paid),
+        mints: r.mints,
+      }))
+      .sort((a, b) => compareRawDesc(a.earned, b.earned));
+  })();
+
+  // During the sale there is no market and no separate holder set — the
+  // minters ARE the holders — so one tab answers the only live question:
+  // who is in, and for how much.
   const tabs: (typeof tab)[] = minting
-    ? ["mints", "holders"]
+    ? ["minters"]
     : address
       ? ["mints", "trades", "holders", "orders"]
       : ["mints", "trades", "holders"];
   const tabLabel = (t: typeof tab) =>
     t === "mints"
       ? `Mints (${mints.length})`
-      : t === "trades"
+      : t === "minters"
+        ? `Minters (${minters.length})`
+        : t === "trades"
         ? `Trades${trades ? ` (${trades.length})` : ""}`
         : t === "holders"
           ? `Holders${holders ? ` (${holders.length})` : ""}`
           : `Orders${orders ? ` (${orders.length})` : ""}`;
 
   const count =
-    tab === "mints"
-      ? mints.length
+    tab === "minters"
+      ? minters.length
+      : tab === "mints"
+        ? mints.length
       : tab === "trades"
         ? (trades?.length ?? 0)
         : tab === "holders"
@@ -235,6 +272,47 @@ export function ActivityTabs({
           </SegmentedList>
         </div>
       </Tabs>
+
+      {tab === "minters" &&
+        (minters.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-500">
+            No mints yet — be the first.
+          </p>
+        ) : (
+          <>
+            <ul className="divide-y divide-gray-100">
+              {minters.slice(from, from + PER_PAGE).map((r, i) => (
+                <li
+                  key={r.source}
+                  className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
+                >
+                  <a
+                    href={`https://xcp.io/address/${r.source}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
+                  >
+                    <span className="w-5 shrink-0 text-right text-xs text-gray-400 tabular-nums">
+                      {from + i + 1}
+                    </span>
+                    <Identicon address={r.source} />
+                    <span className="truncate">{shortAddress(r.source)}</span>
+                  </a>
+                  <span className="shrink-0 text-right text-gray-900">
+                    {compact(tokenQty(r.earned, divisible))}{" "}
+                    <span className="text-gray-400">
+                      ({commasRaw(r.paid)} XCP)
+                    </span>
+                    <span className="ml-2 text-xs text-gray-400">
+                      {r.mints} mint{r.mints === 1 ? "" : "s"}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {pager}
+          </>
+        ))}
 
       {tab === "mints" &&
         (mints.length === 0 ? (
