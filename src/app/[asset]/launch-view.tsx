@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
+import { HostedDescription, OpensCountdown } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
@@ -227,14 +229,12 @@ export function LaunchView({
             ];
 
   // Scheduled: a poster, not a terminal — nothing has happened yet, so
-  // there is nothing to tabulate. Image, identity, countdown.
+  // there is nothing to tabulate. Image, identity, live countdown, and
+  // the standard's terms below so the page is worth sharing.
   if (phase === "scheduled") {
-    const description =
-      fm.description && !/^https?:\/\//i.test(fm.description)
-        ? fm.description
-        : null;
+    const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
     return (
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-2xl space-y-4">
         <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-8">
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
             <TokenImage
@@ -255,25 +255,64 @@ export function LaunchView({
                 )}
               </h1>
               <p className="mt-1 text-sm text-gray-500">
-                by {shortAddress(fm.source)}
+                by{" "}
+                <a
+                  href={`https://xcp.io/address/${fm.source}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={fm.source}
+                  className="hover:text-purple-600 hover:underline"
+                >
+                  {shortAddress(fm.source)}
+                </a>
               </p>
-              {description && (
-                <p className="mt-3 text-sm leading-relaxed text-gray-600">
-                  {description}
-                </p>
-              )}
+              {fm.description &&
+                (isUrlDescription ? (
+                  <HostedDescription url={fm.description} />
+                ) : (
+                  <p className="mt-3 text-sm leading-relaxed text-gray-600">
+                    {fm.description}
+                  </p>
+                ))}
               <div className="mt-6">
-                <div className="text-4xl font-bold tabular-nums text-gray-900">
-                  {blocksEta(fm.start_block - blockHeight)}
-                </div>
-                <div className="mt-1 text-sm text-gray-500">
-                  until minting opens · block{" "}
-                  {fm.start_block.toLocaleString()}
-                </div>
+                <OpensCountdown
+                  startBlock={fm.start_block}
+                  initialHeight={blockHeight}
+                />
               </div>
             </div>
           </div>
         </div>
+
+        {conforming && (
+          <div className="rounded-3xl border border-gray-200 bg-white p-5">
+            <div className="flex flex-wrap gap-x-8 gap-y-3">
+              {(
+                [
+                  ["Price", "0.01 XCP / 1,000 tokens"],
+                  ["Per address", "10 XCP · 1M tokens"],
+                  ["Target", "690 XCP · sells out or refunds"],
+                  ["Supply", "100M · 31M pool-locked"],
+                ] as const
+              ).map(([label, value]) => (
+                <div key={label}>
+                  <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                    {label}
+                  </div>
+                  <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Link
+              href="/dispense"
+              className="mt-4 block w-full rounded-2xl bg-gray-900 px-5 py-3 text-center font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
+            >
+              Get XCP before it opens
+            </Link>
+          </div>
+        )}
       </div>
     );
   }
