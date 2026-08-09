@@ -241,7 +241,6 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
           target="_blank"
           rel="noreferrer"
           aria-label={`${asset} on ${SOCIAL_ICONS[s.type]!.label}`}
-          title={s.data}
           className="flex size-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:border-purple-300 hover:text-purple-600"
         >
           <svg viewBox="0 0 24 24" className="size-[15px] fill-current">
@@ -383,7 +382,6 @@ function CopyButton({ value }: { value: string }) {
         );
       }}
       aria-label="Copy issuer address"
-      title={copied ? "Copied" : "Copy address"}
       className="ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-purple-600"
     >
       {copied ? (
@@ -452,7 +450,6 @@ export function IssuerLine({ source }: { source: string }) {
             href={`https://xcp.io/address/${source}`}
             target="_blank"
             rel="noreferrer"
-            title={source}
             className="rounded hover:text-purple-600 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
           >
             {shortAddress(source)}
@@ -584,10 +581,9 @@ export function AnnouncedAgo({
       href={`https://xcp.io/tx/${txHash}`}
       target="_blank"
       rel="noreferrer"
-      title="The fairminter transaction that announced this launch"
       className="ml-2 text-[13px] text-gray-400 hover:text-purple-600 hover:underline"
     >
-      {unconfirmed ? "announced · unconfirmed" : `announced ${timeAgo(at!)}`}
+      {unconfirmed ? "unconfirmed" : timeAgo(at!)}
     </a>
   );
 }
@@ -604,7 +600,6 @@ export function ArtLightbox({ asset }: { asset: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`View ${asset} artwork full size`}
-        title="Click to enlarge"
         className="group shrink-0 cursor-zoom-in rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
       >
         <TokenImage

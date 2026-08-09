@@ -252,7 +252,7 @@ export function LaunchView({
               <div className="flex items-start gap-2">
                 <h1 className="min-w-0 flex-1 text-2xl font-extrabold leading-tight tracking-tight sm:text-[1.7rem]">
                   {asset}{" "}
-                  <span className="ml-0.5 inline-block translate-y-[-3px] align-middle">
+                  <span className="ml-0.5 align-[0.35em]">
                     <StatusPill phase={phase} hasPool={pool !== null} />
                   </span>
                 </h1>
@@ -393,7 +393,7 @@ export function LaunchView({
               </span>{" "}
               — LP <span className="font-mono">{pool.lp_asset}</span>
               {isHouseLpName(pool.lp_asset) && (
-                <span title="House format: starts 69, ends 69, ≡ 69 (mod 97)"> ✓</span>
+                <span> ✓</span>
               )}{" "}
               was minted to the unspendable address. {compact(poolTokens)}{" "}
               {asset} + {commas(Math.round(poolXcp))} XCP can never be
