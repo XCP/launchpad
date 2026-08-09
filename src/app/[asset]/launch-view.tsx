@@ -248,23 +248,25 @@ export function LaunchView({
       prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+        <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          {/* Out of flow: the links stack can grow a row without shifting the
+              name, address, or chips beside it. */}
+          <div className="absolute right-6 top-6 flex flex-col items-end gap-1.5 sm:right-7 sm:top-7">
+            <HostedSocials url={fm.description ?? ""} asset={asset} />
+            <ShareButton
+              asset={asset}
+              headline={`minting opens in ${blocksEta(fm.start_block - blockHeight)}`}
+              subline="0.01 XCP / 1,000 · sells out or refunds"
+            />
+          </div>
           <div className="flex items-start gap-4 sm:gap-5">
             <ArtLightbox asset={asset} />
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 pr-24 sm:pr-28">
               <div className="flex items-start gap-2">
                 <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                   {asset}
                   <StatusPill phase={phase} hasPool={pool !== null} />
                 </h1>
-                <div className="flex shrink-0 flex-col items-end gap-1.5">
-                  <HostedSocials url={fm.description ?? ""} asset={asset} />
-                  <ShareButton
-                    asset={asset}
-                    headline={`minting opens in ${blocksEta(fm.start_block - blockHeight)}`}
-                    subline="0.01 XCP / 1,000 · sells out or refunds"
-                  />
-                </div>
               </div>
               <div className="flex flex-wrap items-baseline">
                 <IssuerLine source={fm.source} />

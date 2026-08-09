@@ -737,7 +737,7 @@ export function ShareButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 transition-colors hover:border-purple-300 hover:text-purple-600"
+        className="flex h-8 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 text-[11px] font-semibold text-purple-600 transition-colors hover:border-purple-600 hover:bg-purple-600 hover:text-white"
       >
         <svg viewBox="0 0 24 24" className="size-3 fill-current">
           <path d="M18 16.08a2.9 2.9 0 0 0-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.5.47 1.17.77 1.91.77a2.8 2.8 0 1 0-2.8-2.8c0 .24.04.47.09.7L8.11 9.97A2.8 2.8 0 0 0 3.4 12a2.8 2.8 0 0 0 4.71 2.03l7.12 4.16c-.05.21-.08.43-.08.65a2.73 2.73 0 1 0 2.85-2.76Z" />
