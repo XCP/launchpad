@@ -6,6 +6,7 @@ import {
   HostedDescription,
   HostedSocials,
   IssuerChips,
+  isOurMetadata,
   IssuerLine,
   LaunchDescription,
   ScheduledPulse,
@@ -149,13 +150,6 @@ export function LaunchView({
             : "no deadline"}
         </div>
       </div>
-    ) : phase === "scheduled" ? (
-      <div className="text-right">
-        <div className="text-xl font-bold text-gray-900">
-          {blocksEta(fm.start_block - blockHeight)}
-        </div>
-        <div className="mt-0.5 text-xs text-gray-500">until minting opens</div>
-      </div>
     ) : (
       <div className="text-right">
         <div className="text-xl font-bold text-gray-400">
@@ -220,22 +214,15 @@ export function LaunchView({
             ],
             ["Mints", String(mints.length)],
           ]
-        : phase === "scheduled"
-          ? [
-              ["Opens", `block ${fm.start_block.toLocaleString()}`],
-              ["Window", "1,000 blocks (~1 week)"],
-              ["Lot price", "0.01 XCP / 1,000 tokens"],
-              ["Per-address cap", "10 XCP"],
-            ]
-          : [
-              ["Reached", `${(progress * 100).toFixed(1)}%`],
-              ["Participants", String(participants)],
-              [
-                phase === "refunded" ? "Returned" : "Raised",
-                `${commasRaw(fm.paid_quantity)} XCP`,
-              ],
-              ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
-            ];
+        : [
+            ["Reached", `${(progress * 100).toFixed(1)}%`],
+            ["Participants", String(participants)],
+            [
+              phase === "refunded" ? "Returned" : "Raised",
+              `${commasRaw(fm.paid_quantity)} XCP`,
+            ],
+            ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
+          ];
 
   // Scheduled: a poster, not a terminal — nothing has happened yet, so
   // there is nothing to tabulate. Identity and issuer up top, a living
@@ -243,40 +230,55 @@ export function LaunchView({
   // terms and a CTA at the bottom. Built to be bookmarked and shared.
   if (phase === "scheduled") {
     const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
+    const blocksLeft = fm.start_block - blockHeight;
+    // "opens in now" is what blocksEta returns at the boundary, where the
+    // record is still pending but the chain has caught up.
+    const shareHeadline =
+      blocksLeft > 0
+        ? `minting opens in ${blocksEta(blocksLeft)}`
+        : "minting opens this block";
+    // Only a conforming launch has the standard's terms to advertise.
+    const shareSubline = conforming
+      ? "0.01 XCP / 1,000 · sells out or refunds"
+      : "an XCP fairminter on xcp.fun";
     const prose = (fm.description ?? "").trim();
     const hasProse =
       prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
     return (
       <div className="mx-auto max-w-2xl">
         <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
-          {/* Out of flow, and the page's own control rather than the
-              project's: Share holds the corner alone. */}
-          <div className="absolute right-6 top-6 sm:right-7 sm:top-7">
-            <ShareButton
-              asset={asset}
-              headline={`minting opens in ${blocksEta(fm.start_block - blockHeight)}`}
-              subline="0.01 XCP / 1,000 · sells out or refunds"
-            />
-          </div>
-          <div className="flex items-start gap-4 sm:gap-5">
+          {/* Art leads on a phone at full width, then steps aside into the
+              identity square once there's a column to sit beside. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
             <ArtLightbox asset={asset} />
-            <div className="min-w-0 flex-1 pr-20 sm:pr-24">
-              <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2 sm:pr-24">
                 <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                   {asset}
                   <StatusPill phase={phase} hasPool={pool !== null} />
                 </h1>
+                {/* In flow on a phone, pinned to the card's corner above it —
+                    the page's own control, so it sits apart from the
+                    project's links. */}
+                <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
+                  <ShareButton
+                    asset={asset}
+                    headline={shareHeadline}
+                    subline={shareSubline}
+                  />
+                </div>
               </div>
-              <div className="flex flex-wrap items-baseline">
+              <div className="flex flex-wrap items-baseline sm:pr-24">
                 <IssuerLine source={fm.source} />
                 <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
               </div>
               <IssuerChips
                 source={fm.source}
                 currentAsset={asset}
-                blockHeight={blockHeight}
                 trailing={
-                  <HostedSocials url={fm.description ?? ""} asset={asset} />
+                  isOurMetadata(fm.description) ? (
+                    <HostedSocials url={fm.description} asset={asset} />
+                  ) : null
                 }
               />
             </div>
@@ -286,8 +288,21 @@ export function LaunchView({
 
           {/* Only real prose earns the space: a URL is machine metadata, and
               a one-word "description" is noise the poster reads better without. */}
-          {isUrlDescription ? (
+          {isOurMetadata(fm.description) ? (
             <HostedDescription url={fm.description} />
+          ) : isUrlDescription ? (
+            /* Someone else's host: link it rather than fetch it, so viewing a
+               launch never reports the visitor to the issuer's server. */
+            <p className="mt-5 text-sm text-gray-500">
+              <a
+                href={fm.description}
+                target="_blank"
+                rel="noreferrer nofollow"
+                className="break-all text-purple-600 hover:underline"
+              >
+                {fm.description}
+              </a>
+            </p>
           ) : (
             hasProse && <LaunchDescription text={prose} />
           )}

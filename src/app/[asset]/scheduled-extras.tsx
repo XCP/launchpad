@@ -1,7 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
@@ -10,6 +9,7 @@ import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
 import { useDenomination, setDenomination } from "@/lib/denomination";
 import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
+import { METADATA_ORIGIN } from "@/lib/metadata";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import {
   type Fairminter,
@@ -20,6 +20,13 @@ import {
 
 const XCPIO_API = "https://api.xcp.io/v2";
 const SATS = 1e8;
+
+/** One token for the site's uppercase micro-label. */
+const LABEL =
+  "text-[11px] font-medium uppercase tracking-wider text-gray-400";
+/** Keyboard users need to see where they are; nothing else provides this. */
+const FOCUS =
+  "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500";
 
 /** Compact age: 5m, 6h, 3d, 2w, 14mo, 3y. Terse by design — these sit in
  *  chips and beside addresses, where words would crowd the line. */
@@ -55,10 +62,11 @@ function useChainHeight(startBlock: number, initialHeight: number) {
           d.result.counterparty_height,
       ),
     {
-      // Blocks land every ~10 minutes; poll like it, and only tighten to
-      // 30s inside the final dozen blocks where seconds start to matter.
+      // Blocks land every ~10 minutes; poll like it. Half-minute polling
+      // only earns its keep in the last few blocks — a dozen blocks out it
+      // was two hours of 30-second requests to learn nothing.
       refreshInterval: (latest) =>
-        startBlock - (latest ?? initialHeight) <= 12 ? 30_000 : 180_000,
+        startBlock - (latest ?? initialHeight) <= 3 ? 30_000 : 180_000,
       revalidateOnFocus: true,
       fallbackData: initialHeight,
     },
@@ -90,7 +98,14 @@ export function ScheduledPulse({
   const open = remaining <= 0;
 
   useEffect(() => {
-    document.title = open ? `LIVE · ${asset}` : `${remaining} blocks · ${asset}`;
+    const previous = document.title;
+    document.title = open
+      ? `LIVE · ${asset}`
+      : `${remaining} block${remaining === 1 ? "" : "s"} · ${asset}`;
+    // Without this a soft navigation carries the countdown to the next page.
+    return () => {
+      document.title = previous;
+    };
   }, [remaining, open, asset]);
 
 
@@ -111,11 +126,24 @@ export function ScheduledPulse({
   // Render more tiles than most screens can show and let each half clip its
   // far end — the row fills whatever width it's given instead of guessing.
   const RUN = 8;
-  const tipHeight = tip?.height ?? height;
-  const mined = (recent ?? []).slice(0, RUN);
+  // Counterparty parses a block or two behind Bitcoin's tip; take whichever
+  // is further along so the forecast never re-lists a block that exists.
+  const tipHeight = Math.max(tip?.height ?? 0, height);
+  // A blocked mempool.space would otherwise leave the mined half empty next
+  // to a full forecast, which reads as broken rather than loading.
+  const mined =
+    recent ??
+    Array.from({ length: RUN }, (_, i) => ({
+      height: tipHeight - i,
+      timestamp: null as number | null,
+    }));
   // Nearest first: the next block sits against the divider, the forecast
   // runs away to the left.
   const upcoming = Array.from({ length: RUN }, (_, i) => tipHeight + 1 + i);
+  // Minutes, not blocksEta: three tiles in a row reading "~1h" said less
+  // than nothing.
+  const pendingEta = (blocks: number) =>
+    blocks * 10 < 60 ? `~${blocks * 10}m` : `~${((blocks * 10) / 60).toFixed(1)}h`;
 
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => {
@@ -126,9 +154,9 @@ export function ScheduledPulse({
   }, []);
 
   return (
-    <div className="mt-7">
-      <div className="text-center">
-        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+    <div className="mt-8">
+      <div className="py-2 text-center">
+        <div className={`mb-2.5 ${LABEL}`}>
           {open ? "now minting" : "upcoming launch"}
         </div>
         <div className="text-5xl font-extrabold leading-none tracking-tight text-gray-900 tabular-nums">
@@ -145,12 +173,12 @@ export function ScheduledPulse({
             <>
               {blocksEta(remaining)}{" "}
               <span className="text-lg font-semibold text-gray-400">
-                · {remaining.toLocaleString()} blocks
+                · {commas(remaining)} blocks
               </span>
             </>
           )}
         </div>
-        <div className="mt-2 text-sm text-gray-500 tabular-nums">
+        <div className="mt-2.5 text-sm text-gray-500 tabular-nums">
           {open
             ? "minting is live — refresh the page"
             : remaining <= 12
@@ -163,14 +191,16 @@ export function ScheduledPulse({
           as it stands on the right, newest against the divider so each new
           block lands in the same place. Both halves overflow their edge, so
           a wider screen simply shows more chain. */}
-      <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-start gap-2 sm:gap-3">
-        <div className="flex flex-row-reverse justify-start gap-2 overflow-hidden">
+      <div className="mt-8 grid grid-cols-[1fr_auto_1fr] items-start gap-2 sm:gap-3">
+        {/* The mask makes a clipped tile read as continuation. Without it a
+            half-cut height like "61,690" looks like a real block number. */}
+        <div className="flex flex-row-reverse justify-start gap-2 overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_3rem)]">
           {upcoming.map((h, i) => (
             <BlockTile
               key={h}
               height={h}
               tone={h === startBlock ? "target" : "pending"}
-              label={h === startBlock ? "opens" : blocksEta(i + 1)}
+              label={h === startBlock ? "opens" : pendingEta(i + 1)}
               pulseDelayMs={h === startBlock ? undefined : i * 200}
             />
           ))}
@@ -178,29 +208,38 @@ export function ScheduledPulse({
 
         <div className="h-16 w-px self-center bg-[repeating-linear-gradient(to_bottom,#e5e7eb_0_4px,transparent_4px_8px)] sm:h-20" />
 
-        <div className="flex justify-start gap-2 overflow-hidden">
+        <div className="flex justify-start gap-2 overflow-hidden [mask-image:linear-gradient(to_left,transparent,black_3rem)]">
           {mined.map((b, i) => (
             <BlockTile
               key={b.height}
               height={b.height}
               tone={i === 0 ? "tip" : "mined"}
-              label={nowSec === null ? "\u00b7" : blockAge(nowSec - b.timestamp)}
+              label={
+                nowSec === null || b.timestamp === null
+                  ? "\u00b7"
+                  : blockAge(nowSec - b.timestamp)
+              }
             />
           ))}
         </div>
       </div>
 
-      <p className="mt-4 text-center text-xs text-gray-500 tabular-nums">
+      <p className="mt-5 text-center text-xs text-gray-500 tabular-nums">
         {open ? (
           "minting is live"
         ) : (
           <>
-            minting opens at{" "}
-            <span className="font-medium text-gray-700">
-              block {startBlock.toLocaleString()}
+            <span className="whitespace-nowrap">
+              minting opens at{" "}
+              <span className="font-medium text-gray-700">
+                block {commas(startBlock)}
+              </span>
             </span>
-            {deadlineBlock > 0 &&
-              ` \u00b7 window closes ${deadlineBlock.toLocaleString()}`}
+            {deadlineBlock > 0 && (
+              <span className="whitespace-nowrap">
+                {" \u00b7 "}window closes {commas(deadlineBlock)}
+              </span>
+            )}
           </>
         )}
       </p>
@@ -210,9 +249,10 @@ export function ScheduledPulse({
 
 /** Age of a mined block, mempool-style: minutes, then hours. */
 function blockAge(sec: number) {
-  if (sec < 90) return "just now";
-  if (sec < 3600) return `${Math.round(sec / 60)}m ago`;
-  return `${Math.floor(sec / 3600)}h ago`;
+  const min = Math.floor(sec / 60);
+  if (min < 1) return "just now";
+  if (min < 60) return `${min}m ago`;
+  return `${Math.floor(min / 60)}h ago`;
 }
 
 /** One block in the split. The height labels it above; inside is the human
@@ -229,6 +269,7 @@ function BlockTile({
   label: string;
   pulseDelayMs?: number;
 }) {
+  const pulses = tone === "pending";
   const face = {
     tip: "bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-sm",
     mined: "bg-purple-100 text-purple-500",
@@ -247,14 +288,12 @@ function BlockTile({
       </div>
       <div
         style={
-          pulseDelayMs === undefined
-            ? undefined
-            : { animationDelay: `${pulseDelayMs}ms` }
+          pulses && pulseDelayMs !== undefined
+            ? { animationDelay: `${pulseDelayMs}ms` }
+            : undefined
         }
         className={`flex size-[3.75rem] items-center justify-center rounded-xl px-1 text-center text-[11px] font-medium leading-tight sm:size-16 ${face} ${
-          pulseDelayMs === undefined
-            ? ""
-            : "animate-pulse motion-reduce:animate-none"
+          pulses ? "animate-pulse motion-reduce:animate-none" : ""
         }`}
       >
         {label}
@@ -311,13 +350,13 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
 
   return (
     <div className="mt-5 border-y border-gray-100 py-4">
-      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* Four columns only once the card is wide enough for them: at the sm
+          breakpoint the card is still 640px and the last value wraps. */}
+      <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {cells.map(([label, value], i) => (
           <div key={label}>
             <div className="flex items-start justify-between gap-2">
-              <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                {label}
-              </dt>
+              <dt className={LABEL}>{label}</dt>
               {/* The toggle rides the last label, not the values — a value
                   that wraps to two lines would otherwise drag it out of
                   line with the row. */}
@@ -326,7 +365,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
                   type="button"
                   onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
                   aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
-                  className="-mt-0.5 shrink-0 rounded-full border border-gray-200 px-1.5 py-px text-[10px] font-semibold text-gray-400 transition-colors hover:border-purple-300 hover:text-purple-600"
+                  className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS}`}
                 >
                   {usdMode ? "XCP" : "USD"}
                 </button>
@@ -349,10 +388,20 @@ interface HostedMeta {
   social?: { type?: string; data?: string }[];
 }
 
+/** True only for metadata we publish ourselves. Third-party JSON is never
+ *  fetched from the visitor's browser: the description URL is chosen by the
+ *  issuer, so fetching it would hand every viewer's IP to whoever they
+ *  pointed it at. Those launches show the link instead. */
+export function isOurMetadata(url: string | null | undefined) {
+  return typeof url === "string" && url.startsWith(`${METADATA_ORIGIN}/`);
+}
+
 function useHostedMeta(url: string) {
-  return useSWR(/^https?:\/\//i.test(url) ? url : null, (u: string) =>
-    fetchJson(u).catch(() => null),
-  ) as { data: HostedMeta | null | undefined };
+  return useSWR<HostedMeta | null>(
+    isOurMetadata(url) ? url : null,
+    (u: string) => fetchJson(u).catch(() => null),
+    { revalidateOnFocus: false },
+  );
 }
 
 /**
@@ -382,7 +431,7 @@ export function LaunchDescription({ text }: { text: string }) {
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="mt-1.5 text-xs font-medium text-purple-600 hover:text-purple-500"
+          className={`mt-1.5 rounded text-xs font-medium text-purple-600 hover:text-purple-500 ${FOCUS}`}
         >
           {expanded ? "Show less" : "Show more"}
         </button>
@@ -417,30 +466,30 @@ const SOCIAL_ICONS: Record<string, { label: string; path: string }> = {
 /** The launch's social links, from the hosted JSON's `social` array. */
 export function HostedSocials({ url, asset }: { url: string; asset: string }) {
   const { data } = useHostedMeta(url);
+  const seen = new Set<string>();
   const links = (Array.isArray(data?.social) ? data.social : []).filter(
-    (s): s is { type: string; data: string } =>
-      typeof s?.data === "string" && typeof s?.type === "string" && s.type in SOCIAL_ICONS,
+    (s): s is { type: string; data: string } => {
+      // `in` walks the prototype chain, so "constructor" would pass; and an
+      // href is only safe once its scheme is known.
+      if (typeof s?.type !== "string" || !Object.hasOwn(SOCIAL_ICONS, s.type))
+        return false;
+      if (typeof s?.data !== "string" || !/^https:\/\//i.test(s.data)) return false;
+      if (seen.has(s.type)) return false;
+      seen.add(s.type);
+      return true;
+    },
   );
-  // TEMPORARY (design review): show placeholder icons when a launch has no
-  // social links, so the row can be judged. Delete the fallback — the empty
-  // state is correct once the look is settled.
-  const shown =
-    links.length > 0
-      ? links
-      : [
-          { type: "twitter", data: "#" },
-          { type: "telegram", data: "#" },
-        ];
+  if (links.length === 0) return null;
   return (
-    <div className="flex shrink-0 items-center gap-1.5">
-      {shown.map((s) => (
+    <div className="flex shrink-0 items-center gap-2.5">
+      {links.map((s) => (
         <a
           key={s.type}
           href={s.data}
           target="_blank"
           rel="noreferrer"
           aria-label={`${asset} on ${SOCIAL_ICONS[s.type]!.label}`}
-          className="flex size-[26px] items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-colors hover:border-purple-300 hover:bg-white hover:text-purple-600"
+          className={`relative flex size-[26px] items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-colors after:absolute after:-inset-2 after:content-[''] hover:border-purple-300 hover:bg-white hover:text-purple-600 ${FOCUS}`}
         >
           <svg viewBox="0 0 24 24" className="size-[13px] fill-current">
             <path d={SOCIAL_ICONS[s.type]!.path} />
@@ -465,12 +514,10 @@ const ordinal = (n: number) =>
 export function IssuerChips({
   source,
   currentAsset,
-  blockHeight,
   trailing,
 }: {
   source: string;
   currentAsset: string;
-  blockHeight?: number;
   /** The project's own links, flowing at the end of the same run. */
   trailing?: ReactNode;
 }) {
@@ -490,20 +537,24 @@ export function IssuerChips({
       const closed = prior.filter((r) => r.status === "closed");
       // Pool existence is the launched-vs-refunded oracle; one call each,
       // so judge only the four most recent.
+      // Three-state on purpose: a timeout or a 500 must not read as "no
+      // pool", which the chip would publish as someone's launch refunding.
       const pools = await Promise.all(
         closed.slice(0, 4).map((r) =>
           fetchJson(
             `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(r.asset)}/XCP`,
           )
-            .then((p: { result: unknown }) => p.result ?? null)
-            .catch(() => null),
+            .then((p: { result: unknown }) => (p.result ? "graduated" : "refunded"))
+            .catch(() => "unknown"),
         ),
       );
+      const judged = pools.filter((p) => p !== "unknown");
       const last = prior[0];
       return {
         prior: prior.length,
-        judged: pools.length,
-        graduated: pools.filter(Boolean).length,
+        priorCapped: (d.result ?? []).length >= 100,
+        judged: judged.length,
+        graduated: judged.filter((p) => p === "graduated").length,
         last: last?.block_time
           ? { asset: last.asset, at: last.block_time }
           : null,
@@ -528,17 +579,10 @@ export function IssuerChips({
         } issued`
       : ageDays !== null && ageDays > NEW_ADDRESS_DAYS
         ? `on-chain since ${new Date(firstSeen! * 1000).getFullYear()}`
-        : issued || firstSeen
+        : // Only claim "new" on evidence: a failed lookup is not a young address.
+          firstSeen !== null && issued !== null
           ? "new address"
           : null;
-
-  // Silence for a year is the one negative signal worth surfacing: block
-  // gaps are a duration, so this needs no timestamp lookup.
-  const BLOCKS_PER_YEAR = 52_560;
-  const idleBlocks =
-    blockHeight && summary?.last_block ? blockHeight - summary.last_block : 0;
-  const dormantYears =
-    idleBlocks > BLOCKS_PER_YEAR ? Math.floor(idleBlocks / BLOCKS_PER_YEAR) : null;
 
   if (!data) return trailing ? <div className="mt-2">{trailing}</div> : null;
 
@@ -548,7 +592,11 @@ export function IssuerChips({
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
       <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700">
-        {data.prior === 0 ? "first launch" : `${ordinal(data.prior + 1)} launch`}
+        {data.prior === 0
+          ? "first launch"
+          : data.priorCapped
+            ? `${commas(data.prior)}+ launches`
+            : `${ordinal(data.prior + 1)} launch`}
       </span>
       {data.judged > 0 && (
         <span className={chip}>
@@ -564,11 +612,6 @@ export function IssuerChips({
         </Link>
       )}
       {data.prior === 0 && standing && <span className={chip}>{standing}</span>}
-      {dormantYears !== null && (
-        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 tabular-nums">
-          dormant {dormantYears}y
-        </span>
-      )}
       {trailing}
     </div>
   );
@@ -654,7 +697,7 @@ function CopyButton({ value }: { value: string }) {
         );
       }}
       aria-label="Copy issuer address"
-      className="ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-purple-600"
+      className={`relative ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 transition-colors after:absolute after:-inset-3 after:content-[''] hover:bg-gray-100 hover:text-purple-600 ${FOCUS}`}
     >
       {copied ? (
         <svg viewBox="0 0 24 24" className="size-3 fill-green-600">
@@ -710,7 +753,7 @@ export function IssuerLine({ source }: { source: string }) {
             href={`https://xcp.io/address/${source}`}
             target="_blank"
             rel="noreferrer"
-            className="rounded hover:text-purple-600 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+            className={`rounded hover:text-purple-600 hover:underline ${FOCUS}`}
           >
             {shortAddress(source)}
           </a>
@@ -718,18 +761,14 @@ export function IssuerLine({ source }: { source: string }) {
       >
         <div className="grid grid-cols-2 gap-2">
           <div className="rounded-xl bg-gray-50 p-3">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-              XCP balance
-            </div>
-            <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+            <div className={LABEL}>XCP balance</div>
+            <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
               {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
             </div>
           </div>
           <div className="rounded-xl bg-gray-50 p-3">
-            <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-              First seen
-            </div>
-            <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+            <div className={LABEL}>First seen</div>
+            <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
               {firstSeen ? monthYear(firstSeen) : "—"}
             </div>
           </div>
@@ -791,7 +830,7 @@ export function ShareButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex h-8 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 text-[11px] font-semibold text-purple-600 transition-colors hover:border-purple-600 hover:bg-purple-600 hover:text-white"
+        className={`flex h-8 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 text-[11px] font-medium text-purple-600 transition-colors hover:border-purple-600 hover:bg-purple-600 hover:text-white ${FOCUS}`}
       >
         <svg viewBox="0 0 24 24" className="size-3 fill-current">
           <path d="M18 16.08a2.9 2.9 0 0 0-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.5.47 1.17.77 1.91.77a2.8 2.8 0 1 0-2.8-2.8c0 .24.04.47.09.7L8.11 9.97A2.8 2.8 0 0 0 3.4 12a2.8 2.8 0 0 0 4.71 2.03l7.12 4.16c-.05.21-.08.43-.08.65a2.73 2.73 0 1 0 2.85-2.76Z" />
@@ -813,14 +852,14 @@ export function ShareButton({
               className="size-16 shrink-0 rounded-xl bg-gray-100 object-cover"
             />
             <div className="min-w-0">
-              <div className="truncate text-sm font-bold text-gray-900">
+              <div className="truncate text-sm font-semibold text-gray-900">
                 {asset}
               </div>
               <div className="truncate text-xs text-gray-600">{headline}</div>
               <div className="mt-0.5 truncate text-[11px] text-gray-400">
                 {subline}
               </div>
-              <div className="mt-1 truncate text-[10px] text-gray-400">
+              <div className="mt-0.5 truncate text-[10px] text-gray-400">
                 xcp.fun/{asset}
               </div>
             </div>
@@ -837,7 +876,7 @@ export function ShareButton({
                 () => {},
               );
             }}
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+            className={`mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] ${FOCUS}`}
           >
             {copied ? "Link copied" : "Copy link"}
           </button>
@@ -845,10 +884,10 @@ export function ShareButton({
             href={`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`}
             target="_blank"
             rel="noreferrer"
-            className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
+            className={`mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99] ${FOCUS}`}
           >
             <svg viewBox="0 0 24 24" className="size-3.5 fill-current">
-              <path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.47l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.4Z" />
+              <path d={SOCIAL_ICONS.twitter!.path} />
             </svg>
             Share on X
           </a>
@@ -954,12 +993,14 @@ export function ArtLightbox({ asset }: { asset: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`View ${asset} artwork full size`}
-        className="group shrink-0 cursor-zoom-in rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+        className={`group w-full shrink-0 cursor-zoom-in rounded-2xl sm:w-auto ${FOCUS}`}
       >
+        {/* A poster on a phone: full width, then the compact identity square
+            once there's a column to sit beside. */}
         <TokenImage
           asset={asset}
           large
-          className="size-[5.5rem] rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03]"
+          className="aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:size-[5.5rem] sm:aspect-auto sm:w-auto"
         />
       </button>
       <Dialog open={open} onOpenChange={setOpen} title={asset}>

@@ -73,7 +73,8 @@ export default async function LaunchPage({
   if (!fm) notFound();
 
   const [mints, blockHeight, pool, originalDeadline, xcpUsd] = await Promise.all([
-    fetchFairmints(fm.tx_hash),
+    // A pending fairminter cannot have mints yet; don't ask.
+    fm.status === "pending" ? Promise.resolve([]) : fetchFairmints(fm.tx_hash),
     fetchBlockHeight(),
     fm.status === "closed" ? fetchPool(asset) : Promise.resolve(null),
     // Closed rows can't prove their composed window (rewritten on early
