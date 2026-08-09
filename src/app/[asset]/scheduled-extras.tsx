@@ -36,6 +36,8 @@ const timeAgo = (unixSec: number) => {
   return `${Math.round(days / 365)}y ago`;
 };
 
+const daysSince = (unixSec: number) => (Date.now() / 1000 - unixSec) / 86_400;
+
 const monthYear = (unixSec: number) =>
   new Date(unixSec * 1000).toLocaleDateString("en-US", {
     month: "short",
@@ -463,10 +465,12 @@ const ordinal = (n: number) =>
 export function IssuerChips({
   source,
   currentAsset,
+  blockHeight,
   trailing,
 }: {
   source: string;
   currentAsset: string;
+  blockHeight?: number;
   /** The project's own links, flowing at the end of the same run. */
   trailing?: ReactNode;
 }) {
@@ -507,7 +511,35 @@ export function IssuerChips({
     },
     { revalidateOnFocus: false },
   );
-  const issued = useIssuedCount(data && data.prior === 0 ? source : null);
+  const firstTimer = data?.prior === 0;
+  const issued = useIssuedCount(firstTimer ? source : null);
+  const summary = useAddressSummary(firstTimer ? source : null);
+  const firstSeen = useFirstSeen(firstTimer ? summary?.first_block : null);
+
+  // One chip, filled by the first fact that says something. A creator's
+  // own history beats their age, and age beats nothing — but "new address"
+  // is a real answer, not a fallback, so it's stated rather than omitted.
+  const NEW_ADDRESS_DAYS = 90;
+  const ageDays = firstSeen ? daysSince(firstSeen) : null;
+  const standing =
+    issued && issued.count > 0
+      ? `${commas(issued.count)}${issued.capped ? "+" : ""} ${
+          issued.count === 1 && !issued.capped ? "asset" : "assets"
+        } issued`
+      : ageDays !== null && ageDays > NEW_ADDRESS_DAYS
+        ? `on-chain since ${new Date(firstSeen! * 1000).getFullYear()}`
+        : issued || firstSeen
+          ? "new address"
+          : null;
+
+  // Silence for a year is the one negative signal worth surfacing: block
+  // gaps are a duration, so this needs no timestamp lookup.
+  const BLOCKS_PER_YEAR = 52_560;
+  const idleBlocks =
+    blockHeight && summary?.last_block ? blockHeight - summary.last_block : 0;
+  const dormantYears =
+    idleBlocks > BLOCKS_PER_YEAR ? Math.floor(idleBlocks / BLOCKS_PER_YEAR) : null;
+
   if (!data) return trailing ? <div className="mt-2">{trailing}</div> : null;
 
   const chip =
@@ -531,11 +563,10 @@ export function IssuerChips({
           last launch {timeAgo(data.last.at)} · {data.last.asset}
         </Link>
       )}
-      {data.prior === 0 && issued && issued.count > 0 && (
-        <span className={chip}>
-          {commas(issued.count)}
-          {issued.capped ? "+" : ""}{" "}
-          {issued.count === 1 && !issued.capped ? "asset" : "assets"} issued
+      {data.prior === 0 && standing && <span className={chip}>{standing}</span>}
+      {dormantYears !== null && (
+        <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] text-amber-700 tabular-nums">
+          dormant {dormantYears}y
         </span>
       )}
       {trailing}
@@ -553,6 +584,39 @@ interface AddressSummary {
   xcp?: string | number | null;
   assets?: number | null;
   first_block?: number | null;
+  last_block?: number | null;
+}
+
+/** The explorer's address summary, shared: the chips read it eagerly and
+ *  the hover card reuses the same answer instead of asking again. */
+function useAddressSummary(source: string | null) {
+  const { data } = useSWR(
+    source ? ["address-summary", source] : null,
+    () =>
+      (fetchJson(`${XCPIO_API}/addresses/${source}/summary`) as Promise<{
+        result: AddressSummary | null;
+      }>)
+        .then((d) => d.result ?? null)
+        .catch(() => null),
+    { revalidateOnFocus: false },
+  );
+  return data ?? null;
+}
+
+/** When an address first appeared, as a real block timestamp — the model
+ *  reports a height, and estimating a date from it drifts by months. */
+function useFirstSeen(firstBlock: number | null | undefined) {
+  const { data } = useSWR(
+    firstBlock ? ["block-time", firstBlock] : null,
+    () =>
+      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${firstBlock}`) as Promise<{
+        result: { block_time: number };
+      }>)
+        .then((d) => d.result.block_time)
+        .catch(() => null),
+    { revalidateOnFocus: false },
+  );
+  return data ?? null;
 }
 
 /** Assets ever issued from an address — the explorer returns one row per
@@ -612,44 +676,29 @@ function CopyButton({ value }: { value: string }) {
  * goes to the explorer, so touch users lose only the preview.
  */
 export function IssuerLine({ source }: { source: string }) {
-  // The card's three calls are worth making only for someone who asks for
-  // it — arm them on first hover or focus, then SWR keeps the answer.
+  // The reputation call is worth making only for someone who asks for the
+  // card; the summary is already in flight for the chips, so reading it
+  // here costs nothing.
   const [armed, setArmed] = useState(false);
-  const { data } = useSWR(
-    armed ? ["issuer-card", source] : null,
-    async () => {
-      const [summary, rep] = await Promise.all([
-        (fetchJson(`${XCPIO_API}/addresses/${source}/summary`) as Promise<{
-          result: AddressSummary | null;
-        }>)
-          .then((d) => d.result ?? null)
-          .catch(() => null),
-        (fetchJson(`${XCPIO_API}/addresses/${source}/reputation`) as Promise<{
-          result: Reputation | null;
-        }>)
-          .then((d) => d.result ?? null)
-          .catch(() => null),
-      ]);
-      // first_block is a height; the block record carries the real time
-      // (600s-average estimates drift by months at this scale).
-      const firstSeen = summary?.first_block
-        ? await (fetchJson(
-            `${COUNTERPARTY_API_BASE}/blocks/${summary.first_block}`,
-          ) as Promise<{ result: { block_time: number } }>)
-            .then((d) => d.result.block_time)
-            .catch(() => null)
-        : null;
-      return { summary, rep, firstSeen };
-    },
+  const summary = useAddressSummary(source);
+  const firstSeen = useFirstSeen(summary?.first_block);
+  const { data: rep } = useSWR(
+    armed ? ["reputation", source] : null,
+    () =>
+      (fetchJson(`${XCPIO_API}/addresses/${source}/reputation`) as Promise<{
+        result: Reputation | null;
+      }>)
+        .then((d) => d.result ?? null)
+        .catch(() => null),
     { revalidateOnFocus: false },
   );
 
-  const xcp = data?.summary?.xcp;
+  const xcp = summary?.xcp;
   const xcpNum = xcp === null || xcp === undefined ? null : Number(xcp);
-  const held = data?.summary?.assets;
+  const held = summary?.assets;
   const issued = useIssuedCount(armed ? source : null);
-  const score = data?.rep?.track_record?.score;
-  const tier = data?.rep?.track_record?.tier;
+  const score = rep?.track_record?.score;
+  const tier = rep?.track_record?.tier;
 
   return (
     <span className="mt-1 inline-block text-[13px] text-gray-500 tabular-nums">
@@ -681,7 +730,7 @@ export function IssuerLine({ source }: { source: string }) {
               First seen
             </div>
             <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
-              {data?.firstSeen ? monthYear(data.firstSeen) : "—"}
+              {firstSeen ? monthYear(firstSeen) : "—"}
             </div>
           </div>
         </div>

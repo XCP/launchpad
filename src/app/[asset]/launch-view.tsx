@@ -274,6 +274,7 @@ export function LaunchView({
               <IssuerChips
                 source={fm.source}
                 currentAsset={asset}
+                blockHeight={blockHeight}
                 trailing={
                   <HostedSocials url={fm.description ?? ""} asset={asset} />
                 }
