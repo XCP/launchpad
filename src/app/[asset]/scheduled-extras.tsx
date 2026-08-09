@@ -282,9 +282,10 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
   const targetXcp = XCP69_RAISE_SATS / SATS;
   const supplyTokens = XCP69.HARD_CAP / SATS;
   const poolTokens = XCP69.POOL_QUANTITY / SATS;
-  // Fully diluted at the mint price — every token valued at what this sale
-  // charges for it, not at whatever the pool opens to.
-  const mcapXcp = (supplyTokens / lot) * priceXcp;
+  // Valued at the price the pool opens to — the first price the market
+  // actually quotes, which is where the launch's market cap starts.
+  const openPriceXcp = targetXcp / poolTokens;
+  const mcapXcp = supplyTokens * openPriceXcp;
   // A pool is worth both its legs, and the launch funds them equally.
   const liquidityXcp = targetXcp * 2;
 
@@ -293,7 +294,10 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
         ["Price", `${usd(priceXcp * rate)} / ${commas(lot)}`],
         ["Per address", `${usd(capXcp * rate)} · ${compact(capTokens)} max`],
         ["Target", `${usd(targetXcp * rate)} or refund`],
-        ["Market cap", `${usd(mcapXcp * rate)} · ${usd(liquidityXcp * rate)} liquidity`],
+        [
+          "Market cap",
+          `${usd(mcapXcp * rate)} · ${usd(liquidityXcp * rate)} pool`,
+        ],
       ]
     : [
         ["Price", `${priceXcp} XCP / ${commas(lot)}`],
@@ -303,30 +307,35 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
       ];
 
   return (
-    <dl className="mt-5 grid grid-cols-2 items-start gap-3 border-y border-gray-100 py-4 sm:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
-      {cells.map(([label, value]) => (
-        <div key={label}>
-          <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-            {label}
-          </dt>
-          <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-            {value}
-          </dd>
-        </div>
-      ))}
-      {xcpUsd !== null && (
-        <div className="self-center justify-self-end">
-          <button
-            type="button"
-            onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
-            aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
-            className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-400 transition-colors hover:border-purple-300 hover:text-purple-600"
-          >
-            {usdMode ? "XCP" : "USD"}
-          </button>
-        </div>
-      )}
-    </dl>
+    <div className="mt-5 border-y border-gray-100 py-4">
+      <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {cells.map(([label, value], i) => (
+          <div key={label}>
+            <div className="flex items-start justify-between gap-2">
+              <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                {label}
+              </dt>
+              {/* The toggle rides the last label, not the values — a value
+                  that wraps to two lines would otherwise drag it out of
+                  line with the row. */}
+              {xcpUsd !== null && i === cells.length - 1 && (
+                <button
+                  type="button"
+                  onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
+                  aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
+                  className="-mt-0.5 shrink-0 rounded-full border border-gray-200 px-1.5 py-px text-[10px] font-semibold text-gray-400 transition-colors hover:border-purple-300 hover:text-purple-600"
+                >
+                  {usdMode ? "XCP" : "USD"}
+                </button>
+              )}
+            </div>
+            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              {value}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
@@ -338,7 +347,7 @@ interface HostedMeta {
 }
 
 function useHostedMeta(url: string) {
-  return useSWR(url, (u: string) =>
+  return useSWR(/^https?:\/\//i.test(url) ? url : null, (u: string) =>
     fetchJson(u).catch(() => null),
   ) as { data: HostedMeta | null | undefined };
 }
@@ -409,10 +418,19 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
     (s): s is { type: string; data: string } =>
       typeof s?.data === "string" && typeof s?.type === "string" && s.type in SOCIAL_ICONS,
   );
-  if (links.length === 0) return null;
+  // TEMPORARY (design review): show placeholder icons when a launch has no
+  // social links, so the row can be judged. Delete the fallback — the empty
+  // state is correct once the look is settled.
+  const shown =
+    links.length > 0
+      ? links
+      : [
+          { type: "twitter", data: "#" },
+          { type: "telegram", data: "#" },
+        ];
   return (
     <div className="flex shrink-0 gap-1.5">
-      {links.map((s) => (
+      {shown.map((s) => (
         <a
           key={s.type}
           href={s.data}
@@ -689,6 +707,100 @@ export function IssuerLine({ source }: { source: string }) {
       </HoverCard>
       <CopyButton value={source} />
     </span>
+  );
+}
+
+/* ---------- sharing ---------- */
+
+/**
+ * Share sheet: a preview of what a link to this launch looks like when it
+ * lands somewhere, then the two things anyone actually wants to do with it.
+ * The preview is built from the same art and facts as the page, so what's
+ * shown here is what unfurls.
+ */
+export function ShareButton({
+  asset,
+  headline,
+  subline,
+}: {
+  asset: string;
+  headline: string;
+  subline: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const url = `https://xcp.fun/${asset}`;
+  const text = `${asset} — ${headline} on xcp.fun`;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="flex h-8 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-[11px] font-semibold text-gray-500 transition-colors hover:border-purple-300 hover:text-purple-600"
+      >
+        <svg viewBox="0 0 24 24" className="size-3 fill-current">
+          <path d="M18 16.08a2.9 2.9 0 0 0-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.5.47 1.17.77 1.91.77a2.8 2.8 0 1 0-2.8-2.8c0 .24.04.47.09.7L8.11 9.97A2.8 2.8 0 0 0 3.4 12a2.8 2.8 0 0 0 4.71 2.03l7.12 4.16c-.05.21-.08.43-.08.65a2.73 2.73 0 1 0 2.85-2.76Z" />
+        </svg>
+        Share
+      </button>
+
+      <Dialog open={open} onOpenChange={setOpen} title="Share this launch">
+        <div className="px-2 pb-2">
+          <p className="mb-3 text-xs text-gray-500">
+            Copy the link, or post it straight to X.
+          </p>
+
+          {/* What the link looks like when it unfurls. */}
+          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+            <TokenImage
+              asset={asset}
+              large
+              className="size-16 shrink-0 rounded-xl bg-gray-100 object-cover"
+            />
+            <div className="min-w-0">
+              <div className="truncate text-sm font-bold text-gray-900">
+                {asset}
+              </div>
+              <div className="truncate text-xs text-gray-600">{headline}</div>
+              <div className="mt-0.5 truncate text-[11px] text-gray-400">
+                {subline}
+              </div>
+              <div className="mt-1 truncate text-[10px] text-gray-400">
+                xcp.fun/{asset}
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              navigator.clipboard.writeText(url).then(
+                () => {
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 1800);
+                },
+                () => {},
+              );
+            }}
+            className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-purple-600 px-5 py-3 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+          >
+            {copied ? "Link copied" : "Copy link"}
+          </button>
+          <a
+            href={`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 px-5 py-3 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
+          >
+            <svg viewBox="0 0 24 24" className="size-3.5 fill-current">
+              <path d="M18.9 1.15h3.68l-8.04 9.19L24 22.85h-7.41l-5.8-7.58-6.64 7.58H.47l8.6-9.83L0 1.15h7.59l5.24 6.93 6.07-6.93Zm-1.29 19.5h2.04L6.49 3.24H4.3l13.31 17.4Z" />
+            </svg>
+            Share on X
+          </a>
+        </div>
+      </Dialog>
+    </>
   );
 }
 

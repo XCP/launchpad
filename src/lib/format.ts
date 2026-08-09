@@ -30,10 +30,17 @@ export function tokenQty(raw: RawLike | null | undefined, divisible: boolean): n
 export function compact(n: number): string {
   if (!Number.isFinite(n)) return "0";
   const abs = Math.abs(n);
-  if (abs >= 1e12) return `${(n / 1e12).toFixed(2)}T`;
-  if (abs >= 1e9) return `${(n / 1e9).toFixed(2)}B`;
-  if (abs >= 1e6) return `${(n / 1e6).toFixed(2)}M`;
-  if (abs >= 1e3) return `${(n / 1e3).toFixed(1)}K`;
+  // Round tokens are the common case here (100M supply, 31M pool, 1M cap),
+  // and "100.00M" reads as false precision — keep decimals only when they
+  // carry a digit.
+  const scaled = (value: number, suffix: string) =>
+    `${Number(value.toFixed(2)).toLocaleString("en-US", {
+      maximumFractionDigits: 2,
+    })}${suffix}`;
+  if (abs >= 1e12) return scaled(n / 1e12, "T");
+  if (abs >= 1e9) return scaled(n / 1e9, "B");
+  if (abs >= 1e6) return scaled(n / 1e6, "M");
+  if (abs >= 1e3) return scaled(n / 1e3, "K");
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 

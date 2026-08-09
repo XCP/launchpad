@@ -9,6 +9,7 @@ import {
   IssuerLine,
   LaunchDescription,
   ScheduledPulse,
+  ShareButton,
   StatusPill,
   TermsStrip,
 } from "./scheduled-extras";
@@ -256,9 +257,14 @@ export function LaunchView({
                   {asset}
                   <StatusPill phase={phase} hasPool={pool !== null} />
                 </h1>
-                {isUrlDescription && (
-                  <HostedSocials url={fm.description} asset={asset} />
-                )}
+                <div className="flex shrink-0 flex-col items-end gap-1.5">
+                  <HostedSocials url={fm.description ?? ""} asset={asset} />
+                  <ShareButton
+                    asset={asset}
+                    headline={`minting opens in ${blocksEta(fm.start_block - blockHeight)}`}
+                    subline="0.01 XCP / 1,000 · sells out or refunds"
+                  />
+                </div>
               </div>
               <div className="flex flex-wrap items-baseline">
                 <IssuerLine source={fm.source} />
