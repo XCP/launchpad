@@ -7,11 +7,18 @@ import { TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
-import { blocksEta, commas, shortAddress } from "@/lib/format";
+import { useDenomination, setDenomination } from "@/lib/denomination";
+import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
-import { type Fairminter, isXcp69 } from "@/lib/xcp69";
+import {
+  type Fairminter,
+  isXcp69,
+  XCP69,
+  XCP69_RAISE_SATS,
+} from "@/lib/xcp69";
 
 const XCPIO_API = "https://api.xcp.io/v2";
+const SATS = 1e8;
 
 /** Compact age: 5m, 6h, 3d, 2w, 14mo, 3y. Terse by design — these sit in
  *  chips and beside addresses, where words would crowd the line. */
@@ -250,6 +257,76 @@ function BlockTile({
         {label}
       </div>
     </div>
+  );
+}
+
+/* ---------- the standard's terms ---------- */
+
+/**
+ * The four fixed facts of an XCP-69 launch, in either denomination. The
+ * toggle is the point: the same launch reads as chain units to someone who
+ * thinks in XCP and as dollars to everyone else, and two of the four cells
+ * change meaning with it — supply becomes market cap (at the mint price,
+ * the price you'd actually be paying), and the pool's token side becomes
+ * liquidity counted from both legs, which are equal by construction.
+ */
+export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
+  const denom = useDenomination();
+  const usdMode = denom === "USD" && !!xcpUsd;
+  const rate = xcpUsd ?? 0;
+
+  const priceXcp = XCP69.PRICE / SATS; // 0.01 XCP per lot
+  const lot = XCP69.QUANTITY_BY_PRICE / SATS; // 1,000 tokens
+  const capXcp = XCP69.MAX_MINT_PER_ADDRESS / XCP69.QUANTITY_BY_PRICE * priceXcp;
+  const capTokens = XCP69.MAX_MINT_PER_ADDRESS / SATS;
+  const targetXcp = XCP69_RAISE_SATS / SATS;
+  const supplyTokens = XCP69.HARD_CAP / SATS;
+  const poolTokens = XCP69.POOL_QUANTITY / SATS;
+  // Fully diluted at the mint price — every token valued at what this sale
+  // charges for it, not at whatever the pool opens to.
+  const mcapXcp = (supplyTokens / lot) * priceXcp;
+  // A pool is worth both its legs, and the launch funds them equally.
+  const liquidityXcp = targetXcp * 2;
+
+  const cells: [string, string][] = usdMode
+    ? [
+        ["Price", `${usd(priceXcp * rate)} / ${commas(lot)}`],
+        ["Per address", `${usd(capXcp * rate)} · ${compact(capTokens)} max`],
+        ["Target", `${usd(targetXcp * rate)} or refund`],
+        ["Market cap", `${usd(mcapXcp * rate)} · ${usd(liquidityXcp * rate)} liquidity`],
+      ]
+    : [
+        ["Price", `${priceXcp} XCP / ${commas(lot)}`],
+        ["Per address", `${capXcp} XCP · ${compact(capTokens)} max`],
+        ["Target", `${commas(targetXcp)} XCP or refund`],
+        ["Supply", `${compact(supplyTokens)} · ${compact(poolTokens)} pool`],
+      ];
+
+  return (
+    <dl className="mt-5 grid grid-cols-2 items-start gap-3 border-y border-gray-100 py-4 sm:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
+      {cells.map(([label, value]) => (
+        <div key={label}>
+          <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+            {label}
+          </dt>
+          <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+            {value}
+          </dd>
+        </div>
+      ))}
+      {xcpUsd !== null && (
+        <div className="self-center justify-self-end">
+          <button
+            type="button"
+            onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
+            aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
+            className="rounded-full border border-gray-200 px-2 py-1 text-[11px] font-semibold text-gray-400 transition-colors hover:border-purple-300 hover:text-purple-600"
+          >
+            {usdMode ? "XCP" : "USD"}
+          </button>
+        </div>
+      )}
+    </dl>
   );
 }
 

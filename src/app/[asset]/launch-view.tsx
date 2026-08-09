@@ -10,6 +10,7 @@ import {
   LaunchDescription,
   ScheduledPulse,
   StatusPill,
+  TermsStrip,
 } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
@@ -270,27 +271,7 @@ export function LaunchView({
             </div>
           </div>
 
-          {conforming && (
-            <dl className="mt-5 grid grid-cols-2 gap-3 border-y border-gray-100 py-4 sm:grid-cols-4">
-              {(
-                [
-                  ["Price", "0.01 XCP / 1,000"],
-                  ["Per address", "10 XCP · 1M max"],
-                  ["Target", "690 XCP or refund"],
-                  ["Supply", "100M · 31M pool"],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label}>
-                  <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                    {label}
-                  </dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                    {value}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          )}
+          {conforming && <TermsStrip xcpUsd={xcpUsd} />}
 
           {/* Only real prose earns the space: a URL is machine metadata, and
               a one-word "description" is noise the poster reads better without. */}
