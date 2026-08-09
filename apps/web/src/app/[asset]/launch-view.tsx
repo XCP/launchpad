@@ -304,7 +304,7 @@ export function LaunchView({
             </div>
           </div>
 
-          {standardTerms && <TermsStrip xcpUsd={xcpUsd} />}
+          {standardTerms && !minting && <TermsStrip xcpUsd={xcpUsd} />}
 
           {/* Only real prose earns the space: a URL is machine metadata, and
               a one-word "description" is noise the poster reads better without. */}
@@ -363,6 +363,43 @@ export function LaunchView({
             </Link>
           )}
         </div>
+
+        {/* How the sale is actually going — distinct from the fixed terms
+            above (or on the scheduled poster before it): these numbers move. */}
+        {minting && mints.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
+            {(
+              [
+                [
+                  "Raised",
+                  `${commasRaw(fm.paid_quantity)} XCP${
+                    xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""
+                  }`,
+                ],
+                [
+                  "Participants",
+                  `${participants} / ${XCP69_MIN_PARTICIPANTS}+`,
+                ],
+                ["Top address", `${(topShare * 100).toFixed(1)}%`],
+                [
+                  "At close",
+                  openingMultiple(fm)
+                    ? `pool opens ${openingMultiple(fm)!.toFixed(2)}× mint`
+                    : "no pool",
+                ],
+              ] as const
+            ).map(([label, value]) => (
+              <div key={label}>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  {label}
+                </div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Who has minted so far — the sale's own tape, under the card. */}
         {minting && (
