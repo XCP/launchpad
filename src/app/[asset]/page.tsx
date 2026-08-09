@@ -4,7 +4,7 @@ import {
   fetchBlockHeight,
   fetchFairmints,
   fetchFairmintersByAsset,
-  fetchOriginalDeadline,
+  fetchOriginalRecord,
   fetchPool,
   fetchPoolPriceHistory,
 } from "@/lib/api/counterparty";
@@ -72,20 +72,22 @@ export default async function LaunchPage({
       : undefined);
   if (!fm) notFound();
 
-  const [mints, blockHeight, pool, originalDeadline, xcpUsd] = await Promise.all([
+  const [mints, blockHeight, pool, original, xcpUsd] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask.
     fm.status === "pending" ? Promise.resolve([]) : fetchFairmints(fm.tx_hash),
     fetchBlockHeight(),
     fm.status === "closed" ? fetchPool(asset) : Promise.resolve(null),
-    // Closed rows can't prove their composed window (rewritten on early
-    // fills); the NEW_FAIRMINTER event can.
-    fm.status === "closed" && isXcp69(fm)
-      ? fetchOriginalDeadline(fm.tx_hash)
-      : Promise.resolve(null),
+    // The row mutates once a launch leaves "pending" — its block_index
+    // becomes the opening block and a closed window becomes the settlement
+    // block — so both timing clauses are judged on the creation event.
+    fm.status === "pending"
+      ? Promise.resolve({ deadline: null, announceBlock: null })
+      : fetchOriginalRecord(fm.tx_hash),
     fetchXcpUsd(),
   ]);
   const conforming =
-    isXcp69(fm) && (fm.status !== "closed" || windowIsExact(fm, originalDeadline));
+    isXcp69(fm, original.announceBlock) &&
+    (fm.status !== "closed" || windowIsExact(fm, original.deadline));
   const phase = launchPhase(fm, pool !== null);
   const priceHistory =
     phase === "graduated" ? await fetchPoolPriceHistory(asset) : [];

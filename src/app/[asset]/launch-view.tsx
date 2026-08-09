@@ -26,10 +26,11 @@ import {
   shortAddress,
   usd,
 } from "@/lib/format";
-import { big, maxRaw, ratio } from "@/lib/numeric";
+import { big, maxRaw, ratio, rawEquals } from "@/lib/numeric";
 import {
   type Fairminter,
   isHouseLpName,
+  XCP69_EXACT,
   type LaunchPhase,
   openingMultiple,
   saleProgress,
@@ -228,8 +229,19 @@ export function LaunchView({
   // there is nothing to tabulate. Identity and issuer up top, a living
   // countdown (block wall + heartbeat) in the middle, the standard's fixed
   // terms and a CTA at the bottom. Built to be bookmarked and shared.
-  if (phase === "scheduled" || (phase === "minting" && conforming)) {
+  if (phase === "scheduled" || phase === "minting") {
     const minting = phase === "minting";
+    // Conformance is editorial and includes the pre-announcement rule, which
+    // an in-block launch fails while still having every one of the standard's
+    // numbers. Those numbers are what the strip prints and what the form
+    // composes, so both key off the parameters rather than the verdict.
+    const standardTerms =
+      rawEquals(fm.price, XCP69_EXACT.PRICE) &&
+      rawEquals(fm.quantity_by_price, XCP69_EXACT.QUANTITY_BY_PRICE) &&
+      rawEquals(fm.max_mint_per_address, XCP69_EXACT.MAX_MINT_PER_ADDRESS) &&
+      rawEquals(fm.hard_cap, XCP69_EXACT.HARD_CAP) &&
+      rawEquals(fm.soft_cap, XCP69_EXACT.SOFT_CAP) &&
+      rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY);
     const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
     const blocksLeft = fm.start_block - blockHeight;
     // "opens in now" is what blocksEta returns at the boundary, where the
@@ -259,6 +271,11 @@ export function LaunchView({
                 <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                   {asset}
                   <StatusPill phase={phase} hasPool={pool !== null} />
+                  {!conforming && (
+                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                      not XCP-69
+                    </span>
+                  )}
                 </h1>
                 {/* In flow on a phone, pinned to the card's corner above it —
                     the page's own control, so it sits apart from the
@@ -287,7 +304,7 @@ export function LaunchView({
             </div>
           </div>
 
-          {conforming && <TermsStrip xcpUsd={xcpUsd} />}
+          {standardTerms && <TermsStrip xcpUsd={xcpUsd} />}
 
           {/* Only real prose earns the space: a URL is machine metadata, and
               a one-word "description" is noise the poster reads better without. */}
@@ -321,7 +338,7 @@ export function LaunchView({
                   divisible={fm.divisible}
                 />
               </div>
-              <MintPanel asset={asset} xcpUsd={xcpUsd} />
+              {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
             </div>
           ) : (
             <ScheduledPulse
@@ -329,11 +346,15 @@ export function LaunchView({
               startBlock={fm.start_block}
               deadlineBlock={fm.soft_cap_deadline_block}
               initialHeight={blockHeight}
-              mintForm={<MintPanel asset={asset} xcpUsd={xcpUsd} />}
+              mintForm={
+                standardTerms ? (
+                  <MintPanel asset={asset} xcpUsd={xcpUsd} />
+                ) : undefined
+              }
             />
           )}
 
-          {conforming && !minting && (
+          {standardTerms && !minting && (
             <Link
               href="/dispense"
               className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
@@ -346,7 +367,12 @@ export function LaunchView({
         {/* Who has minted so far — the sale's own tape, under the card. */}
         {minting && (
           <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-2">
-            <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
+            <ActivityTabs
+              asset={asset}
+              mints={mints}
+              divisible={fm.divisible}
+              minting
+            />
           </div>
         )}
       </div>
@@ -437,30 +463,6 @@ export function LaunchView({
 
       {/* Main column: chart, story, receipt, activity */}
       <div className="min-w-0 space-y-4">
-      {phase === "minting" && (
-        <>
-          {big(fm.pool_quantity) > 0n && (
-            <div className="rounded-2xl border border-purple-200 bg-purple-50 p-3 text-sm text-purple-900">
-              <strong>
-                {compact(fromSats(saleTarget(fm)))} minted, or everyone is
-                refunded
-              </strong>{" "}
-              — every mint stays escrowed by consensus until it resolves.
-            </div>
-          )}
-
-          {/* Progress — server-rendered baseline, then live with mempool overlay */}
-          <div className="rounded-2xl border border-gray-200 bg-white p-4">
-            <LiveProgress
-              fairminterTxHash={fm.tx_hash}
-              initialEarned={fm.earned_quantity ?? 0}
-              target={saleTarget(fm)}
-              allOrNothing={big(fm.pool_quantity) > 0n}
-              divisible={fm.divisible}
-            />
-          </div>
-        </>
-      )}
 
       {phase === "graduated" && pool && (
         <div className="rounded-2xl border border-gray-200 bg-white p-4">

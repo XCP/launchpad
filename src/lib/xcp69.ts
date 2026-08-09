@@ -119,6 +119,12 @@ export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;
  *   An inequality is unavoidable — composers cannot know their confirmation
  *   block in advance, so no exact lead time is composable.
  *
+ *   The row's `block_index` only means "the block this was announced in"
+ *   while the launch is still pending: core rewrites it to the opening block
+ *   the moment minting starts, which would make every properly scheduled
+ *   launch fail this clause the instant it opened. Past pending, callers pass
+ *   the NEW_FAIRMINTER event's block (fetchOriginalRecord) as announceBlock.
+ *
  * - Window (`soft_cap_deadline_block` vs `start_block + DEADLINE_BLOCKS`):
  *   exact equality while pending/open. Once closed, core may have REWRITTEN
  *   soft_cap_deadline_block to the sell-out block (fairmint.py
@@ -130,7 +136,7 @@ export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;
  *   was never listed while mintable. Call sites close even that gap with
  *   windowIsExact() against the immutable NEW_FAIRMINTER event.
  */
-export function isXcp69(fm: Fairminter): boolean {
+export function isXcp69(fm: Fairminter, announceBlock?: number | null): boolean {
   return (
     (fm.status === "pending" || fm.status === "open" || fm.status === "closed") &&
     rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY) &&
@@ -150,13 +156,29 @@ export function isXcp69(fm: Fairminter): boolean {
     // timing: scheduled start, fixed window, no end_block
     fm.start_block > 0 &&
     fm.end_block === 0 &&
-    (fm.confirmed === false ||
-      fm.block_index >= MEMPOOL_BLOCK_INDEX ||
-      fm.start_block > fm.block_index) &&
+    announcedBeforeStart(fm, announceBlock) &&
     (fm.status === "closed"
       ? fm.soft_cap_deadline_block <= fm.start_block + XCP69.DEADLINE_BLOCKS
       : fm.soft_cap_deadline_block === fm.start_block + XCP69.DEADLINE_BLOCKS)
   );
+}
+
+/**
+ * Was this announced strictly before it could be minted? Unconfirmed rows
+ * pass on the mempool sentinel; a pending row's own block_index is still the
+ * announcement block; anything further along must be judged on the event,
+ * and without it the answer is no rather than a guess.
+ */
+export function announcedBeforeStart(
+  fm: Fairminter,
+  announceBlock?: number | null,
+): boolean {
+  if (fm.confirmed === false || fm.block_index >= MEMPOOL_BLOCK_INDEX)
+    return true;
+  if (fm.status === "pending") return fm.start_block > fm.block_index;
+  return announceBlock !== null && announceBlock !== undefined
+    ? fm.start_block > announceBlock
+    : false;
 }
 
 /**

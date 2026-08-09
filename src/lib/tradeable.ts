@@ -1,6 +1,6 @@
 import {
   fetchAllFairminters,
-  fetchOriginalDeadline,
+  fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
 import { big, compareRawDesc, type Raw } from "@/lib/numeric";
@@ -27,8 +27,10 @@ export async function fetchTradeableAssets(): Promise<string[]> {
     closedPoolFms.map(async (fm) => {
       const pool = await fetchPool(fm.asset);
       if (!pool) return null;
+      const original = await fetchOriginalRecord(fm.tx_hash);
       const conforming =
-        isXcp69(fm) && windowIsExact(fm, await fetchOriginalDeadline(fm.tx_hash));
+        isXcp69(fm, original.announceBlock) &&
+        windowIsExact(fm, original.deadline);
       if (!conforming && !SHOW_NONCONFORMING) return null;
       const xcpDepth = pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b;
       return { asset: fm.asset, xcpDepth };

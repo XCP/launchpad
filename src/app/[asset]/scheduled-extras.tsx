@@ -387,12 +387,17 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
               {/* The toggle rides the last label, not the values — a value
                   that wraps to two lines would otherwise drag it out of
                   line with the row. */}
-              {xcpUsd !== null && i === cells.length - 1 && (
+              {/* Two columns on a phone, four above it — so the toggle
+                  belongs to a different cell at each width to stay on the
+                  end of the first row. */}
+              {xcpUsd !== null && (i === 1 || i === cells.length - 1) && (
                 <button
                   type="button"
                   onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
                   aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
-                  className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS}`}
+                  className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS} ${
+                    i === 1 ? "md:hidden" : "hidden md:block"
+                  }`}
                 >
                   {usdMode ? "XCP" : "USD"}
                 </button>
@@ -556,10 +561,15 @@ export function IssuerChips({
       const d = (await fetchJson(
         `${COUNTERPARTY_API_BASE}/addresses/${source}/fairminters?limit=100&verbose=true`,
       )) as { result: (Fairminter & { block_time?: number })[] };
-      // Only conforming launches count - "2nd launch" has to mean the second
-      // one held to this standard, not the second fairminter of any shape.
+      // Only launches held to this standard count, so "2nd launch" means the
+      // second XCP-69 one. Parameters only: the timing clauses need each
+      // launch's creation event, which would be a request per row.
       const prior = (d.result ?? [])
-        .filter((r) => r.asset !== currentAsset && isXcp69(r))
+        .filter(
+          (r) =>
+            r.asset !== currentAsset &&
+            isXcp69(r, r.status === "pending" ? undefined : r.start_block - 1),
+        )
         .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0));
       const closed = prior.filter((r) => r.status === "closed");
       // Pool existence is the launched-vs-refunded oracle; one call each,
@@ -989,6 +999,20 @@ export function StatusPill({
       className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.className}`}
     >
       {style.label}
+      {/* A sale in progress should look like it's in progress. */}
+      {phase === "minting" && (
+        <span aria-hidden="true">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="animate-pulse motion-reduce:animate-none"
+              style={{ animationDelay: `${i * 250}ms` }}
+            >
+              .
+            </span>
+          ))}
+        </span>
+      )}
     </span>
   );
 }

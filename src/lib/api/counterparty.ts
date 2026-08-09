@@ -143,10 +143,31 @@ export async function fetchPool(asset: string): Promise<Pool | null> {
  * cache long.
  */
 export async function fetchOriginalDeadline(txHash: string): Promise<number | null> {
+  return (await fetchOriginalRecord(txHash)).deadline;
+}
+
+/**
+ * The fairminter as it was created. The `/fairminters` row mutates —
+ * `block_index` is rewritten to the block the launch OPENS in, and a closed
+ * row's `soft_cap_deadline_block` becomes the settlement block — so neither
+ * field can answer a question about creation. The NEW_FAIRMINTER event is
+ * append-only and can: its own block_index is the block the announcement
+ * confirmed in, which is what pre-announcement has to be measured against.
+ */
+export async function fetchOriginalRecord(
+  txHash: string,
+): Promise<{ deadline: number | null; announceBlock: number | null }> {
   const data = await get<{
-    result: { params: { soft_cap_deadline_block: number } }[];
+    result: {
+      block_index: number;
+      params: { soft_cap_deadline_block: number };
+    }[];
   }>(`/transactions/${txHash}/events/NEW_FAIRMINTER`, 3600);
-  return data.result?.[0]?.params?.soft_cap_deadline_block ?? null;
+  const event = data.result?.[0];
+  return {
+    deadline: event?.params?.soft_cap_deadline_block ?? null,
+    announceBlock: event?.block_index ?? null,
+  };
 }
 
 /**

@@ -3,7 +3,7 @@ import { TokenImage } from "@/components/token-image";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
-  fetchOriginalDeadline,
+  fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
@@ -53,16 +53,19 @@ export default async function HomePage() {
     await Promise.all(
       listed.map(async (fm) => {
         const closed = fm.status === "closed";
-        const [pool, originalDeadline] = await Promise.all([
+        const [pool, original] = await Promise.all([
           closed && big(fm.pool_quantity) > 0n
             ? fetchPool(fm.asset)
             : Promise.resolve(null),
-          // Closed rows can't prove their composed window (rewritten on
-          // early fills); the NEW_FAIRMINTER event can.
-          closed && isXcp69(fm) ? fetchOriginalDeadline(fm.tx_hash) : null,
+          // A row past "pending" has had its block_index rewritten to the
+          // opening block, so creation facts come from the event.
+          fm.status === "pending"
+            ? { deadline: null, announceBlock: null }
+            : fetchOriginalRecord(fm.tx_hash),
         ]);
         const conforming =
-          isXcp69(fm) && (!closed || windowIsExact(fm, originalDeadline));
+          isXcp69(fm, original.announceBlock) &&
+          (!closed || windowIsExact(fm, original.deadline));
         // Same fixed supply everywhere, so XCP depth IS the value ranking:
         // Exact sort key: near-equal pools must not swap places between
         // renders.

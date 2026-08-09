@@ -57,10 +57,13 @@ export function ActivityTabs({
   asset,
   mints,
   divisible,
+  minting = false,
 }: {
   asset: string;
   mints: Fairmint[];
   divisible: boolean;
+  /** During the sale there is no market yet: no trades, no book. */
+  minting?: boolean;
 }) {
   const { address } = useWallet();
   const compose = useCompose();
@@ -169,9 +172,11 @@ export function ActivityTabs({
   );
   const busy = isBusy(compose.status);
 
-  const tabs: (typeof tab)[] = address
-    ? ["mints", "trades", "holders", "orders"]
-    : ["mints", "trades", "holders"];
+  const tabs: (typeof tab)[] = minting
+    ? ["mints", "holders"]
+    : address
+      ? ["mints", "trades", "holders", "orders"]
+      : ["mints", "trades", "holders"];
   const tabLabel = (t: typeof tab) =>
     t === "mints"
       ? `Mints (${mints.length})`
