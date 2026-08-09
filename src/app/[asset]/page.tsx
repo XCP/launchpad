@@ -10,7 +10,12 @@ import {
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
-import { isXcp69, launchPhase, windowIsExact } from "@/lib/xcp69";
+import {
+  isXcp69,
+  launchPhase,
+  windowIsExact,
+  xcp69Params,
+} from "@/lib/xcp69";
 import { SHOW_NONCONFORMING } from "@/utils/constants";
 import { PhasePreview } from "./phase-preview";
 
@@ -80,9 +85,9 @@ export default async function LaunchPage({
     // The row mutates once a launch leaves "pending" — its block_index
     // becomes the opening block and a closed window becomes the settlement
     // block — so both timing clauses are judged on the creation event.
-    fm.status === "pending"
-      ? Promise.resolve({ deadline: null, announceBlock: null })
-      : fetchOriginalRecord(fm.tx_hash),
+    fm.status !== "pending" && xcp69Params(fm)
+      ? fetchOriginalRecord(fm.tx_hash)
+      : Promise.resolve({ deadline: null, announceBlock: null }),
     fetchXcpUsd(),
   ]);
   const conforming =

@@ -4,7 +4,7 @@ import {
   fetchPool,
 } from "@/lib/api/counterparty";
 import { big, compareRawDesc, type Raw } from "@/lib/numeric";
-import { isXcp69, windowIsExact } from "@/lib/xcp69";
+import { isXcp69, windowIsExact, xcp69Params } from "@/lib/xcp69";
 import { SHOW_NONCONFORMING } from "@/utils/constants";
 
 /**
@@ -27,7 +27,9 @@ export async function fetchTradeableAssets(): Promise<string[]> {
     closedPoolFms.map(async (fm) => {
       const pool = await fetchPool(fm.asset);
       if (!pool) return null;
-      const original = await fetchOriginalRecord(fm.tx_hash);
+      const original = xcp69Params(fm)
+        ? await fetchOriginalRecord(fm.tx_hash)
+        : { deadline: null, announceBlock: null };
       const conforming =
         isXcp69(fm, original.announceBlock) &&
         windowIsExact(fm, original.deadline);

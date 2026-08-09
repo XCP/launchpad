@@ -25,6 +25,7 @@ import {
   saleProgress,
   saleTarget,
   windowIsExact,
+  xcp69Params,
   XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
 import { SHOW_NONCONFORMING } from "@/utils/constants";
@@ -58,10 +59,13 @@ export default async function HomePage() {
             ? fetchPool(fm.asset)
             : Promise.resolve(null),
           // A row past "pending" has had its block_index rewritten to the
-          // opening block, so creation facts come from the event.
-          fm.status === "pending"
-            ? { deadline: null, announceBlock: null }
-            : fetchOriginalRecord(fm.tx_hash),
+          // opening block, so creation facts come from the event — but only
+          // for rows whose parameters could conform at all. Every launch on
+          // the chain is listed here; asking about all of them is hundreds
+          // of subrequests for an answer six of them can use.
+          fm.status !== "pending" && xcp69Params(fm)
+            ? fetchOriginalRecord(fm.tx_hash)
+            : { deadline: null, announceBlock: null },
         ]);
         const conforming =
           isXcp69(fm, original.announceBlock) &&

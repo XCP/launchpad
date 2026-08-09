@@ -137,6 +137,16 @@ export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;
  *   windowIsExact() against the immutable NEW_FAIRMINTER event.
  */
 export function isXcp69(fm: Fairminter, announceBlock?: number | null): boolean {
+  return xcp69Params(fm) && announcedBeforeStart(fm, announceBlock);
+}
+
+/**
+ * Everything the standard fixes except the pre-announcement clause — all of
+ * it readable from the row itself. Timing needs the creation event, which is
+ * a request per launch, so callers filter on this first and only look up the
+ * few rows that could still qualify.
+ */
+export function xcp69Params(fm: Fairminter): boolean {
   return (
     (fm.status === "pending" || fm.status === "open" || fm.status === "closed") &&
     rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY) &&
@@ -156,7 +166,6 @@ export function isXcp69(fm: Fairminter, announceBlock?: number | null): boolean 
     // timing: scheduled start, fixed window, no end_block
     fm.start_block > 0 &&
     fm.end_block === 0 &&
-    announcedBeforeStart(fm, announceBlock) &&
     (fm.status === "closed"
       ? fm.soft_cap_deadline_block <= fm.start_block + XCP69.DEADLINE_BLOCKS
       : fm.soft_cap_deadline_block === fm.start_block + XCP69.DEADLINE_BLOCKS)
