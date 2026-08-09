@@ -7,6 +7,7 @@ import {
   HostedSocials,
   IssuerChips,
   IssuerLine,
+  LaunchDescription,
   ScheduledPulse,
   StatusPill,
 } from "./scheduled-extras";
@@ -296,17 +297,13 @@ export function LaunchView({
           {isUrlDescription ? (
             <HostedDescription url={fm.description} />
           ) : (
-            hasProse && (
-              <p className="mt-4 text-sm leading-relaxed text-gray-600">
-                {fm.description}
-              </p>
-            )
+            hasProse && <LaunchDescription text={prose} />
           )}
 
           <ScheduledPulse
             asset={asset}
             startBlock={fm.start_block}
-            announceBlock={fm.block_index}
+            deadlineBlock={fm.soft_cap_deadline_block}
             initialHeight={blockHeight}
           />
 

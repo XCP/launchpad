@@ -1,7 +1,6 @@
 "use client";
 
-import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
@@ -55,47 +54,51 @@ function useChainHeight(startBlock: number, initialHeight: number) {
 }
 
 /**
- * The scheduled page's living center: countdown, block wall, heartbeat.
+ * The scheduled page's living center: countdown and block train.
  *
- * The wall draws one square per block of the announced wait, capped at 96
- * squares — past that each square stands for total/96 blocks, with a scale
- * caption so it stays honest. The tab title ticks with the count so a
- * pinned tab is itself a countdown.
+ * The train reads left to right in chain order — newest mined block, the
+ * blocks still to come, then the block that opens minting — so the wait is
+ * a place on the chain rather than an abstract bar. The tab title ticks
+ * with the count, so a pinned tab is itself a countdown.
  */
 export function ScheduledPulse({
   asset,
   startBlock,
-  announceBlock,
+  deadlineBlock,
   initialHeight,
 }: {
   asset: string;
   startBlock: number;
-  announceBlock: number;
+  deadlineBlock: number;
   initialHeight: number;
 }) {
   const height = useChainHeight(startBlock, initialHeight);
-  const total = Math.max(1, startBlock - announceBlock);
-  const remaining = Math.min(Math.max(startBlock - height, 0), total);
+  const remaining = Math.max(startBlock - height, 0);
   const open = remaining <= 0;
 
   useEffect(() => {
     document.title = open ? `LIVE · ${asset}` : `${remaining} blocks · ${asset}`;
   }, [remaining, open, asset]);
 
-  const cells = Math.min(total, 96);
-  const blocksPerCell = total / cells;
-  const minedCells = Math.min(cells, Math.floor((total - remaining) / blocksPerCell));
 
   // Heartbeat: the last Bitcoin block's age, so the page visibly breathes
   // between counterparty polls.
-  const { data: tip } = useSWR(
-    "btc-tip-block",
+  const { data: recent } = useSWR(
+    "btc-recent-blocks",
     () =>
-      fetchJson("https://mempool.space/api/v1/blocks").then(
-        (bs: { height: number; timestamp: number }[]) => bs[0] ?? null,
-      ),
+      fetchJson("https://mempool.space/api/v1/blocks") as Promise<
+        { height: number; timestamp: number }[]
+      >,
     { refreshInterval: 60_000 },
   );
+  const tip = recent?.[0] ?? null;
+  // Left of the divider: blocks that exist, newest against the line.
+  // Right of it: the next blocks, forecast forward — and once the wait is
+  // short enough, the opening block itself lands among them.
+  const mined = [...(recent ?? []).slice(0, 3)].reverse();
+  const tipHeight = tip?.height ?? height;
+  const upcoming = [1, 2, 3].map((n) => tipHeight + n);
+
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => {
     const update = () => setNowSec(Date.now() / 1000);
@@ -103,16 +106,6 @@ export function ScheduledPulse({
     const id = setInterval(update, 30_000);
     return () => clearInterval(id);
   }, []);
-  const agoSec =
-    tip && nowSec !== null ? Math.max(0, nowSec - tip.timestamp) : null;
-  const ago =
-    agoSec === null
-      ? null
-      : agoSec < 90
-        ? "just now"
-        : agoSec < 3600
-          ? `${Math.round(agoSec / 60)}m ago`
-          : `${Math.floor(agoSec / 3600)}h ago`;
 
   return (
     <div className="mt-7">
@@ -148,44 +141,99 @@ export function ScheduledPulse({
         </div>
       </div>
 
-      <div
-        className="mx-auto mt-5 grid gap-1 [grid-template-columns:repeat(var(--cols-sm),minmax(0,1fr))] sm:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]"
-        style={
-          {
-            // Fewer columns on phones so squares stay squares, not dots.
-            "--cols": Math.min(cells, 24),
-            "--cols-sm": Math.min(cells, 16),
-            maxWidth: cells <= 12 ? `${cells * 2.25}rem` : undefined,
-          } as CSSProperties
-        }
-        aria-hidden="true"
-      >
-        {Array.from({ length: cells }, (_, i) => (
-          <span
-            key={i}
-            className={`aspect-square rounded-[3px] ${
-              i < minedCells
-                ? "bg-purple-600"
-                : i === minedCells && !open
-                  ? "animate-pulse bg-purple-300 motion-reduce:animate-none"
-                  : "bg-purple-100"
-            }`}
-          />
-        ))}
-      </div>
-      {blocksPerCell > 1 && (
-        <p className="mt-2 text-center text-[11px] text-gray-400 tabular-nums">
-          each square ≈ {Math.round(blocksPerCell)} blocks (
-          {blocksEta(Math.round(blocksPerCell))})
-        </p>
-      )}
+      {/* Mempool's split: the chain as it stands on the left, pinned to the
+          divider so each new block lands against it, and the blocks still to
+          come on the right. The opening block joins the forecast once it's
+          close enough to be one of them. */}
+      <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-start gap-2 sm:gap-3">
+        <div className="flex justify-end gap-2 overflow-hidden">
+          {mined.map((b, i) => (
+            <BlockTile
+              key={b.height}
+              height={b.height}
+              tone={i === mined.length - 1 ? "tip" : "mined"}
+              label={
+                nowSec === null ? "\u00b7" : blockAge(nowSec - b.timestamp)
+              }
+              className={i === 0 ? "hidden sm:block" : undefined}
+            />
+          ))}
+        </div>
 
-      {tip && ago && (
-        <p className="mt-3 text-center text-xs text-gray-500 tabular-nums">
-          <span className="mr-1.5 inline-block size-1.5 animate-pulse rounded-full bg-green-600 align-middle motion-reduce:animate-none" />
-          block {tip.height.toLocaleString()} · {ago}
-        </p>
-      )}
+        <div className="h-16 w-px self-center bg-[repeating-linear-gradient(to_bottom,#e5e7eb_0_4px,transparent_4px_8px)] sm:h-20" />
+
+        <div className="flex justify-start gap-2 overflow-hidden">
+          {upcoming.map((h, i) => (
+            <BlockTile
+              key={h}
+              height={h}
+              tone={h === startBlock ? "target" : "pending"}
+              label={h === startBlock ? "opens" : blocksEta(i + 1)}
+              className={i === 2 ? "hidden sm:block" : undefined}
+            />
+          ))}
+        </div>
+      </div>
+
+      <p className="mt-4 text-center text-xs text-gray-500 tabular-nums">
+        {open ? (
+          "minting is live"
+        ) : (
+          <>
+            minting opens at{" "}
+            <span className="font-medium text-gray-700">
+              block {startBlock.toLocaleString()}
+            </span>
+            {deadlineBlock > 0 &&
+              ` \u00b7 window closes ${deadlineBlock.toLocaleString()}`}
+          </>
+        )}
+      </p>
+    </div>
+  );
+}
+
+/** Age of a mined block, mempool-style: minutes, then hours. */
+function blockAge(sec: number) {
+  if (sec < 90) return "just now";
+  if (sec < 3600) return `${Math.round(sec / 60)}m ago`;
+  return `${Math.floor(sec / 3600)}h ago`;
+}
+
+/** One block in the split. The height labels it above; inside is the human
+ *  fact — how long ago it was mined, or how far out it still is. */
+function BlockTile({
+  height,
+  tone,
+  label,
+  className = "",
+}: {
+  height: number;
+  tone: "tip" | "mined" | "pending" | "target";
+  label: string;
+  className?: string;
+}) {
+  const face = {
+    tip: "bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-sm",
+    mined: "bg-purple-100 text-purple-500",
+    pending: "border border-dashed border-purple-200 bg-purple-50 text-purple-400",
+    target:
+      "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm ring-2 ring-purple-200",
+  }[tone];
+  return (
+    <div className={`text-center ${className}`}>
+      <div
+        className={`mb-1 text-[10px] font-semibold tabular-nums ${
+          tone === "pending" ? "text-purple-300" : "text-purple-500"
+        }`}
+      >
+        {height.toLocaleString()}
+      </div>
+      <div
+        className={`flex size-[3.75rem] items-center justify-center rounded-xl px-1 text-center text-[11px] font-medium leading-tight sm:size-16 ${face}`}
+      >
+        {label}
+      </div>
     </div>
   );
 }
@@ -203,20 +251,52 @@ function useHostedMeta(url: string) {
   ) as { data: HostedMeta | null | undefined };
 }
 
-/** Description text for launches whose on-chain description is our hosted
+/**
+ * The creator's words, marked as theirs: a blockquote rule instead of site
+ * copy, clamped to three lines so a rambling description can never push the
+ * countdown below the fold.
+ */
+export function LaunchDescription({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const ref = useRef<HTMLParagraphElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (el) setOverflows(el.scrollHeight > el.clientHeight + 1);
+  }, [text]);
+  return (
+    <blockquote className="mt-5 border-l-[3px] border-purple-100 pl-4">
+      <p
+        ref={ref}
+        className={`text-sm leading-relaxed text-gray-600 ${
+          expanded ? "" : "line-clamp-3"
+        }`}
+      >
+        {text}
+      </p>
+      {(overflows || expanded) && (
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          className="mt-1.5 text-xs font-medium text-purple-600 hover:text-purple-500"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </blockquote>
+  );
+}
+
+/** Description for launches whose on-chain description is our hosted
  *  metadata JSON — fetch it and show the human words inside. */
 export function HostedDescription({ url }: { url: string }) {
   const { data } = useHostedMeta(url);
   const text =
     data && typeof data.description === "string" && data.description.trim()
-      ? data.description
+      ? data.description.trim()
       : null;
   if (!text) return null;
-  return (
-    <p className="mt-5 border-y border-gray-100 py-4 text-sm leading-relaxed text-gray-600">
-      {text}
-    </p>
-  );
+  return <LaunchDescription text={text} />;
 }
 
 const SOCIAL_ICONS: Record<string, { label: string; path: string }> = {
