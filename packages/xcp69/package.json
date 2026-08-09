@@ -1,0 +1,10 @@
+{
+  "name": "@launchpad/xcp69",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./xcp69": "./src/xcp69.ts",
+    "./numeric": "./src/numeric.ts"
+  }
+}

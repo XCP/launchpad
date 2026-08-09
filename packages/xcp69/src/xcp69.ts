@@ -6,7 +6,7 @@
  * have no `_normalized` siblings in the API, so all standard math stays raw.
  */
 
-import { big, type Raw, ratio, rawEquals } from "@/lib/numeric";
+import { big, type Raw, ratio, rawEquals } from "./numeric";
 
 /**
  * Fairminter record fields the standard cares about. Quantities are

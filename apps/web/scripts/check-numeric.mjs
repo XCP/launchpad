@@ -24,6 +24,9 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
+// xcp69.ts and numeric.ts moved to the shared package the API worker also
+// reads from (see @launchpad/xcp69); the app's own copy is a re-export.
+const XCP69_SRC = join(ROOT, "..", "..", "packages", "xcp69", "src");
 
 const failures = [];
 const check = (name, actual, expected) => {
@@ -56,7 +59,7 @@ const {
 // value the site no longer uses.
 const XCP69_HARD_CAP = 10_000_000_000_000_000n;
 if (
-  !readFileSync(join(SRC, "lib/xcp69.ts"), "utf8").includes(
+  !readFileSync(join(XCP69_SRC, "xcp69.ts"), "utf8").includes(
     "HARD_CAP: 10_000_000_000_000_000n",
   )
 ) {
@@ -196,7 +199,7 @@ check("approx is the deliberate way back to a double", approx("10000000000000000
 // type-checks cleanly and quietly reintroduces the plus-or-minus-one on the
 // hard cap. The rule has to be stated somewhere, so it is stated here.
 {
-  const source = readFileSync(join(SRC, "lib/xcp69.ts"), "utf8");
+  const source = readFileSync(join(XCP69_SRC, "xcp69.ts"), "utf8");
   const body = /export function isXcp69\([\s\S]*?\n}/.exec(source)?.[0];
   if (!body) {
     failures.push("cannot find isXcp69 — this check has gone stale");

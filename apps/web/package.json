@@ -1,0 +1,41 @@
+{
+  "name": "launchpad",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "check": "tsc --noEmit && eslint && npm run check:numeric",
+    "check:numeric": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/check-numeric.mjs",
+    "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+  },
+  "dependencies": {
+    "@launchpad/xcp69": "*",
+    "@noble/curves": "^1.9.7",
+    "@noble/hashes": "^1.8.0",
+    "@scure/base": "^2.2.0",
+    "@scure/btc-signer": "^2.2.0",
+    "babel-plugin-react-compiler": "^1.0.0",
+    "bignumber.js": "^9.3.1",
+    "next": "^16.2.11",
+    "radix-ui": "^1.6.7",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "swr": "^2.4.0"
+  },
+  "devDependencies": {
+    "@opennextjs/cloudflare": "^1.16.5",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^16.2.11",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "wrangler": "^4.0.0"
+  }
+}

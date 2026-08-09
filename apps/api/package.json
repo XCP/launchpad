@@ -1,0 +1,27 @@
+{
+  "name": "launchpad-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "imports": {
+    "#api/*": {
+      "types": "./src/*.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "scripts": {
+    "dev": "wrangler dev",
+    "check": "tsc --noEmit",
+    "deploy": "wrangler deploy",
+    "migrate:local": "wrangler d1 migrations apply launchpad-db --local",
+    "migrate:remote": "wrangler d1 migrations apply launchpad-db --remote"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
+    "typescript": "^5",
+    "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "hono": "^4.12.28"
+  }
+}

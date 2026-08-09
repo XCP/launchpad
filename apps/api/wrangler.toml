@@ -1,0 +1,25 @@
+# launchpad-api — a small, purpose-built read layer for xcp.fun.
+#
+# It does NOT replace the Counterparty API: it mirrors the small slice of it
+# this site actually needs answered fast and cheap (the launch index, and the
+# per-launch conformance verdict, which otherwise costs a subrequest per
+# launch per render). Everything else — balances, fee rates, live mint
+# progress, wallet composes — still goes straight from the browser to
+# Counterparty, same as today. That traffic is free and not this worker's job.
+name = "launchpad-api"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[observability]
+enabled = true
+
+# Blocks land every ~10 minutes; there is nothing to learn by polling faster.
+[triggers]
+crons = ["*/2 * * * *"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "launchpad-db"
+database_id = "b93ee0d6-a291-4d80-9fac-1dd4dc0c3cbe"
+migrations_dir = "migrations"

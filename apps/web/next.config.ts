@@ -6,6 +6,9 @@ void initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // The XCP-69 predicate is shared with apps/api so the two never derive
+  // different verdicts; Next doesn't transpile workspace packages by default.
+  transpilePackages: ["@launchpad/xcp69"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.xcp.io" },

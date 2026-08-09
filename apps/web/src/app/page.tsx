@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
+import { fetchIndexedLaunches } from "@/lib/api/launchpad-api";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
@@ -35,55 +36,67 @@ export const revalidate = 60;
 const MAX_PER_SECTION = 12;
 
 export default async function HomePage() {
-  const [fairminters, blockHeight, xcpUsd] = await Promise.all([
-    fetchAllFairminters(),
-    fetchBlockHeight(),
-    fetchXcpUsd(),
-  ]);
+  const [blockHeight, xcpUsd] = await Promise.all([fetchBlockHeight(), fetchXcpUsd()]);
 
-  // Parameters only here — the timing clauses need each launch's creation
-  // event, which is fetched below for exactly these rows. Filtering on the
-  // full predicate would reject every launch that has already opened, since
-  // its row no longer reports the block it was announced in.
-  const listed = fairminters.filter((fm) =>
-    SHOW_NONCONFORMING
-      ? Boolean(fm.asset) && !fm.status.startsWith("invalid")
-      : xcp69Params(fm),
-  );
+  // launchpad-api mirrors exactly this query — a launches table read instead
+  // of a fan-out over every fairminter on the chain. It only ever stores
+  // conforming rows, so the relaxed (SHOW_NONCONFORMING) view still needs
+  // the live path; everywhere else, a miss or a timeout falls through to
+  // the same derivation this page always did, so the site works with the
+  // API down, empty, or simply not caught up yet.
+  const indexed = SHOW_NONCONFORMING ? null : await fetchIndexedLaunches(MAX_PER_SECTION);
 
-  // Newest first; the pool row is the graduated-vs-refunded oracle, only
-  // worth a lookup for closed pool fairminters.
-  listed.sort((a, b) => b.block_index - a.block_index);
-  const phased = (
-    await Promise.all(
-      listed.map(async (fm) => {
-        const closed = fm.status === "closed";
-        const [pool, original] = await Promise.all([
-          closed && big(fm.pool_quantity) > 0n
-            ? fetchPool(fm.asset)
-            : Promise.resolve(null),
-          // A row past "pending" has had its block_index rewritten to the
-          // opening block, so creation facts come from the event — but only
-          // for rows whose parameters could conform at all. Every launch on
-          // the chain is listed here; asking about all of them is hundreds
-          // of subrequests for an answer six of them can use.
-          fm.status !== "pending" && xcp69Params(fm)
-            ? fetchOriginalRecord(fm.tx_hash)
-            : { deadline: null, announceBlock: null },
-        ]);
-        const conforming =
-          isXcp69(fm, original.announceBlock) &&
-          (!closed || windowIsExact(fm, original.deadline));
-        // Same fixed supply everywhere, so XCP depth IS the value ranking:
-        // Exact sort key: near-equal pools must not swap places between
-        // renders.
-        const xcpDepth = big(
-          pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
-        );
-        return { fm, phase: launchPhase(fm, pool !== null), conforming, xcpDepth };
-      }),
-    )
-  ).filter((p) => SHOW_NONCONFORMING || p.conforming);
+  const phased =
+    indexed ??
+    (await (async () => {
+      const fairminters = await fetchAllFairminters();
+
+      // Parameters only here — the timing clauses need each launch's
+      // creation event, which is fetched below for exactly these rows.
+      // Filtering on the full predicate would reject every launch that has
+      // already opened, since its row no longer reports the block it was
+      // announced in.
+      const listed = fairminters.filter((fm) =>
+        SHOW_NONCONFORMING
+          ? Boolean(fm.asset) && !fm.status.startsWith("invalid")
+          : xcp69Params(fm),
+      );
+
+      // Newest first; the pool row is the graduated-vs-refunded oracle, only
+      // worth a lookup for closed pool fairminters.
+      listed.sort((a, b) => b.block_index - a.block_index);
+      return (
+        await Promise.all(
+          listed.map(async (fm) => {
+            const closed = fm.status === "closed";
+            const [pool, original] = await Promise.all([
+              closed && big(fm.pool_quantity) > 0n
+                ? fetchPool(fm.asset)
+                : Promise.resolve(null),
+              // A row past "pending" has had its block_index rewritten to
+              // the opening block, so creation facts come from the event —
+              // but only for rows whose parameters could conform at all.
+              // Every launch on the chain is listed here; asking about all
+              // of them is hundreds of subrequests for an answer six of
+              // them can use.
+              fm.status !== "pending" && xcp69Params(fm)
+                ? fetchOriginalRecord(fm.tx_hash)
+                : { deadline: null, announceBlock: null },
+            ]);
+            const conforming =
+              isXcp69(fm, original.announceBlock) &&
+              (!closed || windowIsExact(fm, original.deadline));
+            // Same fixed supply everywhere, so XCP depth IS the value
+            // ranking: exact sort key, near-equal pools must not swap
+            // places between renders.
+            const xcpDepth = big(
+              pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
+            );
+            return { fm, phase: launchPhase(fm, pool !== null), conforming, xcpDepth };
+          }),
+        )
+      ).filter((p) => SHOW_NONCONFORMING || p.conforming);
+    })());
 
   const byPhase = (phase: LaunchPhase) =>
     phased.filter((p) => p.phase === phase).slice(0, MAX_PER_SECTION);
