@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
@@ -429,7 +430,7 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
           { type: "telegram", data: "#" },
         ];
   return (
-    <div className="flex shrink-0 gap-1.5">
+    <div className="flex shrink-0 items-center gap-1.5">
       {shown.map((s) => (
         <a
           key={s.type}
@@ -437,9 +438,9 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
           target="_blank"
           rel="noreferrer"
           aria-label={`${asset} on ${SOCIAL_ICONS[s.type]!.label}`}
-          className="flex size-8 items-center justify-center rounded-full border border-gray-200 bg-white text-gray-500 transition-colors hover:border-purple-300 hover:text-purple-600"
+          className="flex size-[26px] items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-colors hover:border-purple-300 hover:bg-white hover:text-purple-600"
         >
-          <svg viewBox="0 0 24 24" className="size-[15px] fill-current">
+          <svg viewBox="0 0 24 24" className="size-[13px] fill-current">
             <path d={SOCIAL_ICONS[s.type]!.path} />
           </svg>
         </a>
@@ -462,9 +463,12 @@ const ordinal = (n: number) =>
 export function IssuerChips({
   source,
   currentAsset,
+  trailing,
 }: {
   source: string;
   currentAsset: string;
+  /** The project's own links, flowing at the end of the same run. */
+  trailing?: ReactNode;
 }) {
   // First-timers get a different second chip: what they've issued outside
   // the standard says whether they're new on-chain or just new here.
@@ -504,7 +508,7 @@ export function IssuerChips({
     { revalidateOnFocus: false },
   );
   const issued = useIssuedCount(data && data.prior === 0 ? source : null);
-  if (!data) return null;
+  if (!data) return trailing ? <div className="mt-2">{trailing}</div> : null;
 
   const chip =
     "rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums";
@@ -534,6 +538,7 @@ export function IssuerChips({
           {issued.count === 1 && !issued.capped ? "asset" : "assets"} issued
         </span>
       )}
+      {trailing}
     </div>
   );
 }

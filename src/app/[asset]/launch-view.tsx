@@ -249,10 +249,9 @@ export function LaunchView({
     return (
       <div className="mx-auto max-w-2xl">
         <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
-          {/* Out of flow: the links stack can grow a row without shifting the
-              name, address, or chips beside it. */}
-          <div className="absolute right-6 top-6 flex flex-col items-end gap-1.5 sm:right-7 sm:top-7">
-            <HostedSocials url={fm.description ?? ""} asset={asset} />
+          {/* Out of flow, and the page's own control rather than the
+              project's: Share holds the corner alone. */}
+          <div className="absolute right-6 top-6 sm:right-7 sm:top-7">
             <ShareButton
               asset={asset}
               headline={`minting opens in ${blocksEta(fm.start_block - blockHeight)}`}
@@ -261,7 +260,7 @@ export function LaunchView({
           </div>
           <div className="flex items-start gap-4 sm:gap-5">
             <ArtLightbox asset={asset} />
-            <div className="min-w-0 flex-1 pr-24 sm:pr-28">
+            <div className="min-w-0 flex-1 pr-20 sm:pr-24">
               <div className="flex items-start gap-2">
                 <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                   {asset}
@@ -272,7 +271,13 @@ export function LaunchView({
                 <IssuerLine source={fm.source} />
                 <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
               </div>
-              <IssuerChips source={fm.source} currentAsset={asset} />
+              <IssuerChips
+                source={fm.source}
+                currentAsset={asset}
+                trailing={
+                  <HostedSocials url={fm.description ?? ""} asset={asset} />
+                }
+              />
             </div>
           </div>
 
