@@ -5,6 +5,7 @@ import {
   HostedDescription,
   HostedSocials,
   IssuerChips,
+  IssuerLine,
   ScheduledPulse,
 } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
@@ -262,19 +263,7 @@ export function LaunchView({
                   <HostedSocials url={fm.description} asset={asset} />
                 )}
               </div>
-              <p className="mt-1 text-[13px] text-gray-500 tabular-nums">
-                by{" "}
-                <a
-                  href={`https://xcp.io/address/${fm.source}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={fm.source}
-                  className="hover:text-purple-600 hover:underline"
-                >
-                  <span className="hidden sm:inline">{fm.source}</span>
-                  <span className="sm:hidden">{shortAddress(fm.source)}</span>
-                </a>
-              </p>
+              <IssuerLine source={fm.source} />
               <IssuerChips source={fm.source} currentAsset={asset} />
             </div>
           </div>
@@ -283,7 +272,7 @@ export function LaunchView({
             (isUrlDescription ? (
               <HostedDescription url={fm.description} />
             ) : (
-              <p className="mt-4 text-sm leading-relaxed text-gray-600">
+              <p className="mt-5 border-y border-gray-100 py-4 text-sm leading-relaxed text-gray-600">
                 {fm.description}
               </p>
             ))}

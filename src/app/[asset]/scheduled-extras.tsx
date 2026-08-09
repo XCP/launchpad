@@ -1,12 +1,21 @@
 "use client";
 
+import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { fetchJson } from "@/lib/client";
-import { blocksEta } from "@/lib/format";
+import { blocksEta, commas, shortAddress } from "@/lib/format";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { type Fairminter, isXcp69 } from "@/lib/xcp69";
+
+const XCPIO_API = "https://api.xcp.io/v2";
+
+const monthYear = (unixSec: number) =>
+  new Date(unixSec * 1000).toLocaleDateString("en-US", {
+    month: "short",
+    year: "numeric",
+  });
 
 /** Chain height, polled lazily: every 2 minutes far out, tightening to 30s
  *  inside the final 12 blocks so the last stretch reads like a countdown. */
@@ -90,6 +99,9 @@ export function ScheduledPulse({
   return (
     <div className="mt-7">
       <div className="text-center">
+        <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.15em] text-gray-400">
+          {open ? "now minting" : "upcoming launch"}
+        </div>
         <div className="text-5xl font-extrabold leading-none tracking-tight text-gray-900 tabular-nums">
           {open ? (
             "open"
@@ -119,11 +131,15 @@ export function ScheduledPulse({
       </div>
 
       <div
-        className="mx-auto mt-5 grid gap-1"
-        style={{
-          gridTemplateColumns: `repeat(${Math.min(cells, 24)}, minmax(0, 1fr))`,
-          maxWidth: cells <= 12 ? `${cells * 2.25}rem` : undefined,
-        }}
+        className="mx-auto mt-5 grid gap-1 [grid-template-columns:repeat(var(--cols-sm),minmax(0,1fr))] sm:[grid-template-columns:repeat(var(--cols),minmax(0,1fr))]"
+        style={
+          {
+            // Fewer columns on phones so squares stay squares, not dots.
+            "--cols": Math.min(cells, 24),
+            "--cols-sm": Math.min(cells, 16),
+            maxWidth: cells <= 12 ? `${cells * 2.25}rem` : undefined,
+          } as CSSProperties
+        }
         aria-hidden="true"
       >
         {Array.from({ length: cells }, (_, i) => (
@@ -178,7 +194,11 @@ export function HostedDescription({ url }: { url: string }) {
       ? data.description
       : null;
   if (!text) return null;
-  return <p className="mt-4 text-sm leading-relaxed text-gray-600">{text}</p>;
+  return (
+    <p className="mt-5 border-y border-gray-100 py-4 text-sm leading-relaxed text-gray-600">
+      {text}
+    </p>
+  );
 }
 
 const SOCIAL_ICONS: Record<string, { label: string; path: string }> = {
@@ -244,7 +264,7 @@ export function IssuerChips({
     async () => {
       const d = (await fetchJson(
         `${COUNTERPARTY_API_BASE}/addresses/${source}/fairminters?limit=100&verbose=true`,
-      )) as { result: Fairminter[] };
+      )) as { result: (Fairminter & { block_time?: number })[] };
       const prior = (d.result ?? []).filter((r) => r.asset !== currentAsset);
       const closed69 = prior.filter(
         (r) => r.status === "closed" && isXcp69(r),
@@ -261,9 +281,10 @@ export function IssuerChips({
         ),
       );
       const graduated = pools.filter(Boolean).length;
-      const earliest = prior.length
-        ? Math.min(...prior.map((r) => r.block_index))
-        : null;
+      const times = prior
+        .map((r) => r.block_time)
+        .filter((t): t is number => typeof t === "number" && t > 0);
+      const earliest = times.length ? Math.min(...times) : null;
       return {
         prior: prior.length,
         judged: pools.length,
@@ -275,10 +296,8 @@ export function IssuerChips({
   );
   if (!data) return null;
 
-  // Year from block height — 600s blocks from the genesis timestamp is
-  // accurate to well under a year, all a "since" chip needs.
   const sinceYear = data.earliest
-    ? new Date((1231006505 + data.earliest * 600) * 1000).getFullYear()
+    ? new Date(data.earliest * 1000).getFullYear()
     : null;
 
   return (
@@ -295,6 +314,174 @@ export function IssuerChips({
         <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums">
           launching since {sinceYear}
         </span>
+      )}
+    </div>
+  );
+}
+
+/* ---------- issuer identity ---------- */
+
+interface Reputation {
+  track_record?: { score?: number; tier?: string };
+}
+
+interface AddressSummary {
+  xcp?: string | number | null;
+  assets?: number | null;
+  first_block?: number | null;
+}
+
+/** Assets ever issued from an address — the explorer returns one row per
+ *  asset, so a capped page plus its cursor is an exact count or a floor. */
+async function issuedCount(source: string) {
+  const CAP = 100;
+  const d = (await fetchJson(
+    `${XCPIO_API}/addresses/${source}/issued?limit=${CAP}`,
+  )) as { result: { asset: string }[]; next_offset?: number | null };
+  return { count: (d.result ?? []).length, capped: Boolean(d.next_offset) };
+}
+
+function CopyButton({ value }: { value: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        navigator.clipboard.writeText(value).then(
+          () => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          },
+          () => {},
+        );
+      }}
+      aria-label="Copy issuer address"
+      title={copied ? "Copied" : "Copy address"}
+      className="ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 transition-colors hover:bg-gray-100 hover:text-purple-600"
+    >
+      {copied ? (
+        <svg viewBox="0 0 24 24" className="size-3 fill-green-600">
+          <path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2Z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" className="size-3 fill-current">
+          <path d="M16 1H4a2 2 0 0 0-2 2v13h2V3h12V1Zm3 4H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Zm0 16H8V7h11v14Z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+/**
+ * "by 1FairP…pkiGfX" with a copy button, and an at-a-glance card on
+ * hover/focus: XCP balance and first-seen date as the headline numbers,
+ * tokens held and issued below, track record as a footnote. The link still
+ * goes to the explorer, so touch users lose only the preview.
+ */
+export function IssuerLine({ source }: { source: string }) {
+  const { data } = useSWR(
+    ["issuer-card", source],
+    async () => {
+      const [summary, rep, issued] = await Promise.all([
+        (fetchJson(`${XCPIO_API}/addresses/${source}/summary`) as Promise<{
+          result: AddressSummary | null;
+        }>)
+          .then((d) => d.result ?? null)
+          .catch(() => null),
+        (fetchJson(`${XCPIO_API}/addresses/${source}/reputation`) as Promise<{
+          result: Reputation | null;
+        }>)
+          .then((d) => d.result ?? null)
+          .catch(() => null),
+        issuedCount(source).catch(() => null),
+      ]);
+      // first_block is a height; the block record carries the real time
+      // (600s-average estimates drift by months at this scale).
+      const firstSeen = summary?.first_block
+        ? await (fetchJson(
+            `${COUNTERPARTY_API_BASE}/blocks/${summary.first_block}`,
+          ) as Promise<{ result: { block_time: number } }>)
+            .then((d) => d.result.block_time)
+            .catch(() => null)
+        : null;
+      return { summary, rep, issued, firstSeen };
+    },
+    { revalidateOnFocus: false },
+  );
+
+  const xcp = data?.summary?.xcp;
+  const xcpNum = xcp === null || xcp === undefined ? null : Number(xcp);
+  const held = data?.summary?.assets;
+  const issued = data?.issued;
+  const score = data?.rep?.track_record?.score;
+  const tier = data?.rep?.track_record?.tier;
+
+  return (
+    <div className="group relative mt-1 inline-block">
+      <p className="text-[13px] text-gray-500 tabular-nums">
+        by{" "}
+        <a
+          href={`https://xcp.io/address/${source}`}
+          target="_blank"
+          rel="noreferrer"
+          title={source}
+          className="hover:text-purple-600 hover:underline"
+        >
+          {shortAddress(source)}
+        </a>
+        <CopyButton value={source} />
+      </p>
+      {data && (
+        /* pt-2 (not mt-2) keeps the card's hit area touching the line, so the
+           pointer can travel into it without the hover breaking. */
+        <div className="invisible absolute left-0 top-full z-40 pt-2 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
+          <div className="w-[19rem] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-gray-50 p-3">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                  XCP balance
+                </div>
+                <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                  {xcpNum === null || Number.isNaN(xcpNum)
+                    ? "—"
+                    : commas(xcpNum)}
+                </div>
+              </div>
+              <div className="rounded-xl bg-gray-50 p-3">
+                <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+                  First seen
+                </div>
+                <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+                  {data.firstSeen ? monthYear(data.firstSeen) : "—"}
+                </div>
+              </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                Holds{" "}
+                <span className="font-semibold text-gray-900 tabular-nums">
+                  {typeof held === "number" ? commas(held) : "—"}
+                </span>{" "}
+                {held === 1 ? "token" : "tokens"}
+              </div>
+              <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                Issued{" "}
+                <span className="font-semibold text-gray-900 tabular-nums">
+                  {issued
+                    ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
+                    : "—"}
+                </span>{" "}
+                {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
+              </div>
+            </div>
+            {typeof score === "number" && tier && (
+              <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
+                Track record {Math.round(score)}/100 ({tier}) — observed
+                on-chain history, not an endorsement.
+              </p>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
