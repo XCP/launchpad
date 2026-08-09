@@ -730,7 +730,7 @@ export function ShareButton({
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const url = `https://xcp.fun/${asset}`;
-  const text = `${asset} — ${headline} on xcp.fun`;
+  const text = `${asset}: ${headline} on xcp.fun`;
 
   return (
     <>
