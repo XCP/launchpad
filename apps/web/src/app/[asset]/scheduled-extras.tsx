@@ -545,6 +545,56 @@ const ordinal = (n: number) =>
  * Fetched lazily so the poster paints first; renders nothing while loading
  * or for a first-time issuer beyond the "first launch" chip.
  */
+
+/** ~90 days, in blocks — the same "new address" threshold IssuerChips uses,
+ *  applied here from block height instead of a second block-time lookup
+ *  per address (halving the request count for no real loss of precision). */
+const NEW_ADDRESS_BLOCKS = 90 * 24 * 6;
+
+/**
+ * How many of a sale's minters are freshly-created wallets — a batch of
+ * addresses with no history before this launch is the sybil pattern the
+ * per-address cap can't catch on its own. Capped to the `addresses` the
+ * caller passes in (the biggest minters, in practice) and fetched lazily,
+ * client-side, once per mount: this is the same shape as the issuer hover
+ * card, not a repeat of the SSR fan-out the index page used to do.
+ */
+export function NewMinterCount({
+  addresses,
+  blockHeight,
+}: {
+  addresses: string[];
+  blockHeight: number;
+}) {
+  const capped = addresses.slice(0, 25);
+  const { data } = useSWR(
+    capped.length > 0 ? ["new-minters", capped.join(",")] : null,
+    async () => {
+      const summaries = await Promise.all(
+        capped.map((addr) =>
+          fetchJson(`${XCPIO_API}/addresses/${addr}/summary`)
+            .then((d: { result: AddressSummary | null }) => d.result)
+            .catch(() => null),
+        ),
+      );
+      return summaries.filter(
+        (s) => !s?.first_block || blockHeight - s.first_block < NEW_ADDRESS_BLOCKS,
+      ).length;
+    },
+    { revalidateOnFocus: false },
+  );
+  if (data === undefined) return null;
+  return (
+    <div>
+      <div className={LABEL}>New addresses</div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+        {data}
+        {capped.length < addresses.length ? ` of top ${capped.length}` : ""}
+      </div>
+    </div>
+  );
+}
+
 export function IssuerChips({
   source,
   currentAsset,

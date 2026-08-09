@@ -58,12 +58,15 @@ export function ActivityTabs({
   mints,
   divisible,
   minting = false,
+  issuerSource,
 }: {
   asset: string;
   mints: Fairmint[];
   divisible: boolean;
   /** During the sale there is no market yet: no trades, no book. */
   minting?: boolean;
+  /** Flags the launch creator's own row in the minters list. */
+  issuerSource?: string;
 }) {
   const { address } = useWallet();
   const compose = useCompose();
@@ -261,17 +264,25 @@ export function ActivityTabs({
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white">
-      <Tabs value={tab} onValueChange={(v) => setParams(v as typeof tab, 1)}>
-        <div className="border-b border-gray-200 p-2">
-          <SegmentedList variant="card">
-            {tabs.map((t) => (
-              <SegmentedTrigger key={t} value={t} variant="card" grow={false}>
-                {tabLabel(t)}
-              </SegmentedTrigger>
-            ))}
-          </SegmentedList>
+      {/* A tab strip with one destination is chrome, not navigation — just
+          say what the list below is. */}
+      {tabs.length > 1 ? (
+        <Tabs value={tab} onValueChange={(v) => setParams(v as typeof tab, 1)}>
+          <div className="border-b border-gray-200 p-2">
+            <SegmentedList variant="card">
+              {tabs.map((t) => (
+                <SegmentedTrigger key={t} value={t} variant="card" grow={false}>
+                  {tabLabel(t)}
+                </SegmentedTrigger>
+              ))}
+            </SegmentedList>
+          </div>
+        </Tabs>
+      ) : (
+        <div className="border-b border-gray-100 px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-gray-400">
+          {tabLabel(tabs[0]!)}
         </div>
-      </Tabs>
+      )}
 
       {tab === "minters" &&
         (minters.length === 0 ? (
@@ -297,6 +308,11 @@ export function ActivityTabs({
                     </span>
                     <Identicon address={r.source} />
                     <span className="truncate">{shortAddress(r.source)}</span>
+                    {issuerSource === r.source && (
+                      <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                        dev
+                      </span>
+                    )}
                   </a>
                   <span className="shrink-0 text-right text-gray-900">
                     {compact(tokenQty(r.earned, divisible))}{" "}

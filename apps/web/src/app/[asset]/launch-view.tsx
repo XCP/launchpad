@@ -9,6 +9,7 @@ import {
   isOurMetadata,
   IssuerLine,
   LaunchDescription,
+  NewMinterCount,
   ScheduledPulse,
   ShareButton,
   StatusPill,
@@ -96,6 +97,10 @@ export function LaunchView({
     byAddress.size > 0
       ? ratio([...byAddress.values()].reduce(maxRaw, 0n), fm.earned_quantity)
       : 0;
+  // Biggest minters first — the addresses worth checking for freshness.
+  const minterAddresses = [...byAddress.entries()]
+    .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
+    .map(([source]) => source);
 
   // "How's it doing" numbers (graduated): spot from the pool, change over
   // the available history, multiple vs the fixed mint price.
@@ -329,15 +334,6 @@ export function LaunchView({
 
           {minting ? (
             <div className="mt-6">
-              <div className="mb-4">
-                <LiveProgress
-                  fairminterTxHash={fm.tx_hash}
-                  initialEarned={fm.earned_quantity ?? 0}
-                  target={saleTarget(fm)}
-                  allOrNothing={big(fm.pool_quantity) > 0n}
-                  divisible={fm.divisible}
-                />
-              </div>
               {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
             </div>
           ) : (
@@ -365,39 +361,50 @@ export function LaunchView({
         </div>
 
         {/* How the sale is actually going — distinct from the fixed terms
-            above (or on the scheduled poster before it): these numbers move. */}
+            above (or on the scheduled poster before it): these numbers move.
+            The fixed facts (price, cap, at-close multiple) don't repeat here
+            — they ran once on the scheduled poster and don't change. */}
         {minting && mints.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
-            {(
-              [
-                [
-                  "Raised",
-                  `${commasRaw(fm.paid_quantity)} XCP${
-                    xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""
-                  }`,
-                ],
-                [
-                  "Participants",
-                  `${participants} / ${XCP69_MIN_PARTICIPANTS}+`,
-                ],
-                ["Top address", `${(topShare * 100).toFixed(1)}%`],
-                [
-                  "At close",
-                  openingMultiple(fm)
-                    ? `pool opens ${openingMultiple(fm)!.toFixed(2)}× mint`
-                    : "no pool",
-                ],
-              ] as const
-            ).map(([label, value]) => (
-              <div key={label}>
+          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-5">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
                 <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  {label}
+                  Raised
                 </div>
                 <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                  {value}
+                  {commasRaw(fm.paid_quantity)} XCP
+                  {xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""}
                 </div>
               </div>
-            ))}
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Participants
+                </div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                  {participants}
+                </div>
+              </div>
+              <NewMinterCount addresses={minterAddresses} blockHeight={blockHeight} />
+              <div>
+                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                  Closes
+                </div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                  {fm.soft_cap_deadline_block - blockHeight > 0
+                    ? blocksEta(fm.soft_cap_deadline_block - blockHeight)
+                    : "closing"}
+                </div>
+              </div>
+            </div>
+            <div className="mt-4">
+              <LiveProgress
+                fairminterTxHash={fm.tx_hash}
+                initialEarned={fm.earned_quantity ?? 0}
+                target={saleTarget(fm)}
+                allOrNothing={big(fm.pool_quantity) > 0n}
+                divisible={fm.divisible}
+              />
+            </div>
           </div>
         )}
 
@@ -409,6 +416,7 @@ export function LaunchView({
               mints={mints}
               divisible={fm.divisible}
               minting
+              issuerSource={fm.source}
             />
           </div>
         )}
