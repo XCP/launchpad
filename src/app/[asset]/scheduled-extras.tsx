@@ -95,9 +95,14 @@ export function ScheduledPulse({
   // Left of the divider: blocks that exist, newest against the line.
   // Right of it: the next blocks, forecast forward — and once the wait is
   // short enough, the opening block itself lands among them.
-  const mined = [...(recent ?? []).slice(0, 3)].reverse();
+  // Render more tiles than most screens can show and let each half clip its
+  // far end — the row fills whatever width it's given instead of guessing.
+  const RUN = 8;
   const tipHeight = tip?.height ?? height;
-  const upcoming = [1, 2, 3].map((n) => tipHeight + n);
+  const mined = (recent ?? []).slice(0, RUN);
+  // Nearest first: the next block sits against the divider, the forecast
+  // runs away to the left.
+  const upcoming = Array.from({ length: RUN }, (_, i) => tipHeight + 1 + i);
 
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => {
@@ -136,26 +141,24 @@ export function ScheduledPulse({
           {open
             ? "minting is live — refresh the page"
             : remaining <= 12
-              ? `${blocksEta(remaining)} until minting opens · block ${startBlock.toLocaleString()}`
-              : `until minting opens · block ${startBlock.toLocaleString()}`}
+              ? `${blocksEta(remaining)} until minting opens`
+              : "until minting opens"}
         </div>
       </div>
 
-      {/* Mempool's split: the chain as it stands on the left, pinned to the
-          divider so each new block lands against it, and the blocks still to
-          come on the right. The opening block joins the forecast once it's
-          close enough to be one of them. */}
+      {/* Mempool's arrangement: blocks still to come on the left, the chain
+          as it stands on the right, newest against the divider so each new
+          block lands in the same place. Both halves overflow their edge, so
+          a wider screen simply shows more chain. */}
       <div className="mt-6 grid grid-cols-[1fr_auto_1fr] items-start gap-2 sm:gap-3">
-        <div className="flex justify-end gap-2 overflow-hidden">
-          {mined.map((b, i) => (
+        <div className="flex flex-row-reverse justify-start gap-2 overflow-hidden">
+          {upcoming.map((h, i) => (
             <BlockTile
-              key={b.height}
-              height={b.height}
-              tone={i === mined.length - 1 ? "tip" : "mined"}
-              label={
-                nowSec === null ? "\u00b7" : blockAge(nowSec - b.timestamp)
-              }
-              className={i === 0 ? "hidden sm:block" : undefined}
+              key={h}
+              height={h}
+              tone={h === startBlock ? "target" : "pending"}
+              label={h === startBlock ? "opens" : blocksEta(i + 1)}
+              pulseDelayMs={h === startBlock ? undefined : i * 200}
             />
           ))}
         </div>
@@ -163,13 +166,12 @@ export function ScheduledPulse({
         <div className="h-16 w-px self-center bg-[repeating-linear-gradient(to_bottom,#e5e7eb_0_4px,transparent_4px_8px)] sm:h-20" />
 
         <div className="flex justify-start gap-2 overflow-hidden">
-          {upcoming.map((h, i) => (
+          {mined.map((b, i) => (
             <BlockTile
-              key={h}
-              height={h}
-              tone={h === startBlock ? "target" : "pending"}
-              label={h === startBlock ? "opens" : blocksEta(i + 1)}
-              className={i === 2 ? "hidden sm:block" : undefined}
+              key={b.height}
+              height={b.height}
+              tone={i === 0 ? "tip" : "mined"}
+              label={nowSec === null ? "\u00b7" : blockAge(nowSec - b.timestamp)}
             />
           ))}
         </div>
@@ -201,17 +203,18 @@ function blockAge(sec: number) {
 }
 
 /** One block in the split. The height labels it above; inside is the human
- *  fact — how long ago it was mined, or how far out it still is. */
+ *  fact — how long ago it was mined, or how far out it still is. Pending
+ *  blocks breathe, staggered, so the forecast reads as not-yet-real. */
 function BlockTile({
   height,
   tone,
   label,
-  className = "",
+  pulseDelayMs,
 }: {
   height: number;
   tone: "tip" | "mined" | "pending" | "target";
   label: string;
-  className?: string;
+  pulseDelayMs?: number;
 }) {
   const face = {
     tip: "bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-sm",
@@ -221,7 +224,7 @@ function BlockTile({
       "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm ring-2 ring-purple-200",
   }[tone];
   return (
-    <div className={`text-center ${className}`}>
+    <div className="shrink-0 text-center">
       <div
         className={`mb-1 text-[10px] font-semibold tabular-nums ${
           tone === "pending" ? "text-purple-300" : "text-purple-500"
@@ -230,7 +233,16 @@ function BlockTile({
         {height.toLocaleString()}
       </div>
       <div
-        className={`flex size-[3.75rem] items-center justify-center rounded-xl px-1 text-center text-[11px] font-medium leading-tight sm:size-16 ${face}`}
+        style={
+          pulseDelayMs === undefined
+            ? undefined
+            : { animationDelay: `${pulseDelayMs}ms` }
+        }
+        className={`flex size-[3.75rem] items-center justify-center rounded-xl px-1 text-center text-[11px] font-medium leading-tight sm:size-16 ${face} ${
+          pulseDelayMs === undefined
+            ? ""
+            : "animate-pulse motion-reduce:animate-none"
+        }`}
       >
         {label}
       </div>
