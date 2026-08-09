@@ -1,3 +1,4 @@
+import { one } from "#api/db";
 import {
   fetchAllFairminters,
   fetchAnnounceFacts,
@@ -67,9 +68,25 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     }
     const phase = launchPhase(fm, hasPool);
 
-    let mints = 0;
-    let minters = 0;
-    if (fm.status === "open" || fm.status === "closed") {
+    // earned_quantity moves only when a new mint lands, and it's already in
+    // hand from the /fairminters listing — free, no extra request. Reading
+    // it back before deciding means an unchanged launch skips the fairmints
+    // re-fetch and re-batch entirely, instead of re-paginating and
+    // re-diffing its whole mint history every tick forever.
+    const stored =
+      fm.status === "open" || fm.status === "closed"
+        ? await one<{ earned_quantity: string | null; mints: number; minters: number }>(
+            db,
+            `SELECT earned_quantity, mints, minters FROM launches WHERE tx_hash = ?1`,
+            fm.tx_hash,
+          )
+        : null;
+    const earnedChanged =
+      String(fm.earned_quantity ?? "") !== String(stored?.earned_quantity ?? "");
+
+    let mints = stored?.mints ?? 0;
+    let minters = stored?.minters ?? 0;
+    if ((fm.status === "open" || fm.status === "closed") && (!stored || earnedChanged)) {
       const fairmints = await fetchFairmints(fm.tx_hash);
       mints = fairmints.length;
       minters = new Set(fairmints.map((m) => m.source)).size;
