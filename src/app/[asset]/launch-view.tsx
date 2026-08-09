@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
-import { HostedDescription, OpensCountdown } from "./scheduled-extras";
+import {
+  ArtLightbox,
+  HostedDescription,
+  HostedSocials,
+  IssuerChips,
+  ScheduledPulse,
+} from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
@@ -229,32 +235,34 @@ export function LaunchView({
             ];
 
   // Scheduled: a poster, not a terminal — nothing has happened yet, so
-  // there is nothing to tabulate. Image, identity, live countdown, and
-  // the standard's terms below so the page is worth sharing.
+  // there is nothing to tabulate. Identity and issuer up top, a living
+  // countdown (block wall + heartbeat) in the middle, the standard's fixed
+  // terms and a CTA at the bottom. Built to be bookmarked and shared.
   if (phase === "scheduled") {
     const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-8">
-          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-            <TokenImage
-              asset={asset}
-              large
-              className="size-40 shrink-0 rounded-2xl bg-gray-100 object-cover shadow-sm sm:size-48"
-            />
-            <div className="min-w-0 text-center sm:text-left">
-              <h1 className="flex items-center justify-center gap-2 text-3xl font-bold leading-tight sm:justify-start">
-                {asset}
-                {conforming && (
-                  <span
-                    className="rounded bg-purple-50 px-1.5 py-0.5 text-xs font-medium text-purple-700"
-                    title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
-                  >
-                    XCP-69 ✓
-                  </span>
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          <div className="flex items-start gap-4 sm:gap-5">
+            <ArtLightbox asset={asset} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2">
+                <h1 className="min-w-0 flex-1 text-2xl font-extrabold leading-tight tracking-tight sm:text-[1.7rem]">
+                  {asset}{" "}
+                  {conforming && (
+                    <span
+                      className="ml-0.5 inline-block translate-y-[-3px] rounded bg-green-50 px-1.5 py-0.5 align-middle text-[11px] font-medium text-green-700"
+                      title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
+                    >
+                      XCP-69 ✓
+                    </span>
+                  )}
+                </h1>
+                {isUrlDescription && (
+                  <HostedSocials url={fm.description} asset={asset} />
                 )}
-              </h1>
-              <p className="mt-1 text-sm text-gray-500">
+              </div>
+              <p className="mt-1 text-[13px] text-gray-500 tabular-nums">
                 by{" "}
                 <a
                   href={`https://xcp.io/address/${fm.source}`}
@@ -263,56 +271,60 @@ export function LaunchView({
                   title={fm.source}
                   className="hover:text-purple-600 hover:underline"
                 >
-                  {shortAddress(fm.source)}
+                  <span className="hidden sm:inline">{fm.source}</span>
+                  <span className="sm:hidden">{shortAddress(fm.source)}</span>
                 </a>
               </p>
-              {fm.description &&
-                (isUrlDescription ? (
-                  <HostedDescription url={fm.description} />
-                ) : (
-                  <p className="mt-3 text-sm leading-relaxed text-gray-600">
-                    {fm.description}
-                  </p>
-                ))}
-              <div className="mt-6">
-                <OpensCountdown
-                  startBlock={fm.start_block}
-                  initialHeight={blockHeight}
-                />
-              </div>
+              <IssuerChips source={fm.source} currentAsset={asset} />
             </div>
           </div>
-        </div>
 
-        {conforming && (
-          <div className="rounded-3xl border border-gray-200 bg-white p-5">
-            <div className="flex flex-wrap gap-x-8 gap-y-3">
-              {(
-                [
-                  ["Price", "0.01 XCP / 1,000 tokens"],
-                  ["Per address", "10 XCP · 1M tokens"],
-                  ["Target", "690 XCP · sells out or refunds"],
-                  ["Supply", "100M · 31M pool-locked"],
-                ] as const
-              ).map(([label, value]) => (
-                <div key={label}>
-                  <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                    {label}
+          {fm.description &&
+            (isUrlDescription ? (
+              <HostedDescription url={fm.description} />
+            ) : (
+              <p className="mt-4 text-sm leading-relaxed text-gray-600">
+                {fm.description}
+              </p>
+            ))}
+
+          <ScheduledPulse
+            asset={asset}
+            startBlock={fm.start_block}
+            announceBlock={fm.block_index}
+            initialHeight={blockHeight}
+          />
+
+          {conforming && (
+            <>
+              <dl className="mt-6 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4">
+                {(
+                  [
+                    ["Price", "0.01 XCP / 1,000"],
+                    ["Per address", "10 XCP · 1M max"],
+                    ["Target", "690 XCP or refund"],
+                    ["Supply", "100M · 31M pool"],
+                  ] as const
+                ).map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                      {label}
+                    </dt>
+                    <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                      {value}
+                    </dd>
                   </div>
-                  <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                    {value}
-                  </div>
-                </div>
-              ))}
-            </div>
-            <Link
-              href="/dispense"
-              className="mt-4 block w-full rounded-2xl bg-gray-900 px-5 py-3 text-center font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
-            >
-              Get XCP before it opens
-            </Link>
-          </div>
-        )}
+                ))}
+              </dl>
+              <Link
+                href="/dispense"
+                className="mt-5 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+              >
+                Get XCP before it opens
+              </Link>
+            </>
+          )}
+        </div>
       </div>
     );
   }
@@ -331,7 +343,7 @@ export function LaunchView({
             {asset}
             {conforming ? (
               <span
-                className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] font-medium text-purple-700"
+                className="rounded bg-green-50 px-1.5 py-0.5 text-[11px] font-medium text-green-700"
                 title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
               >
                 XCP-69 ✓
