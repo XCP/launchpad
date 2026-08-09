@@ -498,7 +498,7 @@ export function IssuerLine({ source }: { source: string }) {
         {typeof score === "number" && tier && (
           <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
             Track record {Math.round(score)}/100 ({tier}) — observed on-chain
-            history, not an endorsement.
+            reputation from the XCP.io explorer, not an endorsement.
           </p>
         )}
       </HoverCard>
@@ -522,9 +522,11 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
     label: "Graduated",
     className: "border-purple-200 bg-purple-50 text-purple-700",
   },
+  // Amber, not red: the sale missed its target, but nobody lost anything —
+  // every participant got their XCP back. Red would overstate the outcome.
   refunded: {
     label: "Refunded",
-    className: "border-red-200 bg-red-50 text-red-700",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
   },
 };
 
