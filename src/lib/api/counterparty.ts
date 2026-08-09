@@ -162,6 +162,7 @@ export async function fetchOriginalDeadline(txHash: string): Promise<number | nu
  * string, so nothing needs the exact path.
  */
 export interface Dispenser {
+  tx_hash: string;
   source: string;
   give_quantity: number;
   give_remaining: number;

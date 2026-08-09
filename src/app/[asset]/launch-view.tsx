@@ -1,4 +1,17 @@
+import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
+import {
+  AnnouncedAgo,
+  ArtLightbox,
+  HostedDescription,
+  HostedSocials,
+  IssuerChips,
+  IssuerLine,
+  LaunchDescription,
+  ScheduledPulse,
+  StatusPill,
+  TermsStrip,
+} from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
 import {
@@ -223,6 +236,68 @@ export function LaunchView({
               ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
             ];
 
+  // Scheduled: a poster, not a terminal — nothing has happened yet, so
+  // there is nothing to tabulate. Identity and issuer up top, a living
+  // countdown (block wall + heartbeat) in the middle, the standard's fixed
+  // terms and a CTA at the bottom. Built to be bookmarked and shared.
+  if (phase === "scheduled") {
+    const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
+    const prose = (fm.description ?? "").trim();
+    const hasProse =
+      prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          <div className="flex items-start gap-4 sm:gap-5">
+            <ArtLightbox asset={asset} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-start gap-2">
+                <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                  {asset}
+                  <StatusPill phase={phase} hasPool={pool !== null} />
+                </h1>
+                {isUrlDescription && (
+                  <HostedSocials url={fm.description} asset={asset} />
+                )}
+              </div>
+              <div className="flex flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+              </div>
+              <IssuerChips source={fm.source} currentAsset={asset} />
+            </div>
+          </div>
+
+          {conforming && <TermsStrip xcpUsd={xcpUsd} />}
+
+          {/* Only real prose earns the space: a URL is machine metadata, and
+              a one-word "description" is noise the poster reads better without. */}
+          {isUrlDescription ? (
+            <HostedDescription url={fm.description} />
+          ) : (
+            hasProse && <LaunchDescription text={prose} />
+          )}
+
+          <ScheduledPulse
+            asset={asset}
+            startBlock={fm.start_block}
+            deadlineBlock={fm.soft_cap_deadline_block}
+            initialHeight={blockHeight}
+          />
+
+          {conforming && (
+            <Link
+              href="/dispense"
+              className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+            >
+              Get XCP before it opens
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Identity + headline: how's it doing, at a glance */}
@@ -235,15 +310,9 @@ export function LaunchView({
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-bold leading-tight">
             {asset}
-            {conforming ? (
-              <span
-                className="rounded bg-purple-50 px-1.5 py-0.5 text-[11px] font-medium text-purple-700"
-                title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
-              >
-                XCP-69 ✓
-              </span>
-            ) : (
-              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+            <StatusPill phase={phase} hasPool={pool !== null} />
+            {!conforming && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                 not XCP-69
               </span>
             )}
@@ -304,7 +373,7 @@ export function LaunchView({
               </span>{" "}
               — LP <span className="font-mono">{pool.lp_asset}</span>
               {isHouseLpName(pool.lp_asset) && (
-                <span title="House format: starts 69, ends 69, ≡ 69 (mod 97)"> ✓</span>
+                <span> ✓</span>
               )}{" "}
               was minted to the unspendable address. {compact(poolTokens)}{" "}
               {asset} + {commas(Math.round(poolXcp))} XCP can never be
@@ -380,7 +449,6 @@ export function LaunchView({
       )}
 
       {/* The receipt — consensus guarantees as chips; expand to verify */}
-      {conforming && <Guarantees fm={fm} />}
 
       {/* Issuer-only metadata curation; renders nothing for everyone else */}
       <EditPanel asset={asset} issuer={fm.source} />
@@ -390,66 +458,6 @@ export function LaunchView({
       </div>
       </div>
     </div>
-  );
-}
-
-/**
- * The inversion of a memecoin launchpad's "Audit" box: where those detect
- * rug vectors heuristically after the fact, XCP-69 forbids them by
- * consensus. Chips up front, the full receipt one click away.
- */
-function Guarantees({ fm }: { fm: Fairminter }) {
-  const announcedLead =
-    fm.start_block > 0 && fm.block_index < fm.start_block
-      ? `announced on-chain ${(fm.start_block - fm.block_index).toLocaleString()} blocks before minting could open`
-      : "announced on-chain before minting could open";
-  const rows: [string, string][] = [
-    ["No premine", "0 tokens existed before the launch — consensus rejects the XCP-69 shape on any asset with prior supply, and premint is pinned to zero"],
-    ["No commission", "0% of any mint is skimmed to the creator"],
-    ["No sniping", announcedLead + " — early mints are rejected by consensus"],
-    ["No bundling past the cap", "10 XCP per address, enforced per-address by consensus"],
-    ["No creator take", "100% of raised XCP becomes pool liquidity at close"],
-    ["No rug", "LP tokens are minted to the unspendable address — liquidity can never be withdrawn"],
-  ];
-  return (
-    <details className="group rounded-2xl border border-gray-200 bg-white">
-      <summary className="flex cursor-pointer flex-wrap items-center gap-1.5 p-3 [&::-webkit-details-marker]:hidden">
-        {rows.map(([claim, how]) => (
-          <Hint key={claim} content={how}>
-            <span
-              tabIndex={0}
-              className="inline-flex items-center gap-1 rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-xs font-medium text-green-800"
-            >
-              <span aria-hidden>✓</span>
-              {claim}
-            </span>
-          </Hint>
-        ))}
-        <span className="ml-auto whitespace-nowrap text-xs text-gray-400 transition-transform group-open:rotate-180">
-          ▾
-        </span>
-      </summary>
-      <div className="border-t border-gray-100 p-4">
-        <p className="text-xs text-gray-500">
-          Not platform policy — protocol consensus. Every row is verifiable
-          against any Counterparty node from this launch&apos;s on-chain
-          record.
-        </p>
-        <dl className="mt-3 grid gap-2 sm:grid-cols-2">
-          {rows.map(([claim, how]) => (
-            <div key={claim} className="flex gap-2 rounded-md bg-gray-50 p-2.5">
-              <span aria-hidden className="font-semibold text-green-600">
-                ✓
-              </span>
-              <div>
-                <dt className="text-sm font-medium text-gray-900">{claim}</dt>
-                <dd className="mt-0.5 text-xs text-gray-600">{how}</dd>
-              </div>
-            </div>
-          ))}
-        </dl>
-      </div>
-    </details>
   );
 }
 

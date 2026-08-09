@@ -5,12 +5,19 @@ import {
   useContext,
   useMemo,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { GearPopover } from "@/components/ui/popover";
 import { fetchMedianFeeRate } from "@/lib/wallet/useCompose";
+import {
+  readSettings,
+  readSettingsServer,
+  subscribeSettings,
+  updateSettings,
+} from "./trade-settings-store";
 
 /** Market orders live one block: match at confirmation or refund next block. */
 export const MARKET_EXPIRATION = 1;
@@ -18,7 +25,6 @@ const SLIPPAGE_PRESETS = [0.5, 1, 2];
 /** Liquidity slippage is looser by convention — deposits drift with every
  *  pool trade, and a breach is benign (void tx, nothing debited). */
 const LQ_SLIPPAGE_PRESETS = [0.5, 1, 2.5];
-const LQ_DEFAULT_SLIPPAGE = 2.5;
 /** Resting-order lifetimes, in blocks. */
 export const LIMIT_EXPIRATIONS = [
   { blocks: 144, label: "~1 day" },
@@ -74,21 +80,30 @@ export function useSwapSettings(): SwapSettingsValue {
 }
 
 export function SwapSettingsProvider({ children }: { children: ReactNode }) {
-  const [slippageAuto, setSlippageAuto] = useState(true);
-  const [slippagePreset, setSlippagePreset] = useState(1);
-  const [customSlippage, setCustomSlippage] = useState("");
-  const [customExpiration, setCustomExpiration] = useState("");
-  const [customFeeRate, setCustomFeeRate] = useState("");
+  // Persisted settings live in the external store (localStorage-backed,
+  // cross-tab); autoValue is per-surface quote state and stays local.
+  const stored = useSyncExternalStore(
+    subscribeSettings,
+    readSettings,
+    readSettingsServer,
+  );
   const [autoValue, setAutoValue] = useState(1);
-  const [lqSlippagePreset, setLqSlippagePreset] = useState(LQ_DEFAULT_SLIPPAGE);
-  const [lqCustomSlippage, setLqCustomSlippage] = useState("");
-  const [limitExpiration, setLimitExpiration] = useState(1000);
 
   const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
     refreshInterval: 30_000,
   });
 
   const value = useMemo<SwapSettingsValue>(() => {
+    const {
+      slippageAuto,
+      slippagePreset,
+      customSlippage,
+      customExpiration,
+      customFeeRate,
+      lqSlippagePreset,
+      lqCustomSlippage,
+      limitExpiration,
+    } = stored;
     const customSlip = Math.min(parseFloat(customSlippage) || 0, 50);
     const slippage = slippageAuto
       ? autoValue
@@ -104,24 +119,24 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
     const lqSlippage = lqCustomSlip > 0 ? lqCustomSlip : lqSlippagePreset;
     return {
       slippageAuto,
-      setSlippageAuto,
+      setSlippageAuto: (v) => updateSettings({ slippageAuto: v }),
       slippagePreset,
-      setSlippagePreset,
+      setSlippagePreset: (v) => updateSettings({ slippagePreset: v }),
       customSlippage,
-      setCustomSlippage,
+      setCustomSlippage: (v) => updateSettings({ customSlippage: v }),
       customExpiration,
-      setCustomExpiration,
+      setCustomExpiration: (v) => updateSettings({ customExpiration: v }),
       customFeeRate,
-      setCustomFeeRate,
+      setCustomFeeRate: (v) => updateSettings({ customFeeRate: v }),
       medianFeeRate,
       autoValue,
       setAutoValue,
       lqSlippagePreset,
-      setLqSlippagePreset,
+      setLqSlippagePreset: (v) => updateSettings({ lqSlippagePreset: v }),
       lqCustomSlippage,
-      setLqCustomSlippage,
+      setLqCustomSlippage: (v) => updateSettings({ lqCustomSlippage: v }),
       limitExpiration,
-      setLimitExpiration,
+      setLimitExpiration: (v) => updateSettings({ limitExpiration: v }),
       customSlip,
       slippage,
       expiration,
@@ -129,18 +144,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
       lqCustomSlip,
       lqSlippage,
     };
-  }, [
-    slippageAuto,
-    slippagePreset,
-    customSlippage,
-    customExpiration,
-    customFeeRate,
-    medianFeeRate,
-    autoValue,
-    lqSlippagePreset,
-    lqCustomSlippage,
-    limitExpiration,
-  ]);
+  }, [stored, medianFeeRate, autoValue]);
 
   return (
     <SwapSettingsContext value={value}>{children}</SwapSettingsContext>
@@ -279,10 +283,6 @@ export function SwapSettingsGear() {
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
         The Bitcoin miner fee. Default tracks the next-block median.
       </p>
-      <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
-        Min received is enforced by the order itself — worse fills are
-        impossible; better ones refund the difference.
-      </div>
     </GearPopover>
   );
 }

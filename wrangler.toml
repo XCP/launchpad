@@ -1,9 +1,17 @@
 # xcp.fun launchpad — Next.js on OpenNext, same worker pattern as xcp-explorer/exchange.
-# Route/zone binding to xcp.fun happens at cutover; until then workers.dev preview.
+# Full-site cutover to xcp.fun happens at launch; until then workers.dev preview.
+# The metadata paths are routed on the zone NOW: on-chain descriptions bake
+# https://xcp.fun/j/<ASSET>.json (write-once), so those URLs must resolve the
+# moment the first real launch confirms — LAUNCHCOIN's 404 was this gap.
 name = "launchpad"
 main = ".open-next/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+# NOTE: the xcp.fun zone lives in a DIFFERENT Cloudflare account than this
+# worker, so routes cannot attach from here (error 10083). Until the account
+# question is settled, the zone-side fix is a tiny proxy worker in the
+# zone-owning account routed at {www.,}xcp.fun/j/* and /i/*, forwarding to
+# https://launchpad.me-bbe.workers.dev with the same path.
 
 [assets]
 directory = ".open-next/assets"

@@ -566,11 +566,6 @@ export function LiquidityWidget({
               · {pctFmt(ratio(lpBalance ?? 0, lpSupply) * 100)} of the pool
             </p>
           )}
-          <p className="px-2 pt-2 text-xs text-gray-500">
-            Amounts are maximums — the largest proportional deposit is taken
-            and any excess never leaves your wallet. Your LP earns the 50 bps
-            fee on every swap.
-          </p>
         </div>
       ) : (
         <div className="mt-2 space-y-2">
@@ -615,14 +610,12 @@ export function LiquidityWidget({
               </div>
               <div className="flex justify-between">
                 <dt>You receive (est.)</dt>
-                <dd className="text-right font-medium tabular-nums text-gray-700">
-                  {commasRaw(outTokenRaw)} {asset}
-                  <br />
-                  {commasRaw(outXcpRaw)} XCP
+                <dd className="font-medium tabular-nums text-gray-700">
+                  {commasRaw(outTokenRaw)} {asset} + {commasRaw(outXcpRaw)} XCP
                   {xcpUsd && approx(outXcpRaw) > 0 ? (
                     <span className="font-normal text-gray-400">
                       {" "}
-                      (≈{usdFmt((approx(outXcpRaw) / SATS) * xcpUsd)})
+                      (≈{usdFmt(2 * (approx(outXcpRaw) / SATS) * xcpUsd)})
                     </span>
                   ) : null}
                 </dd>
@@ -632,10 +625,9 @@ export function LiquidityWidget({
                   <dt title="Below this the transaction is void — nothing is debited">
                     Min received · slippage {lqSlippage}%
                   </dt>
-                  <dd className="text-right tabular-nums">
+                  <dd className="tabular-nums">
                     {commasRaw(reduceByPercent(outTokenRaw, lqSlippage))}{" "}
-                    {asset}
-                    <br />
+                    {asset} +{" "}
                     {commasRaw(reduceByPercent(outXcpRaw, lqSlippage))} XCP
                   </dd>
                 </div>
@@ -644,10 +636,6 @@ export function LiquidityWidget({
               {txFeeRow}
             </dl>
           </div>
-          <p className="px-2 text-xs text-gray-500">
-            Only liquidity you added can leave — the launch liquidity is
-            burned and stays forever.
-          </p>
         </div>
       )}
 

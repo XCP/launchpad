@@ -25,7 +25,14 @@ const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
  */
 const INSCRIBE_MAX_BYTES = 400 * 1024;
 
-type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
+type NameCheck =
+  | "idle"
+  | "checking"
+  | "available"
+  | "taken"
+  | "owned"
+  | "ineligible"
+  | "invalid";
 
 /**
  * Pre-announcement lead: minting opens this many blocks after compose time.
@@ -34,8 +41,11 @@ type NameCheck = "idle" | "checking" | "available" | "taken" | "invalid";
  * conformance, so the shortest option still leaves hours of headroom for
  * the transaction to confirm.
  */
+// Six blocks is the floor: a 1-block lead is a coin flip on block timing —
+// one slow block and the launch confirms past its start, permanently
+// non-conforming with the name spent (observed live on the first test
+// launch). Anyone who wants a next-block start can compose it themselves.
 const PREANNOUNCE_OPTIONS: { blocks: number; label: string; priority?: boolean }[] = [
-  { blocks: 1, label: "next block (~10 min)", priority: true },
   { blocks: 6, label: "~1 hour", priority: true },
   { blocks: 36, label: "~6 hours" },
   { blocks: 144, label: "~1 day" },
@@ -71,16 +81,41 @@ export default function CreatePage() {
   const [preannounce, setPreannounce] = useState(PREANNOUNCE_DEFAULT);
   const [scheduledStart, setScheduledStart] = useState<number | null>(null);
 
+  const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
+
+  // A registered name you OWN is launchable if it meets the consensus
+  // preconditions: zero supply, unlocked, divisible.
   const checkName = async (value: string) => {
     if (!ASSET_NAME_REGEX.test(value)) {
       setNameCheck(value ? "invalid" : "idle");
       return;
     }
     setNameCheck("checking");
+    setIneligibleReason(null);
     try {
       const res = await fetch(`${COUNTERPARTY_API_BASE}/assets/${value}`);
       const data = res.ok ? await res.json() : { result: null };
-      setNameCheck(data.result ? "taken" : "available");
+      const a = data.result;
+      if (!a) {
+        setNameCheck("available");
+      } else if (address && a.owner === address) {
+        if (a.locked) {
+          setNameCheck("ineligible");
+          setIneligibleReason("its issuance is locked, which can never be undone");
+        } else if ((a.supply ?? 0) > 0) {
+          setNameCheck("ineligible");
+          setIneligibleReason(
+            "it has circulating supply — every unit must be destroyed first",
+          );
+        } else if (a.divisible === false) {
+          setNameCheck("ineligible");
+          setIneligibleReason("it is indivisible; XCP-69 assets are divisible");
+        } else {
+          setNameCheck("owned");
+        }
+      } else {
+        setNameCheck("taken");
+      }
     } catch {
       setNameCheck("idle");
     }
@@ -94,7 +129,7 @@ export default function CreatePage() {
 
   const imageTooBigToInscribe = inscribe && image !== null && image.size > INSCRIBE_MAX_BYTES;
   const canSubmit =
-    nameCheck === "available" &&
+    (nameCheck === "available" || nameCheck === "owned") &&
     image !== null &&
     !imageTooBigToInscribe &&
     isValidSocial(xProfile) &&
@@ -255,14 +290,30 @@ export default function CreatePage() {
           {nameCheck === "available" && (
             <span className="text-green-600">
               {name} is available (0.5 XCP registration fee applies —{" "}
-              <Link href="/xcp" className="underline">
+              <Link href="/dispense" className="underline">
                 need XCP?
               </Link>
               ).
             </span>
           )}
+          {nameCheck === "owned" && (
+            <span className="text-green-700">
+              {name} is yours — this launch reuses your registered name (no
+              registration fee). If the launch fails, the name locks at zero
+              supply forever.
+            </span>
+          )}
+          {nameCheck === "ineligible" && (
+            <span className="text-red-600">
+              You own {name}, but {ineligibleReason}.
+            </span>
+          )}
           {nameCheck === "taken" && (
-            <span className="text-red-600">{name} is already registered.</span>
+            <span className="text-red-600">
+              {name} is already registered.
+              {walletStatus !== "connected" &&
+                " If it's yours, connect that wallet to launch with it."}
+            </span>
           )}
           {nameCheck === "idle" &&
             "The on-chain asset name — universally unique, can never change."}

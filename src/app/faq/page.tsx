@@ -127,10 +127,26 @@ export default async function StandardPage() {
               balance — BTC only covers miner fees. The fastest no-account
               route is an on-chain dispenser: send BTC, the protocol vends
               XCP automatically.{" "}
-              <Link href="/xcp" className="text-purple-600 underline">
+              <Link href="/dispense" className="text-purple-600 underline">
                 Buy from the cheapest dispensers here
               </Link>
               . A max mint is 10 XCP; a launch needs 0.5 XCP for the name.
+            </p>
+          </details>
+          <details className="p-4">
+            <summary className="cursor-pointer text-sm font-medium text-gray-900">
+              What happens to the token itself if a launch fails?
+            </summary>
+            <p className="mt-2 text-sm text-gray-600">
+              It ceases to exist — permanently. At the deadline, consensus
+              destroys every minted token out of protocol escrow (they never
+              touched anyone&apos;s wallet), refunds every minter&apos;s XCP,
+              and closes the asset locked at zero supply. Nothing lingers in
+              any wallet: no frozen tokens, no dust — minters end
+              bit-identical to never having participated, minus one miner
+              fee. The name itself becomes a tombstone: registered forever,
+              mintable never. Worth weighing if you launch with a name you
+              already own — a failed launch buries the name with the launch.
             </p>
           </details>
           <details className="p-4">

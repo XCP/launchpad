@@ -6,16 +6,16 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
  * they are the production domain regardless of where the app runs today.
  */
 export const METADATA_ORIGIN = "https://xcp.fun";
-export const metadataJsonUrl = (asset: string) => `${METADATA_ORIGIN}/j/${asset}.json`;
-export const metadataImageUrl = (asset: string) => `${METADATA_ORIGIN}/i/${asset}`;
+export const metadataJsonUrl = (asset: string) => `${METADATA_ORIGIN}/${asset}.json`;
+export const metadataImageUrl = (asset: string) => `${METADATA_ORIGIN}/full/${asset}`;
 
 /**
- * True 48x48 icon via Cloudflare Image Transformations on the xcp.fun zone
- * (the explorer uses the same /cdn-cgi/image/ pattern on cdn.xcp.io). Resized
- * bytes differ from the original, so this entry carries no content hash.
+ * True 48x48 icon at a clean permanent URL; the /icon route performs the
+ * Cloudflare image transformation internally. Resized bytes differ from
+ * the original, so this entry carries no content hash.
  */
 export const metadataIconUrl = (asset: string) =>
-  `${METADATA_ORIGIN}/cdn-cgi/image/format=auto,fit=cover,width=48,height=48/i/${asset}`;
+  `${METADATA_ORIGIN}/icon/${asset}`;
 
 /** Minimal structural R2 types — avoids a workers-types dependency. */
 interface R2Object {

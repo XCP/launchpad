@@ -254,7 +254,7 @@ const EXEMPT = new Map([
   ["lib/numeric.ts", "defines the conversions everything else is required to use"],
   ["lib/format.ts", "renders through Intl, which takes the exact decimal string"],
   [
-    "app/xcp/use-dispense-router.ts",
+    "app/dispense/use-dispense-router.ts",
     "Bitcoin sat amounts and XCP dispenser units, bounded by XCP's 2.6M supply",
   ],
   [
@@ -263,9 +263,10 @@ const EXEMPT = new Map([
   ],
   ["app/test/page.tsx", "a scratch harness, not shipped UI"],
   [
-    "app/xcp/bridge.tsx",
-    "XCP dispenser units and Bitcoin sat amounts, bounded by XCP's 2.6M supply; " +
-      "its one signed quantity (escrow_quantity) goes through parseUnitsToRaw",
+    "app/dispense/bridge.tsx",
+    "XCP dispenser units and Bitcoin sat amounts, bounded by XCP's 2.6M supply — " +
+      "whole XCP only on the sell side, so escrow_quantity is an exact integer " +
+      "and useCompose's quantityParam gate rejects it if it ever isn't",
   ],
   [
     "app/faq/explainer.tsx",

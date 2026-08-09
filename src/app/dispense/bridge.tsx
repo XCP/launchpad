@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
@@ -8,15 +8,21 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
-import { Dialog } from "@/components/ui/dialog";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
-import { commas, commasRaw, compact, shortAddress, usd as usdFmt } from "@/lib/format";
-import { SATS, approx, parseUnitsToRaw } from "@/lib/numeric";
+import { commas, commasRaw, shortAddress, usd as usdFmt } from "@/lib/format";
+import { approx, SATS } from "@/lib/numeric";
 import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { XCP69 } from "@/lib/xcp69";
+import { GearPopover } from "@/components/ui/popover";
+import { fetchMedianFeeRate } from "@/lib/wallet/useCompose";
+import {
+  readSettings,
+  readSettingsServer,
+  subscribeSettings,
+  updateSettings,
+} from "@/app/swap/trade-settings-store";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import {
@@ -26,7 +32,6 @@ import {
 } from "./use-dispense-router";
 
 /** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
-const TOKENS_PER_XCP = XCP69.QUANTITY_BY_PRICE / XCP69.PRICE;
 
 /**
  * Dispenser addresses with a dispense already pending in the mempool: a
@@ -61,6 +66,15 @@ export function XcpBridge({
   xcpUsd: number | null;
 }) {
   const [direction, setDirection] = useState<"load" | "unload">("load");
+  const settings = useSyncExternalStore(
+    subscribeSettings,
+    readSettings,
+    readSettingsServer,
+  );
+  const customFee = Math.min(
+    Math.round(parseFloat(settings.customFeeRate) || 0),
+    500,
+  );
   const [flips, setFlips] = useState(0);
   const flip = () => {
     setFlips((f) => f + 1);
@@ -69,17 +83,22 @@ export function XcpBridge({
 
   return (
     <div>
-      <Tabs
-        value={direction}
-        onValueChange={(v) => {
-          if (v !== direction) flip();
-        }}
-      >
-        <SegmentedList className="mb-4 w-64">
-          <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
-          <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
-        </SegmentedList>
-      </Tabs>
+      <div className="mb-4 grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
+        <div className="flex items-center justify-between">
+          <Tabs
+            value={direction}
+            onValueChange={(v) => {
+              if (v !== direction) flip();
+            }}
+          >
+            <SegmentedList className="w-64">
+              <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
+              <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
+            </SegmentedList>
+          </Tabs>
+          <DispenseSettingsGear />
+        </div>
+      </div>
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         {direction === "load" ? (
           <LoadCard
@@ -88,6 +107,7 @@ export function XcpBridge({
             xcpUsd={xcpUsd}
             onFlip={flip}
             flips={flips}
+            customFee={customFee}
           />
         ) : (
           <UnloadCard
@@ -96,10 +116,78 @@ export function XcpBridge({
             xcpUsd={xcpUsd}
             onFlip={flip}
             flips={flips}
+            customFee={customFee}
           />
         )}
       </div>
     </div>
+  );
+}
+
+/** External link to a dispenser's page on the explorer. */
+function ExplorerLink({ txHash }: { txHash: string }) {
+  return (
+    <a
+      href={`https://xcp.io/tx/${txHash}`}
+      target="_blank"
+      rel="noreferrer"
+      aria-label="View dispenser on xcp.io"
+      onClick={(e) => e.stopPropagation()}
+      className="relative z-10 shrink-0 text-gray-300 transition-colors hover:text-purple-600"
+    >
+      <svg
+        viewBox="0 0 12 12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="size-3"
+      >
+        <path d="M5 2H2.5A.5.5 0 0 0 2 2.5v7a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V7M7 2h3v3M10 2 5.5 6.5" />
+      </svg>
+    </a>
+  );
+}
+
+/** TX fee for both directions — routing budgets it, composes pay it. */
+function DispenseSettingsGear() {
+  const settings = useSyncExternalStore(
+    subscribeSettings,
+    readSettings,
+    readSettingsServer,
+  );
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+    refreshInterval: 30_000,
+  });
+  const customFee = Math.min(
+    Math.round(parseFloat(settings.customFeeRate) || 0),
+    500,
+  );
+  return (
+    <GearPopover active={customFee > 0} label="Dispense settings">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+            customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          }`}
+        >
+          <AmountInput
+            value={settings.customFeeRate}
+            onChange={(v) => updateSettings({ customFeeRate: v })}
+            placeholder={medianFeeRate ? String(medianFeeRate) : "…"}
+            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            className="w-10 bg-transparent text-right text-xs font-medium outline-none"
+          />
+          <span className="text-xs text-gray-400">sat/vB</span>
+        </span>
+      </div>
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+        The Bitcoin miner fee. Default tracks the next-block priority rate —
+        dispense purchases should confirm promptly.
+      </p>
+    </GearPopover>
   );
 }
 
@@ -113,23 +201,31 @@ function LoadCard({
   xcpUsd,
   onFlip,
   flips,
+  customFee,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
   xcpUsd: number | null;
   onFlip: () => void;
   flips: number;
+  customFee: number;
 }) {
   const { address, status: walletStatus, connect } = useWallet();
+  const { data: btcBalanceSats } = useSWR(
+    address ? [address, "btc-balance"] : null,
+    async ([addr]) => {
+      const r = await fetchJson(`https://mempool.space/api/address/${addr}`);
+      const c = r.chain_stats;
+      return (c?.funded_txo_sum ?? 0) - (c?.spent_txo_sum ?? 0);
+    },
+    { refreshInterval: 60_000 },
+  );
   const router = useDispenseRouter();
-  const [routeIdx, setRouteIdx] = useState(0);
   // Independent-field pattern: whichever side was typed last drives; the
   // other derives. No dead fields — start from either end of the bridge.
   const [xcpAmount, setXcpAmount] = useState("");
   const [btcAmount, setBtcAmount] = useState("");
   const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
-  const [routeOpen, setRouteOpen] = useState(false);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [armed, setArmed] = useState(false);
 
   const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
@@ -155,9 +251,7 @@ function LoadCard({
   );
   const legFeeSats = Math.max(1, feeRec?.halfHourFee ?? 3) * 300;
 
-  const pick = Math.min(routeIdx, Math.max(open.length - 1, 0));
-  const d = open[pick];
-  const forced = pick !== 0 && d ? d : null; // user explicitly chose a route
+  const d = open[0];
   const unitXcp = d ? d.give_quantity / SATS : 1;
   const capsAll = open.map((r) =>
     Math.max(0, Math.floor(r.give_remaining / r.give_quantity)),
@@ -208,7 +302,6 @@ function LoadCard({
     let best: PlannedLeg[] = [];
     let bestCost = Infinity;
     for (const sub of subsets) {
-      if (forced && !sub.some((i) => routes[i].source === forced.source)) continue;
       if (sub.reduce((s, i) => s + caps[i], 0) < n) continue;
       const order = [...sub].sort(
         (x, y) => routes[x].satoshirate - routes[y].satoshirate,
@@ -267,7 +360,7 @@ function LoadCard({
         <div className="text-sm font-semibold text-gray-900">
           {allDone
             ? `${commas(totalXcp)} XCP incoming`
-            : `Loading ${commas(totalXcp)} XCP · ${router.legs.length} route${
+            : `Buying ${commas(totalXcp)} XCP · ${router.legs.length} route${
                 router.legs.length === 1 ? "" : "s"
               }`}
         </div>
@@ -378,7 +471,7 @@ function LoadCard({
       ? "Enter an amount"
       : armed && plan.length > 1
         ? `Sign ${plan.length} transactions`
-        : `Load ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
+        : `Buy ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
 
   return (
     <div className="contents">
@@ -386,11 +479,34 @@ function LoadCard({
       {/* You receive · Counterparty — XCP always first */}
       <Well
         focusable
-        label="You receive · Counterparty"
+        label="You receive"
         topRight={
-          xcpBalance !== undefined && (
-            <span>Balance: {commasRaw(xcpBalance)}</span>
-          )
+          <span className="flex items-center gap-1">
+            {presets.map((p) => (
+              <button
+                key={p.label}
+                type="button"
+                disabled={!p.available}
+                title={
+                  p.available ? undefined : "This route doesn't have that much left"
+                }
+                onClick={() => {
+                  setXcpAmount(String(p.k * unitXcp));
+                  setLastEdited("xcp");
+                  setArmed(false);
+                }}
+                className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+                  !p.available
+                    ? "cursor-not-allowed border-gray-100 text-gray-300"
+                    : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
+                      ? "border-purple-400 bg-white text-purple-600"
+                      : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </span>
         }
         chip={<XcpChip />}
         footer={
@@ -402,36 +518,15 @@ function LoadCard({
                 Math.abs(snapped - typedXcp) > 1e-9 && (
                   <span className="text-amber-600">
                     {" "}
-                    · snaps to {commas(snapped)} ({commas(unitXcp)}-XCP units)
+                    · adjusts to {commas(snapped)}
                   </span>
                 )}
             </span>
-            <span className="flex items-center gap-1">
-              {presets.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  disabled={!p.available}
-                  title={
-                    p.available ? undefined : "This route doesn't have that much left"
-                  }
-                  onClick={() => {
-                    setXcpAmount(String(p.k * unitXcp));
-                    setLastEdited("xcp");
-                    setArmed(false);
-                  }}
-                  className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
-                    !p.available
-                      ? "cursor-not-allowed border-gray-100 text-gray-300"
-                      : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
-                        ? "border-purple-400 bg-white text-purple-600"
-                        : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </span>
+            {xcpBalance !== undefined && (
+              <span className="text-gray-500">
+                Balance: {commasRaw(xcpBalance)}
+              </span>
+            )}
           </>
         }
       >
@@ -454,17 +549,24 @@ function LoadCard({
       {/* You send · Bitcoin */}
       <Well
         focusable
-        label="You send · Bitcoin"
+        label="You send"
         chip={<BtcChip />}
         footer={
-          <span>
-            {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
-            {lastEdited === "btc" &&
-              typedBtcSats > 0 &&
-              typedBtcSats !== btcSats && (
-                <span className="text-amber-600"> · sends exactly {fmtBtc(btcSats)}</span>
-              )}
-          </span>
+          <>
+            <span>
+              {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
+              {lastEdited === "btc" &&
+                typedBtcSats > 0 &&
+                typedBtcSats !== btcSats && (
+                  <span className="text-amber-600"> · exact cost {fmtBtc(btcSats)}</span>
+                )}
+            </span>
+            {btcBalanceSats !== undefined && (
+              <span className="text-gray-500">
+                Balance: {fmtBtc(btcBalanceSats)}
+              </span>
+            )}
+          </>
         }
       >
         <AmountInput
@@ -479,7 +581,7 @@ function LoadCard({
         />
       </Well>
 
-      {/* Rate + route details */}
+      {/* Rate line + always-open receipt (the house grammar) */}
       <div className="px-2 pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600">
@@ -495,84 +597,41 @@ function LoadCard({
               </span>
             )}
           </span>
-          <button
-            type="button"
-            onClick={() => setDetailsOpen((v) => !v)}
-            aria-label="Route details"
-            className="flex items-center gap-1 text-gray-400 hover:text-gray-600"
-          >
-            <span
-              aria-hidden
-              className="inline-block transition-transform duration-100"
-              style={{ transform: detailsOpen ? "rotate(180deg)" : "none" }}
-            >
-              ▾
-            </span>
-          </button>
         </div>
-        {detailsOpen && (
+        {plan.length > 0 && snapped > 0 && (
           <dl className="mt-2 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
-            {plan.length > 1 ? (
-              plan.map((leg, i) => (
-                <div key={leg.dispenser.source} className="flex justify-between">
-                  <dt>{i === 0 ? `Routes (${plan.length} txs)` : ""}</dt>
-                  <dd>
-                    {commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
-                    · {Math.round(leg.dispenser.price).toLocaleString()} sats ·{" "}
-                    {shortAddress(leg.dispenser.source)}
-                  </dd>
-                </div>
-              ))
-            ) : (
-              <div className="flex justify-between">
-                <dt>Route</dt>
-                <dd>
-                  <button
-                    type="button"
-                    onClick={() => setRouteOpen(true)}
-                    className="font-medium text-purple-600 hover:underline"
-                  >
-                    {shortAddress(d.source)} · cheapest of {open.length} ▾
-                  </button>
-                </dd>
-              </div>
-            )}
             <div className="flex justify-between">
-              <dt>Depth</dt>
+              <dt>Routes</dt>
               <dd>
-                {commas(capacity * unitXcp)} XCP across up to {MAX_LEGS} of{" "}
-                {open.length} route{open.length === 1 ? "" : "s"}
+                {plan.length > 1 ? (
+                  `${plan.length} txs · ${plan
+                    .map((leg) =>
+                      commas(leg.units * (leg.dispenser.give_quantity / SATS)),
+                    )
+                    .join(" + ")} XCP`
+                ) : (
+                  <span>
+                    {shortAddress(plan[0]!.dispenser.source)} · cheapest of{" "}
+                    {open.length}
+                  </span>
+                )}
               </dd>
             </div>
-            {plan.length > 0 && (
-              <div className="flex justify-between">
-                <dt title="Each route is its own Bitcoin transaction — the router weighs this against cheaper but shallower routes">
-                  Network fees · {plan.length} tx{plan.length === 1 ? "" : "s"}
-                </dt>
-                <dd>
-                  ~{(plan.length * legFeeSats).toLocaleString()} sats
-                  {btcUsd
-                    ? ` (≈${usdFmt(((plan.length * legFeeSats) / SATS) * btcUsd)})`
-                    : ""}
-                </dd>
-              </div>
-            )}
+            <div className="flex justify-between">
+              <dt title="Each route is its own Bitcoin transaction — the router weighs this against cheaper but shallower routes">
+                TX fees{plan.length > 1 ? ` · ${plan.length} txs` : ""}
+              </dt>
+              <dd>
+                ~{(plan.length * legFeeSats).toLocaleString()} sats
+                {btcUsd
+                  ? ` (≈${usdFmt(((plan.length * legFeeSats) / SATS) * btcUsd)})`
+                  : ""}
+              </dd>
+            </div>
             <div className="flex justify-between">
               <dt>Arrival</dt>
-              <dd>next block after your BTC confirms</dd>
+              <dd>next block after BTC confirms</dd>
             </div>
-            {snapped > 0 && (
-              <div className="flex justify-between">
-                <dt>Mints</dt>
-                <dd>{compact(snapped * TOKENS_PER_XCP)} tokens of any launch</dd>
-              </div>
-            )}
-            {hiddenCount > 0 && (
-              <div className="flex justify-between">
-                <dt>Hidden routes</dt>
-                <dd>{hiddenCount} with a purchase pending in the mempool</dd>
-              </div>
-            )}
           </dl>
         )}
       </div>
@@ -621,7 +680,7 @@ function LoadCard({
                   return;
                 }
                 setArmed(false);
-                router.start(plan);
+                router.start(plan, customFee > 0 ? customFee : undefined);
               }}
               className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
             >
@@ -630,56 +689,11 @@ function LoadCard({
           </>
         )}
         <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
-          Non-custodial: the protocol vends automatically when your BTC
-          confirms. A dispense is a purchase — no refund path.
+          XCP arrives automatically when your BTC confirms. Purchases are
+          final.
         </p>
       </div>
 
-      <Dialog
-        open={routeOpen}
-        onOpenChange={(o) => !o && setRouteOpen(false)}
-        title="Choose a route"
-      >
-            <div className="max-h-[45vh] overflow-y-auto">
-              {open.map((disp, i) => (
-                <button
-                  key={disp.source}
-                  type="button"
-                  onClick={() => {
-                    setRouteIdx(i);
-                    setRouteOpen(false);
-                  }}
-                  className={`flex h-14 w-full items-center justify-between gap-3 rounded-xl px-3 text-left transition-colors hover:bg-gray-50 ${
-                    disp.source === d.source ? "bg-purple-50/60" : ""
-                  }`}
-                >
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-gray-900">
-                      {Math.round(disp.price).toLocaleString()} sats/XCP
-                      {btcUsd && (
-                        <span className="font-normal text-gray-400">
-                          {" "}
-                          ({usdFmt((disp.price / SATS) * btcUsd)})
-                        </span>
-                      )}
-                    </span>
-                    <span className="block truncate text-xs text-gray-400">
-                      {shortAddress(disp.source)}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs text-gray-500">
-                    {commas(disp.give_remaining / SATS)} XCP left
-                  </span>
-                </button>
-              ))}
-            </div>
-            {hiddenCount > 0 && (
-              <p className="px-3 pb-1 pt-2 text-[11px] text-gray-400">
-                {hiddenCount} route{hiddenCount === 1 ? "" : "s"} hidden — a
-                purchase is pending in the mempool.
-              </p>
-            )}
-      </Dialog>
     </div>
     <RouteBook open={open} plan={plan} hiddenCount={hiddenCount} />
     </div>
@@ -704,12 +718,14 @@ function UnloadCard({
   xcpUsd,
   onFlip,
   flips,
+  customFee,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
   xcpUsd: number | null;
   onFlip: () => void;
   flips: number;
+  customFee: number;
 }) {
   const { address, status: walletStatus, connect } = useWallet();
   const compose = useCompose();
@@ -742,11 +758,11 @@ function UnloadCard({
   );
 
   const priceSats = Math.round(parseFloat(price)) || (marketSats ?? 0);
-  // Exact from the typed digits: this becomes escrow_quantity on a dispenser
-  // the user signs for. XCP's supply keeps it inside the safe range today, but
-  // the value is a signed quantity and reading it is no more work than not.
-  const escrowExact = parseUnitsToRaw(escrow) ?? 0n;
-  const escrowRaw = approx(escrowExact);
+  // Whole XCP only: these dispensers vend 1 XCP at a time, so a fractional
+  // remainder could never vend — it would just sit until close.
+  const typedEscrow = parseFloat(escrow) || 0;
+  const wholeEscrow = Math.floor(typedEscrow);
+  const escrowRaw = wholeEscrow * SATS;
   const btcIfSold = priceSats > 0 ? (escrowRaw / SATS) * (priceSats / SATS) : 0;
   const perXcpUsd = btcUsd ? (priceSats / SATS) * btcUsd : null;
   const vsMarket = perXcpUsd && xcpUsd ? (perXcpUsd / xcpUsd - 1) * 100 : null;
@@ -756,13 +772,26 @@ function UnloadCard({
   const busy = isBusy(compose.status);
   const ready = escrowRaw >= SATS && priceSats > 0 && !busy && !existing && !insufficient;
 
+  // Inventory priced at-or-under yours — what must sell before your first
+  // vend (ties go to earlier tx_index, so equal prices count as ahead).
+  const queueAheadXcp = Math.round(
+    dispensers
+      .filter((r) => priceSats > 0 && r.price <= priceSats)
+      .reduce((sum, r) => sum + r.give_remaining, 0) / SATS,
+  );
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+    refreshInterval: 30_000,
+  });
+  const sellFeeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
+
   const openDispenser = () =>
     compose.composeDispenser({
       asset: "XCP",
       give_quantity: SATS, // 1 XCP per vend — matches the load list's filter
-      escrow_quantity: escrowExact,
+      escrow_quantity: escrowRaw,
       mainchainrate: priceSats,
       status: 0,
+      fee_rate: customFee > 0 ? customFee : undefined,
     });
 
   const close = () =>
@@ -796,7 +825,7 @@ function UnloadCard({
       <div className="rounded-3xl border border-amber-200 bg-white p-6 text-sm text-gray-700">
         <p className="flex items-center gap-2">
           <span className="size-2 animate-pulse rounded-full bg-amber-500" />
-          <span className="font-semibold">Unload closing</span>
+          <span className="font-semibold">Sale closing</span>
         </p>
         <p className="mt-2">
           It can still sell until{" "}
@@ -850,35 +879,130 @@ function UnloadCard({
         ? "Insufficient XCP balance"
         : escrowRaw < SATS
           ? "Minimum 1 XCP"
-          : `Unload ${commasRaw(escrowExact)} XCP`;
+          : `Sell ${commas(escrowRaw / SATS)} XCP`;
 
   return (
     <div className="contents">
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
+      {/* Price well — same grammar as the limit form's price */}
+      <div>
+        <Well
+          focusable
+          label="Price · sats per XCP"
+          topRight={
+            marketSats ? (
+              <span className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setPrice(String(marketSats))}
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  Market
+                </button>
+                {[1, 5, 10].map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() =>
+                      setPrice(String(Math.round(marketSats * (1 + p / 100))))
+                    }
+                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  >
+                    +{p}%
+                  </button>
+                ))}
+              </span>
+            ) : undefined
+          }
+          footer={
+            <>
+              <span>
+                {vsMarket !== null && Math.abs(vsMarket) >= 0.5 ? (
+                  <span
+                    className={
+                      vsMarket > 0
+                        ? "font-medium text-green-600"
+                        : "font-medium text-amber-600"
+                    }
+                  >
+                    {vsMarket > 0
+                      ? `+${vsMarket.toFixed(0)}% premium`
+                      : `−${Math.abs(vsMarket).toFixed(0)}% · sells fast`}
+                  </span>
+                ) : vsMarket !== null ? (
+                  <span>at market</span>
+                ) : (
+                  <span>&nbsp;</span>
+                )}
+              </span>
+              {marketSats && (
+                <button
+                  type="button"
+                  className="text-gray-500 hover:text-purple-600"
+                  onClick={() => setPrice(String(marketSats))}
+                >
+                  Market: {marketSats.toLocaleString()}
+                </button>
+              )}
+            </>
+          }
+        >
+          <AmountInput
+            value={price}
+            onChange={setPrice}
+            placeholder={marketSats ? String(marketSats) : "0"}
+            ariaLabel="Price in sats per XCP"
+            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          />
+        </Well>
+      </div>
+
       {/* You send · Counterparty */}
       <Well
         focusable
-        label="You send · Counterparty"
+        label="You sell"
         topRight={
-          balance !== undefined && (
-            <button
-              type="button"
-              className="hover:text-gray-700 hover:underline"
-              onClick={() =>
-                setEscrow(
-                  (approx(balance) / SATS).toFixed(8).replace(/\.?0+$/, ""),
-                )
-              }
-            >
-              Balance: {commasRaw(balance)}
-            </button>
-          )
+          balance !== undefined && balance > 0 ? (
+            <span className="flex items-center gap-1">
+              {[25, 50, 75, 100].map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() =>
+                    setEscrow(String(Math.floor((approx(balance) / SATS) * (p / 100))))
+                  }
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  {p === 100 ? "Max" : `${p}%`}
+                </button>
+              ))}
+            </span>
+          ) : undefined
         }
         chip={<XcpChip />}
         footer={
-          <span>
-            {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
-          </span>
+          <>
+            <span>
+              {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
+              {typedEscrow > 0 && typedEscrow % 1 !== 0 && wholeEscrow >= 1 && (
+                <span className="text-amber-600">
+                  {" "}
+                  · adjusts to {wholeEscrow} (sells whole XCP)
+                </span>
+              )}
+            </span>
+            {balance !== undefined && (
+              <button
+                type="button"
+                className={`min-w-0 truncate hover:text-purple-600 ${
+                  insufficient ? "text-red-600" : "text-gray-500"
+                }`}
+                onClick={() => setEscrow(String(Math.floor(approx(balance) / SATS)))}
+              >
+                Balance: {commasRaw(balance)}
+              </button>
+            )}
+          </>
         }
       >
         <AmountInput
@@ -895,8 +1019,8 @@ function UnloadCard({
 
       {/* You receive · Bitcoin */}
       <Well
-        label="You receive · Bitcoin"
-        topRight={<span>as it sells, at your price</span>}
+        label="You receive"
+        topRight={<span>paid as it sells</span>}
         chip={<BtcChip />}
         footer={
           <span>
@@ -915,45 +1039,41 @@ function UnloadCard({
         </div>
       </Well>
 
-      {/* Price row */}
-      <div className="px-2 pt-2">
-        <div className="flex items-center justify-between gap-3 text-xs">
-          <span className="text-gray-500">Your price</span>
-          <span className="flex items-center gap-2">
-            <span
-              className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-                parseFloat(price) > 0 ? "border-purple-300" : "border-gray-200"
-              }`}
-            >
-              <AmountInput
-                value={price}
-                onChange={setPrice}
-                placeholder={marketSats ? String(marketSats) : "0"}
-                ariaLabel="Price in sats per XCP"
-                className="w-16 bg-transparent text-right text-xs font-medium outline-none"
-              />
-              <span className="ml-1 text-gray-400">sats/XCP</span>
-            </span>
-            {vsMarket !== null && (
-              <span
-                className={
-                  Math.abs(vsMarket) < 0.5
-                    ? "font-medium text-gray-500"
-                    : vsMarket > 0
-                      ? "font-medium text-green-600"
-                      : "font-medium text-amber-600"
-                }
-              >
-                {Math.abs(vsMarket) < 0.5
-                  ? "at market"
-                  : vsMarket > 0
-                    ? `+${vsMarket.toFixed(0)}% premium`
-                    : `−${Math.abs(vsMarket).toFixed(0)}% · sells fast`}
-              </span>
+      {/* Always-open receipt — the house grammar */}
+      {escrowRaw >= SATS && priceSats > 0 && (
+        <div className="px-2 pt-2">
+          <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+            <div className="flex justify-between">
+              <dt title="Inventory priced at or under yours — at the same price, earlier dispensers vend first">
+                Queue
+              </dt>
+              <dd className="font-medium tabular-nums text-gray-700">
+                {queueAheadXcp > 0
+                  ? `${queueAheadXcp.toLocaleString()} XCP ahead of you`
+                  : "first at this price"}
+              </dd>
+            </div>
+            <div className="flex justify-between">
+              <dt>Vends</dt>
+              <dd>{wholeEscrow.toLocaleString()} × 1 XCP</dd>
+            </div>
+            {sellFeeRate !== null && (
+              <div className="flex justify-between">
+                <dt>TX fee</dt>
+                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                  {sellFeeRate} sat/vB
+                  {btcUsd !== null && (
+                    <span className="text-gray-400">
+                      {" "}
+                      (~{usdFmt(((sellFeeRate * 250) / SATS) * btcUsd)})
+                    </span>
+                  )}
+                </dd>
+              </div>
             )}
-          </span>
+          </dl>
         </div>
-      </div>
+      )}
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
@@ -978,16 +1098,13 @@ function UnloadCard({
             {buttonLabel}
           </button>
         )}
-        <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
-          Sells 1 XCP at a time from your own on-chain dispenser — no
-          counterparty, no custody. Closing takes ~5 blocks and returns the
-          rest.
-        </p>
+
       </div>
     </div>
     <SellBook
       open={dispensers}
       yourPriceSats={priceSats}
+      yourEscrowXcp={escrowRaw / SATS}
       active={escrowRaw > 0 || (parseFloat(price) || 0) > 0}
       onPick={(sats) => setPrice(String(sats))}
     />
@@ -1041,13 +1158,16 @@ function RouteBook({
                   {Math.round(r.price).toLocaleString()}{" "}
                   <span className="font-normal text-gray-400">sats</span>
                 </span>
-                <span className="text-gray-500">
-                  {t ? (
-                    <span className="font-semibold text-purple-700">
-                      {commas(t * (r.give_quantity / SATS))} of{" "}
-                    </span>
-                  ) : null}
-                  {commas(r.give_remaining / SATS)} XCP
+                <span className="flex items-center gap-2">
+                  <span className="text-gray-500">
+                    {t ? (
+                      <span className="font-semibold text-purple-700">
+                        {commas(t * (r.give_quantity / SATS))} of{" "}
+                      </span>
+                    ) : null}
+                    {Math.round(r.give_remaining / SATS).toLocaleString()} XCP
+                  </span>
+                  <ExplorerLink txHash={r.tx_hash} />
                 </span>
               </span>
             </li>
@@ -1075,17 +1195,21 @@ function RouteBook({
 function SellBook({
   open,
   yourPriceSats,
+  yourEscrowXcp,
   active,
   onPick,
 }: {
   open: Dispenser[];
   yourPriceSats: number;
+  yourEscrowXcp: number;
   active: boolean;
   onPick: (sats: number) => void;
 }) {
   const rows = open.slice(0, 10);
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
-  const rank = yourPriceSats > 0 ? open.filter((r) => r.price < yourPriceSats).length : 0;
+  // Equal prices sell before you (earlier tx_index vends first), so a
+  // matched price slots you below the incumbents.
+  const rank = yourPriceSats > 0 ? open.filter((r) => r.price <= yourPriceSats).length : 0;
   const markerAt = Math.min(rank, rows.length);
   const youRow = active && yourPriceSats > 0 && (
     <li
@@ -1098,7 +1222,7 @@ function SellBook({
           <span className="font-normal text-amber-600">sats</span>
         </span>
         <span className="font-medium text-amber-700">
-          you · #{rank + 1} of {open.length + 1}
+          {yourEscrowXcp > 0 ? `you · ${commas(yourEscrowXcp)} XCP` : "you"}
         </span>
       </span>
     </li>
@@ -1140,7 +1264,7 @@ function SellRow({
         type="button"
         title={`${r.source} — click to match this price`}
         onClick={() => onPick(Math.round(r.price))}
-        className="relative w-full overflow-hidden rounded-lg border border-transparent px-2.5 py-1.5 text-left text-xs transition-colors hover:border-amber-300 hover:bg-amber-50/50 active:scale-[0.99]"
+        className="relative w-full overflow-hidden rounded-lg border border-transparent py-1.5 pl-2.5 pr-8 text-left text-xs transition-colors hover:border-amber-300 hover:bg-amber-50/50 active:scale-[0.99]"
       >
         <span
           aria-hidden
@@ -1152,9 +1276,12 @@ function SellRow({
             {Math.round(r.price).toLocaleString()}{" "}
             <span className="font-normal text-gray-400">sats</span>
           </span>
-          <span className="text-gray-500">{commas(r.give_remaining / SATS)} XCP</span>
+          <span className="text-gray-500">{Math.round(r.give_remaining / SATS).toLocaleString()} XCP</span>
         </span>
       </button>
+      <span className="absolute inset-y-0 right-2 flex items-center">
+        <ExplorerLink txHash={r.tx_hash} />
+      </span>
     </li>
   );
 }

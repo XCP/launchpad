@@ -36,6 +36,10 @@
 .modal-pop {
   animation: pop-in 0.15s ease-out;
 }
+/* Hover previews use the same entrance, faster — they're transient. */
+.hover-pop {
+  animation: pop-in 0.12s ease-out;
+}
 @keyframes fade-in {
   from {
     opacity: 0;

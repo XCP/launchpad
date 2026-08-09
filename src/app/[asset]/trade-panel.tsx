@@ -63,15 +63,19 @@ export function TradePanel({
   asset,
   xcpUsd = null,
   onOpenSelector,
+  side: sideProp,
 }: {
   asset: string;
   xcpUsd?: number | null;
   /** When set, the token chip opens the pair selector (multi-asset /swap). */
   onOpenSelector?: () => void;
+  /** Controlled Buy/Sell (the /limit page owns the tabs); hides the pills. */
+  side?: "buy" | "sell";
 }) {
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
-  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [sideState, setSideState] = useState<"buy" | "sell">("buy");
+  const side = sideProp ?? sideState;
   const [limitPrice, setLimitPrice] = useState(""); // XCP per token
   // Amount and Total are bidirectional (the liquidity-form pattern):
   // edit either and the other derives through the price.
@@ -286,26 +290,28 @@ export function TradePanel({
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
-      {/* Buy | Sell — same pill row as liquidity's Add | Remove */}
-      <div className="flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
-        {(["buy", "sell"] as const).map((s) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setSide(s)}
-            className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
-              side === s
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            {s}
-          </button>
-        ))}
-      </div>
+      {/* Buy | Sell — internal pills, unless the page owns the tabs */}
+      {sideProp === undefined && (
+        <div className="mb-2 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
+          {(["buy", "sell"] as const).map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setSideState(s)}
+              className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
+                side === s
+                  ? "bg-white text-gray-900 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Price well — presets nudge off the pool spot */}
-      <div className="mt-2">
+      <div>
         <Well
           focusable
           label={`Price · XCP per ${asset}`}
