@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
 import {
+  AnnouncedAgo,
   ArtLightbox,
   HostedDescription,
   HostedSocials,
   IssuerChips,
   IssuerLine,
   ScheduledPulse,
+  StatusPill,
 } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
@@ -250,20 +252,18 @@ export function LaunchView({
               <div className="flex items-start gap-2">
                 <h1 className="min-w-0 flex-1 text-2xl font-extrabold leading-tight tracking-tight sm:text-[1.7rem]">
                   {asset}{" "}
-                  {conforming && (
-                    <span
-                      className="ml-0.5 inline-block translate-y-[-3px] rounded bg-green-50 px-1.5 py-0.5 align-middle text-[11px] font-medium text-green-700"
-                      title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
-                    >
-                      XCP-69 ✓
-                    </span>
-                  )}
+                  <span className="ml-0.5 inline-block translate-y-[-3px] align-middle">
+                    <StatusPill phase={phase} hasPool={pool !== null} />
+                  </span>
                 </h1>
                 {isUrlDescription && (
                   <HostedSocials url={fm.description} asset={asset} />
                 )}
               </div>
-              <IssuerLine source={fm.source} />
+              <div className="flex flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+              </div>
               <IssuerChips source={fm.source} currentAsset={asset} />
             </div>
           </div>
@@ -330,15 +330,9 @@ export function LaunchView({
         <div className="min-w-0">
           <h1 className="flex items-center gap-2 text-xl font-bold leading-tight">
             {asset}
-            {conforming ? (
-              <span
-                className="rounded bg-green-50 px-1.5 py-0.5 text-[11px] font-medium text-green-700"
-                title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
-              >
-                XCP-69 ✓
-              </span>
-            ) : (
-              <span className="rounded bg-amber-50 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">
+            <StatusPill phase={phase} hasPool={pool !== null} />
+            {!conforming && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
                 not XCP-69
               </span>
             )}

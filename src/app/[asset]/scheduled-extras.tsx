@@ -2,14 +2,26 @@
 
 import type { CSSProperties } from "react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
+import { Dialog } from "@/components/ui/dialog";
+import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
 import { blocksEta, commas, shortAddress } from "@/lib/format";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { type Fairminter, isXcp69 } from "@/lib/xcp69";
 
 const XCPIO_API = "https://api.xcp.io/v2";
+
+/** Coarse "how long ago" for chips: days, then months, then years. */
+const timeAgo = (unixSec: number) => {
+  const days = (Date.now() / 1000 - unixSec) / 86_400;
+  if (days < 1) return "today";
+  if (days < 45) return `${Math.round(days)}d ago`;
+  if (days < 365) return `${Math.round(days / 30)}mo ago`;
+  return `${(days / 365).toFixed(1)}y ago`;
+};
 
 const monthYear = (unixSec: number) =>
   new Date(unixSec * 1000).toLocaleDateString("en-US", {
@@ -265,14 +277,16 @@ export function IssuerChips({
       const d = (await fetchJson(
         `${COUNTERPARTY_API_BASE}/addresses/${source}/fairminters?limit=100&verbose=true`,
       )) as { result: (Fairminter & { block_time?: number })[] };
-      const prior = (d.result ?? []).filter((r) => r.asset !== currentAsset);
-      const closed69 = prior.filter(
-        (r) => r.status === "closed" && isXcp69(r),
-      );
+      // Only conforming launches count - "2nd launch" has to mean the second
+      // one held to this standard, not the second fairminter of any shape.
+      const prior = (d.result ?? [])
+        .filter((r) => r.asset !== currentAsset && isXcp69(r))
+        .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0));
+      const closed = prior.filter((r) => r.status === "closed");
       // Pool existence is the launched-vs-refunded oracle; a handful of
       // extra calls, so cap at the 8 most recent.
       const pools = await Promise.all(
-        closed69.slice(0, 8).map((r) =>
+        closed.slice(0, 8).map((r) =>
           fetchJson(
             `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(r.asset)}/XCP`,
           )
@@ -280,25 +294,27 @@ export function IssuerChips({
             .catch(() => null),
         ),
       );
-      const graduated = pools.filter(Boolean).length;
-      const times = prior
-        .map((r) => r.block_time)
-        .filter((t): t is number => typeof t === "number" && t > 0);
-      const earliest = times.length ? Math.min(...times) : null;
+      const last = prior[0];
+      // First-timers get a different second chip: what they have issued
+      // outside the standard says whether they are new on-chain or new here.
+      const issued =
+        prior.length === 0 ? await issuedCount(source).catch(() => null) : null;
       return {
         prior: prior.length,
         judged: pools.length,
-        graduated,
-        earliest,
+        graduated: pools.filter(Boolean).length,
+        last: last?.block_time
+          ? { asset: last.asset, at: last.block_time }
+          : null,
+        issued,
       };
     },
     { revalidateOnFocus: false },
   );
   if (!data) return null;
 
-  const sinceYear = data.earliest
-    ? new Date(data.earliest * 1000).getFullYear()
-    : null;
+  const chip =
+    "rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums";
 
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
@@ -306,13 +322,24 @@ export function IssuerChips({
         {data.prior === 0 ? "first launch" : `${ordinal(data.prior + 1)} launch`}
       </span>
       {data.judged > 0 && (
-        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums">
+        <span className={chip}>
           {data.graduated} graduated · {data.judged - data.graduated} refunded
         </span>
       )}
-      {data.prior > 0 && sinceYear && (
-        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums">
-          launching since {sinceYear}
+      {data.last && (
+        <Link
+          href={`/${data.last.asset}`}
+          className={`${chip} transition-colors hover:border-purple-300 hover:text-purple-600`}
+        >
+          last launch {timeAgo(data.last.at)} · {data.last.asset}
+        </Link>
+      )}
+      {data.prior === 0 && data.issued && data.issued.count > 0 && (
+        <span className={chip}>
+          {commas(data.issued.count)}
+          {data.issued.capped ? "+" : ""}{" "}
+          {data.issued.count === 1 && !data.issued.capped ? "asset" : "assets"}{" "}
+          issued
         </span>
       )}
     </div>
@@ -417,89 +444,158 @@ export function IssuerLine({ source }: { source: string }) {
   const tier = data?.rep?.track_record?.tier;
 
   return (
-    <div className="group relative mt-1 inline-block">
-      <p className="text-[13px] text-gray-500 tabular-nums">
-        by{" "}
-        <a
-          href={`https://xcp.io/address/${source}`}
-          target="_blank"
-          rel="noreferrer"
-          title={source}
-          className="hover:text-purple-600 hover:underline"
-        >
-          {shortAddress(source)}
-        </a>
-        <CopyButton value={source} />
-      </p>
-      {data && (
-        /* pt-2 (not mt-2) keeps the card's hit area touching the line, so the
-           pointer can travel into it without the hover breaking. */
-        <div className="invisible absolute left-0 top-full z-40 pt-2 opacity-0 transition-opacity group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100">
-          <div className="w-[19rem] max-w-[calc(100vw-2.5rem)] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-gray-50 p-3">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-                  XCP balance
-                </div>
-                <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
-                  {xcpNum === null || Number.isNaN(xcpNum)
-                    ? "—"
-                    : commas(xcpNum)}
-                </div>
-              </div>
-              <div className="rounded-xl bg-gray-50 p-3">
-                <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
-                  First seen
-                </div>
-                <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
-                  {data.firstSeen ? monthYear(data.firstSeen) : "—"}
-                </div>
-              </div>
+    <span className="mt-1 inline-block text-[13px] text-gray-500 tabular-nums">
+      by{" "}
+      <HoverCard
+        trigger={
+          <a
+            href={`https://xcp.io/address/${source}`}
+            target="_blank"
+            rel="noreferrer"
+            title={source}
+            className="rounded hover:text-purple-600 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+          >
+            {shortAddress(source)}
+          </a>
+        }
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-gray-50 p-3">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+              XCP balance
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                Holds{" "}
-                <span className="font-semibold text-gray-900 tabular-nums">
-                  {typeof held === "number" ? commas(held) : "—"}
-                </span>{" "}
-                {held === 1 ? "token" : "tokens"}
-              </div>
-              <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                Issued{" "}
-                <span className="font-semibold text-gray-900 tabular-nums">
-                  {issued
-                    ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
-                    : "—"}
-                </span>{" "}
-                {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
-              </div>
+            <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+              {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
             </div>
-            {typeof score === "number" && tier && (
-              <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
-                Track record {Math.round(score)}/100 ({tier}) — observed
-                on-chain history, not an endorsement.
-              </p>
-            )}
+          </div>
+          <div className="rounded-xl bg-gray-50 p-3">
+            <div className="text-[10px] font-medium uppercase tracking-wider text-gray-400">
+              First seen
+            </div>
+            <div className="mt-1 text-lg font-bold text-gray-900 tabular-nums">
+              {data?.firstSeen ? monthYear(data.firstSeen) : "—"}
+            </div>
           </div>
         </div>
-      )}
-    </div>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            Holds{" "}
+            <span className="font-semibold text-gray-900 tabular-nums">
+              {typeof held === "number" ? commas(held) : "—"}
+            </span>{" "}
+            {held === 1 ? "token" : "tokens"}
+          </div>
+          <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            Issued{" "}
+            <span className="font-semibold text-gray-900 tabular-nums">
+              {issued
+                ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
+                : "—"}
+            </span>{" "}
+            {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
+          </div>
+        </div>
+        {typeof score === "number" && tier && (
+          <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
+            Track record {Math.round(score)}/100 ({tier}) — observed on-chain
+            history, not an endorsement.
+          </p>
+        )}
+      </HoverCard>
+      <CopyButton value={source} />
+    </span>
+  );
+}
+
+/* ---------- launch status + age ---------- */
+
+const STATUS_STYLES: Record<string, { label: string; className: string }> = {
+  scheduled: {
+    label: "Scheduled",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+  },
+  minting: {
+    label: "Minting",
+    className: "border-green-200 bg-green-50 text-green-700",
+  },
+  graduated: {
+    label: "Graduated",
+    className: "border-purple-200 bg-purple-50 text-purple-700",
+  },
+  refunded: {
+    label: "Refunded",
+    className: "border-red-200 bg-red-50 text-red-700",
+  },
+};
+
+const MINTED_OUT = {
+  label: "Minted out",
+  className: "border-gray-200 bg-gray-100 text-gray-600",
+};
+
+/** Lifecycle pill beside the asset name - the first thing a visitor needs:
+ *  can I act now, is it coming, or is it over? */
+export function StatusPill({
+  phase,
+  hasPool,
+}: {
+  phase: string;
+  hasPool: boolean;
+}) {
+  // A classic fairminter that sold out has no pool to graduate into; calling
+  // that "graduated" would overstate it.
+  const style =
+    (phase === "graduated" && !hasPool ? null : STATUS_STYLES[phase]) ??
+    MINTED_OUT;
+  return (
+    <span
+      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.className}`}
+    >
+      {style.label}
+    </span>
+  );
+}
+
+/** How long ago the launch itself was announced, linked to the fairminter
+ *  transaction. Pairs with the issuer address: who, and when. */
+export function AnnouncedAgo({
+  blockIndex,
+  txHash,
+}: {
+  blockIndex: number;
+  txHash: string;
+}) {
+  const unconfirmed = blockIndex >= 9_999_999;
+  const { data: at } = useSWR(
+    unconfirmed ? null : ["block-time", blockIndex],
+    () =>
+      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${blockIndex}`) as Promise<{
+        result: { block_time: number };
+      }>)
+        .then((d) => d.result.block_time)
+        .catch(() => null),
+    { revalidateOnFocus: false },
+  );
+  if (!unconfirmed && !at) return null;
+  return (
+    <a
+      href={`https://xcp.io/tx/${txHash}`}
+      target="_blank"
+      rel="noreferrer"
+      title="The fairminter transaction that announced this launch"
+      className="ml-2 text-[13px] text-gray-400 hover:text-purple-600 hover:underline"
+    >
+      {unconfirmed ? "announced · unconfirmed" : `announced ${timeAgo(at!)}`}
+    </a>
   );
 }
 
 /* ---------- artwork ---------- */
 
-/** The poster art: compact in the card, full-size on click. */
+/** The poster art: compact in the card, full-size in a dialog on click.
+ *  The shared Dialog brings focus trapping, Escape, and scroll lock. */
 export function ArtLightbox({ asset }: { asset: string }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
   return (
     <>
       <button
@@ -507,7 +603,7 @@ export function ArtLightbox({ asset }: { asset: string }) {
         onClick={() => setOpen(true)}
         aria-label={`View ${asset} artwork full size`}
         title="Click to enlarge"
-        className="group shrink-0 cursor-zoom-in"
+        className="group shrink-0 cursor-zoom-in rounded-2xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
       >
         <TokenImage
           asset={asset}
@@ -515,20 +611,13 @@ export function ArtLightbox({ asset }: { asset: string }) {
           className="size-[5.5rem] rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03]"
         />
       </button>
-      {open && (
-        <div
-          role="dialog"
-          aria-label={`${asset} artwork, enlarged`}
-          onClick={() => setOpen(false)}
-          className="fixed inset-0 z-50 flex cursor-zoom-out items-center justify-center bg-black/85 p-6"
-        >
-          <TokenImage
-            asset={asset}
-            large
-            className="max-h-[85vh] w-auto max-w-full rounded-2xl object-contain shadow-2xl sm:max-w-[36rem]"
-          />
-        </div>
-      )}
+      <Dialog open={open} onOpenChange={setOpen} title={asset}>
+        <TokenImage
+          asset={asset}
+          large
+          className="max-h-[70vh] w-full rounded-2xl object-contain"
+        />
+      </Dialog>
     </>
   );
 }
