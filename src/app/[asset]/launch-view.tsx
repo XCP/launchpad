@@ -226,6 +226,58 @@ export function LaunchView({
               ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
             ];
 
+  // Scheduled: a poster, not a terminal — nothing has happened yet, so
+  // there is nothing to tabulate. Image, identity, countdown.
+  if (phase === "scheduled") {
+    const description =
+      fm.description && !/^https?:\/\//i.test(fm.description)
+        ? fm.description
+        : null;
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-8">
+          <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
+            <TokenImage
+              asset={asset}
+              large
+              className="size-40 shrink-0 rounded-2xl bg-gray-100 object-cover shadow-sm sm:size-48"
+            />
+            <div className="min-w-0 text-center sm:text-left">
+              <h1 className="flex items-center justify-center gap-2 text-3xl font-bold leading-tight sm:justify-start">
+                {asset}
+                {conforming && (
+                  <span
+                    className="rounded bg-purple-50 px-1.5 py-0.5 text-xs font-medium text-purple-700"
+                    title="Conforms to the XCP-69 standard — every field checked against the fairminter record"
+                  >
+                    XCP-69 ✓
+                  </span>
+                )}
+              </h1>
+              <p className="mt-1 text-sm text-gray-500">
+                by {shortAddress(fm.source)}
+              </p>
+              {description && (
+                <p className="mt-3 text-sm leading-relaxed text-gray-600">
+                  {description}
+                </p>
+              )}
+              <div className="mt-6">
+                <div className="text-4xl font-bold tabular-nums text-gray-900">
+                  {blocksEta(fm.start_block - blockHeight)}
+                </div>
+                <div className="mt-1 text-sm text-gray-500">
+                  until minting opens · block{" "}
+                  {fm.start_block.toLocaleString()}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Identity + headline: how's it doing, at a glance */}
