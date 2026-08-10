@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { HeaderWallet } from "@/components/header-wallet";
 import { PendingDock } from "@/components/pending-dock";
 import { SitePresenceBadge } from "@/components/site-presence";
 import { SwrProvider } from "@/lib/swr-provider";
@@ -45,6 +46,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               >
                 Launch
               </Link>
+              <HeaderWallet />
             </nav>
           </div>
         </header>

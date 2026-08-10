@@ -4,6 +4,8 @@ import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
+import { ConnectButton } from "@/components/connect-button";
+import { CTA } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
@@ -210,7 +212,7 @@ function LoadCard({
   flips: number;
   customFee: number;
 }) {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus } = useWallet();
   const { data: btcBalanceSats } = useSWR(
     address ? [address, "btc-balance"] : null,
     async ([addr]) => {
@@ -642,13 +644,7 @@ function LoadCard({
         )}
 
         {walletStatus !== "connected" ? (
-          <button
-            type="button"
-            onClick={() => connect()}
-            className="w-full rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
-          >
-            {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-          </button>
+          <ConnectButton />
         ) : (
           <>
             {armed && plan.length > 1 && (
@@ -671,8 +667,7 @@ function LoadCard({
                 </div>
               </div>
             )}
-            <button
-              type="button"
+            <CTA
               disabled={busy || n === 0}
               onClick={() => {
                 if (plan.length > 1 && !armed) {
@@ -682,10 +677,9 @@ function LoadCard({
                 setArmed(false);
                 router.start(plan, customFee > 0 ? customFee : undefined);
               }}
-              className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
             >
               {buttonLabel}
-            </button>
+            </CTA>
           </>
         )}
         <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
@@ -727,7 +721,7 @@ function UnloadCard({
   flips: number;
   customFee: number;
 }) {
-  const { address, status: walletStatus, connect } = useWallet();
+  const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
 
   const marketSats = btcUsd && xcpUsd ? Math.round((xcpUsd / btcUsd) * SATS) : null;
@@ -1081,22 +1075,11 @@ function UnloadCard({
         )}
 
         {walletStatus !== "connected" ? (
-          <button
-            type="button"
-            onClick={() => connect()}
-            className="w-full rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99]"
-          >
-            {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-          </button>
+          <ConnectButton />
         ) : (
-          <button
-            type="button"
-            disabled={!ready}
-            onClick={openDispenser}
-            className="w-full rounded-2xl bg-purple-600 px-5 py-3.5 font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-          >
+          <CTA disabled={!ready} onClick={openDispenser}>
             {buttonLabel}
-          </button>
+          </CTA>
         )}
 
       </div>

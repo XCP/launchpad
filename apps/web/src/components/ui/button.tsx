@@ -3,8 +3,11 @@
 import type { ButtonHTMLAttributes } from "react";
 
 const VARIANTS = {
+  // Disabled stays purple, just dimmed — "hasn't been filled in yet" should
+  // never read as "broken" or "off". Gray was doing that: a form with
+  // nothing typed into it looked dead rather than merely not-yet-ready.
   primary:
-    "bg-purple-600 text-white hover:bg-purple-500 disabled:bg-gray-200 disabled:text-gray-400",
+    "bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40 disabled:hover:bg-purple-600",
   dark: "bg-gray-900 text-white hover:bg-gray-700",
   danger: "bg-red-600 text-white hover:bg-red-500",
 } as const;
