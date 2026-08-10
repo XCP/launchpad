@@ -20,7 +20,7 @@ import { fetchJson } from "@/lib/client";
 import { useLaunchRoom } from "@/lib/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { Identicon } from "./launch-view";
-import { useAddressFreshness } from "./scheduled-extras";
+import { AddressHoverCard, useAddressFreshness } from "./scheduled-extras";
 
 const PER_PAGE = 25;
 
@@ -327,12 +327,12 @@ export function ActivityTabs({
           </p>
         ) : (
           <>
-            <div className="grid grid-cols-[2rem_minmax(0,1fr)_4.5rem_7rem_9rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+            <div className="grid grid-cols-[2rem_minmax(0,1fr)_7rem_9rem_4.5rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
               <span />
               <span>Address</span>
-              <span className="text-right">Mints</span>
               <span className="text-right">Amount</span>
               <span className="text-right">Paid</span>
+              <span className="text-right">Mints</span>
             </div>
             <ul className="divide-y divide-gray-100">
               {minters.slice(from, from + PER_PAGE).map((r, i) => {
@@ -340,7 +340,7 @@ export function ActivityTabs({
                 return (
                   <li
                     key={r.source}
-                    className="relative grid grid-cols-[2rem_minmax(0,1fr)_4.5rem_7rem_9rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
+                    className="relative grid grid-cols-[2rem_minmax(0,1fr)_7rem_9rem_4.5rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
                   >
                     <span
                       aria-hidden
@@ -351,15 +351,13 @@ export function ActivityTabs({
                       {from + i + 1}
                     </span>
                     <span className="relative z-10 flex min-w-0 items-center gap-2">
-                      <a
-                        href={`https://xcp.io/address/${r.source}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
+                      <AddressHoverCard
+                        source={r.source}
+                        className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700"
                       >
                         <Identicon address={r.source} />
                         <span className="truncate">{shortAddress(r.source)}</span>
-                      </a>
+                      </AddressHoverCard>
                       {/* Outside the link: an ancestor's underline paints
                           through descendant text regardless of the
                           descendant's own text-decoration, so the only way
@@ -375,14 +373,14 @@ export function ActivityTabs({
                         </span>
                       )}
                     </span>
-                    <span className="relative z-10 text-right tabular-nums text-gray-500">
-                      {r.mints} TX{r.mints === 1 ? "" : "s"}
-                    </span>
                     <span className="relative z-10 text-right tabular-nums text-gray-900">
                       {commas(tokenQty(r.earned, divisible))}
                     </span>
                     <span className="relative z-10 text-right tabular-nums text-gray-500">
                       {commasRaw(r.paid)} XCP
+                    </span>
+                    <span className="relative z-10 text-right tabular-nums text-gray-500">
+                      {r.mints} TX{r.mints === 1 ? "" : "s"}
                     </span>
                   </li>
                 );

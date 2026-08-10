@@ -935,18 +935,30 @@ function CopyButton({ value }: { value: string }) {
 }
 
 /**
- * "by 1FairP…pkiGfX" with a copy button, and an at-a-glance card on
- * hover/focus: XCP balance and first-seen date as the headline numbers,
- * tokens held and issued below, track record as a footnote. The link still
- * goes to the explorer, so touch users lose only the preview.
+ * Any address, wrapped in an at-a-glance card on hover/focus (tap on
+ * touch): XCP balance and first-seen date as the headline numbers, tokens
+ * held and issued below, track record as a footnote. `children` is just the
+ * visible content — a short address, an identicon row, whatever the caller
+ * wants — this component builds the actual link/button around it (and
+ * still goes to the explorer either way), so touch users lose only the
+ * preview, never the navigation.
+ *
+ * Every fetch is gated on `armed` (first hover/tap), not page load — the
+ * cost of adding this to N rows of a table is "one more request when
+ * someone actually looks," never N requests up front.
  */
-export function IssuerLine({ source }: { source: string }) {
-  // The reputation call is worth making only for someone who asks for the
-  // card; the summary is already in flight for the chips, so reading it
-  // here costs nothing.
+export function AddressHoverCard({
+  source,
+  className = "",
+  children,
+}: {
+  source: string;
+  className?: string;
+  children: ReactNode;
+}) {
   const [armed, setArmed] = useState(false);
   const coarse = useCoarsePointer();
-  const summary = useAddressSummary(source);
+  const summary = useAddressSummary(armed ? source : null);
   const firstSeen = useFirstSeen(summary?.first_block);
   const { data: rep } = useSWR(
     armed ? ["reputation", source] : null,
@@ -967,77 +979,87 @@ export function IssuerLine({ source }: { source: string }) {
   const tier = rep?.track_record?.tier;
 
   return (
+    <HoverCard
+      touch={coarse}
+      onArm={() => setArmed(true)}
+      trigger={
+        // A tap can't hover, so it opens the card instead of leaving the
+        // page; the explorer link lives inside the card either way.
+        coarse ? (
+          <button type="button" className={`rounded ${FOCUS} ${className}`}>
+            {children}
+          </button>
+        ) : (
+          <a
+            href={`https://xcp.io/address/${source}`}
+            target="_blank"
+            rel="noreferrer"
+            className={`rounded hover:underline ${FOCUS} ${className}`}
+          >
+            {children}
+          </a>
+        )
+      }
+    >
+      <div className="grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-gray-50 p-3">
+          <div className={LABEL}>XCP balance</div>
+          <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
+            {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
+          </div>
+        </div>
+        <div className="rounded-xl bg-gray-50 p-3">
+          <div className={LABEL}>First seen</div>
+          <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
+            {firstSeen ? monthYear(firstSeen) : "—"}
+          </div>
+        </div>
+      </div>
+      <div className="mt-2 grid grid-cols-2 gap-2">
+        <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          Holds{" "}
+          <span className="font-semibold text-gray-900 tabular-nums">
+            {typeof held === "number" ? commas(held) : "—"}
+          </span>{" "}
+          {held === 1 ? "token" : "tokens"}
+        </div>
+        <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          Issued{" "}
+          <span className="font-semibold text-gray-900 tabular-nums">
+            {issued
+              ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
+              : "—"}
+          </span>{" "}
+          {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
+        </div>
+      </div>
+      {typeof score === "number" && tier && (
+        <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
+          Track record {Math.round(score)}/100 ({tier}) — observed on-chain
+          reputation from the XCP.io explorer, not an endorsement.
+        </p>
+      )}
+      <a
+        href={`https://xcp.io/address/${source}`}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-2 block text-xs font-medium text-purple-600 hover:underline"
+      >
+        View on explorer ↗
+      </a>
+    </HoverCard>
+  );
+}
+
+/**
+ * "by 1FairP…pkiGfX" with a copy button, and the address hover card above.
+ * The link still goes to the explorer, so touch users lose only the preview.
+ */
+export function IssuerLine({ source }: { source: string }) {
+  return (
     <span className="mt-1 inline-block text-[13px] text-gray-500 tabular-nums">
       by{" "}
-      <HoverCard
-        touch={coarse}
-        onArm={() => setArmed(true)}
-        trigger={
-          coarse ? (
-            // A tap can't hover, so it opens the card instead of leaving the
-            // page; the explorer link lives inside it.
-            <button type="button" className={`rounded underline-offset-2 ${FOCUS}`}>
-              {shortAddress(source)}
-            </button>
-          ) : (
-            <a
-              href={`https://xcp.io/address/${source}`}
-              target="_blank"
-              rel="noreferrer"
-              className={`rounded underline-offset-2 hover:underline ${FOCUS}`}
-            >
-              {shortAddress(source)}
-            </a>
-          )
-        }
-      >
-        <div className="grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-gray-50 p-3">
-            <div className={LABEL}>XCP balance</div>
-            <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
-              {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
-            </div>
-          </div>
-          <div className="rounded-xl bg-gray-50 p-3">
-            <div className={LABEL}>First seen</div>
-            <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
-              {firstSeen ? monthYear(firstSeen) : "—"}
-            </div>
-          </div>
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-2">
-          <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            Holds{" "}
-            <span className="font-semibold text-gray-900 tabular-nums">
-              {typeof held === "number" ? commas(held) : "—"}
-            </span>{" "}
-            {held === 1 ? "token" : "tokens"}
-          </div>
-          <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            Issued{" "}
-            <span className="font-semibold text-gray-900 tabular-nums">
-              {issued
-                ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
-                : "—"}
-            </span>{" "}
-            {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
-          </div>
-        </div>
-        {typeof score === "number" && tier && (
-          <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
-            Track record {Math.round(score)}/100 ({tier}) — observed on-chain
-            reputation from the XCP.io explorer, not an endorsement.
-          </p>
-        )}
-        <a
-          href={`https://xcp.io/address/${source}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-2 block text-xs font-medium text-purple-600 hover:underline"
-        >
-          View on explorer ↗
-        </a>
-      </HoverCard>
+      <AddressHoverCard source={source}>{shortAddress(source)}</AddressHoverCard>
       <CopyButton value={source} />
     </span>
   );
