@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
 import {
+  AddressHoverCard,
   AnnouncedAgo,
   ArtLightbox,
   BlockAgo,
@@ -31,6 +32,7 @@ import {
   fromSats,
   price as formatPrice,
   shortAddress,
+  tokenQty,
   usd,
 } from "@/lib/format";
 import { big, maxRaw, ratio, rawEquals } from "@/lib/numeric";
@@ -435,88 +437,96 @@ export function LaunchView({
     );
   }
 
-  // Refunded: a tombstone, not a terminal — there's no market to look at
-  // and nothing left to track live, only what happened. One plaque: art
-  // beside the facts, the guarantee's own receipt (the XCP that came back)
-  // as the one number big enough to read from across the room.
+  // Refunded: a tombstone, not a terminal. There's no market, no live
+  // holders (supply was destroyed), no orders — nothing here is still
+  // happening, so nothing here should look like it is. The art leads, full
+  // width and faded; the outcome (XCP back, not the asset's own branding)
+  // is the first thing stated; the facts read like an epitaph line, not a
+  // dashboard; and the record of who showed up is a plain list, not the
+  // full trading-terminal activity tabs — those tabs are structurally
+  // empty for a dead asset, and giving it that chrome would overstate it.
   if (phase === "refunded") {
+    const topMinters = minterAddresses.slice(0, 8);
+    const extraMinters = minterAddresses.length - topMinters.length;
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-            <ArtLightbox asset={asset} size="large" />
-            <div className="min-w-0 flex-1">
-              <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
-                {asset}
-                <StatusPill phase={phase} hasPool={false} />
-                {!conforming && (
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                    not XCP-69
-                  </span>
-                )}
-              </h1>
-              <div className="mt-1 flex flex-wrap items-baseline">
-                <IssuerLine source={fm.source} />
-              </div>
-              <p className="mt-3 text-sm text-gray-600">
-                Reached {(progress * 100).toFixed(1)}% of the sale before the
-                deadline. Every XCP escrowed was returned by the protocol and
-                the unsold supply destroyed — nobody was left holding a dead
-                token; this is what the guarantee is for.
-              </p>
-            </div>
-          </div>
+        <ArtLightbox asset={asset} size="hero" muted />
 
-          {/* The one number worth reading from across the room. */}
-          <div className="mt-6 border-t border-gray-100 pt-5 text-center">
+        <div className="mt-7 text-center">
+          <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+            Refunded by consensus
+          </div>
+          <div className="mt-1 text-5xl font-bold tabular-nums text-gray-900">
+            {commasRaw(fm.paid_quantity)}{" "}
+            <span className="text-2xl font-semibold text-gray-400">XCP</span>
+          </div>
+          <p className="mx-auto mt-3 max-w-sm text-sm text-gray-500">
+            {asset} reached {(progress * 100).toFixed(1)}% of its sale before
+            the deadline. Every XCP escrowed came back and the unsold supply
+            was destroyed — the guarantee, not a rescue.
+          </p>
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13px] text-gray-400">
+          <span className="inline-flex items-center gap-1.5">
+            {asset}
+            {!conforming && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
+                not XCP-69
+              </span>
+            )}
+          </span>
+          <span aria-hidden>·</span>
+          <IssuerLine source={fm.source} />
+        </div>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-gray-100 pt-5 text-center text-xs text-gray-400 tabular-nums">
+          <span>{participants} minters</span>
+          <span aria-hidden>·</span>
+          <span>{mints.length} mints</span>
+          <span aria-hidden>·</span>
+          <span>
+            closed <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
+          </span>
+        </div>
+
+        {topMinters.length > 0 && (
+          <div className="mt-8 border-t border-gray-100 pt-5">
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-              Refunded
+              Who was here
             </div>
-            <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
-              {commasRaw(fm.paid_quantity)} XCP
-            </div>
+            <ul className="mt-3 space-y-2.5">
+              {topMinters.map((source) => (
+                <li
+                  key={source}
+                  className="flex items-center justify-between gap-3 text-sm"
+                >
+                  <AddressHoverCard
+                    source={source}
+                    className="flex min-w-0 items-center gap-2 font-mono text-gray-500 hover:text-purple-700"
+                  >
+                    <Identicon address={source} />
+                    <span className="truncate">{shortAddress(source)}</span>
+                  </AddressHoverCard>
+                  <span className="shrink-0 tabular-nums text-gray-400">
+                    {commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))}{" "}
+                    {asset}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            {extraMinters > 0 && (
+              <a
+                href={`https://xcp.io/asset/${asset}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-block text-xs font-medium text-purple-600 hover:underline"
+              >
+                +{extraMinters} more on the explorer ↗
+              </a>
+            )}
           </div>
-
-          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4">
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                Participants
-              </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                {participants}
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                Mints
-              </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                {mints.length}
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                Reached
-              </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                {(progress * 100).toFixed(1)}%
-              </div>
-            </div>
-            <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                Closed
-              </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-4">
-          <EditPanel asset={asset} issuer={fm.source} />
-          <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
-        </div>
+        )}
       </div>
     );
   }

@@ -1279,13 +1279,19 @@ export function BlockAgo({ blockIndex }: { blockIndex: number }) {
 /** The poster art: compact in the card, full-size in a dialog on click.
  *  The shared Dialog brings focus trapping, Escape, and scroll lock.
  *  `size` "large" gives the desktop side a real presence (a plaque photo,
- *  not an icon) — mobile stays full-width either way. */
+ *  not an icon) — mobile stays full-width either way. "hero" stays
+ *  full-width at every breakpoint, for the refunded tombstone, where the
+ *  art carries the page rather than sitting beside a text column.
+ *  `muted` fades the art to grayscale — restored to color on hover, a
+ *  closer look at something that's over rather than a live thumbnail. */
 export function ArtLightbox({
   asset,
   size = "compact",
+  muted = false,
 }: {
   asset: string;
-  size?: "compact" | "large";
+  size?: "compact" | "large" | "hero";
+  muted?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -1294,16 +1300,24 @@ export function ArtLightbox({
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`View ${asset} artwork full size`}
-        className={`group w-full shrink-0 cursor-zoom-in rounded-2xl sm:w-auto ${FOCUS}`}
+        className={`group w-full shrink-0 cursor-zoom-in rounded-2xl ${
+          size === "hero" ? "" : "sm:w-auto"
+        } ${FOCUS}`}
       >
         {/* A poster on a phone: full width, then the compact identity square
             (or, for "large", a real plaque-sized photo) once there's a
-            column to sit beside. */}
+            column to sit beside. "hero" never steps aside. */}
         <TokenImage
           asset={asset}
           large
-          className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:aspect-auto sm:w-auto ${
-            size === "large" ? "sm:size-40" : "sm:size-[5.5rem]"
+          className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-all duration-500 group-hover:scale-[1.01] ${
+            muted ? "grayscale group-hover:grayscale-0" : "group-hover:scale-[1.03]"
+          } ${
+            size === "hero"
+              ? ""
+              : size === "large"
+                ? "sm:aspect-auto sm:w-auto sm:size-40"
+                : "sm:aspect-auto sm:w-auto sm:size-[5.5rem]"
           }`}
         />
       </button>
