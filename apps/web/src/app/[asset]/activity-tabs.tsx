@@ -249,7 +249,7 @@ export function ActivityTabs({
     t === "mints"
       ? `Mints (${mints.length})`
       : t === "minters"
-        ? `Minters (${minters.length})`
+        ? `Holders (${minters.length})`
         : t === "mempool"
           ? `Mempool${roomState ? ` (${pending.length})` : ""}`
           : t === "trades"

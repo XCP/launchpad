@@ -637,7 +637,7 @@ export function ParticipantsStat({
   const data = useAddressFreshness(addresses, blockHeight);
   return (
     <div>
-      <div className={LABEL}>Minters</div>
+      <div className={LABEL}>Holders</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
         {participants}
         {data && data.known > 0 ? ` · ${data.newAddresses.size} new` : ""}
