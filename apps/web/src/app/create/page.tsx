@@ -11,7 +11,7 @@ import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { SATS } from "@/lib/numeric";
 import { isValidSocial } from "@/lib/social";
-import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
+import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
   generateLpAssetName,
@@ -102,8 +102,10 @@ export default function CreatePage() {
 
   // What this launch will actually cost, before the wallet ever asks —
   // the same "receipt above the button" grammar the swap and dispense
-  // forms already use.
-  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+  // forms already use. Next-block rate, not the median: this is a single
+  // small transaction that has to confirm before the fixed pre-announcement
+  // window elapses, so the estimate shown here is exactly what gets paid.
+  const { data: feeRate } = useSWR("btc-feerate-priority", fetchPriorityFeeRate, {
     refreshInterval: 60_000,
   });
   const { data: btcUsd } = useSWR("btc-usd", fetchBtcUsd, { refreshInterval: 60_000 });
@@ -191,6 +193,10 @@ export default function CreatePage() {
       const startBlock = height + PREANNOUNCE_BLOCKS;
       setScheduledStart(startBlock);
 
+      // Next-block rate: this is a single small transaction, always worth
+      // paying to confirm promptly rather than risk it lingering.
+      const submitFeeRate = await fetchPriorityFeeRate();
+
       if (inscribe && isTaproot && address) {
         // 3a. Commit/reveal inscription: the image becomes the permanent
         //     on-chain description; the inscription output is burned.
@@ -202,7 +208,7 @@ export default function CreatePage() {
           jsonUrl: upload.json_url,
           imageData: new Uint8Array(await image.arrayBuffer()),
           mimeType: image.type,
-          feeRate: 2,
+          feeRate: submitFeeRate,
           address,
           signPsbt,
           broadcast: broadcastTransaction,
@@ -230,6 +236,7 @@ export default function CreatePage() {
         pool_quantity: XCP69_EXACT.POOL_QUANTITY,
         lp_asset: generateLpAssetName(),
         description: upload.json_url,
+        fee_rate: submitFeeRate,
       });
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Something went wrong");
@@ -454,15 +461,6 @@ export default function CreatePage() {
             />
           </div>
 
-          {/* Pre-announcement — fixed, not a choice */}
-          <div className="mt-5">
-            <p className="text-sm font-medium text-gray-700">Minting opens in ~6 hours</p>
-            <p className="mt-1 text-xs text-gray-500">
-              Announced on-chain first — nobody, creator included, can mint
-              early.
-            </p>
-          </div>
-
           {/* The due line — what pressing the button actually costs,
               stated before it's asked for, same grammar as swap/dispense. */}
           <div className="mt-5 border-t border-gray-100 pt-4">
@@ -479,17 +477,17 @@ export default function CreatePage() {
                       : "—"}
                 </dd>
               </div>
-              {medianFeeRate !== undefined && (
+              {feeRate !== undefined && (
                 <div className="flex justify-between">
                   <dt>Network fee (est.)</dt>
                   <dd className="tabular-nums text-gray-700">
-                    {medianFeeRate} sat/vB
+                    {feeRate} sat/vB
                     {btcUsd !== null && btcUsd !== undefined && (
                       <span className="text-gray-400">
                         {" "}
                         (~
                         {usd(
-                          ((medianFeeRate * LAUNCH_TX_VBYTES_ESTIMATE) / SATS) * btcUsd,
+                          ((feeRate * LAUNCH_TX_VBYTES_ESTIMATE) / SATS) * btcUsd,
                         )}
                         )
                       </span>
