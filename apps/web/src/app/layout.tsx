@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { PendingDock } from "@/components/pending-dock";
+import { SitePresenceBadge } from "@/components/site-presence";
 import { SwrProvider } from "@/lib/swr-provider";
 import { WalletProvider } from "@/lib/wallet/wallet-context";
 import "./globals.css";
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               <Link href="/" className="text-lg font-bold tracking-tight">
                 xcp<span className="text-purple-600">.fun</span>
               </Link>
+              <SitePresenceBadge />
               <nav className="flex items-center gap-3 text-sm font-medium text-gray-600 sm:gap-4">
                 <Link href="/swap" className="hover:text-gray-900">Swap</Link>
                 <Link href="/limit" className="hover:text-gray-900">Limit</Link>

@@ -9,7 +9,8 @@ import {
   isOurMetadata,
   IssuerLine,
   LaunchDescription,
-  NewMinterCount,
+  ParticipantsStat,
+  RaisedStat,
   ScheduledPulse,
   ShareButton,
   StatusPill,
@@ -17,6 +18,8 @@ import {
 } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
+import type { FeeSummary } from "@/lib/api/launchpad-api";
+import { LaunchRoomProvider } from "@/lib/launch-room";
 import {
   blocksEta,
   commas,
@@ -65,6 +68,7 @@ export function LaunchView({
   pool,
   priceHistory,
   xcpUsd,
+  feeSats,
 }: {
   asset: string;
   fm: Fairminter;
@@ -75,6 +79,7 @@ export function LaunchView({
   pool: Pool | null;
   priceHistory: PoolSnapshot[];
   xcpUsd: number | null;
+  feeSats: FeeSummary | null;
 }) {
   const progress = saleProgress(fm);
   // sort_pair orders the pool lexically — XCP can sit on either side.
@@ -265,6 +270,7 @@ export function LaunchView({
     const hasProse =
       prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
     return (
+      <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
       <div className="mx-auto max-w-2xl">
         <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
           {/* Art leads on a phone at full width, then steps aside into the
@@ -311,9 +317,24 @@ export function LaunchView({
 
           {standardTerms && !minting && <TermsStrip xcpUsd={xcpUsd} />}
 
-          {/* Only real prose earns the space: a URL is machine metadata, and
-              a one-word "description" is noise the poster reads better without. */}
-          {isOurMetadata(fm.description) ? (
+          {/* Once minting is live, the live number IS the description's
+              spot — what the launch is about mattered before anything had
+              happened; how it's going matters now. */}
+          {minting ? (
+            mints.length > 0 && (
+              <div className="mt-4">
+                <LiveProgress
+                  initialEarned={fm.earned_quantity ?? 0}
+                  target={saleTarget(fm)}
+                  allOrNothing={big(fm.pool_quantity) > 0n}
+                  divisible={fm.divisible}
+                />
+              </div>
+            )
+          ) : /* Only real prose earns the space: a URL is machine metadata,
+                 and a one-word "description" is noise the poster reads
+                 better without. */
+          isOurMetadata(fm.description) ? (
             <HostedDescription url={fm.description} />
           ) : isUrlDescription ? (
             /* Someone else's host: link it rather than fetch it, so viewing a
@@ -360,67 +381,56 @@ export function LaunchView({
           )}
         </div>
 
-        {/* How the sale is actually going — distinct from the fixed terms
-            above (or on the scheduled poster before it): these numbers move.
-            The fixed facts (price, cap, at-close multiple) don't repeat here
-            — they ran once on the scheduled poster and don't change. */}
+        {/* How the sale is actually going — the live progress number now
+            sits above, where the description used to be. These facts are
+            the rest of it: still live, still not a repeat of the fixed
+            terms that ran once on the scheduled poster. */}
         {minting && mints.length > 0 && (
-          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-5">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
+            <RaisedStat paidQuantity={fm.paid_quantity} xcpUsd={xcpUsd} progress={progress} />
+            {feeSats && feeSats.mints > 0 && (
               <div>
-                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Raised
+                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                  TX fees
                 </div>
                 <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                  {commasRaw(fm.paid_quantity)} XCP
-                  {xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""}
+                  {commas(feeSats.totalFeeSats)} sats
                 </div>
               </div>
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Participants
-                </div>
-                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                  {participants}
-                </div>
+            )}
+            <ParticipantsStat
+              participants={participants}
+              addresses={minterAddresses}
+              blockHeight={blockHeight}
+            />
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                Deadline
               </div>
-              <NewMinterCount addresses={minterAddresses} blockHeight={blockHeight} />
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-                  Closes
-                </div>
-                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                  {fm.soft_cap_deadline_block - blockHeight > 0
-                    ? blocksEta(fm.soft_cap_deadline_block - blockHeight)
-                    : "closing"}
-                </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                {fm.soft_cap_deadline_block - blockHeight > 0
+                  ? `${blocksEta(fm.soft_cap_deadline_block - blockHeight)} · block ${commas(fm.soft_cap_deadline_block)}`
+                  : "closing"}
               </div>
-            </div>
-            <div className="mt-4">
-              <LiveProgress
-                fairminterTxHash={fm.tx_hash}
-                initialEarned={fm.earned_quantity ?? 0}
-                target={saleTarget(fm)}
-                allOrNothing={big(fm.pool_quantity) > 0n}
-                divisible={fm.divisible}
-              />
             </div>
           </div>
         )}
 
         {/* Who has minted so far — the sale's own tape, under the card. */}
         {minting && (
-          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-2">
+          <div className="mt-4">
             <ActivityTabs
               asset={asset}
               mints={mints}
               divisible={fm.divisible}
               minting
               issuerSource={fm.source}
+              blockHeight={blockHeight}
             />
           </div>
         )}
       </div>
+      </LaunchRoomProvider>
     );
   }
 

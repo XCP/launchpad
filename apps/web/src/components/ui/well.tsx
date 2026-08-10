@@ -38,7 +38,7 @@ export function Well({
     <div
       className={
         focusable
-          ? "group rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-gray-200 focus-within:bg-white"
+          ? "group rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-purple-500 focus-within:bg-white"
           : "rounded-2xl bg-gray-50 p-4"
       }
     >

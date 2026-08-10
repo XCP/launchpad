@@ -10,8 +10,17 @@ import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
 import { useCoarsePointer } from "@/lib/use-coarse-pointer";
 import { useDenomination, setDenomination } from "@/lib/denomination";
-import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
+import {
+  blocksEta,
+  commas,
+  commasRaw,
+  compact,
+  fromSats,
+  shortAddress,
+  usd,
+} from "@/lib/format";
 import { METADATA_ORIGIN } from "@/lib/metadata";
+import type { Raw } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import {
   type Fairminter,
@@ -27,7 +36,7 @@ const SATS = 1e8;
 
 /** One token for the site's uppercase micro-label. */
 const LABEL =
-  "text-[11px] font-medium uppercase tracking-wider text-gray-400";
+  "text-[11px] font-medium uppercase tracking-wider text-gray-500";
 /** Keyboard users need to see where they are; nothing else provides this. */
 const FOCUS =
   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500";
@@ -552,44 +561,107 @@ const ordinal = (n: number) =>
 const NEW_ADDRESS_BLOCKS = 90 * 24 * 6;
 
 /**
- * How many of a sale's minters are freshly-created wallets — a batch of
+ * Which of a sale's minters are freshly-created wallets — a batch of
  * addresses with no history before this launch is the sybil pattern the
  * per-address cap can't catch on its own. Capped to the `addresses` the
  * caller passes in (the biggest minters, in practice) and fetched lazily,
  * client-side, once per mount: this is the same shape as the issuer hover
- * card, not a repeat of the SSR fan-out the index page used to do.
+ * card, not a repeat of the SSR fan-out the index page used to do. Callers
+ * sharing the same address list hit the same SWR cache entry — no repeat
+ * fetch just because two components on the page both want it.
  */
-export function NewMinterCount({
-  addresses,
-  blockHeight,
-}: {
-  addresses: string[];
-  blockHeight: number;
-}) {
+export function useAddressFreshness(addresses: string[], blockHeight: number) {
   const capped = addresses.slice(0, 25);
-  const { data } = useSWR(
+  return useSWR(
     capped.length > 0 ? ["new-minters", capped.join(",")] : null,
     async () => {
       const summaries = await Promise.all(
         capped.map((addr) =>
           fetchJson(`${XCPIO_API}/addresses/${addr}/summary`)
             .then((d: { result: AddressSummary | null }) => d.result)
-            .catch(() => null),
+            .catch(() => undefined),
         ),
       );
-      return summaries.filter(
-        (s) => !s?.first_block || blockHeight - s.first_block < NEW_ADDRESS_BLOCKS,
-      ).length;
+      // A failed lookup is not evidence of anything — only a real
+      // first_block, young enough, counts. (An address the explorer has
+      // literally never seen would report first_block: null, which is
+      // arguably the newest an address can be; that still counts as new.)
+      const isNew = (s: AddressSummary | null) =>
+        !s?.first_block || blockHeight - s.first_block < NEW_ADDRESS_BLOCKS;
+      const newAddresses = new Set<string>();
+      let known = 0;
+      capped.forEach((addr, i) => {
+        const s = summaries[i];
+        if (s === undefined) return;
+        known++;
+        if (isNew(s)) newAddresses.add(addr);
+      });
+      return { newAddresses, known };
     },
     { revalidateOnFocus: false },
-  );
-  if (data === undefined) return null;
+  ).data;
+}
+
+/**
+ * Participants, with the freshly-created-wallet count folded in as a
+ * sub-fact rather than its own grid cell.
+ */
+export function ParticipantsStat({
+  participants,
+  addresses,
+  blockHeight,
+}: {
+  participants: number;
+  addresses: string[];
+  blockHeight: number;
+}) {
+  const data = useAddressFreshness(addresses, blockHeight);
   return (
     <div>
-      <div className={LABEL}>New addresses</div>
+      <div className={LABEL}>Minters</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-        {data}
-        {capped.length < addresses.length ? ` of top ${capped.length}` : ""}
+        {participants}
+        {data && data.known > 0 ? ` · ${data.newAddresses.size} new` : ""}
+      </div>
+    </div>
+  );
+}
+
+/** Raised, in whichever denomination the site-wide toggle is set to — one
+ *  value shown at a time, not XCP-and-USD side by side. */
+export function RaisedStat({
+  paidQuantity,
+  xcpUsd,
+  progress,
+}: {
+  paidQuantity: Raw | null;
+  xcpUsd: number | null;
+  /** Sale progress in [0, 1] — a share of the raise, not of the wallet. */
+  progress: number;
+}) {
+  const denom = useDenomination();
+  const usdMode = denom === "USD" && xcpUsd !== null;
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-2">
+        <div className={LABEL}>Raised</div>
+        {xcpUsd !== null && (
+          <button
+            type="button"
+            onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
+            aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
+            className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS}`}
+          >
+            {usdMode ? "XCP" : "USD"}
+          </button>
+        )}
+      </div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+        {usdMode
+          ? usd(fromSats(paidQuantity) * (xcpUsd as number))
+          : `${commasRaw(paidQuantity)} XCP`}
+        {" · "}
+        {(progress * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%
       </div>
     </div>
   );

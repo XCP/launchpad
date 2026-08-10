@@ -3,6 +3,8 @@
 import { useRef, useState } from 'react'
 import { useWallet } from './wallet-context'
 import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
+import { parseTxInputs, type TxInput } from './raw-tx'
+import { msSinceLastSpend, recentlySpentUtxos, registerSpentUtxos } from './spent-utxos'
 import { quantityParam } from '@/lib/numeric'
 import { COUNTERPARTY_API_BASE } from '@/utils/constants'
 
@@ -25,6 +27,38 @@ export type ComposeState =
   | { status: 'error'; txid: null; error: string }
 
 const INITIAL_STATE: ComposeState = { status: 'idle', txid: null, error: null }
+
+// core's own error text (composer.py) for "the selected UTXOs don't cover
+// this" — matched narrowly so this retry never masks a wallet that's
+// actually empty, only the propagation-lag window right after our own
+// broadcast (see spent-utxos.ts's msSinceLastSpend doc comment).
+const INSUFFICIENT_UTXO_PATTERN = /insufficient funds for the target amount|no utxos found for/i
+const UTXO_RACE_RETRY_WINDOW_MS = 8_000
+const UTXO_RACE_RETRY_DELAY_MS = 2_000
+
+/** One bounded, invisible retry for the UTXO-propagation race: if we JUST
+ *  broadcast something and the very next compose fails with exactly the
+ *  "not enough" shape core raises when it can't cover the amount, wait a
+ *  beat and try again once before surfacing anything to the user. Anything
+ *  else — a different error, or a wallet that's simply been empty for
+ *  longer than that window — passes straight through. */
+async function withUtxoRaceRetry<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn()
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    const sinceSpend = msSinceLastSpend()
+    if (
+      INSUFFICIENT_UTXO_PATTERN.test(msg) &&
+      sinceSpend !== null &&
+      sinceSpend < UTXO_RACE_RETRY_WINDOW_MS
+    ) {
+      await new Promise((resolve) => setTimeout(resolve, UTXO_RACE_RETRY_DELAY_MS))
+      return fn()
+    }
+    throw e
+  }
+}
 
 /** Fetch next-block median fee rate from mempool.space (cached 30s).
  *  Exported so surfaces can show the rate a compose will actually pay. */
@@ -116,14 +150,22 @@ export function useCompose() {
   const [state, setState] = useState<ComposeState>(INITIAL_STATE)
   const busyRef = useRef(false)
 
-  /** Compose → sign → broadcast pipeline */
-  const run = async (expectedAddress: string, getUnsignedHex: () => Promise<string>): Promise<void> => {
+  /**
+   * Compose → sign → broadcast pipeline. `getUnsigned` returns both the hex
+   * to sign and the inputs it spends — recorded as spent only once broadcast
+   * actually succeeds (composing alone spends nothing), so the NEXT compose
+   * can tell core to exclude them regardless of which backend worker
+   * answers it. See spent-utxos.ts for why that matters.
+   */
+  const run = async (
+    getUnsigned: () => Promise<{ hex: string; inputs: TxInput[] }>,
+  ): Promise<void> => {
     if (busyRef.current) return
     busyRef.current = true
 
     try {
       setState({ status: 'composing', txid: null, error: null })
-      const unsignedHex = await getUnsignedHex()
+      const { hex: unsignedHex, inputs } = await withUtxoRaceRetry(getUnsigned)
 
       setState({ status: 'signing', txid: null, error: null })
       const signedHex = await signTransaction(unsignedHex)
@@ -131,6 +173,7 @@ export function useCompose() {
       setState({ status: 'broadcasting', txid: null, error: null })
       const txid = await broadcastTransaction(signedHex)
 
+      registerSpentUtxos(inputs)
       setState({ status: 'confirmed', txid, error: null })
     } catch (e) {
       setState({ status: 'error', txid: null, error: friendlyError(e) })
@@ -152,15 +195,35 @@ export function useCompose() {
       setState({ status: 'error', txid: null, error: 'Invalid wallet address' })
       return
     }
-    run(address, () =>
-      composeRequest(
+    const excludeUtxos = recentlySpentUtxos()
+    run(async () => {
+      const hex = await composeRequest(
         `addresses/${address}`,
         type,
         params,
-        { exclude_utxos_with_balances: 'true' },
+        {
+          exclude_utxos_with_balances: 'true',
+          // Without this, core's UTXO selection (list_unspent) only offers
+          // already-CONFIRMED UTXOs. The moment one compose is pending, its
+          // change output is unconfirmed and invisible to the next one — a
+          // wallet with no other confirmed UTXOs reads as "not enough
+          // BTC/XCP" for a second action, even though chaining off that
+          // change is exactly what a real wallet does. This is what let
+          // users stack a mint, then a swap, then a launch, back to back.
+          allow_unconfirmed_inputs: 'true',
+          // Belt-and-suspenders against the SAME UTXO being offered twice in
+          // quick succession: core's own UTXOLocks guard is an in-memory,
+          // per-process singleton that explicitly does not cross workers, so
+          // two composes moments apart can land on different backend
+          // processes that have never heard of each other's selection. This
+          // excludes whatever WE know we just spent, regardless of which
+          // worker answers.
+          ...(excludeUtxos.length > 0 ? { exclude_utxos: excludeUtxos.join(',') } : {}),
+        },
         feeRateOverride,
-      ),
-    )
+      )
+      return { hex, inputs: parseTxInputs(hex) }
+    })
   }
 
   const executeUtxo = (utxo: string, type: string, params: Record<string, ComposeValue>): void => {
@@ -172,7 +235,12 @@ export function useCompose() {
       setState({ status: 'error', txid: null, error: 'Invalid UTXO format' })
       return
     }
-    run(address, () => composeRequest(`utxos/${utxo}`, type, params))
+    // Targets one exact, caller-specified UTXO — no ambiguous selection to
+    // race, so nothing to record here.
+    run(async () => {
+      const hex = await composeRequest(`utxos/${utxo}`, type, params)
+      return { hex, inputs: [] }
+    })
   }
 
   const composeOrder = (params: {

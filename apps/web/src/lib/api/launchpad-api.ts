@@ -82,6 +82,41 @@ function toFairminter(row: ApiLaunchRow): Fairminter {
   };
 }
 
+export interface FeeSummary {
+  totalFeeSats: number;
+  counted: number;
+  mints: number;
+}
+
+interface ApiFeeSummary {
+  total_fee_sats: number;
+  counted: number;
+  mints: number;
+}
+
+/** Bitcoin-side fee total for a launch's mints — data only apps/api has
+ *  (fetched server-side from mempool.space, once per mint, ever); the live
+ *  Counterparty derivation has no equivalent to fall back to, so a failure
+ *  here just hides the stat. */
+export async function fetchLaunchFees(asset: string): Promise<FeeSummary | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/launches/${asset}/fees`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiFeeSummary | null };
+    if (!data.result) return null;
+    return {
+      totalFeeSats: data.result.total_fee_sats,
+      counted: data.result.counted,
+      mints: data.result.mints,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchIndexedLaunches(
   perPhase: number,
 ): Promise<IndexedLaunch[] | null> {

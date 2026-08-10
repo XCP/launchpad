@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
+import type { FeeSummary } from "@/lib/api/launchpad-api";
 import { approx, ratio } from "@/lib/numeric";
 import { type Fairminter, XCP69 } from "@/lib/xcp69";
 import { LaunchView } from "./launch-view";
@@ -19,6 +20,7 @@ interface RealProps {
   pool: Pool | null;
   priceHistory: PoolSnapshot[];
   xcpUsd: number | null;
+  feeSats: FeeSummary | null;
 }
 
 /**

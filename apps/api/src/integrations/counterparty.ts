@@ -63,6 +63,20 @@ export async function fetchAllFairminters(): Promise<CpFairminter[]> {
   return rows;
 }
 
+/** One fairminter by tx_hash — O(1), for the live room's poll tick. Never
+ *  used by the main indexer pass, which already has every row from the
+ *  bulk listing; this is only for the single asset someone is watching. */
+export async function fetchFairminter(txHash: string): Promise<CpFairminter | null> {
+  try {
+    const data: { result: CpFairminter | null } = await get(
+      `/fairminters/${txHash}?verbose=true`,
+    );
+    return data.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchBlockHeight(): Promise<number> {
   const data: { result: { counterparty_height: number } } = await get("/");
   return data.result.counterparty_height;

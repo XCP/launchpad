@@ -90,6 +90,27 @@ export interface MinterRow {
   mints: number;
 }
 
+export interface FeeSummary {
+  total_fee_sats: number;
+  counted: number;
+  mints: number;
+}
+
+/** Bitcoin-side cost of a launch's mints, summed once at read time. `counted`
+ *  can trail `mints` — a fee lookup can fail (see fetchTxFee) — so the
+ *  caller can tell a true zero from an incomplete sample. */
+export function sumFees(db: D1Database, launchTx: string): Promise<FeeSummary | null> {
+  return one<FeeSummary>(
+    db,
+    `SELECT CAST(COALESCE(SUM(fee_sats), 0) AS INTEGER) AS total_fee_sats,
+            COUNT(fee_sats) AS counted,
+            COUNT(*) AS mints
+     FROM launch_mints
+     WHERE launch_tx = ?1`,
+    launchTx,
+  );
+}
+
 export function listMinters(
   db: D1Database,
   launchTx: string,

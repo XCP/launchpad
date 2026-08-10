@@ -17,13 +17,17 @@ export function TokenImage({
   className?: string;
   large?: boolean;
 }) {
+  // Small icons need the same fallback the large render already has:
+  // cdn.xcp.io ingests our CIP-25 metadata on its own crawl schedule, so a
+  // just-launched asset can 404 there for a while — falling straight to the
+  // monogram when our own hosted original is right there and reliable.
   const sources = large
     ? [
         `https://cdn.xcp.io/img/full/${asset}`,
         `/i/${asset}`,
         `https://cdn.xcp.io/img/icon/${asset}`,
       ]
-    : [`https://cdn.xcp.io/img/icon/${asset}`];
+    : [`https://cdn.xcp.io/img/icon/${asset}`, `/i/${asset}`];
   const [index, setIndex] = useState(0);
 
   if (index >= sources.length) {

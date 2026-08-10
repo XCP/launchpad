@@ -123,7 +123,7 @@ export function EditPanel({ asset, issuer }: { asset: string; issuer: string }) 
             onChange={(e) => setName(e.target.value)}
             placeholder={asset}
             maxLength={127}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div>
@@ -136,7 +136,7 @@ export function EditPanel({ asset, issuer }: { asset: string; issuer: string }) 
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             maxLength={2000}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -151,7 +151,7 @@ export function EditPanel({ asset, issuer }: { asset: string; issuer: string }) 
               onChange={(e) => setX(e.target.value)}
               placeholder="https://x.com/yourtoken"
               className={`mt-1 block w-full rounded-md border bg-white p-2.5 text-sm outline-none ${
-                isValidSocial(x) ? "border-gray-300 focus:border-purple-500" : "border-red-400"
+                isValidSocial(x) ? "border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500" : "border-red-400"
               }`}
             />
           </div>
@@ -167,7 +167,7 @@ export function EditPanel({ asset, issuer }: { asset: string; issuer: string }) 
               placeholder="https://t.me/yourtoken"
               className={`mt-1 block w-full rounded-md border bg-white p-2.5 text-sm outline-none ${
                 isValidSocial(telegram)
-                  ? "border-gray-300 focus:border-purple-500"
+                  ? "border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
                   : "border-red-400"
               }`}
             />

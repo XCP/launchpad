@@ -23,11 +23,30 @@ const sha256Hex = async (bytes: ArrayBuffer) => {
     .join("");
 };
 
+/** Whether any fairminter transaction has actually confirmed on-chain for
+ *  this asset — as opposed to one that was composed but rejected by
+ *  consensus (recorded `status: "invalid: ..."`), which claims nothing. */
+async function assetHasRealFairminter(asset: string): Promise<boolean> {
+  try {
+    const res = await fetch(
+      `${COUNTERPARTY_API_BASE}/assets/${asset}/fairminters?limit=100&verbose=true`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return true; // Can't confirm it's safe — fail closed.
+    const data = (await res.json()) as { result?: { status?: string }[] };
+    return (data.result ?? []).some((fm) => !fm.status?.startsWith("invalid"));
+  } catch {
+    return true; // Same: an unknown Counterparty state must not unblock a name.
+  }
+}
+
 /**
- * Stores a launch's image + enhanced-asset-info JSON. Create-once via POST
- * (called from the create flow before composing the fairminter, so the
- * on-chain description URL resolves from the first block); edits go through
- * PUT below, gated by a BIP-322 signature from the asset's current owner.
+ * Stores a launch's image + enhanced-asset-info JSON, called from the create
+ * flow before composing the fairminter (so the on-chain description URL
+ * resolves from the first block). Freely (re)writable up until a real
+ * fairminter exists for the asset — see assetHasRealFairminter — at which
+ * point this route refuses and further edits go through PUT below instead,
+ * gated by a BIP-322 signature from the asset's current owner.
  */
 export async function POST(request: Request) {
   const form = await request.formData();
@@ -56,11 +75,21 @@ export async function POST(request: Request) {
 
   const bucket = await getMetadataBucket();
 
-  // Create-once: the launch flow owns creation; later changes must come
-  // through PUT with an owner signature.
-  if (await bucket.head(`j/${asset}`)) {
+  // The permalink is immutable — it's what the locked on-chain description
+  // points at forever — but the JSON hosted at it is just centralized
+  // storage, free to overwrite right up until a real launch exists. This
+  // route runs before the fairminter is even composed, so a failed or
+  // abandoned attempt (wrong fee, rejected signature, insufficient funds,
+  // a closed tab) must leave the name retryable — Counterparty never
+  // reserved anything, only this write did, and treating that write as
+  // permanent burns the name for nothing. Once a fairminter is real,
+  // though, this route stops being the write path: further changes go
+  // through PUT below, owner-signature gated. A composed-but-rejected
+  // attempt is recorded on-chain as `status: "invalid: ..."` (same shape
+  // core uses for fairmints); only a non-invalid row counts as real.
+  if (await assetHasRealFairminter(asset)) {
     return NextResponse.json(
-      { error: `Metadata for ${asset} already exists` },
+      { error: `${asset} has already launched` },
       { status: 409 },
     );
   }

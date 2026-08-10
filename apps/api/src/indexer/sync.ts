@@ -1,4 +1,4 @@
-import { one } from "#api/db";
+import { one, q } from "#api/db";
 import {
   fetchAllFairminters,
   fetchAnnounceFacts,
@@ -6,6 +6,7 @@ import {
   fetchFairmints,
   fetchPool,
 } from "#api/integrations/counterparty";
+import { fetchTxFee } from "#api/integrations/mempool";
 import {
   isXcp69,
   launchPhase,
@@ -16,6 +17,40 @@ import {
 
 const CONFORMANCE_VERSION = 1;
 const WORKLIST_LIMIT = 15;
+const FEE_LOOKUP_CONCURRENCY = 10;
+// SQLite's own bound-parameter ceiling (D1 doesn't raise it) — chunk any
+// IN (...) built from a candidate list so this stays safe regardless of how
+// many launches xcp.fun ends up tracking.
+const SQL_VAR_LIMIT = 100;
+
+interface StoredLaunch {
+  tx_hash: string;
+  earned_quantity: string | null;
+  mints: number;
+  minters: number;
+}
+
+/** One batched read instead of one SELECT per candidate inside the main
+ *  loop — at "hundreds of launches" scale, a per-row round trip serialized
+ *  inside a for-loop is hundreds of sequential D1 reads every 2 minutes for
+ *  no reason this data couldn't answer in one (chunked) query. */
+async function fetchStoredByTxHash(
+  db: D1Database,
+  txHashes: string[],
+): Promise<Map<string, StoredLaunch>> {
+  const out = new Map<string, StoredLaunch>();
+  for (let i = 0; i < txHashes.length; i += SQL_VAR_LIMIT) {
+    const chunk = txHashes.slice(i, i + SQL_VAR_LIMIT);
+    const placeholders = chunk.map((_, idx) => `?${idx + 1}`).join(",");
+    const rows = await q<StoredLaunch>(
+      db,
+      `SELECT tx_hash, earned_quantity, mints, minters FROM launches WHERE tx_hash IN (${placeholders})`,
+      ...chunk,
+    );
+    for (const row of rows) out.set(row.tx_hash, row);
+  }
+  return out;
+}
 
 const truthy = (raw: unknown) => raw !== null && raw !== undefined && raw !== 0 && raw !== "0";
 
@@ -24,7 +59,10 @@ export interface SyncResult {
   written: number;
   resolved: number;
   mints_ingested: number;
+  fees_backfilled: number;
 }
+
+const FEE_BACKFILL_LIMIT = 15;
 
 /**
  * One poll: list every fairminter, keep only the ones whose fixed parameters
@@ -36,6 +74,10 @@ export interface SyncResult {
 export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   const [all, height] = await Promise.all([fetchAllFairminters(), fetchBlockHeight()]);
   const candidates = all.filter((fm) => fm.asset && xcp69Params(fm));
+  const storedByTxHash = await fetchStoredByTxHash(
+    db,
+    candidates.filter((fm) => fm.status === "open" || fm.status === "closed").map((fm) => fm.tx_hash),
+  );
 
   let written = 0;
   let mintsIngested = 0;
@@ -72,15 +114,9 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     // hand from the /fairminters listing — free, no extra request. Reading
     // it back before deciding means an unchanged launch skips the fairmints
     // re-fetch and re-batch entirely, instead of re-paginating and
-    // re-diffing its whole mint history every tick forever.
-    const stored =
-      fm.status === "open" || fm.status === "closed"
-        ? await one<{ earned_quantity: string | null; mints: number; minters: number }>(
-            db,
-            `SELECT earned_quantity, mints, minters FROM launches WHERE tx_hash = ?1`,
-            fm.tx_hash,
-          )
-        : null;
+    // re-diffing its whole mint history every tick forever. Pre-fetched
+    // above in one batched query, not one SELECT per candidate here.
+    const stored = storedByTxHash.get(fm.tx_hash) ?? null;
     const earnedChanged =
       String(fm.earned_quantity ?? "") !== String(stored?.earned_quantity ?? "");
 
@@ -91,12 +127,34 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
       mints = fairmints.length;
       minters = new Set(fairmints.map((m) => m.source)).size;
       if (fairmints.length > 0) {
+        // Counterparty's own list has no "since" filter, so the read above is
+        // always the full history — that's a subrequest cost, not a D1 one.
+        // The write is the one that must not repeat: without this guard,
+        // every tick a launch mints would INSERT OR IGNORE its ENTIRE mint
+        // history again, and D1 bills per row a statement TOUCHES (a
+        // conflicting row still counts) — a launch with M mints so far would
+        // cost an M-row write on every single tick it's still active, the
+        // same "unconditional write over a full listing" shape that ran up
+        // the prior project's bill. Only mints at or after the highest
+        // block already on file are even candidates for insertion; the ones
+        // already known are filtered out client-side before they ever reach
+        // D1, not just de-duplicated by it. (`>=`, not `>`: multiple mints
+        // can land in the boundary block, and OR IGNORE is what makes
+        // re-checking that one block free.)
+        const highWater = await one<{ max_block: number | null }>(
+          db,
+          `SELECT MAX(block_index) AS max_block FROM launch_mints WHERE launch_tx = ?1`,
+          fm.tx_hash,
+        );
+        const sinceBlock = highWater?.max_block ?? -1;
+        const candidates = fairmints.filter((m) => m.block_index >= sinceBlock);
+
         const stmt = db.prepare(
           `INSERT OR IGNORE INTO launch_mints
              (tx_hash, launch_tx, block_index, source, earn_quantity, paid_quantity)
            VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
         );
-        const batch = fairmints.map((m) =>
+        const batch = candidates.map((m) =>
           stmt.bind(
             m.tx_hash,
             fm.tx_hash,
@@ -106,8 +164,35 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
             String(m.paid_quantity),
           ),
         );
-        const results = await db.batch(batch);
-        mintsIngested += results.filter((r) => (r.meta.rows_written ?? 0) > 0).length;
+        const results = candidates.length > 0 ? await db.batch(batch) : [];
+        // Only rows this statement actually inserted — a mint already on
+        // file is never asked about again, so the fee lookup below runs
+        // exactly once per mint for the lifetime of the launch.
+        const newlyInserted = candidates.filter(
+          (_, idx) => (results[idx]!.meta.rows_written ?? 0) > 0,
+        );
+        mintsIngested += newlyInserted.length;
+        // Concurrent, not sequential: a burst of new mints in one tick used
+        // to pay for every fee lookup back-to-back (up to a 10s timeout
+        // each), which could run the whole job past the lock's 110s lease
+        // and let the next cron tick start concurrently. Capped batches keep
+        // worst case bounded regardless of burst size.
+        for (let i = 0; i < newlyInserted.length; i += FEE_LOOKUP_CONCURRENCY) {
+          const slice = newlyInserted.slice(i, i + FEE_LOOKUP_CONCURRENCY);
+          await Promise.all(
+            slice.map(async (m) => {
+              const fee = await fetchTxFee(m.tx_hash);
+              if (fee) {
+                await db
+                  .prepare(
+                    `UPDATE launch_mints SET fee_sats = ?1, weight_wu = ?2 WHERE tx_hash = ?3`,
+                  )
+                  .bind(fee.feeSats, fee.weightWu, m.tx_hash)
+                  .run();
+              }
+            }),
+          );
+        }
       }
     }
 
@@ -142,7 +227,17 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
            pool_xcp_sats = excluded.pool_xcp_sats,
            seen_at_block = excluded.seen_at_block,
            updated_at = excluded.updated_at,
-           conforming = CASE WHEN ?23 IS NOT NULL THEN ?23 ELSE launches.conforming END
+           -- A stale conformance_version means the standard's own predicate
+           -- changed since this row was last judged: its old verdict is
+           -- reopened to NULL so it re-enters resolveUndecided's worklist
+           -- and gets judged fresh, rather than grandfathering a verdict the
+           -- current predicate never actually produced.
+           conforming = CASE
+             WHEN ?23 IS NOT NULL THEN ?23
+             WHEN launches.conformance_version < ${CONFORMANCE_VERSION} THEN NULL
+             ELSE launches.conforming
+           END,
+           conformance_version = ${CONFORMANCE_VERSION}
          WHERE launches.status IS NOT excluded.status
             OR launches.phase IS NOT excluded.phase
             OR launches.earned_quantity IS NOT excluded.earned_quantity
@@ -151,8 +246,10 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
             OR launches.mints IS NOT excluded.mints
             OR launches.minters IS NOT excluded.minters
             OR launches.pool_xcp_reserve IS NOT excluded.pool_xcp_reserve
+            OR launches.pool_token_reserve IS NOT excluded.pool_token_reserve
             OR launches.pool_xcp_sats IS NOT excluded.pool_xcp_sats
-            OR (?23 IS NOT NULL AND launches.conforming IS NULL)`,
+            OR (?23 IS NOT NULL AND launches.conforming IS NULL)
+            OR launches.conformance_version < ${CONFORMANCE_VERSION}`,
       )
       .bind(
         fm.tx_hash,
@@ -199,13 +296,48 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   }
 
   const resolved = await resolveUndecided(db);
+  const feesBackfilled = await backfillMissingFees(db);
 
   return {
     candidates: candidates.length,
     written,
     resolved,
     mints_ingested: mintsIngested,
+    fees_backfilled: feesBackfilled,
   };
+}
+
+/** A mint's fee lookup normally happens exactly once, the tick it's first
+ *  inserted (see above) — but a single transient mempool.space failure used
+ *  to leave it NULL forever, which the site had to caveat in its own UI
+ *  ("6 of 8 known") rather than just show a real number. Retrying a small,
+ *  bounded batch every tick means a miss self-heals within a few minutes
+ *  instead of needing a one-off manual backfill ever again. */
+async function backfillMissingFees(db: D1Database): Promise<number> {
+  const missing = await q<{ tx_hash: string }>(
+    db,
+    `SELECT tx_hash FROM launch_mints WHERE fee_sats IS NULL LIMIT ?1`,
+    FEE_BACKFILL_LIMIT,
+  );
+  if (missing.length === 0) return 0;
+
+  let backfilled = 0;
+  for (let i = 0; i < missing.length; i += FEE_LOOKUP_CONCURRENCY) {
+    const slice = missing.slice(i, i + FEE_LOOKUP_CONCURRENCY);
+    const results = await Promise.all(
+      slice.map(async (row) => {
+        const fee = await fetchTxFee(row.tx_hash);
+        if (!fee) return false;
+        await db
+          .prepare(`UPDATE launch_mints SET fee_sats = ?1, weight_wu = ?2 WHERE tx_hash = ?3`)
+          .bind(fee.feeSats, fee.weightWu, row.tx_hash)
+          .run();
+        return true;
+      }),
+    );
+    backfilled += results.filter(Boolean).length;
+  }
+  return backfilled;
 }
 
 /** Rows whose parameters match but whose timing verdict is still unknown —

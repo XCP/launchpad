@@ -11,15 +11,51 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Custom domain (same mechanism as img-cdn's cdn.xcp.io route): Cloudflare
+# provisions and manages the DNS record itself on deploy, nothing manual.
+# workers_dev stays on: apps/web still calls launchpad-api.me-bbe.workers.dev
+# directly (HTTP fetches and the LaunchRoom/SitePresence WebSockets) — adding
+# a custom route silently disables the workers.dev URL unless told not to,
+# which would have broken every one of those calls in production.
+workers_dev = true
+routes = [
+  { pattern = "api.xcp.fun", custom_domain = true },
+]
+
 [observability]
 enabled = true
 
-# Blocks land every ~10 minutes; there is nothing to learn by polling faster.
+# Blocks land every ~10 minutes, and Counterparty's /fairminters list has no
+# server-side filter beyond status — every tick re-lists the chain's ENTIRE
+# fairminter universe (not just xcp.fun's own tracked set), so this job's
+# cost scales with total chain activity regardless of how small xcp.fun
+# stays. That cost is fixed per call; the only lever here is how often it's
+# called. This index only needs to be "roughly current" — anything a viewer
+# is actually watching second-to-second (an active mint's progress, the
+# mempool) is LaunchRoom's job now, polled per-launch on its own much
+# tighter, much cheaper cycle. 5 minutes is still well inside "notice a new
+# launch soon after it's created," at less than half the call volume.
 [triggers]
-crons = ["*/2 * * * *"]
+crons = ["*/5 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
 database_name = "launchpad-db"
 database_id = "b93ee0d6-a291-4d80-9fac-1dd4dc0c3cbe"
 migrations_dir = "migrations"
+
+# One room per launch, hibernating WebSockets: a viewer just sitting on the
+# page costs nothing between messages, and N viewers of the same launch share
+# one poll loop instead of each hitting Counterparty independently.
+[[durable_objects.bindings]]
+name = "LAUNCH_ROOM"
+class_name = "LaunchRoom"
+
+# One fixed instance, site-wide — see SitePresence's own doc comment.
+[[durable_objects.bindings]]
+name = "SITE_PRESENCE"
+class_name = "SitePresence"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["LaunchRoom", "SitePresence"]

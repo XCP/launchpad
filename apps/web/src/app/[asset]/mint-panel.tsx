@@ -9,14 +9,15 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
+import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { commas, commasRaw, usd as usdFmt } from "@/lib/format";
-import { approx } from "@/lib/numeric";
+import { approx, big } from "@/lib/numeric";
 import { registerPending } from "@/lib/pending";
 import { isBusy } from "@/lib/use-busy";
 import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { XCP69 } from "@/lib/xcp69";
+import { saleTarget, xcp69Params, XCP69 } from "@/lib/xcp69";
 
 const SATS = 1e8;
 const MINT_VBYTES = 250;
@@ -40,8 +41,29 @@ export function MintPanel({
   const compose = useCompose();
   const [tokens, setTokens] = useState("10000");
 
+  // How many lots are actually left to mint — core rejects a fairmint whose
+  // quantity would push the asset past hard_cap outright (no partial fill
+  // for priced fairminters), so a stale or missing read just means no extra
+  // clamp is applied rather than a false one.
+  const { data: remainingLots } = useSWR(
+    ["mint-remaining", asset],
+    async () => {
+      const fairminters = await fetchFairmintersByAsset(asset);
+      const fm = fairminters.find((f) => xcp69Params(f));
+      if (!fm) return null;
+      const remaining = big(saleTarget(fm)) - big(fm.earned_quantity ?? 0);
+      const remainingRaw = remaining > 0n ? remaining : 0n;
+      return Math.floor(approx(remainingRaw) / XCP69.QUANTITY_BY_PRICE);
+    },
+    { refreshInterval: 20_000, revalidateOnFocus: false },
+  );
+  const maxLots =
+    remainingLots !== undefined && remainingLots !== null
+      ? Math.min(MAX_LOTS, remainingLots)
+      : MAX_LOTS;
+
   const typedTokens = parseFloat(tokens) || 0;
-  const lots = Math.max(0, Math.min(MAX_LOTS, Math.floor(typedTokens / TOKENS_PER_LOT)));
+  const lots = Math.max(0, Math.min(maxLots, Math.floor(typedTokens / TOKENS_PER_LOT)));
   const mintTokens = lots * TOKENS_PER_LOT;
   const adjusted = typedTokens > 0 && mintTokens !== typedTokens;
   const costXcp = lots * XCP_PER_LOT;
@@ -98,7 +120,7 @@ export function MintPanel({
       {/* You receive — tokens, in whole lots */}
       <Well
         focusable
-        label="You receive"
+        label="You mint"
         topRight={
           <span className="flex items-center gap-1">
             {PRESETS.map((p) => (
@@ -156,7 +178,7 @@ export function MintPanel({
       <div className="mt-1">
         <Well
           label="You pay"
-          topRight={<span>escrowed until the launch resolves</span>}
+          topRight={<span>escrowed until the launch</span>}
           chip={<AssetChip asset="XCP" />}
           footer={
             <>
@@ -171,7 +193,7 @@ export function MintPanel({
                     setTokens(
                       String(
                         Math.min(
-                          MAX_LOTS,
+                          maxLots,
                           Math.floor(approx(xcpBalance) / XCP69.PRICE),
                         ) * TOKENS_PER_LOT,
                       ),
@@ -204,7 +226,7 @@ export function MintPanel({
           <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
             <div className="flex justify-between">
               <dt title="Escrowed by the protocol, not sent to the creator">
-                If it misses the target
+                If it fails to launch
               </dt>
               <dd className="font-medium text-gray-700">
                 full XCP refund, automatic
@@ -222,7 +244,7 @@ export function MintPanel({
                 <dd>
                   {medianFeeRate} sat/vB
                   {btcUsd !== undefined && (
-                    <span className="text-gray-400">
+                    <span className="text-gray-500">
                       {" "}
                       (~{usdFmt(((medianFeeRate * MINT_VBYTES) / SATS) * btcUsd)})
                     </span>
@@ -254,7 +276,7 @@ export function MintPanel({
           </CTA>
         )}
         {insufficient && (
-          <p className="mt-2 text-center text-[11px] text-gray-400">
+          <p className="mt-2 text-center text-[11px] text-gray-500">
             Need XCP?{" "}
             <Link href="/dispense" className="text-purple-600 underline">
               Buy some with BTC

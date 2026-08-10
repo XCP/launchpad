@@ -136,7 +136,7 @@ export function PriceChart({
         {yTicks.map((t) => (
           <g key={t.v}>
             <line x1={PAD.left} x2={W - PAD.right} y1={t.y} y2={t.y} stroke="#f3f4f6" strokeWidth={1} />
-            <text x={W - PAD.right + 6} y={t.y + 3} fontSize={10} fill="#9ca3af">
+            <text x={W - PAD.right + 6} y={t.y + 3} fontSize={10} fill="#6b7280">
               {formatPrice(t.v)}
             </text>
           </g>
@@ -151,7 +151,7 @@ export function PriceChart({
           strokeWidth={1}
           strokeDasharray="4 3"
         />
-        <text x={PAD.left + 2} y={mintY - 4} fontSize={10} fill="#9ca3af">
+        <text x={PAD.left + 2} y={mintY - 4} fontSize={10} fill="#6b7280">
           mint price
         </text>
         <path d={area} fill="#9333ea" opacity={0.08} />
@@ -171,10 +171,10 @@ export function PriceChart({
           </>
         )}
         {/* x extent labels: first and last block */}
-        <text x={PAD.left} y={H - 6} fontSize={10} fill="#9ca3af">
+        <text x={PAD.left} y={H - 6} fontSize={10} fill="#6b7280">
           block {points[0].block.toLocaleString()}
         </text>
-        <text x={W - PAD.right} y={H - 6} fontSize={10} fill="#9ca3af" textAnchor="end">
+        <text x={W - PAD.right} y={H - 6} fontSize={10} fill="#6b7280" textAnchor="end">
           {last.block >= blockHeight - 1 ? "now" : `block ${last.block.toLocaleString()}`}
         </text>
       </svg>

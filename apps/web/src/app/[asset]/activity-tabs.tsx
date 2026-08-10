@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import type { Fairmint } from "@/lib/api/counterparty";
 import {
+  commas,
   commasRaw,
   compact,
   price as formatPrice,
@@ -16,8 +17,10 @@ import { isBusy } from "@/lib/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchJson } from "@/lib/client";
+import { useLaunchRoom } from "@/lib/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { Identicon } from "./launch-view";
+import { useAddressFreshness } from "./scheduled-extras";
 
 const PER_PAGE = 25;
 
@@ -35,6 +38,12 @@ interface TradeRow {
   addr: string;
   via: "pool" | "book";
   txHash: string;
+}
+
+interface PendingMint {
+  txHash: string;
+  source: string;
+  quantity: Raw;
 }
 
 interface OpenOrder {
@@ -59,6 +68,7 @@ export function ActivityTabs({
   divisible,
   minting = false,
   issuerSource,
+  blockHeight,
 }: {
   asset: string;
   mints: Fairmint[];
@@ -67,11 +77,13 @@ export function ActivityTabs({
   minting?: boolean;
   /** Flags the launch creator's own row in the minters list. */
   issuerSource?: string;
+  /** Needed only for the Minters tab, to judge address freshness. */
+  blockHeight?: number;
 }) {
   const { address } = useWallet();
   const compose = useCompose();
   const [tab, setTab] = useState<
-    "mints" | "minters" | "trades" | "holders" | "orders"
+    "mints" | "minters" | "mempool" | "trades" | "holders" | "orders"
   >(minting ? "minters" : "mints");
   const [pageParam, setPage] = useState(1);
   const setParams = (t: typeof tab, p: number) => {
@@ -175,6 +187,21 @@ export function ActivityTabs({
   );
   const busy = isBusy(compose.status);
 
+  // Pending mints for this launch, from the page's shared room — the same
+  // Durable Object LiveProgress's bar overlay reads, one poll loop server-side
+  // per launch rather than a separate per-visitor mempool scan for every open
+  // tab. No third-party fee lookups: those would mean one browser-side
+  // request per pending mint to an external service, for every visitor who
+  // opens this tab. That belongs server-side, which is exactly where the
+  // room's own poll now lives.
+  const { state: roomState } = useLaunchRoom();
+  const pending: PendingMint[] = (roomState?.pending ?? []).map((p) => ({
+    txHash: p.tx_hash,
+    source: p.source,
+    quantity: p.quantity,
+  }));
+  const pendingTotal = sumRaw(pending.map((p) => p.quantity));
+
   // One row per address: what they hold of this sale, what they paid, and
   // how many times they came back. Exact sums — a whale near the per-address
   // cap is the number this table exists to show.
@@ -204,12 +231,17 @@ export function ActivityTabs({
       }))
       .sort((a, b) => compareRawDesc(a.earned, b.earned));
   })();
+  const mintersTotal = sumRaw(minters.map((r) => r.earned));
+  const freshness = useAddressFreshness(
+    minting ? minters.map((r) => r.source) : [],
+    blockHeight ?? 0,
+  );
 
   // During the sale there is no market and no separate holder set — the
-  // minters ARE the holders — so one tab answers the only live question:
-  // who is in, and for how much.
+  // minters ARE the holders — so "who is in" and "what's still queued"
+  // are the only two live questions.
   const tabs: (typeof tab)[] = minting
-    ? ["minters"]
+    ? ["minters", "mempool"]
     : address
       ? ["mints", "trades", "holders", "orders"]
       : ["mints", "trades", "holders"];
@@ -218,22 +250,26 @@ export function ActivityTabs({
       ? `Mints (${mints.length})`
       : t === "minters"
         ? `Minters (${minters.length})`
-        : t === "trades"
-        ? `Trades${trades ? ` (${trades.length})` : ""}`
-        : t === "holders"
-          ? `Holders${holders ? ` (${holders.length})` : ""}`
-          : `Orders${orders ? ` (${orders.length})` : ""}`;
+        : t === "mempool"
+          ? `Mempool${roomState ? ` (${pending.length})` : ""}`
+          : t === "trades"
+            ? `Trades${trades ? ` (${trades.length})` : ""}`
+            : t === "holders"
+              ? `Holders${holders ? ` (${holders.length})` : ""}`
+              : `Orders${orders ? ` (${orders.length})` : ""}`;
 
   const count =
     tab === "minters"
       ? minters.length
-      : tab === "mints"
-        ? mints.length
-      : tab === "trades"
-        ? (trades?.length ?? 0)
-        : tab === "holders"
-          ? (holders?.length ?? 0)
-          : (orders?.length ?? 0);
+      : tab === "mempool"
+        ? pending.length
+        : tab === "mints"
+          ? mints.length
+          : tab === "trades"
+            ? (trades?.length ?? 0)
+            : tab === "holders"
+              ? (holders?.length ?? 0)
+              : (orders?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
   const page = Math.min(pageParam, totalPages);
   const from = (page - 1) * PER_PAGE;
@@ -244,7 +280,7 @@ export function ActivityTabs({
         type="button"
         disabled={page <= 1}
         onClick={() => setParams(tab, page - 1)}
-        className="rounded-md border border-gray-200 px-3 py-1.5 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-md border border-gray-200 px-3 py-2 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         ← Prev
       </button>
@@ -255,7 +291,7 @@ export function ActivityTabs({
         type="button"
         disabled={page >= totalPages}
         onClick={() => setParams(tab, page + 1)}
-        className="rounded-md border border-gray-200 px-3 py-1.5 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-md border border-gray-200 px-3 py-2 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Next →
       </button>
@@ -279,7 +315,7 @@ export function ActivityTabs({
           </div>
         </Tabs>
       ) : (
-        <div className="border-b border-gray-100 px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-gray-400">
+        <div className="border-b border-gray-100 px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-gray-500">
           {tabLabel(tabs[0]!)}
         </div>
       )}
@@ -291,40 +327,123 @@ export function ActivityTabs({
           </p>
         ) : (
           <>
+            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_9rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              <span />
+              <span className="text-right">Mints</span>
+              <span className="text-right">Amount</span>
+              <span className="text-right">Paid</span>
+            </div>
             <ul className="divide-y divide-gray-100">
-              {minters.slice(from, from + PER_PAGE).map((r, i) => (
-                <li
-                  key={r.source}
-                  className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
-                >
-                  <a
-                    href={`https://xcp.io/address/${r.source}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
+              {minters.slice(from, from + PER_PAGE).map((r, i) => {
+                const pct = ratio(r.earned, mintersTotal) * 100;
+                return (
+                  <li
+                    key={r.source}
+                    className="relative grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_9rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
                   >
-                    <span className="w-5 shrink-0 text-right text-xs text-gray-400 tabular-nums">
-                      {from + i + 1}
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 bg-purple-50/70"
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                    <span className="relative z-10 flex min-w-0 items-center gap-2">
+                      <a
+                        href={`https://xcp.io/address/${r.source}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
+                      >
+                        <span className="w-8 shrink-0 text-right text-xs text-gray-400 tabular-nums">
+                          {from + i + 1}
+                        </span>
+                        <Identicon address={r.source} />
+                        <span className="truncate">{shortAddress(r.source)}</span>
+                      </a>
+                      {/* Outside the link: an ancestor's underline paints
+                          through descendant text regardless of the
+                          descendant's own text-decoration, so the only way
+                          to keep the chip clean is to not be inside the <a>. */}
+                      {issuerSource === r.source && (
+                        <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                          dev
+                        </span>
+                      )}
+                      {freshness?.newAddresses.has(r.source) && (
+                        <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
+                          new
+                        </span>
+                      )}
                     </span>
-                    <Identicon address={r.source} />
-                    <span className="truncate">{shortAddress(r.source)}</span>
-                    {issuerSource === r.source && (
-                      <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
-                        dev
+                    <span className="relative z-10 text-right tabular-nums text-gray-500">
+                      {r.mints} TX{r.mints === 1 ? "" : "s"}
+                    </span>
+                    <span className="relative z-10 text-right tabular-nums text-gray-900">
+                      {commas(tokenQty(r.earned, divisible))}
+                    </span>
+                    <span className="relative z-10 text-right tabular-nums text-gray-500">
+                      {commasRaw(r.paid)} XCP
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+            {pager}
+          </>
+        ))}
+
+      {tab === "mempool" &&
+        (!roomState ? (
+          <p className="p-6 text-center text-sm text-gray-400">
+            Loading mempool…
+          </p>
+        ) : pending.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-500">
+            Nothing queued — every mint so far has confirmed.
+          </p>
+        ) : (
+          <>
+            <p className="border-b border-gray-100 bg-amber-50/50 px-4 py-2 text-xs text-amber-800">
+              Unconfirmed and provisional — mempool mints can exceed what&apos;s
+              left, get replaced, or never confirm. Only what lands on-chain
+              counts.
+            </p>
+            <ul className="divide-y divide-gray-100">
+              {pending.slice(from, from + PER_PAGE).map((p, i) => {
+                const pct = ratio(p.quantity, pendingTotal) * 100;
+                return (
+                  <li
+                    key={p.txHash}
+                    className="relative flex items-center justify-between overflow-hidden px-4 py-2 text-sm"
+                  >
+                    <span
+                      aria-hidden
+                      className="absolute inset-y-0 left-0 bg-amber-50"
+                      style={{ width: `${Math.min(100, pct)}%` }}
+                    />
+                    <a
+                      href={`https://xcp.io/address/${p.source}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="relative z-10 flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
+                    >
+                      <span className="w-8 shrink-0 text-right text-xs text-gray-400 tabular-nums">
+                        {from + i + 1}
                       </span>
-                    )}
-                  </a>
-                  <span className="shrink-0 text-right text-gray-900">
-                    {compact(tokenQty(r.earned, divisible))}{" "}
-                    <span className="text-gray-400">
-                      ({commasRaw(r.paid)} XCP)
-                    </span>
-                    <span className="ml-2 text-xs text-gray-400">
-                      {r.mints} mint{r.mints === 1 ? "" : "s"}
-                    </span>
-                  </span>
-                </li>
-              ))}
+                      <Identicon address={p.source} />
+                      <span className="truncate">{shortAddress(p.source)}</span>
+                    </a>
+                    <a
+                      href={`https://xcp.io/tx/${p.txHash}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="relative z-10 shrink-0 text-right text-gray-900 hover:text-purple-700 hover:underline"
+                    >
+                      {compact(tokenQty(p.quantity, divisible))}{" "}
+                      <span className="text-gray-400">pending</span>
+                    </a>
+                  </li>
+                );
+              })}
             </ul>
             {pager}
           </>
@@ -530,7 +649,7 @@ export function ActivityTabs({
                       onClick={() =>
                         compose.composeCancel({ offer_hash: o.tx_hash })
                       }
-                      className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                      className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
                     >
                       {busy ? "…" : "Cancel"}
                     </button>
