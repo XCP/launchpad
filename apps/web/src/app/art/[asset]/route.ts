@@ -1,4 +1,4 @@
-import { METADATA_ORIGIN } from "@/lib/metadata";
+import { getMetadataBucket } from "@/lib/metadata";
 import { CDN_BASE } from "@/utils/constants";
 
 /**
@@ -8,6 +8,10 @@ import { CDN_BASE } from "@/utils/constants";
  * it hasn't crawled — not a 404 — and that header isn't in the CORS-exposed
  * safelist, so a browser can never read it on a cross-origin fetch to
  * cdn.xcp.io. Checked here, server-side, where CORS doesn't apply.
+ *
+ * The fallback reads R2 directly (like /i/[asset]/route.ts) rather than
+ * self-fetching /i/<ASSET> over HTTP — a Worker fetching its own zone comes
+ * back non-OK here even though the same URL is fine from the outside.
  */
 export async function GET(
   _request: Request,
@@ -31,11 +35,12 @@ export async function GET(
     // cdn.xcp.io unreachable — fall through to our own hosted original
   }
 
-  const res = await fetch(`${METADATA_ORIGIN}/i/${asset}`);
-  if (!res.ok) return new Response("Not found", { status: 404 });
-  return new Response(res.body, {
+  const bucket = await getMetadataBucket();
+  const object = await bucket.get(`i/${asset}`);
+  if (!object) return new Response("Not found", { status: 404 });
+  return new Response(object.body, {
     headers: {
-      "content-type": res.headers.get("content-type") ?? "image/png",
+      "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
       "cache-control": "public, max-age=3600",
       "access-control-allow-origin": "*",
     },
