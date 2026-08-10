@@ -7,9 +7,12 @@ import {
   fetchOriginalRecord,
   fetchPool,
   fetchPoolPriceHistory,
+  fetchPoolVolume24h,
+  type PoolVolume,
 } from "@/lib/api/counterparty";
 import { fetchLaunchFees } from "@/lib/api/launchpad-api";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
+import { fetchHolderCount } from "@/lib/api/xcpio";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import {
   isXcp69,
@@ -105,8 +108,15 @@ export default async function LaunchPage({
     isXcp69(fm, original.announceBlock) &&
     (fm.status !== "closed" || windowIsExact(fm, original.deadline));
   const phase = launchPhase(fm, pool !== null);
-  const priceHistory =
-    phase === "graduated" ? await fetchPoolPriceHistory(asset) : [];
+  const emptyVolume: PoolVolume = { volumeXcpRaw: "0", trades: 0 };
+  const [priceHistory, holderCount, poolVolume] =
+    phase === "graduated"
+      ? await Promise.all([
+          fetchPoolPriceHistory(asset),
+          fetchHolderCount(asset),
+          pool ? fetchPoolVolume24h(asset) : Promise.resolve(emptyVolume),
+        ])
+      : [[], null, emptyVolume];
 
   return (
     <PhasePreview
@@ -121,6 +131,8 @@ export default async function LaunchPage({
       xcpUsd={xcpUsd}
       btcUsd={btcUsd}
       feeSats={feeSats}
+      holderCount={holderCount}
+      poolVolume={poolVolume}
     />
   );
 }

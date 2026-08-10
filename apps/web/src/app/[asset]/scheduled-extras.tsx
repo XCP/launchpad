@@ -387,7 +387,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
       ];
 
   return (
-    <div className="mt-5 border-t border-gray-100 py-4">
+    <div className="mt-5 border-t border-gray-100 pb-4 pt-2">
       {/* Four columns only once the card is wide enough for them: at the sm
           breakpoint the card is still 640px and the last value wraps. */}
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">

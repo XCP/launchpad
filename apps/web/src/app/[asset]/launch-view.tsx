@@ -22,7 +22,7 @@ import {
   TxFeesStat,
 } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
-import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
+import type { Fairmint, Pool, PoolSnapshot, PoolVolume } from "@/lib/api/counterparty";
 import type { FeeSummary } from "@/lib/api/launchpad-api";
 import { LaunchRoomProvider } from "@/lib/launch-room";
 import {
@@ -74,6 +74,8 @@ export function LaunchView({
   xcpUsd,
   btcUsd,
   feeSats,
+  holderCount,
+  poolVolume,
 }: {
   asset: string;
   fm: Fairminter;
@@ -86,6 +88,8 @@ export function LaunchView({
   xcpUsd: number | null;
   btcUsd: number | null;
   feeSats: FeeSummary | null;
+  holderCount: number | null;
+  poolVolume: PoolVolume;
 }) {
   const progress = saleProgress(fm);
   // An inscribed launch's description IS the image (hex-encoded on the
@@ -169,7 +173,7 @@ export function LaunchView({
           "XCP side of the locked pool",
         ],
         ["Supply", compact(supplyTokens)],
-        ["Participants", String(participants)],
+        ["Holders", String(holderCount ?? participants)],
         [
           "LP",
           isHouseLpName(pool.lp_asset) ? "burned ✓" : "burned",
@@ -180,7 +184,7 @@ export function LaunchView({
       // pool to show a spot price for.
       [
         ["Reached", `${(progress * 100).toFixed(1)}%`],
-        ["Participants", String(participants)],
+        ["Holders", String(holderCount ?? participants)],
         ["Raised", `${commasRaw(fm.paid_quantity)} XCP`],
         ["Supply", compact(supplyTokens)],
       ];
@@ -299,7 +303,7 @@ export function LaunchView({
               about the launch" anymore, just the countdown or the form. */}
           {!minting && standardTerms && <TermsStrip xcpUsd={xcpUsd} />}
           {minting && mints.length > 0 && (
-            <div className="mt-5 border-t border-gray-100 pb-2 pt-4">
+            <div className="mt-5 border-t border-gray-100 pb-2 pt-2">
               <LiveProgress
                 initialEarned={fm.earned_quantity ?? 0}
                 target={saleTarget(fm)}
@@ -567,17 +571,29 @@ export function LaunchView({
               <IssuerLine source={fm.source} />
               <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
             </div>
-            <IssuerChips
-              source={fm.source}
-              currentAsset={asset}
-              trailing={
-                isOurMetadata(fm.description) ? (
-                  <HostedSocials url={fm.description} asset={asset} />
-                ) : isInscribed ? (
-                  <InscriptionChip txHash={fm.tx_hash} />
-                ) : null
-              }
-            />
+            {/* Issuer-history chips ("first launch", "3rd launch") answer
+                "should I trust this creator" — the question before minting.
+                Once an asset has graduated it has its own track record;
+                "first launch" here reads as "first launch on the site",
+                not "this issuer's first launch". Facts about the ASSET
+                replace them; the issuer stays named in the line above. */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {pool && (
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums">
+                  graduated <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
+                </span>
+              )}
+              {holderCount !== null && (
+                <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums">
+                  {commas(holderCount)} holder{holderCount === 1 ? "" : "s"}
+                </span>
+              )}
+              {isOurMetadata(fm.description) ? (
+                <HostedSocials url={fm.description} asset={asset} />
+              ) : isInscribed ? (
+                <InscriptionChip txHash={fm.tx_hash} />
+              ) : null}
+            </div>
           </div>
         </div>
 
@@ -611,30 +627,53 @@ export function LaunchView({
       </div>
 
       {/* Stat strip — its own card, same grammar as minting's and
-          refunded's. */}
-      <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
-        {strip.map(([label, value, hint]) => {
-          const cell = (
-            <div
-              className={hint ? "cursor-help" : undefined}
-              tabIndex={hint ? 0 : undefined}
-            >
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                {label}
-              </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                {value}
-              </div>
+          refunded's. Volume leads as a second big fact (trading activity,
+          not another launch-time fact like the six below it); everything
+          else stays small. */}
+      <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-5">
+        {pool && (
+          <div className="pb-4 text-center">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              24h volume
             </div>
-          );
-          return hint ? (
-            <Hint key={label} content={hint}>
-              {cell}
-            </Hint>
-          ) : (
-            <div key={label}>{cell}</div>
-          );
-        })}
+            <div className="mt-1 text-2xl font-bold tabular-nums text-gray-900">
+              {commas(fromSats(poolVolume.volumeXcpRaw))}{" "}
+              <span className="text-base font-semibold text-gray-400">XCP</span>
+            </div>
+            <div className="mt-0.5 text-xs text-gray-500">
+              {xcpUsd ? `${usd(fromSats(poolVolume.volumeXcpRaw) * xcpUsd)} · ` : ""}
+              {poolVolume.trades} trade{poolVolume.trades === 1 ? "" : "s"}
+            </div>
+          </div>
+        )}
+        <div
+          className={`grid grid-cols-2 gap-3 sm:grid-cols-4 ${
+            pool ? "border-t border-gray-100 pt-4" : ""
+          }`}
+        >
+          {strip.map(([label, value, hint]) => {
+            const cell = (
+              <div
+                className={hint ? "cursor-help" : undefined}
+                tabIndex={hint ? 0 : undefined}
+              >
+                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                  {label}
+                </div>
+                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                  {value}
+                </div>
+              </div>
+            );
+            return hint ? (
+              <Hint key={label} content={hint}>
+                {cell}
+              </Hint>
+            ) : (
+              <div key={label}>{cell}</div>
+            );
+          })}
+        </div>
       </div>
 
       <div
@@ -699,7 +738,12 @@ export function LaunchView({
       <EditPanel asset={asset} issuer={fm.source} />
 
       {/* Activity: the mint tape and live holders */}
-      <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
+      <ActivityTabs
+        asset={asset}
+        mints={mints}
+        divisible={fm.divisible}
+        issuerSource={fm.source}
+      />
       </div>
       </div>
     </div>

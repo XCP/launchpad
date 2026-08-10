@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
+import type { Fairmint, Pool, PoolSnapshot, PoolVolume } from "@/lib/api/counterparty";
 import type { FeeSummary } from "@/lib/api/launchpad-api";
 import { approx, ratio } from "@/lib/numeric";
 import { type Fairminter, XCP69 } from "@/lib/xcp69";
@@ -22,6 +22,8 @@ interface RealProps {
   xcpUsd: number | null;
   btcUsd: number | null;
   feeSats: FeeSummary | null;
+  holderCount: number | null;
+  poolVolume: PoolVolume;
 }
 
 /**
@@ -180,6 +182,11 @@ function fabricate(realProps: RealProps, phase: Phase): RealProps {
           : fakeMints(real.asset, fm.tx_hash, H, qbp, mintPrice, 74, softCap),
       pool,
       priceHistory: history,
+      holderCount: !borrowAll && real.holderCount ? real.holderCount : 58,
+      poolVolume:
+        !borrowAll && real.poolVolume.trades > 0
+          ? real.poolVolume
+          : { volumeXcpRaw: "850000000000", trades: 23 },
     };
   }
 

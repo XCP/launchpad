@@ -1,5 +1,5 @@
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
-import { parseJsonLossless, type Raw } from "@/lib/numeric";
+import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
 
 interface Paginated<T> {
@@ -201,6 +201,62 @@ export async function fetchXcpDispensers(limit = 10): Promise<Dispenser[]> {
   return data.result
     .filter((d) => d.give_remaining > 0 && d.give_quantity === 1e8)
     .slice(0, limit);
+}
+
+interface PoolMatch {
+  status: string;
+  forward_asset: string;
+  forward_quantity: Raw;
+  backward_asset: string;
+  backward_quantity: Raw;
+  block_time: number;
+}
+
+export interface PoolVolume {
+  /** Stringified bigint — crosses the server/client prop boundary like
+   *  every other raw quantity in this codebase; convert with big(). */
+  volumeXcpRaw: Raw;
+  trades: number;
+}
+
+/**
+ * Trailing 24h swap volume + trade count for the TOKEN/XCP pool, computed
+ * from the pool's own match history rather than a third-party aggregate —
+ * matches page newest-first, so this stops as soon as it walks outside the
+ * window instead of always paging to `maxPages`.
+ */
+export async function fetchPoolVolume24h(
+  asset: string,
+  maxPages = 3,
+): Promise<PoolVolume> {
+  const cutoff = Math.floor(Date.now() / 1000) - 86_400;
+  let volumeXcpRaw = 0n;
+  let trades = 0;
+  let cursor: number | null = null;
+  let pages = 0;
+  let inWindow = true;
+  do {
+    const page: Paginated<PoolMatch> = await get(
+      `/pools/${encodeURIComponent(asset)}/XCP/matches?limit=200${
+        cursor !== null ? `&cursor=${cursor}` : ""
+      }`,
+      30,
+    );
+    for (const m of page.result) {
+      if (m.block_time < cutoff) {
+        inWindow = false;
+        break;
+      }
+      if (m.status !== "valid") continue;
+      volumeXcpRaw += big(
+        m.forward_asset === "XCP" ? m.forward_quantity : m.backward_quantity,
+      );
+      trades++;
+    }
+    cursor = page.next_cursor;
+    pages++;
+  } while (inWindow && cursor !== null && pages < maxPages);
+  return { volumeXcpRaw: volumeXcpRaw.toString(), trades };
 }
 
 export async function fetchBlockHeight(): Promise<number> {

@@ -83,8 +83,8 @@ export function ActivityTabs({
   const { address } = useWallet();
   const compose = useCompose();
   const [tab, setTab] = useState<
-    "mints" | "minters" | "mempool" | "trades" | "holders" | "orders"
-  >(minting ? "minters" : "mints");
+    "minters" | "mempool" | "trades" | "holders" | "orders"
+  >(minting ? "minters" : "trades");
   const [pageParam, setPage] = useState(1);
   const setParams = (t: typeof tab, p: number) => {
     setTab(t);
@@ -239,37 +239,35 @@ export function ActivityTabs({
 
   // During the sale there is no market and no separate holder set — the
   // minters ARE the holders — so "who is in" and "what's still queued"
-  // are the only two live questions.
+  // are the only two live questions. Once there's a market, the mint
+  // tape stops being the interesting question — what matters is what's
+  // trading, what's resting on the book, and who's actually holding.
   const tabs: (typeof tab)[] = minting
     ? ["minters", "mempool"]
     : address
-      ? ["mints", "trades", "holders", "orders"]
-      : ["mints", "trades", "holders"];
+      ? ["trades", "orders", "holders"]
+      : ["trades", "holders"];
   const tabLabel = (t: typeof tab) =>
-    t === "mints"
-      ? `Mints (${mints.length})`
-      : t === "minters"
-        ? `Holders (${minters.length})`
-        : t === "mempool"
-          ? `Mempool${roomState ? ` (${pending.length})` : ""}`
-          : t === "trades"
-            ? `Trades${trades ? ` (${trades.length})` : ""}`
-            : t === "holders"
-              ? `Holders${holders ? ` (${holders.length})` : ""}`
-              : `Orders${orders ? ` (${orders.length})` : ""}`;
+    t === "minters"
+      ? `Holders (${minters.length})`
+      : t === "mempool"
+        ? `Mempool${roomState ? ` (${pending.length})` : ""}`
+        : t === "trades"
+          ? `Trades${trades ? ` (${trades.length})` : ""}`
+          : t === "holders"
+            ? `Holders${holders ? ` (${holders.length})` : ""}`
+            : `Orders${orders ? ` (${orders.length})` : ""}`;
 
   const count =
     tab === "minters"
       ? minters.length
       : tab === "mempool"
         ? pending.length
-        : tab === "mints"
-          ? mints.length
-          : tab === "trades"
-            ? (trades?.length ?? 0)
-            : tab === "holders"
-              ? (holders?.length ?? 0)
-              : (orders?.length ?? 0);
+        : tab === "trades"
+          ? (trades?.length ?? 0)
+          : tab === "holders"
+            ? (holders?.length ?? 0)
+            : (orders?.length ?? 0);
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
   const page = Math.min(pageParam, totalPages);
   const from = (page - 1) * PER_PAGE;
@@ -448,47 +446,6 @@ export function ActivityTabs({
           </>
         ))}
 
-      {tab === "mints" &&
-        (mints.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">No mints yet.</p>
-        ) : (
-          <>
-            <ul className="divide-y divide-gray-100">
-              {mints.slice(from, from + PER_PAGE).map((m) => (
-                <li
-                  key={m.tx_hash}
-                  className="flex items-center justify-between px-4 py-2 text-sm"
-                >
-                  <a
-                    href={`https://xcp.io/address/${m.source}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
-                  >
-                    <Identicon address={m.source} />
-                    {shortAddress(m.source)}
-                  </a>
-                  <span className="text-gray-900">
-                    {compact(tokenQty(m.earn_quantity, divisible))}{" "}
-                    <span className="text-gray-400">
-                      ({commasRaw(m.paid_quantity)} XCP)
-                    </span>
-                  </span>
-                  <a
-                    href={`https://xcp.io/tx/${m.tx_hash}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs text-gray-500 hover:text-purple-700 hover:underline"
-                  >
-                    block {m.block_index}
-                  </a>
-                </li>
-              ))}
-            </ul>
-            {pager}
-          </>
-        ))}
-
       {tab === "trades" &&
         (!trades ? (
           <p className="p-6 text-center text-sm text-gray-400">Loading trades…</p>
@@ -584,6 +541,15 @@ export function ActivityTabs({
                         >
                           {shortAddress(h.address)}
                         </a>
+                      )}
+                      {/* No "no history" tag here — freshness at mint time
+                          doesn't mean anything for a holder who bought in
+                          on the market; only the issuer's own row is a
+                          fact worth flagging post-graduation. */}
+                      {issuerSource === h.address && (
+                        <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                          dev
+                        </span>
                       )}
                     </span>
                     <span className="relative z-10 text-gray-900">
