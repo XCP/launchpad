@@ -56,11 +56,19 @@ export function SitePresenceBadge() {
     };
   }, []);
 
-  if (count === null) return null;
+  // Reserve the pill's footprint from the first paint, even before a count
+  // exists — appearing from nothing shifts everything after it (the Swap /
+  // Limit / Dispense links) sideways the moment the socket answers.
+  // `invisible` keeps the box in flow; only its content fades in.
   return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500">
+    <span
+      aria-hidden={count === null}
+      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500 ${
+        count === null ? "invisible" : ""
+      }`}
+    >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-      {count} online
+      {count ?? 0} online
     </span>
   );
 }
