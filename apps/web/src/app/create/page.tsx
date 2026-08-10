@@ -2,18 +2,22 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import useSWR from "swr";
+import { ConnectButton } from "@/components/connect-button";
+import { CTA } from "@/components/ui/button";
+import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
-import { fromSats, commas } from "@/lib/format";
+import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
+import { SATS } from "@/lib/numeric";
 import { isValidSocial } from "@/lib/social";
-import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
+import { fetchMedianFeeRate, fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
   generateLpAssetName,
   XCP69,
   XCP69_EXACT,
   XCP69_MIN_PARTICIPANTS,
-  XCP69_OPENING_MULTIPLE,
   XCP69_RAISE_SATS,
 } from "@/lib/xcp69";
 
@@ -24,6 +28,16 @@ const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
  * standardness ceiling puts the practical content limit around 400 KB.
  */
 const INSCRIBE_MAX_BYTES = 400 * 1024;
+
+/** A named-asset registration is a fixed protocol fee, paid in the same
+ *  compose transaction — not a separate step. */
+const REGISTRATION_FEE_XCP = 0.5;
+
+/** A fairminter compose is one input, one output, no special script —
+ *  close enough to a plain transfer for the "how much will this cost"
+ *  estimate this line exists to give, not an exact preview of the final
+ *  composed size. */
+const LAUNCH_TX_VBYTES_ESTIMATE = 200;
 
 type NameCheck =
   | "idle"
@@ -62,8 +76,11 @@ const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
   done: "Done",
 };
 
+const inputClass =
+  "mt-1 block w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm outline-none transition-colors focus:border-purple-500 focus:bg-white";
+
 export default function CreatePage() {
-  const { address, status: walletStatus, connect, signPsbt, broadcastTransaction } = useWallet();
+  const { address, status: walletStatus, signPsbt, broadcastTransaction } = useWallet();
   const compose = useCompose();
   const isTaproot = address?.startsWith("bc1p") ?? false;
   const [inscribe, setInscribe] = useState(false);
@@ -82,6 +99,16 @@ export default function CreatePage() {
   const [scheduledStart, setScheduledStart] = useState<number | null>(null);
 
   const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
+
+  // What this launch will actually cost, before the wallet ever asks —
+  // the same "receipt above the button" grammar the swap and dispense
+  // forms already use.
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+    refreshInterval: 60_000,
+  });
+  const { data: btcUsd } = useSWR("btc-usd", fetchBtcUsd, { refreshInterval: 60_000 });
+  const { data: xcpUsd } = useSWR("xcp-usd", fetchXcpUsd, { refreshInterval: 60_000 });
+  const registrationFeeXcp = nameCheck === "available" ? REGISTRATION_FEE_XCP : 0;
 
   // A registered name you OWN is launchable if it meets the consensus
   // preconditions: zero supply, unlocked, divisible.
@@ -259,272 +286,367 @@ export default function CreatePage() {
     );
   }
 
+  const buttonLabel =
+    inscribeStep && inscribeStep !== "done"
+      ? INSCRIBE_STEP_LABELS[inscribeStep]
+      : compose.status === "composing"
+        ? "Composing…"
+        : compose.status === "signing"
+          ? "Confirm in wallet…"
+          : compose.status === "broadcasting"
+            ? "Broadcasting…"
+            : `Launch ${name || "token"}`;
+
   return (
-    <div className="mx-auto max-w-lg space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold">Launch a token</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Name, image, description. Everything else is the standard.
-        </p>
-      </div>
+    <div className="mx-auto max-w-4xl">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          <h1 className="text-2xl font-bold">Launch a token</h1>
+          <p className="mt-1 text-sm text-gray-600">
+            Name, image, description. Everything else is the standard.
+          </p>
 
-      {/* Name — on Counterparty the asset name is the ticker; one identity */}
-      <div>
-        <label htmlFor="asset-name" className="text-sm font-medium text-gray-700">
-          Name <span className="text-red-500">*</span>
-        </label>
-        <input
-          id="asset-name"
-          type="text"
-          value={name}
-          onChange={(e) => handleNameChange(e.target.value)}
-          onBlur={() => checkName(name)}
-          placeholder="PEPECOIN"
-          maxLength={12}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 font-mono uppercase outline-none focus:border-purple-500"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          {nameCheck === "invalid" &&
-            "4-12 letters A-Z, cannot start with A (named assets only)."}
-          {nameCheck === "checking" && "Checking availability…"}
-          {nameCheck === "available" && (
-            <span className="text-green-600">
-              {name} is available (0.5 XCP registration fee applies —{" "}
-              <Link href="/dispense" className="underline">
-                need XCP?
-              </Link>
-              ).
-            </span>
-          )}
-          {nameCheck === "owned" && (
-            <span className="text-green-700">
-              {name} is yours — this launch reuses your registered name (no
-              registration fee). If the launch fails, the name locks at zero
-              supply forever.
-            </span>
-          )}
-          {nameCheck === "ineligible" && (
-            <span className="text-red-600">
-              You own {name}, but {ineligibleReason}.
-            </span>
-          )}
-          {nameCheck === "taken" && (
-            <span className="text-red-600">
-              {name} is already registered.
-              {walletStatus !== "connected" &&
-                " If it's yours, connect that wallet to launch with it."}
-            </span>
-          )}
-          {nameCheck === "idle" &&
-            "The on-chain asset name — universally unique, can never change."}
-        </p>
-      </div>
-
-      {/* Image */}
-      <div>
-        <label htmlFor="token-image" className="text-sm font-medium text-gray-700">
-          Image <span className="text-red-500">*</span>
-        </label>
-        <div className="relative mt-1 flex min-h-32 items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-white p-4 hover:border-purple-400">
-          <input
-            id="token-image"
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            onChange={(e) => setImage(e.target.files?.[0] ?? null)}
-            className="absolute inset-0 cursor-pointer opacity-0"
-            aria-label="Upload token image"
-          />
-          {image ? (
-            <div className="flex items-center gap-3 text-sm">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={URL.createObjectURL(image)}
-                alt=""
-                className="size-16 rounded-full object-cover"
-              />
-              <div>
-                <div className="font-medium">{image.name}</div>
-                <div className="text-xs text-gray-500">
-                  {(image.size / 1024).toFixed(0)} KB · click to replace
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="text-center text-sm text-gray-500">
-              <div className="font-medium text-gray-700">
-                Select an image or drag and drop it here
-              </div>
-              <div className="mt-1 text-xs">
-                PNG, JPEG, WEBP or GIF · max 2 MB · square (1:1) recommended
-              </div>
-            </div>
-          )}
-        </div>
-        {isTaproot && (
-          <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+          {/* Name — on Counterparty the asset name is the ticker; one identity */}
+          <div className="mt-6">
+            <label htmlFor="asset-name" className="text-sm font-medium text-gray-700">
+              Name <span className="text-red-500">*</span>
+            </label>
             <input
-              type="checkbox"
-              checked={inscribe}
-              onChange={(e) => setInscribe(e.target.checked)}
-              className="mt-0.5"
+              id="asset-name"
+              type="text"
+              value={name}
+              onChange={(e) => handleNameChange(e.target.value)}
+              onBlur={() => checkName(name)}
+              placeholder="PEPECOIN"
+              maxLength={12}
+              className={`${inputClass} font-mono uppercase`}
             />
-            <span>
-              <span className="font-medium">Inscribe the image on-chain.</span>{" "}
-              <span className="text-xs text-gray-500">
-                The image itself becomes the permanent on-chain description
-                (commit + reveal, two signatures, higher fees scale with image
-                size; the inscription is burned so it belongs to the asset
-                forever). Max 400 KB. Taproot wallets only.
-              </span>
-              {imageTooBigToInscribe && (
-                <span className="mt-1 block text-xs text-red-600">
-                  This image is {(image!.size / 1024).toFixed(0)} KB — inscribing
-                  caps at 400 KB. Use a smaller file or uncheck to host it instead.
+            <p className="mt-1 text-xs text-gray-500">
+              {nameCheck === "invalid" &&
+                "4-12 letters A-Z, cannot start with A (named assets only)."}
+              {nameCheck === "checking" && "Checking availability…"}
+              {nameCheck === "available" && (
+                <span className="text-green-600">
+                  {name} is available (0.5 XCP registration fee applies —{" "}
+                  <Link href="/dispense" className="underline">
+                    need XCP?
+                  </Link>
+                  ).
                 </span>
               )}
-            </span>
-          </label>
-        )}
-      </div>
+              {nameCheck === "owned" && (
+                <span className="text-green-700">
+                  {name} is yours — this launch reuses your registered name (no
+                  registration fee). If the launch fails, the name locks at zero
+                  supply forever.
+                </span>
+              )}
+              {nameCheck === "ineligible" && (
+                <span className="text-red-600">
+                  You own {name}, but {ineligibleReason}.
+                </span>
+              )}
+              {nameCheck === "taken" && (
+                <span className="text-red-600">
+                  {name} is already registered.
+                  {walletStatus !== "connected" &&
+                    " If it's yours, connect that wallet to launch with it."}
+                </span>
+              )}
+              {nameCheck === "idle" &&
+                "The on-chain asset name — universally unique, can never change."}
+            </p>
+          </div>
 
-      {/* Description */}
-      <div>
-        <label htmlFor="token-description" className="text-sm font-medium text-gray-700">
-          Description
-        </label>
-        <textarea
-          id="token-description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          rows={3}
-          maxLength={2000}
-          placeholder="What is this?"
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
-        />
-      </div>
+          {/* Image */}
+          <div className="mt-5">
+            <label htmlFor="token-image" className="text-sm font-medium text-gray-700">
+              Image <span className="text-red-500">*</span>
+            </label>
+            <div className="relative mt-1 flex min-h-32 items-center justify-center rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 p-4 hover:border-purple-400">
+              <input
+                id="token-image"
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif"
+                onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                aria-label="Upload token image"
+              />
+              {image ? (
+                <div className="flex items-center gap-3 text-sm">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={URL.createObjectURL(image)}
+                    alt=""
+                    className="size-16 rounded-full object-cover"
+                  />
+                  <div>
+                    <div className="font-medium">{image.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {(image.size / 1024).toFixed(0)} KB · click to replace
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center text-sm text-gray-500">
+                  <div className="font-medium text-gray-700">
+                    Select an image or drag and drop it here
+                  </div>
+                  <div className="mt-1 text-xs">
+                    PNG, JPEG, WEBP or GIF · max 2 MB · square (1:1) recommended
+                  </div>
+                </div>
+              )}
+            </div>
+            {isTaproot && (
+              <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={inscribe}
+                  onChange={(e) => setInscribe(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>
+                  <span className="font-medium">Inscribe the image on-chain.</span>{" "}
+                  <span className="text-xs text-gray-500">
+                    The image itself becomes the permanent on-chain description
+                    (commit + reveal, two signatures, higher fees scale with image
+                    size; the inscription is burned so it belongs to the asset
+                    forever). Max 400 KB. Taproot wallets only.
+                  </span>
+                  {imageTooBigToInscribe && (
+                    <span className="mt-1 block text-xs text-red-600">
+                      This image is {(image!.size / 1024).toFixed(0)} KB — inscribing
+                      caps at 400 KB. Use a smaller file or uncheck to host it instead.
+                    </span>
+                  )}
+                </span>
+              </label>
+            )}
+          </div>
 
-      {/* Socials — optional, tucked away */}
-      <details className="group">
-        <summary className="cursor-pointer text-sm font-medium text-gray-700 marker:content-none">
-          <span className="text-purple-600">＋</span> Add social links{" "}
-          <span className="font-normal text-gray-400">(optional)</span>
-        </summary>
-        <div className="mt-3 grid gap-4 sm:grid-cols-2">
-          <SocialInput
-            id="x-profile"
-            label="X profile"
-            placeholder="https://x.com/yourtoken"
-            value={xProfile}
-            onChange={setXProfile}
-          />
-          <SocialInput
-            id="telegram"
-            label="Telegram"
-            placeholder="https://t.me/yourtoken"
-            value={telegram}
-            onChange={setTelegram}
+          {/* Description */}
+          <div className="mt-5">
+            <label htmlFor="token-description" className="text-sm font-medium text-gray-700">
+              Description
+            </label>
+            <textarea
+              id="token-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={3}
+              maxLength={2000}
+              placeholder="What is this?"
+              className={inputClass}
+            />
+          </div>
+
+          {/* Socials — we collect two URLs; there's nothing here worth
+              hiding behind a disclosure. */}
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <SocialInput
+              id="x-profile"
+              label="X profile"
+              placeholder="https://x.com/yourtoken"
+              value={xProfile}
+              onChange={setXProfile}
+            />
+            <SocialInput
+              id="telegram"
+              label="Telegram"
+              placeholder="https://t.me/yourtoken"
+              value={telegram}
+              onChange={setTelegram}
+            />
+          </div>
+
+          {/* Pre-announcement — the only knob the standard leaves open */}
+          <div className="mt-5">
+            <label htmlFor="preannounce" className="text-sm font-medium text-gray-700">
+              Minting opens in
+            </label>
+            <select
+              id="preannounce"
+              value={preannounce}
+              onChange={(e) => setPreannounce(Number(e.target.value))}
+              className={inputClass}
+            >
+              {PREANNOUNCE_OPTIONS.map((o) => (
+                <option key={o.blocks} value={o.blocks}>
+                  {o.label} ({o.blocks} blocks) after launch
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Every XCP-69 launch is announced on-chain before minting opens —
+              nobody, creator included, can mint early. The 1,000-block (~7 day)
+              window starts when minting opens.
+            </p>
+            {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.priority && (
+              <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
+                Tight lead: your launch transaction will pay mempool.space&apos;s
+                next-block fee rate, because it must confirm before minting
+                opens — a launch that confirms late opens instantly and fails
+                the standard.
+              </p>
+            )}
+          </div>
+
+          <p className="mt-5 text-xs text-gray-500">
+            The on-chain description locks at launch and can never change. It
+            points at info this site hosts for you — and as the issuer you can
+            edit that info later from the launch page with your wallet. The
+            rest of the terms are fixed by the standard — see the preview.
+          </p>
+
+          {/* The due line — what pressing the button actually costs,
+              stated before it's asked for, same grammar as swap/dispense. */}
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <dl className="space-y-1.5 text-xs text-gray-500">
+              <div className="flex justify-between">
+                <dt>Registration fee</dt>
+                <dd className="font-medium tabular-nums text-gray-700">
+                  {registrationFeeXcp > 0
+                    ? `${registrationFeeXcp} XCP${
+                        xcpUsd ? ` (${usd(registrationFeeXcp * xcpUsd)})` : ""
+                      }`
+                    : nameCheck === "owned"
+                      ? "none — you already own this name"
+                      : "—"}
+                </dd>
+              </div>
+              {medianFeeRate !== undefined && (
+                <div className="flex justify-between">
+                  <dt>Network fee (est.)</dt>
+                  <dd className="tabular-nums text-gray-700">
+                    {medianFeeRate} sat/vB
+                    {btcUsd !== null && btcUsd !== undefined && (
+                      <span className="text-gray-400">
+                        {" "}
+                        (~
+                        {usd(
+                          ((medianFeeRate * LAUNCH_TX_VBYTES_ESTIMATE) / SATS) * btcUsd,
+                        )}
+                        )
+                      </span>
+                    )}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </div>
+
+          {uploadError && (
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {uploadError}
+            </p>
+          )}
+          {compose.status === "error" && (
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              {compose.error}
+            </p>
+          )}
+
+          <div className="mt-5">
+            {walletStatus !== "connected" ? (
+              <ConnectButton className="w-full" />
+            ) : (
+              <CTA onClick={handleLaunch} disabled={!canSubmit}>
+                {buttonLabel}
+              </CTA>
+            )}
+          </div>
+        </div>
+
+        {/* Live preview — the token as it'll actually look, plus the
+            terms worth seeing before you sign rather than the full fixed
+            list every launch already shares. */}
+        <div className="mt-6 lg:mt-0">
+          <PreviewCard
+            name={name}
+            image={image}
+            description={description}
+            nameCheck={nameCheck}
+            registrationFeeXcp={registrationFeeXcp}
           />
         </div>
-      </details>
+      </div>
+    </div>
+  );
+}
 
-      {/* Pre-announcement — the only knob the standard leaves open */}
-      <div>
-        <label htmlFor="preannounce" className="text-sm font-medium text-gray-700">
-          Minting opens in
-        </label>
-        <select
-          id="preannounce"
-          value={preannounce}
-          onChange={(e) => setPreannounce(Number(e.target.value))}
-          className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500"
-        >
-          {PREANNOUNCE_OPTIONS.map((o) => (
-            <option key={o.blocks} value={o.blocks}>
-              {o.label} ({o.blocks} blocks) after launch
-            </option>
-          ))}
-        </select>
-        <p className="mt-1 text-xs text-gray-500">
-          Every XCP-69 launch is announced on-chain before minting opens —
-          nobody, creator included, can mint early. The 1,000-block (~7 day)
-          window starts when minting opens.
-        </p>
-        {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.priority && (
-          <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
-            Tight lead: your launch transaction will pay mempool.space&apos;s
-            next-block fee rate, because it must confirm before minting
-            opens — a launch that confirms late opens instantly and fails
-            the standard.
-          </p>
+function PreviewCard({
+  name,
+  image,
+  description,
+  nameCheck,
+  registrationFeeXcp,
+}: {
+  name: string;
+  image: File | null;
+  description: string;
+  nameCheck: NameCheck;
+  registrationFeeXcp: number;
+}) {
+  const priceXcp = XCP69.PRICE / SATS;
+  const lot = XCP69.QUANTITY_BY_PRICE / SATS;
+  const targetXcp = fromSats(XCP69_RAISE_SATS);
+  const statusLabel: Record<NameCheck, string> = {
+    idle: "on-chain asset name",
+    checking: "checking…",
+    available: "available",
+    owned: "yours — reused, no fee",
+    taken: "already registered",
+    ineligible: "not launchable",
+    invalid: "4-12 letters, A-Z",
+  };
+  const statusTone: Record<NameCheck, string> = {
+    idle: "text-gray-400",
+    checking: "text-gray-400",
+    available: "text-green-600",
+    owned: "text-green-700",
+    taken: "text-red-600",
+    ineligible: "text-red-600",
+    invalid: "text-gray-400",
+  };
+
+  return (
+    <div className="sticky top-4 rounded-3xl border border-gray-200 bg-gray-50 p-5">
+      <div className="flex items-center gap-3">
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={URL.createObjectURL(image)}
+            alt=""
+            className="size-14 shrink-0 rounded-2xl bg-gray-200 object-cover"
+          />
+        ) : (
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gray-200 text-lg font-bold text-gray-400">
+            {name.slice(0, 1) || "?"}
+          </div>
         )}
+        <div className="min-w-0">
+          <div className="truncate text-lg font-bold leading-tight">
+            {name || "YOURTOKEN"}
+          </div>
+          <div className={`text-xs font-medium ${statusTone[nameCheck]}`}>
+            {statusLabel[nameCheck]}
+          </div>
+        </div>
       </div>
 
-      {/* The terms — fixed by the standard, shown, not asked */}
-      <div className="rounded-lg border border-gray-200 bg-white p-4 text-sm">
-        <div className="mb-2 font-semibold">XCP-69 terms (fixed)</div>
-        <dl className="space-y-1 text-gray-600">
-          <Row k="Supply" v="100,000,000 — locked at launch" />
-          <Row k="Public sale" v="69,000,000 at 0.01 XCP per 1,000" />
-          <Row
-            k="Per address"
-            v={`max ${commas(fromSats(XCP69.MAX_MINT_PER_ADDRESS))} (10 XCP)`}
-          />
-          <Row k="Window" v="1,000 blocks (~7 days) — sells out, or refunds within the week" />
-          <Row
-            k="You receive"
-            v={`0 of the ${commas(fromSats(XCP69_RAISE_SATS))} XCP raised — all of it becomes pool liquidity, LP burned`}
-          />
-          <Row
-            k="Pool opens"
-            v={`31,000,000 tokens at ${XCP69_OPENING_MULTIPLE.toFixed(2)}× mint price`}
-          />
-          <Row k="Minimum community" v={`${XCP69_MIN_PARTICIPANTS} distinct addresses`} />
-        </dl>
-      </div>
-
-      <p className="text-xs text-gray-500">
-        The on-chain description locks at launch and can never change. It
-        points at info this site hosts for you — and as the issuer you can
-        edit that info later from the launch page with your wallet.
-      </p>
-
-      {uploadError && (
-        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {uploadError}
-        </p>
-      )}
-      {compose.status === "error" && (
-        <p className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {compose.error}
-        </p>
+      {description && (
+        <p className="mt-3 line-clamp-3 text-sm text-gray-600">{description}</p>
       )}
 
-      {walletStatus !== "connected" ? (
-        <button
-          type="button"
-          onClick={() => connect()}
-          className="w-full rounded-md bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700"
-        >
-          {walletStatus === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-        </button>
-      ) : (
-        <button
-          type="button"
-          onClick={handleLaunch}
-          disabled={!canSubmit}
-          className="w-full rounded-md bg-gray-900 px-5 py-3 font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {inscribeStep && inscribeStep !== "done"
-            ? INSCRIBE_STEP_LABELS[inscribeStep]
-            : compose.status === "composing"
-              ? "Composing…"
-              : compose.status === "signing"
-                ? "Confirm in wallet…"
-                : compose.status === "broadcasting"
-                  ? "Broadcasting…"
-                  : `Launch ${name || "token"} from ${address?.slice(0, 8)}…`}
-        </button>
-      )}
+      <dl className="mt-4 space-y-2 border-t border-gray-200 pt-4 text-xs">
+        <Row k="Registration fee" v={registrationFeeXcp > 0 ? `${registrationFeeXcp} XCP` : "none"} />
+        <Row k="Price" v={`${priceXcp} XCP / ${commas(lot)}`} />
+        <Row k="Target" v={`${commas(targetXcp)} XCP or refund`} />
+        <Row k="Window" v="1,000 blocks (~7 days)" />
+        <Row k="Minimum community" v={`${XCP69_MIN_PARTICIPANTS}+ addresses`} />
+        <Row k="Liquidity" v="locked forever, LP burned" />
+      </dl>
     </div>
   );
 }
@@ -554,9 +676,7 @@ function SocialInput({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className={`mt-1 block w-full rounded-md border bg-white p-2.5 text-sm outline-none ${
-          valid ? "border-gray-300 focus:border-purple-500" : "border-red-400"
-        }`}
+        className={`${inputClass} ${valid ? "" : "border-red-400"}`}
       />
       {!valid && (
         <p className="mt-1 text-xs text-red-600">
@@ -570,8 +690,8 @@ function SocialInput({
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-4">
-      <dt className="shrink-0">{k}</dt>
-      <dd className="text-right font-medium text-gray-900">{v}</dd>
+      <dt className="text-gray-500">{k}</dt>
+      <dd className="text-right font-medium tabular-nums text-gray-900">{v}</dd>
     </div>
   );
 }
