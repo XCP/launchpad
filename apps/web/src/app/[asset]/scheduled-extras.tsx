@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
-import { TokenImage } from "@/components/token-image";
+import { HeroTokenImage, TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
@@ -1328,16 +1328,14 @@ export function ArtLightbox({ asset }: { asset: string }) {
       >
         {/* A poster on a phone: full width, then the compact identity square
             once there's a column to sit beside. */}
-        <TokenImage
+        <HeroTokenImage
           asset={asset}
-          large
           className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:aspect-auto sm:w-auto sm:size-[5.5rem]`}
         />
       </button>
       <Dialog open={open} onOpenChange={setOpen} title={asset} variant="lightbox">
-        <TokenImage
+        <HeroTokenImage
           asset={asset}
-          large
           className="h-full w-full rounded-2xl object-contain shadow-2xl"
         />
       </Dialog>
