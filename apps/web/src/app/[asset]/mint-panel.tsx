@@ -178,7 +178,7 @@ export function MintPanel({
       <div className="mt-1">
         <Well
           label="You pay"
-          topRight={<span>escrowed until the launch</span>}
+          topRight={<span>escrowed until launch</span>}
           chip={<AssetChip asset="XCP" />}
           footer={
             <>

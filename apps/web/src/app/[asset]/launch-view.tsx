@@ -437,26 +437,25 @@ export function LaunchView({
     );
   }
 
-  // Refunded: the same card, pill, and stat-cell grammar every other phase
-  // uses — just told what actually happened here. There's no market, no
-  // live holders (supply was destroyed), no orders, so nothing tries to
-  // look live: the art is bigger than any other phase's and muted, there's
-  // no edit affordance and no CTA, and the record of who showed up is a
-  // plain list rather than the trading-terminal activity tabs, whose
-  // Trades/Holders/Orders tabs would just be empty here.
+  // Refunded: the same header, card, and stat-cell grammar every other
+  // phase uses — the "\u{1F480} RIP" pill is what says this one's over, not a
+  // different-looking page. There's no market, no live holders (supply was
+  // destroyed), no orders, so there's no edit affordance and no CTA, and
+  // the record of who showed up is a plain list rather than the
+  // trading-terminal activity tabs, whose Trades/Holders/Orders tabs would
+  // just be empty here.
   if (phase === "refunded") {
     const topMinters = minterAddresses.slice(0, 8);
     const extraMinters = minterAddresses.length - topMinters.length;
     return (
       <div className="mx-auto max-w-2xl">
         <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
-          {/* Half the header is the art, half is the identity — a real
-              presence for the image without it swallowing the card. */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-6">
-            <div className="sm:w-1/2">
-              <ArtLightbox asset={asset} size="hero" muted />
-            </div>
-            <div className="min-w-0 sm:flex sm:w-1/2 sm:flex-col sm:justify-center">
+          {/* Same header shape as every other phase — compact art beside
+              identity, issuer chips and all. The pill alone says this one's
+              over; nothing else about the chrome needs to look different. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+            <ArtLightbox asset={asset} />
+            <div className="min-w-0 flex-1">
               <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                 {asset}
                 <StatusPill phase={phase} hasPool={false} />
@@ -466,9 +465,11 @@ export function LaunchView({
                   </span>
                 )}
               </h1>
-              <div className="mt-1 flex flex-wrap items-baseline">
+              <div className="flex flex-wrap items-baseline">
                 <IssuerLine source={fm.source} />
+                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
               </div>
+              <IssuerChips source={fm.source} currentAsset={asset} />
               <p className="mt-3 text-sm text-gray-600">
                 Reached {(progress * 100).toFixed(1)}% of the sale before the
                 deadline. Every XCP escrowed came back and the unsold supply
@@ -477,8 +478,7 @@ export function LaunchView({
             </div>
           </div>
 
-          {/* The one number worth reading from across the room — full
-              width, not split with the header above it. */}
+          {/* The one number worth reading from across the room. */}
           <div className="mt-6 border-t border-gray-100 pt-5 text-center">
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
               Refunded
