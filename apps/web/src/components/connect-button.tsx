@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import { CTA } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -9,29 +9,19 @@ const CHROME_STORE_URL =
   "https://chromewebstore.google.com/detail/xcp-wallet/nicpjdbehgcjbjfjkobcidnfmfpijohg";
 
 /**
- * The disconnected-state CTA. Never disabled — when the wallet isn't
- * connected, this IS the button. "not_detected" opens an install prompt
- * instead of calling connect(), which has no provider to talk to yet.
+ * The connect click and its install-prompt modal, shared by every trigger
+ * that needs one — the full-width form CTA and the header's compact
+ * button want different shapes but the same behavior: "not_detected"
+ * opens an install prompt instead of calling connect(), which has no
+ * provider to talk to yet.
  */
-export function ConnectButton({
-  size = "lg",
-  className = "",
-}: {
-  size?: "lg" | "md";
-  className?: string;
-}) {
+export function useConnectAction(): { status: ReturnType<typeof useWallet>["status"]; onClick: () => void; installPrompt: ReactNode } {
   const { status, connect } = useWallet();
   const [installOpen, setInstallOpen] = useState(false);
-  return (
-    <>
-      <CTA
-        variant="primary"
-        size={size}
-        className={className}
-        onClick={() => (status === "not_detected" ? setInstallOpen(true) : connect())}
-      >
-        {status === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
-      </CTA>
+  return {
+    status,
+    onClick: () => (status === "not_detected" ? setInstallOpen(true) : connect()),
+    installPrompt: (
       <Dialog
         open={installOpen}
         onOpenChange={setInstallOpen}
@@ -52,6 +42,26 @@ export function ConnectButton({
           </a>
         </div>
       </Dialog>
+    ),
+  };
+}
+
+/** The disconnected-state CTA. Never disabled — when the wallet isn't
+ *  connected, this IS the button. */
+export function ConnectButton({
+  size = "lg",
+  className = "",
+}: {
+  size?: "lg" | "md";
+  className?: string;
+}) {
+  const { status, onClick, installPrompt } = useConnectAction();
+  return (
+    <>
+      <CTA variant="primary" size={size} className={className} onClick={onClick}>
+        {status === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
+      </CTA>
+      {installPrompt}
     </>
   );
 }

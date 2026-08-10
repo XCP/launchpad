@@ -2,22 +2,35 @@
 
 import { useState } from "react";
 import { Popover as P } from "radix-ui";
-import { ConnectButton } from "@/components/connect-button";
+import { useConnectAction } from "@/components/connect-button";
 import { shortAddress } from "@/lib/format";
 import { useWallet } from "@/lib/wallet/wallet-context";
 
 /**
- * The header's wallet slot: the compact Connect CTA while disconnected,
- * a short-address pill with a small menu once connected. Same wallet
- * state every form on the site already reads — this is just its one
- * global, always-visible surface.
+ * The header's wallet slot: same shape as the Launch button beside it
+ * (just purple, saying "Connect") while disconnected, a short-address
+ * pill with a small menu once connected. Same wallet state every form on
+ * the site already reads — this is just its one global, always-visible
+ * surface.
  */
 export function HeaderWallet() {
   const { status, address, disconnect } = useWallet();
   const [copied, setCopied] = useState(false);
+  const { onClick, installPrompt } = useConnectAction();
 
   if (status !== "connected" || !address) {
-    return <ConnectButton size="md" />;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={onClick}
+          className="rounded-md bg-purple-600 px-3 py-1.5 text-white hover:bg-purple-500"
+        >
+          Connect
+        </button>
+        {installPrompt}
+      </>
+    );
   }
 
   return (
