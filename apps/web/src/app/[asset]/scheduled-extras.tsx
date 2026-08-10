@@ -1177,7 +1177,7 @@ const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   // Amber, not red: the sale missed its target, but nobody lost anything —
   // every participant got their XCP back. Red would overstate the outcome.
   refunded: {
-    label: "Refunded",
+    label: "RIP",
     className: "border-amber-200 bg-amber-50 text-amber-700",
   },
 };
@@ -1279,9 +1279,10 @@ export function BlockAgo({ blockIndex }: { blockIndex: number }) {
 /** The poster art: compact in the card, full-size in a dialog on click.
  *  The shared Dialog brings focus trapping, Escape, and scroll lock.
  *  `size` "large" gives the desktop side a real presence (a plaque photo,
- *  not an icon) — mobile stays full-width either way. "hero" stays
- *  full-width at every breakpoint, for the refunded tombstone, where the
- *  art carries the page rather than sitting beside a text column.
+ *  not an icon) — mobile stays full-width either way. "hero" always fills
+ *  whatever column its flex parent gives it — the refunded tombstone puts
+ *  it at half the card's width, a real presence beside the identity rather
+ *  than a small icon or a full-bleed banner.
  *  `muted` fades the art to grayscale — restored to color on hover, a
  *  closer look at something that's over rather than a live thumbnail. */
 export function ArtLightbox({
@@ -1306,18 +1307,19 @@ export function ArtLightbox({
       >
         {/* A poster on a phone: full width, then the compact identity square
             (or, for "large", a real plaque-sized photo) once there's a
-            column to sit beside. "hero" never steps aside. */}
+            column to sit beside. "hero" stays square but never steps down
+            to a fixed size — its parent's width is the point. */}
         <TokenImage
           asset={asset}
           large
-          className={`w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-all duration-500 group-hover:scale-[1.01] ${
+          className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-all duration-500 group-hover:scale-[1.01] ${
             muted ? "grayscale group-hover:grayscale-0" : "group-hover:scale-[1.03]"
           } ${
-            size === "hero"
-              ? "aspect-[16/9]"
-              : size === "large"
-                ? "aspect-square sm:aspect-auto sm:w-auto sm:size-40"
-                : "aspect-square sm:aspect-auto sm:w-auto sm:size-[5.5rem]"
+            size === "large"
+              ? "sm:aspect-auto sm:w-auto sm:size-40"
+              : size === "compact"
+                ? "sm:aspect-auto sm:w-auto sm:size-[5.5rem]"
+                : ""
           }`}
         />
       </button>

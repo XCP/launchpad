@@ -450,29 +450,35 @@ export function LaunchView({
     return (
       <div className="mx-auto max-w-2xl">
         <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
-          <ArtLightbox asset={asset} size="hero" muted />
-
-          <div className="mt-5">
-            <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
-              {asset}
-              <StatusPill phase={phase} hasPool={false} />
-              {!conforming && (
-                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                  not XCP-69
-                </span>
-              )}
-            </h1>
-            <div className="mt-1 flex flex-wrap items-baseline">
-              <IssuerLine source={fm.source} />
+          {/* Half the header is the art, half is the identity — a real
+              presence for the image without it swallowing the card. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-stretch sm:gap-6">
+            <div className="sm:w-1/2">
+              <ArtLightbox asset={asset} size="hero" muted />
             </div>
-            <p className="mt-3 text-sm text-gray-600">
-              Reached {(progress * 100).toFixed(1)}% of the sale before the
-              deadline. Every XCP escrowed came back and the unsold supply
-              was destroyed — the guarantee, not a rescue.
-            </p>
+            <div className="min-w-0 sm:flex sm:w-1/2 sm:flex-col sm:justify-center">
+              <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                {asset}
+                <StatusPill phase={phase} hasPool={false} />
+                {!conforming && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    not XCP-69
+                  </span>
+                )}
+              </h1>
+              <div className="mt-1 flex flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                Reached {(progress * 100).toFixed(1)}% of the sale before the
+                deadline. Every XCP escrowed came back and the unsold supply
+                was destroyed — the guarantee, not a rescue.
+              </p>
+            </div>
           </div>
 
-          {/* The one number worth reading from across the room. */}
+          {/* The one number worth reading from across the room — full
+              width, not split with the header above it. */}
           <div className="mt-6 border-t border-gray-100 pt-5 text-center">
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
               Refunded
