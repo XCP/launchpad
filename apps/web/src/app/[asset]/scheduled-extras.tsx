@@ -1310,14 +1310,14 @@ export function ArtLightbox({
         <TokenImage
           asset={asset}
           large
-          className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-all duration-500 group-hover:scale-[1.01] ${
+          className={`w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-all duration-500 group-hover:scale-[1.01] ${
             muted ? "grayscale group-hover:grayscale-0" : "group-hover:scale-[1.03]"
           } ${
             size === "hero"
-              ? ""
+              ? "aspect-[16/9]"
               : size === "large"
-                ? "sm:aspect-auto sm:w-auto sm:size-40"
-                : "sm:aspect-auto sm:w-auto sm:size-[5.5rem]"
+                ? "aspect-square sm:aspect-auto sm:w-auto sm:size-40"
+                : "aspect-square sm:aspect-auto sm:w-auto sm:size-[5.5rem]"
           }`}
         />
       </button>
