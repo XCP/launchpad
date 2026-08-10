@@ -11,7 +11,7 @@ import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { SATS } from "@/lib/numeric";
 import { isValidSocial } from "@/lib/social";
-import { fetchMedianFeeRate, fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
+import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
   generateLpAssetName,
@@ -60,22 +60,13 @@ type NameCheck =
 
 /**
  * Pre-announcement lead: minting opens this many blocks after compose time.
- * The standard requires only that the launch confirms strictly before
- * start_block — but a launch that confirms late opens instantly and fails
- * conformance, so the shortest option still leaves hours of headroom for
- * the transaction to confirm.
+ * Fixed, not a choice — the standard requires only that the launch confirms
+ * strictly before start_block, but a launch that confirms late opens
+ * instantly and fails conformance. 36 blocks (~6 hours) leaves comfortable
+ * headroom for confirmation at the ordinary median fee rate, so there's no
+ * "tight lead" tier to warn about or pay a priority rate for.
  */
-// Six blocks is the floor: a 1-block lead is a coin flip on block timing —
-// one slow block and the launch confirms past its start, permanently
-// non-conforming with the name spent (observed live on the first test
-// launch). Anyone who wants a next-block start can compose it themselves.
-const PREANNOUNCE_OPTIONS: { blocks: number; label: string; priority?: boolean }[] = [
-  { blocks: 6, label: "~1 hour", priority: true },
-  { blocks: 36, label: "~6 hours" },
-  { blocks: 144, label: "~1 day" },
-  { blocks: 432, label: "~3 days" },
-];
-const PREANNOUNCE_DEFAULT = 36;
+const PREANNOUNCE_BLOCKS = 36;
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
   preparing: "Preparing inscription…",
@@ -105,7 +96,6 @@ export default function CreatePage() {
   const [telegram, setTelegram] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [preannounce, setPreannounce] = useState(PREANNOUNCE_DEFAULT);
   const [scheduledStart, setScheduledStart] = useState<number | null>(null);
 
   const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
@@ -198,16 +188,8 @@ export default function CreatePage() {
       //    window is exactly the standard's 1,000 blocks from that start.
       const heightRes = await fetch(`${COUNTERPARTY_API_BASE}/`);
       const height = (await heightRes.json()).result.counterparty_height as number;
-      const startBlock = height + preannounce;
+      const startBlock = height + PREANNOUNCE_BLOCKS;
       setScheduledStart(startBlock);
-
-      // Tight leads leave little room for a slow confirmation — a launch
-      // confirming after its start block opens instantly and fails the
-      // standard. Pay the next-block rate so that can't happen.
-      const isPriority = PREANNOUNCE_OPTIONS.find(
-        (o) => o.blocks === preannounce,
-      )?.priority;
-      const feeRate = isPriority ? await fetchPriorityFeeRate() : undefined;
 
       if (inscribe && isTaproot && address) {
         // 3a. Commit/reveal inscription: the image becomes the permanent
@@ -220,7 +202,7 @@ export default function CreatePage() {
           jsonUrl: upload.json_url,
           imageData: new Uint8Array(await image.arrayBuffer()),
           mimeType: image.type,
-          feeRate: feeRate ?? 2,
+          feeRate: 2,
           address,
           signPsbt,
           broadcast: broadcastTransaction,
@@ -248,7 +230,6 @@ export default function CreatePage() {
         pool_quantity: XCP69_EXACT.POOL_QUANTITY,
         lp_asset: generateLpAssetName(),
         description: upload.json_url,
-        ...(feeRate ? { fee_rate: feeRate } : {}),
       });
     } catch (e) {
       setUploadError(e instanceof Error ? e.message : "Something went wrong");
@@ -278,10 +259,7 @@ export default function CreatePage() {
             <span className="font-mono font-medium text-gray-900">
               {scheduledStart?.toLocaleString()}
             </span>{" "}
-            (
-            {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.label ??
-              `~${preannounce} blocks`}
-            ) — until then the launch is announced on-chain and nobody, you
+            (~6 hours) — until then the launch is announced on-chain and nobody, you
             included, can mint. Then it runs for 1,000 blocks (~7 days): it
             sells out, or everyone is refunded.
           </p>
@@ -476,35 +454,13 @@ export default function CreatePage() {
             />
           </div>
 
-          {/* Pre-announcement — the only knob the standard leaves open */}
+          {/* Pre-announcement — fixed, not a choice */}
           <div className="mt-5">
-            <label htmlFor="preannounce" className="text-sm font-medium text-gray-700">
-              Minting opens in
-            </label>
-            <select
-              id="preannounce"
-              value={preannounce}
-              onChange={(e) => setPreannounce(Number(e.target.value))}
-              className={inputClass}
-            >
-              {PREANNOUNCE_OPTIONS.map((o) => (
-                <option key={o.blocks} value={o.blocks}>
-                  {o.label} ({o.blocks} blocks)
-                </option>
-              ))}
-            </select>
+            <p className="text-sm font-medium text-gray-700">Minting opens in ~6 hours</p>
             <p className="mt-1 text-xs text-gray-500">
               Announced on-chain first — nobody, creator included, can mint
               early.
             </p>
-            {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.priority && (
-              <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
-                Tight lead: your launch transaction will pay mempool.space&apos;s
-                next-block fee rate, because it must confirm before minting
-                opens — a launch that confirms late opens instantly and fails
-                the standard.
-              </p>
-            )}
           </div>
 
           {/* The due line — what pressing the button actually costs,
