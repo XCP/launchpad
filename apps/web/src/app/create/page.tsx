@@ -299,7 +299,11 @@ export default function CreatePage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6">
+        {/* items-stretch (the grid default) is deliberate here: the right
+            cell must be as tall as the form for the sticky preview to have
+            room to travel and settle at the viewport's vertical center as
+            you scroll — with items-start it has nowhere to go. */}
         <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
           <h1 className="text-2xl font-bold">Launch a token</h1>
           <p className="mt-1 text-sm text-gray-600">
@@ -393,7 +397,9 @@ export default function CreatePage() {
                     Select an image or drag and drop it here
                   </div>
                   <div className="mt-1 text-xs">
-                    PNG, JPEG, WEBP or GIF · max 2 MB · square (1:1) recommended
+                    PNG, JPEG, WEBP or GIF ·{" "}
+                    {inscribe ? "max 400 KB (inscribing)" : "max 2 MB"} · square
+                    (1:1) recommended
                   </div>
                 </div>
               )}
@@ -473,14 +479,13 @@ export default function CreatePage() {
             >
               {PREANNOUNCE_OPTIONS.map((o) => (
                 <option key={o.blocks} value={o.blocks}>
-                  {o.label} ({o.blocks} blocks) after launch
+                  {o.label} ({o.blocks} blocks)
                 </option>
               ))}
             </select>
             <p className="mt-1 text-xs text-gray-500">
-              Every XCP-69 launch is announced on-chain before minting opens —
-              nobody, creator included, can mint early. The 1,000-block (~7 day)
-              window starts when minting opens.
+              Announced on-chain first — nobody, creator included, can mint
+              early.
             </p>
             {PREANNOUNCE_OPTIONS.find((o) => o.blocks === preannounce)?.priority && (
               <p className="mt-1 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-700">
@@ -491,13 +496,6 @@ export default function CreatePage() {
               </p>
             )}
           </div>
-
-          <p className="mt-5 text-xs text-gray-500">
-            The on-chain description locks at launch and can never change. It
-            points at info this site hosts for you — and as the issuer you can
-            edit that info later from the launch page with your wallet. The
-            rest of the terms are fixed by the standard — see the preview.
-          </p>
 
           {/* The due line — what pressing the button actually costs,
               stated before it's asked for, same grammar as swap/dispense. */}
@@ -567,7 +565,6 @@ export default function CreatePage() {
             image={image}
             description={description}
             nameCheck={nameCheck}
-            registrationFeeXcp={registrationFeeXcp}
           />
         </div>
       </div>
@@ -580,17 +577,16 @@ function PreviewCard({
   image,
   description,
   nameCheck,
-  registrationFeeXcp,
 }: {
   name: string;
   image: File | null;
   description: string;
   nameCheck: NameCheck;
-  registrationFeeXcp: number;
 }) {
   const priceXcp = XCP69.PRICE / SATS;
   const lot = XCP69.QUANTITY_BY_PRICE / SATS;
   const targetXcp = fromSats(XCP69_RAISE_SATS);
+  const supplyTokens = fromSats(XCP69.HARD_CAP);
   const statusLabel: Record<NameCheck, string> = {
     idle: "on-chain asset name",
     checking: "checking…",
@@ -611,7 +607,7 @@ function PreviewCard({
   };
 
   return (
-    <div className="sticky top-4 rounded-3xl border border-gray-200 bg-gray-50 p-5">
+    <div className="lg:sticky lg:top-1/2 lg:-translate-y-1/2 rounded-3xl border border-gray-200 bg-gray-50 p-5">
       <div className="flex items-center gap-3">
         {image ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -640,7 +636,7 @@ function PreviewCard({
       )}
 
       <dl className="mt-4 space-y-2 border-t border-gray-200 pt-4 text-xs">
-        <Row k="Registration fee" v={registrationFeeXcp > 0 ? `${registrationFeeXcp} XCP` : "none"} />
+        <Row k="Supply" v={`${commas(supplyTokens)} — locked at launch`} />
         <Row k="Price" v={`${priceXcp} XCP / ${commas(lot)}`} />
         <Row k="Target" v={`${commas(targetXcp)} XCP or refund`} />
         <Row k="Window" v="1,000 blocks (~7 days)" />
@@ -664,7 +660,9 @@ function SocialInput({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const [touched, setTouched] = useState(false);
   const valid = isValidSocial(value);
+  const showError = touched && !valid;
   return (
     <div>
       <label htmlFor={id} className="text-sm font-medium text-gray-700">
@@ -675,10 +673,11 @@ function SocialInput({
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={() => setTouched(true)}
         placeholder={placeholder}
-        className={`${inputClass} ${valid ? "" : "border-red-400"}`}
+        className={`${inputClass} ${showError ? "border-red-400" : ""}`}
       />
-      {!valid && (
+      {showError && (
         <p className="mt-1 text-xs text-red-600">
           Paste the profile URL or enter the handle.
         </p>
