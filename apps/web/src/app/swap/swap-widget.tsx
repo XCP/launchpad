@@ -507,8 +507,7 @@ export function SwapWidget({
                       : "text-gray-400"
                 }
               >
-                Price impact {impact > 0 ? "−" : ""}
-                {impact.toFixed(1)}%
+                Price impact {impact.toFixed(1)}%
               </span>
             )}
             {rateText && (

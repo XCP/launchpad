@@ -24,10 +24,20 @@ import {
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
 
 /**
- * Inscribed images live in the reveal witness; Bitcoin's 400k-weight
- * standardness ceiling puts the practical content limit around 400 KB.
+ * Inscribed images live in the reveal witness, chunked into 520-byte
+ * pushes alongside the fairminter's own CBOR metadata in the same
+ * script — both count against Bitcoin's 400,000-weight standardness
+ * ceiling (MAX_STANDARD_TX_WEIGHT; a mempool policy default, not
+ * consensus, but the one that determines whether the reveal tx actually
+ * relays). Worked backward from the exact weight formula
+ * (apps/web/src/lib/inscriber/transactions.ts's estimateRevealWeight):
+ * 400 KB of body already overshoots the ceiling by ~12,700 weight units
+ * in the worst realistic case (long asset name, long hosted JSON URL,
+ * a longer mime type like image/svg+xml) — a launch in that gap would
+ * broadcast a transaction most public mempools simply refuse to relay.
+ * 385 KB keeps every real launch under the ceiling with room to spare.
  */
-const INSCRIBE_MAX_BYTES = 400 * 1024;
+const INSCRIBE_MAX_BYTES = 385 * 1024;
 
 /** A named-asset registration is a fixed protocol fee, paid in the same
  *  compose transaction — not a separate step. */
@@ -398,7 +408,7 @@ export default function CreatePage() {
                   </div>
                   <div className="mt-1 text-xs">
                     PNG, JPEG, WEBP or GIF ·{" "}
-                    {inscribe ? "max 400 KB (inscribing)" : "max 2 MB"} · square
+                    {inscribe ? "max 385 KB (inscribing)" : "max 2 MB"} · square
                     (1:1) recommended
                   </div>
                 </div>
@@ -418,12 +428,12 @@ export default function CreatePage() {
                     The image itself becomes the permanent on-chain description
                     (commit + reveal, two signatures, higher fees scale with image
                     size; the inscription is burned so it belongs to the asset
-                    forever). Max 400 KB. Taproot wallets only.
+                    forever). Max 385 KB. Taproot wallets only.
                   </span>
                   {imageTooBigToInscribe && (
                     <span className="mt-1 block text-xs text-red-600">
                       This image is {(image!.size / 1024).toFixed(0)} KB — inscribing
-                      caps at 400 KB. Use a smaller file or uncheck to host it instead.
+                      caps at 385 KB. Use a smaller file or uncheck to host it instead.
                     </span>
                   )}
                 </span>
