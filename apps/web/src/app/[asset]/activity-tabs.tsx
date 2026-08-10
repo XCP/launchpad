@@ -328,7 +328,7 @@ export function ActivityTabs({
         ) : (
           <>
             <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_9rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-              <span />
+              <span>Address</span>
               <span className="text-right">Mints</span>
               <span className="text-right">Amount</span>
               <span className="text-right">Paid</span>
