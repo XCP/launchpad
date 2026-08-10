@@ -1296,11 +1296,11 @@ export function ArtLightbox({ asset }: { asset: string }) {
           className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:aspect-auto sm:w-auto sm:size-[5.5rem]`}
         />
       </button>
-      <Dialog open={open} onOpenChange={setOpen} title={asset}>
+      <Dialog open={open} onOpenChange={setOpen} title={asset} variant="lightbox">
         <TokenImage
           asset={asset}
           large
-          className="max-h-[70vh] w-full rounded-2xl object-contain"
+          className="h-full w-full rounded-2xl object-contain shadow-2xl"
         />
       </Dialog>
     </>
