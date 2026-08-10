@@ -1274,6 +1274,22 @@ export function BlockAgo({ blockIndex }: { blockIndex: number }) {
   return <>{at ? timeAgo(at) : "—"}</>;
 }
 
+/** "Aug 2026" for a block — a calendar fact, not a relative one, for a
+ *  headline that reads as a record rather than a live countdown. */
+export function BlockMonthYear({ blockIndex }: { blockIndex: number }) {
+  const { data: at } = useSWR(
+    ["block-time", blockIndex],
+    () =>
+      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${blockIndex}`) as Promise<{
+        result: { block_time: number };
+      }>)
+        .then((d) => d.result.block_time)
+        .catch(() => null),
+    { revalidateOnFocus: false },
+  );
+  return <>{at ? monthYear(at) : "—"}</>;
+}
+
 /* ---------- artwork ---------- */
 
 /** The poster art: compact in the card, full-size in a dialog on click.

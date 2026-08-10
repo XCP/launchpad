@@ -5,6 +5,7 @@ import {
   AnnouncedAgo,
   ArtLightbox,
   BlockAgo,
+  BlockMonthYear,
   DenomToggle,
   HostedDescription,
   HostedSocials,
@@ -276,9 +277,34 @@ export function LaunchView({
     const prose = (fm.description ?? "").trim();
     const hasProse =
       prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
+    // Only real prose earns the space: a URL is machine metadata, and a
+    // one-word "description" is noise the poster reads better without.
+    // Shared between phases since it now renders in two different spots —
+    // before the countdown on scheduled, below the live bar on minting.
+    const descriptionBlock = isOurMetadata(fm.description) ? (
+      <HostedDescription url={fm.description} />
+    ) : isUrlDescription ? (
+      // Someone else's host: link it rather than fetch it, so viewing a
+      // launch never reports the visitor to the issuer's server.
+      <p className="mt-5 text-sm text-gray-500">
+        <a
+          href={fm.description}
+          target="_blank"
+          rel="noreferrer nofollow"
+          className="break-all text-purple-600 hover:underline"
+        >
+          {fm.description}
+        </a>
+      </p>
+    ) : (
+      hasProse && <LaunchDescription text={prose} />
+    );
     return (
       <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
       <div className="mx-auto max-w-2xl">
+        {/* Identity, on its own — separate from the countdown/mint-form
+            card below it, the same way every other phase keeps its header
+            apart from its content. */}
         <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
           {/* Art leads on a phone at full width, then steps aside into the
               identity square once there's a column to sit beside. */}
@@ -321,43 +347,28 @@ export function LaunchView({
               />
             </div>
           </div>
+        </div>
 
+        <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
           {standardTerms && !minting && <TermsStrip xcpUsd={xcpUsd} />}
 
-          {/* Once minting is live, the live number IS the description's
-              spot — what the launch is about mattered before anything had
-              happened; how it's going matters now. */}
           {minting ? (
-            mints.length > 0 && (
-              <div className="mt-4">
+            <>
+              {/* The live number leads — how it's going matters most once
+                  minting is real — with the description back underneath
+                  it, the way the scheduled poster always kept it. */}
+              {mints.length > 0 && (
                 <LiveProgress
                   initialEarned={fm.earned_quantity ?? 0}
                   target={saleTarget(fm)}
                   allOrNothing={big(fm.pool_quantity) > 0n}
                   divisible={fm.divisible}
                 />
-              </div>
-            )
-          ) : /* Only real prose earns the space: a URL is machine metadata,
-                 and a one-word "description" is noise the poster reads
-                 better without. */
-          isOurMetadata(fm.description) ? (
-            <HostedDescription url={fm.description} />
-          ) : isUrlDescription ? (
-            /* Someone else's host: link it rather than fetch it, so viewing a
-               launch never reports the visitor to the issuer's server. */
-            <p className="mt-5 text-sm text-gray-500">
-              <a
-                href={fm.description}
-                target="_blank"
-                rel="noreferrer nofollow"
-                className="break-all text-purple-600 hover:underline"
-              >
-                {fm.description}
-              </a>
-            </p>
+              )}
+              {descriptionBlock}
+            </>
           ) : (
-            hasProse && <LaunchDescription text={prose} />
+            descriptionBlock
           )}
 
           {minting ? (
@@ -467,25 +478,30 @@ export function LaunchView({
               </h1>
               <div className="flex flex-wrap items-baseline">
                 <IssuerLine source={fm.source} />
-                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
               </div>
               <IssuerChips source={fm.source} currentAsset={asset} />
-              <p className="mt-3 text-sm text-gray-600">
-                Reached {(progress * 100).toFixed(1)}% of the sale before the
-                deadline. Every XCP escrowed came back and the unsold supply
-                was destroyed — the guarantee, not a rescue.
-              </p>
             </div>
           </div>
 
-          {/* The one number worth reading from across the room. */}
-          <div className="mt-6 border-t border-gray-100 pt-5 text-center">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-              Refunded
+          {/* Two facts, same weight — when, and what came back. Neither
+              is the headline; they're just what happened. */}
+          <div className="mt-6 grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 pt-5 text-center">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Failed on
+              </div>
+              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+                <BlockMonthYear blockIndex={fm.soft_cap_deadline_block} />
+              </div>
             </div>
-            <div className="mt-1 text-4xl font-bold tabular-nums text-gray-900">
-              {commasRaw(fm.paid_quantity)}{" "}
-              <span className="text-xl font-semibold text-gray-400">XCP</span>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Refunded
+              </div>
+              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+                {commasRaw(fm.paid_quantity)}{" "}
+                <span className="text-base font-semibold text-gray-400">XCP</span>
+              </div>
             </div>
           </div>
         </div>
