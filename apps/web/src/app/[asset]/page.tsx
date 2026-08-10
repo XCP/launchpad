@@ -4,6 +4,7 @@ import {
   fetchBlockHeight,
   fetchFairmints,
   fetchFairmintersByAsset,
+  fetchMempoolFairminter,
   fetchOriginalRecord,
   fetchPool,
   fetchPoolPriceHistory,
@@ -74,7 +75,7 @@ export default async function LaunchPage({
   if (!/^[B-Z][A-Z]{3,11}$/.test(asset)) notFound();
 
   const fairminters = await fetchFairmintersByAsset(asset);
-  const fm =
+  let fm =
     // Selection is by parameters only: the timing clauses need the creation
     // event, fetched below. (Also, `find(isXcp69)` would hand the array index
     // in as announceBlock.)
@@ -82,17 +83,44 @@ export default async function LaunchPage({
     (SHOW_NONCONFORMING
       ? fairminters.find((f) => !f.status.startsWith("invalid"))
       : undefined);
-  if (!fm) notFound();
 
-  const [mints, blockHeight, pool, original, xcpUsd, btcUsd, feeSats] = await Promise.all([
-    // A pending fairminter cannot have mints yet; don't ask.
-    fm.status === "pending" ? Promise.resolve([]) : fetchFairmints(fm.tx_hash),
-    fetchBlockHeight(),
+  // blockHeight is needed up front now: a mempool-sourced fm needs it to
+  // compute a real status (mempool-time status is computed against
+  // counterparty-core's own sentinel height, so it always reads "open"
+  // even for a launch whose start_block is still days out).
+  const blockHeight = await fetchBlockHeight();
+  let isPendingConfirmation = false;
+
+  if (!fm) {
+    // Nothing confirmed yet doesn't mean nothing exists — a launch page
+    // visited right after its own creation is broadcast, not confirmed.
+    // /assets/{asset}/fairminters only ever returns confirmed rows, so
+    // check the mempool before giving up. Shaped as an ordinary Fairminter
+    // so it flows through the same Scheduled/Minting view as everything
+    // else — no separate "pending" page to keep in sync.
+    const pending = fairminters.length === 0 ? await fetchMempoolFairminter(asset) : null;
+    if (!pending) notFound();
+    fm = {
+      ...pending,
+      status: pending.start_block > blockHeight ? "pending" : "open",
+      confirmed: false,
+    };
+    isPendingConfirmation = true;
+  }
+
+  const [mints, pool, original, xcpUsd, btcUsd, feeSats] = await Promise.all([
+    // A pending fairminter cannot have mints yet; don't ask. Same for
+    // anything still unconfirmed — the tx_hash isn't indexed yet either.
+    fm.status === "pending" || isPendingConfirmation
+      ? Promise.resolve([])
+      : fetchFairmints(fm.tx_hash),
     fm.status === "closed" ? fetchPool(asset) : Promise.resolve(null),
     // The row mutates once a launch leaves "pending" — its block_index
     // becomes the opening block and a closed window becomes the settlement
     // block — so both timing clauses are judged on the creation event.
-    fm.status !== "pending" && xcp69Params(fm)
+    // An unconfirmed launch skips this too: isXcp69's own confirmed-false
+    // path already treats the pre-announcement clause as satisfied.
+    fm.status !== "pending" && !isPendingConfirmation && xcp69Params(fm)
       ? fetchOriginalRecord(fm.tx_hash)
       : Promise.resolve({ deadline: null, announceBlock: null }),
     fetchXcpUsd(),
@@ -102,7 +130,9 @@ export default async function LaunchPage({
     fetchBtcUsd(),
     // Bitcoin-side fee data only apps/api has; only the minting stat strip
     // reads it, so don't ask outside that phase.
-    fm.status === "open" ? fetchLaunchFees(asset) : Promise.resolve(null),
+    fm.status === "open" && !isPendingConfirmation
+      ? fetchLaunchFees(asset)
+      : Promise.resolve(null),
   ]);
   const conforming =
     isXcp69(fm, original.announceBlock) &&

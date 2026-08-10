@@ -259,6 +259,49 @@ export async function fetchPoolVolume24h(
   return { volumeXcpRaw: volumeXcpRaw.toString(), trades };
 }
 
+interface MempoolFairminterEvent {
+  tx_hash: string;
+  // The mempool-time params shape is already field-for-field the same
+  // record /fairminters returns once confirmed — Fairminter minus the
+  // two fields that only exist once mints happen.
+  params: Omit<Fairminter, "earned_quantity" | "paid_quantity" | "confirmed">;
+}
+
+/**
+ * A fairminter that's been broadcast but hasn't confirmed yet, shaped as an
+ * ordinary Fairminter so it can go straight through the normal LaunchView
+ * pipeline — no separate "pending" page. /assets/{asset}/fairminters only
+ * ever returns confirmed rows, so a launch page for a still-in-mempool
+ * fairminter 404s unless something checks the mempool event stream
+ * separately. No asset filter on that endpoint, but NEW_FAIRMINTER is a
+ * low-volume event — one page is always enough in practice. No caching:
+ * mempool state is only worth reading fresh, and this only runs on the
+ * 404-fallback path anyway.
+ *
+ * `status` here is whatever counterparty-core computed at mempool-parse
+ * time against its MEMPOOL_BLOCK_INDEX sentinel, which makes any future
+ * start_block look already-reached — always "open", never "pending". The
+ * caller must recompute status from the real chain height instead of
+ * trusting this one. `confirmed: false` (not set here — the caller adds
+ * it) is what makes isXcp69's pre-announcement check pass optimistically
+ * pre-confirmation, the same path a mempool `block_index` sentinel takes.
+ */
+export async function fetchMempoolFairminter(
+  asset: string,
+): Promise<Fairminter | null> {
+  try {
+    const data = await get<{ result: MempoolFairminterEvent[] }>(
+      `/mempool/events/NEW_FAIRMINTER?limit=500`,
+      0,
+    );
+    const event = data.result.find((e) => e.params.asset === asset);
+    if (!event) return null;
+    return { ...event.params, earned_quantity: null, paid_quantity: null };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchBlockHeight(): Promise<number> {
   const data = await get<{ result: { counterparty_height: number } }>("/", 30);
   return data.result.counterparty_height;
