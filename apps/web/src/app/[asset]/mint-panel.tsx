@@ -258,7 +258,7 @@ export function MintPanel({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
-          <ErrorBanner className="mb-2">{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
         )}
         {walletStatus !== "connected" ? (
           <ConnectButton />

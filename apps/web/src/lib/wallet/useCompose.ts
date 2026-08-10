@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useWallet } from './wallet-context'
 import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
 import { parseTxInputs, type TxInput } from './raw-tx'
@@ -149,6 +149,18 @@ export function useCompose() {
   const { address, signTransaction, broadcastTransaction } = useWallet()
   const [state, setState] = useState<ComposeState>(INITIAL_STATE)
   const busyRef = useRef(false)
+
+  // A stale error (e.g. "Wallet not authorized") shouldn't outlive the
+  // condition that caused it. Connecting, switching, or disconnecting the
+  // wallet clears it automatically instead of waiting for the user to
+  // resubmit the exact same action.
+  const lastAddressRef = useRef(address)
+  useEffect(() => {
+    if (lastAddressRef.current !== address) {
+      lastAddressRef.current = address
+      setState((s) => (s.status === 'error' ? INITIAL_STATE : s))
+    }
+  }, [address])
 
   /**
    * Compose → sign → broadcast pipeline. `getUnsigned` returns both the hex

@@ -571,7 +571,7 @@ export function SwapWidget({
         )}
 
         {compose.status === "error" && (
-          <ErrorBanner className="mb-2">{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (
