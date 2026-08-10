@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { TokenImage } from "@/components/token-image";
 import {
   AddressHoverCard,
   AnnouncedAgo,
@@ -37,16 +36,14 @@ import {
   tokenQty,
   usd,
 } from "@/lib/format";
-import { big, maxRaw, ratio, rawEquals } from "@/lib/numeric";
+import { big, ratio, rawEquals } from "@/lib/numeric";
 import {
   type Fairminter,
   isHouseLpName,
   XCP69_EXACT,
   type LaunchPhase,
-  openingMultiple,
   saleProgress,
   saleTarget,
-  XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
 import { ActivityTabs } from "./activity-tabs";
 import { AssetTradeSurface } from "./asset-trade-surface";
@@ -111,10 +108,6 @@ export function LaunchView({
     byAddress.set(m.source, (byAddress.get(m.source) ?? 0n) + big(m.earn_quantity));
   }
   const participants = byAddress.size;
-  const topShare =
-    byAddress.size > 0
-      ? ratio([...byAddress.values()].reduce(maxRaw, 0n), fm.earned_quantity)
-      : 0;
   // Biggest minters first — the addresses worth checking for freshness.
   const minterAddresses = [...byAddress.entries()]
     .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
@@ -140,113 +133,57 @@ export function LaunchView({
   // launches with a market to look at.
   const hasAside = phase === "graduated" && pool !== null;
 
-  /* Header right: the one number that answers "how's it doing?" */
-  const headline =
-    phase === "graduated" && pool ? (
-      <div className="text-right">
-        <div className="text-xl font-bold tabular-nums text-gray-900">
-          {formatPrice(spot)} <span className="text-sm font-medium text-gray-500">XCP</span>
-        </div>
-        <div className="mt-0.5 text-xs text-gray-500">
-          {xcpUsd ? `${usd(spot * xcpUsd)} · ` : ""}
-          {multiple ? `${multiple.toFixed(2)}× mint` : ""}
-          {change !== null && (
-            <span
-              className={`ml-1.5 font-semibold ${
-                change >= 0 ? "text-green-600" : "text-red-600"
-              }`}
-            >
-              {change >= 0 ? "+" : ""}
-              {change.toFixed(1)}%
-            </span>
-          )}
-        </div>
-      </div>
-    ) : phase === "minting" ? (
-      <div className="text-right">
-        <div className="text-xl font-bold tabular-nums text-gray-900">
-          {(progress * 100).toFixed(1)}%{" "}
-          <span className="text-sm font-medium text-gray-500">sold</span>
-        </div>
-        <div className="mt-0.5 text-xs text-gray-500">
-          {fm.soft_cap_deadline_block > 0
-            ? `${blocksEta(fm.soft_cap_deadline_block - blockHeight)} left`
-            : "no deadline"}
-        </div>
-      </div>
-    ) : (
-      // Refunded gets its own tombstone view entirely (see below); this
-      // fallback is only reached by a classic (non-pool) fairminter that
-      // met its target — "graduated" without a pool to show a spot price for.
-      <div className="text-right">
-        <div className="text-xl font-bold text-gray-400">minted out</div>
-        <div className="mt-0.5 text-xs text-gray-500">
-          reached {(progress * 100).toFixed(1)}%
-        </div>
-      </div>
-    );
+  // Only "graduated" (pool or not) ever reaches this point — scheduled,
+  // minting, and refunded all return their own views earlier. The change
+  // shown beside spot is real signed data (unlike price impact elsewhere),
+  // so it keeps its own +/- rather than borrowing the site's usual
+  // unsigned-magnitude convention.
+  const priceChangeNode =
+    change !== null ? (
+      <span
+        className={`ml-1.5 font-semibold ${
+          change >= 0 ? "text-green-600" : "text-red-600"
+        }`}
+      >
+        {change >= 0 ? "+" : ""}
+        {change.toFixed(1)}%
+      </span>
+    ) : null;
 
   /* The stat strip: dense, phase-specific, no prose. */
-  const strip: [string, string, string?][] =
-    phase === "graduated" && pool
-      ? [
-          ["Market cap", mcapUsd ? usd(mcapUsd) : "—"],
-          [
-            "Sold out in",
-            `${(fm.soft_cap_deadline_block - fm.start_block).toLocaleString()} block${
-              fm.soft_cap_deadline_block - fm.start_block === 1 ? "" : "s"
-            }`,
-            "From mint-open to the block that filled the sale — consensus rewrites the deadline to the fill block",
-          ],
-          [
-            "Liquidity",
-            `${commas(Math.round(poolXcp))} XCP${
-              xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""
-            }`,
-            "XCP side of the locked pool",
-          ],
-          ["Supply", compact(supplyTokens)],
-          ["Participants", String(participants)],
-          [
-            "LP",
-            isHouseLpName(pool.lp_asset) ? "burned ✓" : "burned",
-            `${pool.lp_asset} — minted to the unspendable address; liquidity can never leave`,
-          ],
-        ]
-      : phase === "minting"
-        ? [
-            [
-              "Raised",
-              `${commasRaw(fm.paid_quantity)} XCP${
-                xcpUsd ? ` (${usd(fromSats(fm.paid_quantity) * xcpUsd)})` : ""
-              }`,
-            ],
-            [
-              "At close",
-              openingMultiple(fm)
-                ? `pool opens ${openingMultiple(fm)!.toFixed(2)}× mint`
-                : "no pool",
-            ],
-            [
-              "Participants",
-              `${participants} / ${XCP69_MIN_PARTICIPANTS}+`,
-              `Success requires at least ${XCP69_MIN_PARTICIPANTS} distinct addresses`,
-            ],
-            [
-              "Top address",
-              `${(topShare * 100).toFixed(1)}%`,
-              "Share of the sale held by the largest single address (cap 1.45%). Per address, not per person — it raises the cost of faking a crowd, it cannot prevent one.",
-            ],
-            ["Mints", String(mints.length)],
-          ]
-        : // Same as above: only a classic fairminter that met its target
-          // reaches this fallback now that refunded has its own view.
-          [
-            ["Reached", `${(progress * 100).toFixed(1)}%`],
-            ["Participants", String(participants)],
-            ["Raised", `${commasRaw(fm.paid_quantity)} XCP`],
-            ["Supply", compact(supplyTokens)],
-          ];
+  const strip: [string, string, string?][] = pool
+    ? [
+        ["Market cap", mcapUsd ? usd(mcapUsd) : "—"],
+        [
+          "Sold out in",
+          `${(fm.soft_cap_deadline_block - fm.start_block).toLocaleString()} block${
+            fm.soft_cap_deadline_block - fm.start_block === 1 ? "" : "s"
+          }`,
+          "From mint-open to the block that filled the sale — consensus rewrites the deadline to the fill block",
+        ],
+        [
+          "Liquidity",
+          `${commas(Math.round(poolXcp))} XCP${
+            xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""
+          }`,
+          "XCP side of the locked pool",
+        ],
+        ["Supply", compact(supplyTokens)],
+        ["Participants", String(participants)],
+        [
+          "LP",
+          isHouseLpName(pool.lp_asset) ? "burned ✓" : "burned",
+          `${pool.lp_asset} — minted to the unspendable address; liquidity can never leave`,
+        ],
+      ]
+    : // A classic fairminter that met its target — "graduated" without a
+      // pool to show a spot price for.
+      [
+        ["Reached", `${(progress * 100).toFixed(1)}%`],
+        ["Participants", String(participants)],
+        ["Raised", `${commasRaw(fm.paid_quantity)} XCP`],
+        ["Supply", compact(supplyTokens)],
+      ];
 
   // Scheduled: a poster, not a terminal — nothing has happened yet, so
   // there is nothing to tabulate. Identity and issuer up top, a living
@@ -595,32 +532,87 @@ export function LaunchView({
 
   return (
     <div>
-      {/* Identity + headline: how's it doing, at a glance */}
-      <div className="flex flex-wrap items-center gap-3">
-        <TokenImage
-          asset={asset}
-          large
-          className="size-12 rounded-lg bg-gray-100 object-cover shadow-sm"
-        />
-        <div className="min-w-0">
-          <h1 className="flex items-center gap-2 text-xl font-bold leading-tight">
-            {asset}
-            <StatusPill phase={phase} hasPool={pool !== null} />
-            {!conforming && (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
-                not XCP-69
-              </span>
-            )}
-          </h1>
-          <p className="mt-0.5 text-xs text-gray-500">
-            by {shortAddress(fm.source)} · {phase}
-          </p>
+      {/* Identity, same shape every other phase uses: compact art with its
+          own lightbox, issuer line with copy + hover card, announced-ago,
+          issuer chips, share button in the standard corner. Only the "one
+          number worth reading from across the room" changes per phase —
+          here it's spot price instead of a countdown or a refund total. */}
+      <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+          <ArtLightbox asset={asset} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2 sm:pr-24">
+              <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                {asset}
+                <StatusPill phase={phase} hasPool={pool !== null} />
+                {!conforming && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    not XCP-69
+                  </span>
+                )}
+              </h1>
+              <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
+                <ShareButton
+                  asset={asset}
+                  headline={pool ? `${formatPrice(spot)} XCP` : "minted out"}
+                  subline={
+                    conforming
+                      ? "0.01 XCP / 1,000 · sells out or refunds"
+                      : "an XCP fairminter on xcp.fun"
+                  }
+                />
+              </div>
+            </div>
+            <div className="flex flex-wrap items-baseline sm:pr-24">
+              <IssuerLine source={fm.source} />
+              <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+            </div>
+            <IssuerChips
+              source={fm.source}
+              currentAsset={asset}
+              trailing={
+                isOurMetadata(fm.description) ? (
+                  <HostedSocials url={fm.description} asset={asset} />
+                ) : isInscribed ? (
+                  <InscriptionChip txHash={fm.tx_hash} />
+                ) : null
+              }
+            />
+          </div>
         </div>
-        <div className="ml-auto">{headline}</div>
+
+        <div className="mt-6 border-t border-gray-100 pt-5 text-center">
+          {pool ? (
+            <>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Spot price
+              </div>
+              <div className="mt-1 text-4xl font-bold tabular-nums text-gray-900">
+                {formatPrice(spot)}{" "}
+                <span className="text-xl font-semibold text-gray-400">XCP</span>
+              </div>
+              <div className="mt-1 text-sm text-gray-500">
+                {xcpUsd ? `${usd(spot * xcpUsd)} · ` : ""}
+                {multiple ? `${multiple.toFixed(2)}× mint` : ""}
+                {priceChangeNode}
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+                Minted out
+              </div>
+              <div className="mt-1 text-2xl font-bold text-gray-400">
+                reached {(progress * 100).toFixed(1)}%
+              </div>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* Stat strip — the terminal row */}
-      <div className="mt-4 flex flex-wrap gap-x-8 gap-y-3 border-y border-gray-200 py-3">
+      {/* Stat strip — its own card, same grammar as minting's and
+          refunded's. */}
+      <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
         {strip.map(([label, value, hint]) => {
           const cell = (
             <div
@@ -648,8 +640,8 @@ export function LaunchView({
       <div
         className={
           hasAside
-            ? "mt-5 lg:grid lg:grid-cols-[21rem_minmax(0,1fr)] lg:items-start lg:gap-6"
-            : "mt-5"
+            ? "mt-4 lg:grid lg:grid-cols-[21rem_minmax(0,1fr)] lg:items-start lg:gap-6"
+            : "mt-4"
         }
       >
       {/* Aside first (pons grammar): do I want in, do I want out */}
