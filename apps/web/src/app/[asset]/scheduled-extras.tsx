@@ -1257,11 +1257,36 @@ export function AnnouncedAgo({
   );
 }
 
+/** Relative time since a block, for facts with no single transaction to
+ *  point at the way an announcement has — a refund settles as a ledger
+ *  event inside the deadline block, not a transaction of its own. */
+export function BlockAgo({ blockIndex }: { blockIndex: number }) {
+  const { data: at } = useSWR(
+    ["block-time", blockIndex],
+    () =>
+      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${blockIndex}`) as Promise<{
+        result: { block_time: number };
+      }>)
+        .then((d) => d.result.block_time)
+        .catch(() => null),
+    { revalidateOnFocus: false },
+  );
+  return <>{at ? timeAgo(at) : "—"}</>;
+}
+
 /* ---------- artwork ---------- */
 
 /** The poster art: compact in the card, full-size in a dialog on click.
- *  The shared Dialog brings focus trapping, Escape, and scroll lock. */
-export function ArtLightbox({ asset }: { asset: string }) {
+ *  The shared Dialog brings focus trapping, Escape, and scroll lock.
+ *  `size` "large" gives the desktop side a real presence (a plaque photo,
+ *  not an icon) — mobile stays full-width either way. */
+export function ArtLightbox({
+  asset,
+  size = "compact",
+}: {
+  asset: string;
+  size?: "compact" | "large";
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -1272,11 +1297,14 @@ export function ArtLightbox({ asset }: { asset: string }) {
         className={`group w-full shrink-0 cursor-zoom-in rounded-2xl sm:w-auto ${FOCUS}`}
       >
         {/* A poster on a phone: full width, then the compact identity square
-            once there's a column to sit beside. */}
+            (or, for "large", a real plaque-sized photo) once there's a
+            column to sit beside. */}
         <TokenImage
           asset={asset}
           large
-          className="aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:size-[5.5rem] sm:aspect-auto sm:w-auto"
+          className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:aspect-auto sm:w-auto ${
+            size === "large" ? "sm:size-40" : "sm:size-[5.5rem]"
+          }`}
         />
       </button>
       <Dialog open={open} onOpenChange={setOpen} title={asset}>

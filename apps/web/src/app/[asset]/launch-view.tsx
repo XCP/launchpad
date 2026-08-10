@@ -3,6 +3,7 @@ import { TokenImage } from "@/components/token-image";
 import {
   AnnouncedAgo,
   ArtLightbox,
+  BlockAgo,
   DenomToggle,
   HostedDescription,
   HostedSocials,
@@ -166,10 +167,11 @@ export function LaunchView({
         </div>
       </div>
     ) : (
+      // Refunded gets its own tombstone view entirely (see below); this
+      // fallback is only reached by a classic (non-pool) fairminter that
+      // met its target — "graduated" without a pool to show a spot price for.
       <div className="text-right">
-        <div className="text-xl font-bold text-gray-400">
-          {phase === "refunded" ? "refunded" : "minted out"}
-        </div>
+        <div className="text-xl font-bold text-gray-400">minted out</div>
         <div className="mt-0.5 text-xs text-gray-500">
           reached {(progress * 100).toFixed(1)}%
         </div>
@@ -229,14 +231,13 @@ export function LaunchView({
             ],
             ["Mints", String(mints.length)],
           ]
-        : [
+        : // Same as above: only a classic fairminter that met its target
+          // reaches this fallback now that refunded has its own view.
+          [
             ["Reached", `${(progress * 100).toFixed(1)}%`],
             ["Participants", String(participants)],
-            [
-              phase === "refunded" ? "Returned" : "Raised",
-              `${commasRaw(fm.paid_quantity)} XCP`,
-            ],
-            ["Supply", phase === "refunded" ? "destroyed" : compact(supplyTokens)],
+            ["Raised", `${commasRaw(fm.paid_quantity)} XCP`],
+            ["Supply", compact(supplyTokens)],
           ];
 
   // Scheduled: a poster, not a terminal — nothing has happened yet, so
@@ -434,6 +435,92 @@ export function LaunchView({
     );
   }
 
+  // Refunded: a tombstone, not a terminal — there's no market to look at
+  // and nothing left to track live, only what happened. One plaque: art
+  // beside the facts, the guarantee's own receipt (the XCP that came back)
+  // as the one number big enough to read from across the room.
+  if (phase === "refunded") {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
+            <ArtLightbox asset={asset} size="large" />
+            <div className="min-w-0 flex-1">
+              <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                {asset}
+                <StatusPill phase={phase} hasPool={false} />
+                {!conforming && (
+                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    not XCP-69
+                  </span>
+                )}
+              </h1>
+              <div className="mt-1 flex flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+              </div>
+              <p className="mt-3 text-sm text-gray-600">
+                Reached {(progress * 100).toFixed(1)}% of the sale before the
+                deadline. Every XCP escrowed was returned by the protocol and
+                the unsold supply destroyed — nobody was left holding a dead
+                token; this is what the guarantee is for.
+              </p>
+            </div>
+          </div>
+
+          {/* The one number worth reading from across the room. */}
+          <div className="mt-6 border-t border-gray-100 pt-5 text-center">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              Refunded
+            </div>
+            <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+              {commasRaw(fm.paid_quantity)} XCP
+            </div>
+          </div>
+
+          <div className="mt-5 grid grid-cols-2 gap-3 border-t border-gray-100 pt-5 sm:grid-cols-4">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                Participants
+              </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                {participants}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                Mints
+              </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                {mints.length}
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                Reached
+              </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                {(progress * 100).toFixed(1)}%
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                Closed
+              </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          <EditPanel asset={asset} issuer={fm.source} />
+          <ActivityTabs asset={asset} mints={mints} divisible={fm.divisible} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div>
       {/* Identity + headline: how's it doing, at a glance */}
@@ -527,21 +614,6 @@ export function LaunchView({
             blockHeight={blockHeight}
             xcpUsd={xcpUsd}
           />
-        </div>
-      )}
-
-      {phase === "refunded" && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
-          <h2 className="text-sm font-semibold text-gray-700">
-            Refunded by consensus — the guarantee executed
-          </h2>
-          <p className="mt-1.5 text-sm text-gray-600">
-            Reached {(progress * 100).toFixed(1)}% with {participants} of the
-            69 addresses a sellout requires. Every one of the{" "}
-            {commasRaw(fm.paid_quantity)} XCP escrowed was returned by
-            the protocol and the unsold supply destroyed. Nobody was left
-            holding a dead token — this is what the guarantee is for.
-          </p>
         </div>
       )}
 
