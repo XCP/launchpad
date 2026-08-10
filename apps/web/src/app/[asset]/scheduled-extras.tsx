@@ -640,7 +640,7 @@ export function ParticipantsStat({
       <div className={LABEL}>Holders</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
         {participants}
-        {data && data.known > 0 ? ` · ${data.newAddresses.size} new` : ""}
+        {data && data.known > 0 ? ` · ${data.newAddresses.size} no history` : ""}
       </div>
     </div>
   );

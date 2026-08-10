@@ -369,7 +369,7 @@ export function ActivityTabs({
                       )}
                       {freshness?.newAddresses.has(r.source) && (
                         <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
-                          new
+                          no history
                         </span>
                       )}
                     </span>
