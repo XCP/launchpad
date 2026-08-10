@@ -387,7 +387,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
       ];
 
   return (
-    <div className="mt-5 border-y border-gray-100 py-4">
+    <div className="mt-5 border-t border-gray-100 py-4">
       {/* Four columns only once the card is wide enough for them: at the sm
           breakpoint the card is still 640px and the last value wraps. */}
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -452,7 +452,15 @@ function useHostedMeta(url: string) {
  * copy, clamped to three lines so a rambling description can never push the
  * countdown below the fold.
  */
-export function LaunchDescription({ text }: { text: string }) {
+export function LaunchDescription({
+  text,
+  marginClassName = "mt-5",
+}: {
+  text: string;
+  /** Override the top margin — minting lines this up with the live
+   *  progress card above it, which scheduled doesn't need. */
+  marginClassName?: string;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [overflows, setOverflows] = useState(false);
   const ref = useRef<HTMLParagraphElement>(null);
@@ -461,7 +469,7 @@ export function LaunchDescription({ text }: { text: string }) {
     if (el) setOverflows(el.scrollHeight > el.clientHeight + 1);
   }, [text]);
   return (
-    <blockquote className="mt-5 border-l-[3px] border-purple-100 pl-4">
+    <blockquote className={`${marginClassName} border-l-[3px] border-purple-100 pl-4`}>
       <p
         ref={ref}
         className={`text-sm leading-relaxed text-gray-600 ${
@@ -485,14 +493,20 @@ export function LaunchDescription({ text }: { text: string }) {
 
 /** Description for launches whose on-chain description is our hosted
  *  metadata JSON — fetch it and show the human words inside. */
-export function HostedDescription({ url }: { url: string }) {
+export function HostedDescription({
+  url,
+  marginClassName,
+}: {
+  url: string;
+  marginClassName?: string;
+}) {
   const { data } = useHostedMeta(url);
   const text =
     data && typeof data.description === "string" && data.description.trim()
       ? data.description.trim()
       : null;
   if (!text) return null;
-  return <LaunchDescription text={text} />;
+  return <LaunchDescription text={text} marginClassName={marginClassName} />;
 }
 
 const SOCIAL_ICONS: Record<string, { label: string; path: string }> = {
@@ -621,26 +635,15 @@ export function useAddressFreshness(addresses: string[], blockHeight: number) {
   ).data;
 }
 
-/**
- * Participants, with the freshly-created-wallet count folded in as a
- * sub-fact rather than its own grid cell.
- */
-export function ParticipantsStat({
-  participants,
-  addresses,
-  blockHeight,
-}: {
-  participants: number;
-  addresses: string[];
-  blockHeight: number;
-}) {
-  const data = useAddressFreshness(addresses, blockHeight);
+/** Distinct addresses that have minted. Individual no-history addresses
+ *  are already flagged in the table below, so the count here doesn't
+ *  repeat that — just how many, in plain terms. */
+export function ParticipantsStat({ participants }: { participants: number }) {
   return (
     <div>
       <div className={LABEL}>Holders</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-        {participants}
-        {data && data.known > 0 ? ` · ${data.newAddresses.size} no history` : ""}
+        {participants} addresses
       </div>
     </div>
   );

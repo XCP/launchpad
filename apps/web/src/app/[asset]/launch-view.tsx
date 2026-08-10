@@ -284,26 +284,28 @@ export function LaunchView({
       prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
     // Only real prose earns the space: a URL is machine metadata, and a
     // one-word "description" is noise the poster reads better without.
-    // Shared between phases since it now renders in two different spots —
-    // before the countdown on scheduled, below the live bar on minting.
-    const descriptionBlock = isOurMetadata(fm.description) ? (
-      <HostedDescription url={fm.description} />
-    ) : isUrlDescription ? (
-      // Someone else's host: link it rather than fetch it, so viewing a
-      // launch never reports the visitor to the issuer's server.
-      <p className="mt-5 text-sm text-gray-500">
-        <a
-          href={fm.description}
-          target="_blank"
-          rel="noreferrer nofollow"
-          className="break-all text-purple-600 hover:underline"
-        >
-          {fm.description}
-        </a>
-      </p>
-    ) : (
-      hasProse && <LaunchDescription text={prose} />
-    );
+    // Shared between phases since it renders in two different spots —
+    // before the countdown on scheduled, below the live bar on minting —
+    // each needing its own top margin to land in the same visual place.
+    const renderDescription = (marginClassName: string) =>
+      isOurMetadata(fm.description) ? (
+        <HostedDescription url={fm.description} marginClassName={marginClassName} />
+      ) : isUrlDescription ? (
+        // Someone else's host: link it rather than fetch it, so viewing a
+        // launch never reports the visitor to the issuer's server.
+        <p className={`${marginClassName} text-sm text-gray-500`}>
+          <a
+            href={fm.description}
+            target="_blank"
+            rel="noreferrer nofollow"
+            className="break-all text-purple-600 hover:underline"
+          >
+            {fm.description}
+          </a>
+        </p>
+      ) : (
+        hasProse && <LaunchDescription text={prose} marginClassName={marginClassName} />
+      );
     return (
       <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
       <div className="mx-auto max-w-2xl">
@@ -360,7 +362,7 @@ export function LaunchView({
               about the launch" anymore, just the countdown or the form. */}
           {!minting && standardTerms && <TermsStrip xcpUsd={xcpUsd} />}
           {minting && mints.length > 0 && (
-            <div className="mt-4">
+            <div className="mt-5 border-t border-gray-100 pb-2 pt-4">
               <LiveProgress
                 initialEarned={fm.earned_quantity ?? 0}
                 target={saleTarget(fm)}
@@ -369,7 +371,7 @@ export function LaunchView({
               />
             </div>
           )}
-          {descriptionBlock}
+          {renderDescription("mt-5")}
         </div>
 
         {minting ? (
@@ -413,11 +415,7 @@ export function LaunchView({
             {feeSats && feeSats.mints > 0 && (
               <TxFeesStat totalFeeSats={feeSats.totalFeeSats} btcUsd={btcUsd} />
             )}
-            <ParticipantsStat
-              participants={participants}
-              addresses={minterAddresses}
-              blockHeight={blockHeight}
-            />
+            <ParticipantsStat participants={participants} />
             <div>
               <div className="flex items-start justify-between gap-2">
                 <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
@@ -517,7 +515,7 @@ export function LaunchView({
         <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
           <div>
             <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-              Participants
+              Holders
             </div>
             <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
               {participants}
