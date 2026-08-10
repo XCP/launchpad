@@ -437,78 +437,112 @@ export function LaunchView({
     );
   }
 
-  // Refunded: a tombstone, not a terminal. There's no market, no live
-  // holders (supply was destroyed), no orders — nothing here is still
-  // happening, so nothing here should look like it is. The art leads, full
-  // width and faded; the outcome (XCP back, not the asset's own branding)
-  // is the first thing stated; the facts read like an epitaph line, not a
-  // dashboard; and the record of who showed up is a plain list, not the
-  // full trading-terminal activity tabs — those tabs are structurally
-  // empty for a dead asset, and giving it that chrome would overstate it.
+  // Refunded: the same card, pill, and stat-cell grammar every other phase
+  // uses — just told what actually happened here. There's no market, no
+  // live holders (supply was destroyed), no orders, so nothing tries to
+  // look live: the art is bigger than any other phase's and muted, there's
+  // no edit affordance and no CTA, and the record of who showed up is a
+  // plain list rather than the trading-terminal activity tabs, whose
+  // Trades/Holders/Orders tabs would just be empty here.
   if (phase === "refunded") {
     const topMinters = minterAddresses.slice(0, 8);
     const extraMinters = minterAddresses.length - topMinters.length;
     return (
       <div className="mx-auto max-w-2xl">
-        <ArtLightbox asset={asset} size="hero" muted />
+        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          <ArtLightbox asset={asset} size="hero" muted />
 
-        <div className="mt-7 text-center">
-          <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
-            Refunded by consensus
+          <div className="mt-5">
+            <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+              {asset}
+              <StatusPill phase={phase} hasPool={false} />
+              {!conforming && (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                  not XCP-69
+                </span>
+              )}
+            </h1>
+            <div className="mt-1 flex flex-wrap items-baseline">
+              <IssuerLine source={fm.source} />
+            </div>
+            <p className="mt-3 text-sm text-gray-600">
+              Reached {(progress * 100).toFixed(1)}% of the sale before the
+              deadline. Every XCP escrowed came back and the unsold supply
+              was destroyed — the guarantee, not a rescue.
+            </p>
           </div>
-          <div className="mt-1 text-5xl font-bold tabular-nums text-gray-900">
-            {commasRaw(fm.paid_quantity)}{" "}
-            <span className="text-2xl font-semibold text-gray-400">XCP</span>
+
+          {/* The one number worth reading from across the room. */}
+          <div className="mt-6 border-t border-gray-100 pt-5 text-center">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              Refunded
+            </div>
+            <div className="mt-1 text-4xl font-bold tabular-nums text-gray-900">
+              {commasRaw(fm.paid_quantity)}{" "}
+              <span className="text-xl font-semibold text-gray-400">XCP</span>
+            </div>
           </div>
-          <p className="mx-auto mt-3 max-w-sm text-sm text-gray-500">
-            {asset} reached {(progress * 100).toFixed(1)}% of its sale before
-            the deadline. Every XCP escrowed came back and the unsold supply
-            was destroyed — the guarantee, not a rescue.
-          </p>
         </div>
 
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-[13px] text-gray-400">
-          <span className="inline-flex items-center gap-1.5">
-            {asset}
-            {!conforming && (
-              <span className="rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
-                not XCP-69
-              </span>
-            )}
-          </span>
-          <span aria-hidden>·</span>
-          <IssuerLine source={fm.source} />
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 border-t border-gray-100 pt-5 text-center text-xs text-gray-400 tabular-nums">
-          <span>{participants} minters</span>
-          <span aria-hidden>·</span>
-          <span>{mints.length} mints</span>
-          <span aria-hidden>·</span>
-          <span>
-            closed <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
-          </span>
+        <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Participants
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              {participants}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Mints
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              {mints.length}
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Reached
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              {(progress * 100).toFixed(1)}%
+            </div>
+          </div>
+          <div>
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+              Closed
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
+            </div>
+          </div>
         </div>
 
         {topMinters.length > 0 && (
-          <div className="mt-8 border-t border-gray-100 pt-5">
-            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-5">
+            <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
               Who was here
             </div>
-            <ul className="mt-3 space-y-2.5">
-              {topMinters.map((source) => (
+            <ul className="mt-3 divide-y divide-gray-100">
+              {topMinters.map((source, i) => (
                 <li
                   key={source}
-                  className="flex items-center justify-between gap-3 text-sm"
+                  className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0"
                 >
-                  <AddressHoverCard
-                    source={source}
-                    className="flex min-w-0 items-center gap-2 font-mono text-gray-500 hover:text-purple-700"
-                  >
-                    <Identicon address={source} />
-                    <span className="truncate">{shortAddress(source)}</span>
-                  </AddressHoverCard>
-                  <span className="shrink-0 tabular-nums text-gray-400">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="w-4 shrink-0 text-xs text-gray-400 tabular-nums">
+                      {i + 1}
+                    </span>
+                    <AddressHoverCard
+                      source={source}
+                      className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700"
+                    >
+                      <Identicon address={source} />
+                      <span className="truncate">{shortAddress(source)}</span>
+                    </AddressHoverCard>
+                  </span>
+                  <span className="shrink-0 tabular-nums text-gray-500">
                     {commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))}{" "}
                     {asset}
                   </span>
