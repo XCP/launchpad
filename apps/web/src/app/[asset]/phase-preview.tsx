@@ -20,6 +20,7 @@ interface RealProps {
   pool: Pool | null;
   priceHistory: PoolSnapshot[];
   xcpUsd: number | null;
+  btcUsd: number | null;
   feeSats: FeeSummary | null;
 }
 

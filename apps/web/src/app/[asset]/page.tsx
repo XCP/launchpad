@@ -9,7 +9,7 @@ import {
   fetchPoolPriceHistory,
 } from "@/lib/api/counterparty";
 import { fetchLaunchFees } from "@/lib/api/launchpad-api";
-import { fetchXcpUsd } from "@/lib/api/price";
+import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import {
   isXcp69,
@@ -81,7 +81,7 @@ export default async function LaunchPage({
       : undefined);
   if (!fm) notFound();
 
-  const [mints, blockHeight, pool, original, xcpUsd, feeSats] = await Promise.all([
+  const [mints, blockHeight, pool, original, xcpUsd, btcUsd, feeSats] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask.
     fm.status === "pending" ? Promise.resolve([]) : fetchFairmints(fm.tx_hash),
     fetchBlockHeight(),
@@ -93,6 +93,10 @@ export default async function LaunchPage({
       ? fetchOriginalRecord(fm.tx_hash)
       : Promise.resolve({ deadline: null, announceBlock: null }),
     fetchXcpUsd(),
+    // Same upstream feed as fetchXcpUsd (Next dedupes by URL) — only the
+    // TX fees stat needs it, and only to convert its sats into a dollar
+    // figure when the site-wide denomination toggle is on.
+    fetchBtcUsd(),
     // Bitcoin-side fee data only apps/api has; only the minting stat strip
     // reads it, so don't ask outside that phase.
     fm.status === "open" ? fetchLaunchFees(asset) : Promise.resolve(null),
@@ -115,6 +119,7 @@ export default async function LaunchPage({
       pool={pool}
       priceHistory={priceHistory}
       xcpUsd={xcpUsd}
+      btcUsd={btcUsd}
       feeSats={feeSats}
     />
   );

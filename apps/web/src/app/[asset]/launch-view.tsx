@@ -3,6 +3,7 @@ import { TokenImage } from "@/components/token-image";
 import {
   AnnouncedAgo,
   ArtLightbox,
+  DenomToggle,
   HostedDescription,
   HostedSocials,
   IssuerChips,
@@ -15,6 +16,7 @@ import {
   ShareButton,
   StatusPill,
   TermsStrip,
+  TxFeesStat,
 } from "./scheduled-extras";
 import { Hint } from "@/components/ui/tooltip";
 import type { Fairmint, Pool, PoolSnapshot } from "@/lib/api/counterparty";
@@ -68,6 +70,7 @@ export function LaunchView({
   pool,
   priceHistory,
   xcpUsd,
+  btcUsd,
   feeSats,
 }: {
   asset: string;
@@ -79,6 +82,7 @@ export function LaunchView({
   pool: Pool | null;
   priceHistory: PoolSnapshot[];
   xcpUsd: number | null;
+  btcUsd: number | null;
   feeSats: FeeSummary | null;
 }) {
   const progress = saleProgress(fm);
@@ -389,14 +393,7 @@ export function LaunchView({
           <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
             <RaisedStat paidQuantity={fm.paid_quantity} xcpUsd={xcpUsd} progress={progress} />
             {feeSats && feeSats.mints > 0 && (
-              <div>
-                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                  TX fees
-                </div>
-                <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
-                  {commas(feeSats.totalFeeSats)} sats
-                </div>
-              </div>
+              <TxFeesStat totalFeeSats={feeSats.totalFeeSats} btcUsd={btcUsd} />
             )}
             <ParticipantsStat
               participants={participants}
@@ -404,12 +401,15 @@ export function LaunchView({
               blockHeight={blockHeight}
             />
             <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
-                Deadline
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[11px] font-medium uppercase tracking-wider text-gray-500">
+                  Deadline
+                </div>
+                {xcpUsd !== null && <DenomToggle visibleOn="desktop" />}
               </div>
               <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
                 {fm.soft_cap_deadline_block - blockHeight > 0
-                  ? `${blocksEta(fm.soft_cap_deadline_block - blockHeight)} · block ${commas(fm.soft_cap_deadline_block)}`
+                  ? `Block ${commas(fm.soft_cap_deadline_block)}`
                   : "closing"}
               </div>
             </div>

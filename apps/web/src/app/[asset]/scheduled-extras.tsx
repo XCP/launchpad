@@ -627,8 +627,32 @@ export function ParticipantsStat({
   );
 }
 
+/** The small XCP/USD pill. One global denomination, but the button itself
+ *  lives on a different stat cell depending on breakpoint (desktop: Deadline,
+ *  the last cell in the row; mobile: TX fees, the end of the first row) —
+ *  same technique TermsStrip uses, ported here so the button never renders
+ *  twice at once. Callers decide whether to render it at all (gated on
+ *  their own rate's availability); this component only handles placement. */
+export function DenomToggle({ visibleOn }: { visibleOn: "mobile" | "desktop" }) {
+  const denom = useDenomination();
+  const usdMode = denom === "USD";
+  return (
+    <button
+      type="button"
+      onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
+      aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
+      className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS} ${
+        visibleOn === "mobile" ? "sm:hidden" : "hidden sm:block"
+      }`}
+    >
+      {usdMode ? "XCP" : "USD"}
+    </button>
+  );
+}
+
 /** Raised, in whichever denomination the site-wide toggle is set to — one
- *  value shown at a time, not XCP-and-USD side by side. */
+ *  value shown at a time, not XCP-and-USD side by side. The toggle button
+ *  itself now lives elsewhere (see DenomToggle); this just responds to it. */
 export function RaisedStat({
   paidQuantity,
   xcpUsd,
@@ -643,25 +667,40 @@ export function RaisedStat({
   const usdMode = denom === "USD" && xcpUsd !== null;
   return (
     <div>
-      <div className="flex items-start justify-between gap-2">
-        <div className={LABEL}>Raised</div>
-        {xcpUsd !== null && (
-          <button
-            type="button"
-            onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
-            aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
-            className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS}`}
-          >
-            {usdMode ? "XCP" : "USD"}
-          </button>
-        )}
-      </div>
+      <div className={LABEL}>Raised</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
         {usdMode
           ? usd(fromSats(paidQuantity) * (xcpUsd as number))
           : `${commasRaw(paidQuantity)} XCP`}
         {" · "}
         {(progress * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%
+      </div>
+    </div>
+  );
+}
+
+/** Bitcoin-side cost of the launch's mints so far — sats by default, USD
+ *  when the site-wide toggle is on and a BTC/USD rate is available. Hosts
+ *  the denom toggle on mobile (see DenomToggle's own doc comment). */
+export function TxFeesStat({
+  totalFeeSats,
+  btcUsd,
+}: {
+  totalFeeSats: number;
+  btcUsd: number | null;
+}) {
+  const denom = useDenomination();
+  const usdMode = denom === "USD" && btcUsd !== null;
+  return (
+    <div>
+      <div className="flex items-start justify-between gap-2">
+        <div className={LABEL}>TX fees</div>
+        {btcUsd !== null && <DenomToggle visibleOn="mobile" />}
+      </div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+        {usdMode
+          ? usd(fromSats(totalFeeSats) * (btcUsd as number))
+          : `${commas(totalFeeSats)} sats`}
       </div>
     </div>
   );

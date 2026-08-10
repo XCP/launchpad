@@ -327,7 +327,8 @@ export function ActivityTabs({
           </p>
         ) : (
           <>
-            <div className="grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_9rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+            <div className="grid grid-cols-[2rem_minmax(0,1fr)_4.5rem_7rem_9rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              <span />
               <span>Address</span>
               <span className="text-right">Mints</span>
               <span className="text-right">Amount</span>
@@ -339,13 +340,16 @@ export function ActivityTabs({
                 return (
                   <li
                     key={r.source}
-                    className="relative grid grid-cols-[minmax(0,1fr)_4.5rem_7rem_9rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
+                    className="relative grid grid-cols-[2rem_minmax(0,1fr)_4.5rem_7rem_9rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
                   >
                     <span
                       aria-hidden
                       className="absolute inset-y-0 left-0 bg-purple-50/70"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
+                    <span className="relative z-10 text-left text-xs text-gray-400 tabular-nums">
+                      {from + i + 1}
+                    </span>
                     <span className="relative z-10 flex min-w-0 items-center gap-2">
                       <a
                         href={`https://xcp.io/address/${r.source}`}
@@ -353,9 +357,6 @@ export function ActivityTabs({
                         rel="noreferrer"
                         className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
                       >
-                        <span className="w-8 shrink-0 text-right text-xs text-gray-400 tabular-nums">
-                          {from + i + 1}
-                        </span>
                         <Identicon address={r.source} />
                         <span className="truncate">{shortAddress(r.source)}</span>
                       </a>
