@@ -21,6 +21,10 @@ export interface Fairminter {
   asset: string;
   asset_longname: string | null;
   description: string;
+  /** "text/plain" for a hosted-JSON-URL description; the real content type
+   *  (e.g. "image/png") when the description is an inscribed image.
+   *  Optional: the D1-indexed listing path doesn't store it. */
+  mime_type?: string;
   price: Raw;
   quantity_by_price: Raw;
   hard_cap: Raw;

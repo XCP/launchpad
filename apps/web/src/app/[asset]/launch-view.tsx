@@ -9,6 +9,7 @@ import {
   DenomToggle,
   HostedDescription,
   HostedSocials,
+  InscriptionChip,
   IssuerChips,
   isOurMetadata,
   IssuerLine,
@@ -90,6 +91,10 @@ export function LaunchView({
   feeSats: FeeSummary | null;
 }) {
   const progress = saleProgress(fm);
+  // An inscribed launch's description IS the image (hex-encoded on the
+  // wire) rather than our hosted JSON URL — mime_type is the only signal
+  // that distinguishes the two, since a raw hex blob isn't a URL either.
+  const isInscribed = fm.mime_type?.startsWith("image/") ?? false;
   // sort_pair orders the pool lexically — XCP can sit on either side.
   const xcpIsA = pool?.asset_a === "XCP";
   // Raw reserves, not `_normalized`: the normalized strings are API-side
@@ -342,40 +347,40 @@ export function LaunchView({
                 trailing={
                   isOurMetadata(fm.description) ? (
                     <HostedSocials url={fm.description} asset={asset} />
+                  ) : isInscribed ? (
+                    <InscriptionChip txHash={fm.tx_hash} />
                   ) : null
                 }
               />
             </div>
           </div>
+
+          {/* The fixed facts (scheduled) or the live number (minting)
+              belong with identity — nothing below this card is a "fact
+              about the launch" anymore, just the countdown or the form. */}
+          {!minting && standardTerms && <TermsStrip xcpUsd={xcpUsd} />}
+          {minting && mints.length > 0 && (
+            <div className="mt-4">
+              <LiveProgress
+                initialEarned={fm.earned_quantity ?? 0}
+                target={saleTarget(fm)}
+                allOrNothing={big(fm.pool_quantity) > 0n}
+                divisible={fm.divisible}
+              />
+            </div>
+          )}
+          {descriptionBlock}
         </div>
 
-        <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
-          {standardTerms && !minting && <TermsStrip xcpUsd={xcpUsd} />}
-
-          {minting ? (
-            <>
-              {/* The live number leads — how it's going matters most once
-                  minting is real — with the description back underneath
-                  it, the way the scheduled poster always kept it. */}
-              {mints.length > 0 && (
-                <LiveProgress
-                  initialEarned={fm.earned_quantity ?? 0}
-                  target={saleTarget(fm)}
-                  allOrNothing={big(fm.pool_quantity) > 0n}
-                  divisible={fm.divisible}
-                />
-              )}
-              {descriptionBlock}
-            </>
-          ) : (
-            descriptionBlock
-          )}
-
-          {minting ? (
-            <div className="mt-6">
-              {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
-            </div>
-          ) : (
+        {minting ? (
+          /* MintPanel brings its own card chrome — the same shape the
+             swap/limit/dispense forms use — so it isn't nested inside a
+             second one here. */
+          <div className="mt-4">
+            {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
             <ScheduledPulse
               asset={asset}
               startBlock={fm.start_block}
@@ -387,17 +392,16 @@ export function LaunchView({
                 ) : undefined
               }
             />
-          )}
-
-          {standardTerms && !minting && (
-            <Link
-              href="/dispense"
-              className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
-            >
-              Get XCP before it opens
-            </Link>
-          )}
-        </div>
+            {standardTerms && (
+              <Link
+                href="/dispense"
+                className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+              >
+                Get XCP before it opens
+              </Link>
+            )}
+          </div>
+        )}
 
         {/* How the sale is actually going — the live progress number now
             sits above, where the description used to be. These facts are
@@ -479,7 +483,11 @@ export function LaunchView({
               <div className="flex flex-wrap items-baseline">
                 <IssuerLine source={fm.source} />
               </div>
-              <IssuerChips source={fm.source} currentAsset={asset} />
+              <IssuerChips
+                source={fm.source}
+                currentAsset={asset}
+                trailing={isInscribed ? <InscriptionChip txHash={fm.tx_hash} /> : null}
+              />
             </div>
           </div>
 
