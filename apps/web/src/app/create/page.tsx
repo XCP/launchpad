@@ -517,7 +517,7 @@ export default function CreatePage() {
           <div className="mt-5 border-t border-gray-100 pt-4">
             <dl className="space-y-1.5 text-xs text-gray-500">
               <div className="flex justify-between">
-                <dt>Registration fee</dt>
+                <dt>Counterparty</dt>
                 <dd className="font-medium tabular-nums text-gray-700">
                   {registrationFeeXcp > 0
                     ? `${registrationFeeXcp} XCP${
@@ -530,7 +530,7 @@ export default function CreatePage() {
               </div>
               {feeRate !== undefined && (
                 <div className="flex justify-between">
-                  <dt>Network fee (est.)</dt>
+                  <dt>Bitcoin tx fee</dt>
                   <dd className="tabular-nums text-gray-700">
                     {feeRate} sat/vB
                     {btcUsd !== null && btcUsd !== undefined && (
