@@ -516,26 +516,6 @@ export default function CreatePage() {
               stated before it's asked for, same grammar as swap/dispense. */}
           <div className="mt-5 border-t border-gray-100 pt-4">
             <dl className="space-y-1.5 text-xs text-gray-500">
-              <div className="flex items-center justify-between">
-                <dt>Minting opens</dt>
-                <dd className="flex items-center gap-1">
-                  <span className="font-medium tabular-nums text-gray-700">
-                    {preannounceOption === "custom"
-                      ? customBlockInput
-                        ? `block ${commas(customBlockNum)}`
-                        : "custom block"
-                      : PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)
-                          ?.label}
-                  </span>
-                  <ScheduleGear
-                    option={preannounceOption}
-                    onOptionChange={setPreannounceOption}
-                    customBlock={customBlockInput}
-                    onCustomBlockChange={setCustomBlockInput}
-                    blockHeight={blockHeight}
-                  />
-                </dd>
-              </div>
               <div className="flex justify-between">
                 <dt>Registration fee</dt>
                 <dd className="font-medium tabular-nums text-gray-700">
@@ -600,6 +580,11 @@ export default function CreatePage() {
             image={image}
             description={description}
             nameCheck={nameCheck}
+            preannounceOption={preannounceOption}
+            onPreannounceOptionChange={setPreannounceOption}
+            customBlockInput={customBlockInput}
+            onCustomBlockChange={setCustomBlockInput}
+            blockHeight={blockHeight}
           />
         </div>
       </div>
@@ -612,12 +597,23 @@ function PreviewCard({
   image,
   description,
   nameCheck,
+  preannounceOption,
+  onPreannounceOptionChange,
+  customBlockInput,
+  onCustomBlockChange,
+  blockHeight,
 }: {
   name: string;
   image: File | null;
   description: string;
   nameCheck: NameCheck;
+  preannounceOption: PreannounceOption;
+  onPreannounceOptionChange: (o: PreannounceOption) => void;
+  customBlockInput: string;
+  onCustomBlockChange: (v: string) => void;
+  blockHeight: number | undefined;
 }) {
+  const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
   const priceXcp = XCP69.PRICE / SATS;
   const lot = XCP69.QUANTITY_BY_PRICE / SATS;
   const targetXcp = fromSats(XCP69_RAISE_SATS);
@@ -674,6 +670,23 @@ function PreviewCard({
         <Row k="Supply" v={`${commas(supplyTokens)} — locked at launch`} />
         <Row k="Price" v={`${priceXcp} XCP / ${commas(lot)}`} />
         <Row k="Target" v={`${commas(targetXcp)} XCP or refund`} />
+        <div className="flex items-center justify-between gap-4">
+          <dt className="text-gray-500">Minting opens</dt>
+          <dd className="flex items-center gap-1 text-right font-medium tabular-nums text-gray-900">
+            {preannounceOption === "custom"
+              ? customBlockInput
+                ? `block ${commas(customBlockNum)}`
+                : "custom block"
+              : PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)?.label}
+            <ScheduleGear
+              option={preannounceOption}
+              onOptionChange={onPreannounceOptionChange}
+              customBlock={customBlockInput}
+              onCustomBlockChange={onCustomBlockChange}
+              blockHeight={blockHeight}
+            />
+          </dd>
+        </div>
         <Row k="Window" v="1,000 blocks (~7 days)" />
         <Row k="Minimum community" v={`${XCP69_MIN_PARTICIPANTS}+ addresses`} />
         <Row k="Liquidity" v="locked forever, LP burned" />
