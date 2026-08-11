@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
+import { AmountInput } from "@/components/amount-input";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
+import { GearPopover } from "@/components/ui/popover";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/utils/constants";
 import { fromSats, commas, usd } from "@/lib/format";
@@ -60,13 +62,33 @@ type NameCheck =
 
 /**
  * Pre-announcement lead: minting opens this many blocks after compose time.
- * Fixed, not a choice — the standard requires only that the launch confirms
- * strictly before start_block, but a launch that confirms late opens
- * instantly and fails conformance. 36 blocks (~6 hours) leaves comfortable
- * headroom for confirmation at the ordinary median fee rate, so there's no
- * "tight lead" tier to warn about or pay a priority rate for.
+ * The standard requires only that the launch confirms strictly before
+ * start_block — a launch that confirms late opens instantly and fails
+ * conformance — so 36 blocks (~6 hours) is the floor: comfortable headroom
+ * at the ordinary median fee rate, below which we just don't let anyone go,
+ * preset or custom. Presets cover the common cases; Custom takes a raw
+ * block height for scheduling further out (e.g. staggering a batch of
+ * launches across weeks) — block, not a date, because the target is
+ * consensus state, not a wall-clock time this page can't actually promise.
  */
-const PREANNOUNCE_BLOCKS = 36;
+const PREANNOUNCE_FLOOR_BLOCKS = 36;
+const PREANNOUNCE_PRESETS = [
+  { id: "short", blocks: 36, label: "~6 hours" },
+  { id: "day", blocks: 144, label: "~1 day" },
+  { id: "week", blocks: 1008, label: "~7 days" },
+] as const;
+type PreannounceOption = (typeof PREANNOUNCE_PRESETS)[number]["id"] | "custom";
+
+/** ~10 min/block, the same average the rest of the app assumes. Rough on
+ *  purpose — the UI beside this always says "estimate," never "at". */
+function estimateFromBlocks(blocksFromNow: number): string {
+  if (blocksFromNow <= 0) return "not far enough in the future";
+  const minutes = blocksFromNow * 10;
+  if (minutes < 90) return `~${minutes} minutes`;
+  const hours = minutes / 60;
+  if (hours < 48) return `~${Math.round(hours)} hours`;
+  return `~${Math.round(hours / 24)} days`;
+}
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
   preparing: "Preparing inscription…",
@@ -97,6 +119,13 @@ export default function CreatePage() {
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [scheduledStart, setScheduledStart] = useState<number | null>(null);
+  const [scheduledLabel, setScheduledLabel] = useState<string | null>(null);
+
+  // Advanced, tucked behind the gear — the default (shortest preset) never
+  // needs a second thought; Custom exists for staggering a batch of launches
+  // across a specific future date rather than picking from three buckets.
+  const [preannounceOption, setPreannounceOption] = useState<PreannounceOption>("short");
+  const [customBlockInput, setCustomBlockInput] = useState("");
 
   const [ineligibleReason, setIneligibleReason] = useState<string | null>(null);
 
@@ -110,7 +139,22 @@ export default function CreatePage() {
   });
   const { data: btcUsd } = useSWR("btc-usd", fetchBtcUsd, { refreshInterval: 60_000 });
   const { data: xcpUsd } = useSWR("xcp-usd", fetchXcpUsd, { refreshInterval: 60_000 });
+  const { data: blockHeight } = useSWR(
+    "block-height",
+    async () => {
+      const res = await fetch(`${COUNTERPARTY_API_BASE}/`);
+      return (await res.json()).result.counterparty_height as number;
+    },
+    { refreshInterval: 30_000 },
+  );
   const registrationFeeXcp = nameCheck === "available" ? REGISTRATION_FEE_XCP : 0;
+
+  const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
+  const minCustomBlock =
+    blockHeight !== undefined ? blockHeight + PREANNOUNCE_FLOOR_BLOCKS : undefined;
+  const scheduleValid =
+    preannounceOption !== "custom" ||
+    (minCustomBlock !== undefined && customBlockNum >= minCustomBlock);
 
   // A registered name you OWN is launchable if it meets the consensus
   // preconditions: zero supply, unlocked, divisible.
@@ -163,6 +207,7 @@ export default function CreatePage() {
     !imageTooBigToInscribe &&
     isValidSocial(xProfile) &&
     isValidSocial(telegram) &&
+    scheduleValid &&
     walletStatus === "connected" &&
     !submitting &&
     compose.status !== "composing" &&
@@ -186,12 +231,18 @@ export default function CreatePage() {
       const upload = await uploadRes.json();
       if (!uploadRes.ok) throw new Error(upload.error ?? "Upload failed");
 
-      // 2. Schedule: minting opens after the pre-announcement lead, and the
-      //    window is exactly the standard's 1,000 blocks from that start.
+      // 2. Schedule: minting opens after the pre-announcement lead (a preset
+      //    from now, or an exact future block for Custom), and the window is
+      //    exactly the standard's 1,000 blocks from that start.
       const heightRes = await fetch(`${COUNTERPARTY_API_BASE}/`);
       const height = (await heightRes.json()).result.counterparty_height as number;
-      const startBlock = height + PREANNOUNCE_BLOCKS;
+      const preset = PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption);
+      const startBlock =
+        preannounceOption === "custom"
+          ? customBlockNum
+          : height + (preset?.blocks ?? PREANNOUNCE_FLOOR_BLOCKS);
       setScheduledStart(startBlock);
+      setScheduledLabel(preset ? preset.label : estimateFromBlocks(startBlock - height));
 
       // Next-block rate: this is a single small transaction, always worth
       // paying to confirm promptly rather than risk it lingering.
@@ -266,9 +317,9 @@ export default function CreatePage() {
             <span className="font-mono font-medium text-gray-900">
               {scheduledStart?.toLocaleString()}
             </span>{" "}
-            (~6 hours) — until then the launch is announced on-chain and nobody, you
-            included, can mint. Then it runs for 1,000 blocks (~7 days): it
-            sells out, or everyone is refunded.
+            ({scheduledLabel}) — until then the launch is announced on-chain and
+            nobody, you included, can mint. Then it runs for 1,000 blocks (~7
+            days): it sells out, or everyone is refunded.
           </p>
           <a
             href={`/${name}`}
@@ -465,6 +516,26 @@ export default function CreatePage() {
               stated before it's asked for, same grammar as swap/dispense. */}
           <div className="mt-5 border-t border-gray-100 pt-4">
             <dl className="space-y-1.5 text-xs text-gray-500">
+              <div className="flex items-center justify-between">
+                <dt>Minting opens</dt>
+                <dd className="flex items-center gap-1">
+                  <span className="font-medium tabular-nums text-gray-700">
+                    {preannounceOption === "custom"
+                      ? customBlockInput
+                        ? `block ${commas(customBlockNum)}`
+                        : "custom block"
+                      : PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)
+                          ?.label}
+                  </span>
+                  <ScheduleGear
+                    option={preannounceOption}
+                    onOptionChange={setPreannounceOption}
+                    customBlock={customBlockInput}
+                    onCustomBlockChange={setCustomBlockInput}
+                    blockHeight={blockHeight}
+                  />
+                </dd>
+              </div>
               <div className="flex justify-between">
                 <dt>Registration fee</dt>
                 <dd className="font-medium tabular-nums text-gray-700">
@@ -608,6 +679,99 @@ function PreviewCard({
         <Row k="Liquidity" v="locked forever, LP burned" />
       </dl>
     </div>
+  );
+}
+
+/** The gear beside "Minting opens" — presets cover it for everyone else;
+ *  Custom exists for staggering a batch of launches across specific future
+ *  blocks (e.g. one per day for a couple months). */
+function ScheduleGear({
+  option,
+  onOptionChange,
+  customBlock,
+  onCustomBlockChange,
+  blockHeight,
+}: {
+  option: PreannounceOption;
+  onOptionChange: (o: PreannounceOption) => void;
+  customBlock: string;
+  onCustomBlockChange: (v: string) => void;
+  blockHeight: number | undefined;
+}) {
+  const customNum = Math.round(parseFloat(customBlock)) || 0;
+  const minBlock =
+    blockHeight !== undefined ? blockHeight + PREANNOUNCE_FLOOR_BLOCKS : undefined;
+  const tooSoon =
+    option === "custom" &&
+    customBlock !== "" &&
+    minBlock !== undefined &&
+    customNum < minBlock;
+
+  return (
+    <GearPopover active={option !== "short"} label="Launch timing" small>
+      <div className="text-xs font-medium text-gray-500">Minting opens</div>
+      <div className="mt-2 flex items-center gap-1.5">
+        {PREANNOUNCE_PRESETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => onOptionChange(p.id)}
+            className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+              option === p.id
+                ? "border-purple-600 bg-purple-50 text-purple-700"
+                : "border-gray-200 text-gray-600 hover:border-gray-300"
+            }`}
+          >
+            {p.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => onOptionChange("custom")}
+          className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
+            option === "custom"
+              ? "border-purple-600 bg-purple-50 text-purple-700"
+              : "border-gray-200 text-gray-600 hover:border-gray-300"
+          }`}
+        >
+          Custom
+        </button>
+      </div>
+      {option === "custom" && (
+        <div className="mt-3">
+          <div
+            className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+              tooSoon ? "border-red-400 bg-red-50" : "border-gray-200"
+            }`}
+          >
+            <AmountInput
+              value={customBlock}
+              onChange={onCustomBlockChange}
+              placeholder={minBlock ? String(minBlock) : "block height"}
+              ariaLabel="Target start block"
+              className="w-full bg-transparent text-xs font-medium outline-none"
+            />
+            <span className="text-xs text-gray-400">block</span>
+          </div>
+          {customBlock === "" ? (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+              Any future block, {minBlock ? `${commas(minBlock)} or later` : "at least ~6 hours out"} —
+              same floor as the shortest preset.
+            </p>
+          ) : tooSoon ? (
+            <p className="mt-1.5 text-[11px] font-medium text-red-600">
+              Too soon — needs to be block {minBlock ? commas(minBlock) : "…"} or
+              later (~6 hours out, same floor as the shortest preset).
+            </p>
+          ) : (
+            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+              ≈ {estimateFromBlocks(customNum - (blockHeight ?? customNum))} from
+              now — an estimate, not a guarantee; block time isn&apos;t exact.
+            </p>
+          )}
+        </div>
+      )}
+    </GearPopover>
   );
 }
 
