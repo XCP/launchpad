@@ -19,7 +19,6 @@ import {
   generateLpAssetName,
   XCP69,
   XCP69_EXACT,
-  XCP69_MIN_PARTICIPANTS,
   XCP69_RAISE_SATS,
 } from "@/lib/xcp69";
 
@@ -639,57 +638,64 @@ function PreviewCard({
 
   return (
     <div className="lg:sticky lg:top-1/2 lg:-translate-y-1/2 rounded-3xl border border-gray-200 bg-gray-50 p-5">
-      <div className="flex items-center gap-3">
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={URL.createObjectURL(image)}
-            alt=""
-            className="size-14 shrink-0 rounded-2xl bg-gray-200 object-cover"
-          />
-        ) : (
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gray-200 text-lg font-bold text-gray-400">
-            {name.slice(0, 1) || "?"}
-          </div>
-        )}
-        <div className="min-w-0">
-          <div className="truncate text-lg font-bold leading-tight">
-            {name || "YOURTOKEN"}
-          </div>
-          <div className={`text-xs font-medium ${statusTone[nameCheck]}`}>
-            {statusLabel[nameCheck]}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          {image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={URL.createObjectURL(image)}
+              alt=""
+              className="size-14 shrink-0 rounded-2xl bg-gray-200 object-cover"
+            />
+          ) : (
+            <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-gray-200 text-lg font-bold text-gray-400">
+              {name.slice(0, 1) || "?"}
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="truncate text-lg font-bold leading-tight">
+              {name || "YOURTOKEN"}
+            </div>
+            <div className={`text-xs font-medium ${statusTone[nameCheck]}`}>
+              {statusLabel[nameCheck]}
+            </div>
           </div>
         </div>
+        {/* Advanced, and detached from any one fact below — this is a
+            setting for the launch, not an attribute of it. */}
+        <ScheduleGear
+          option={preannounceOption}
+          onOptionChange={onPreannounceOptionChange}
+          customBlock={customBlockInput}
+          onCustomBlockChange={onCustomBlockChange}
+          blockHeight={blockHeight}
+        />
       </div>
 
       {description && (
         <p className="mt-3 line-clamp-3 text-sm text-gray-600">{description}</p>
       )}
 
+      {/* Touchstone facts only — what it costs, what the goal is, whether
+          it's safe, and when it starts. Supply, the mint window's exact
+          length, and the minimum-community floor are all true but not
+          decision-relevant the way these four are; they live in the docs. */}
       <dl className="mt-4 space-y-2 border-t border-gray-200 pt-4 text-xs">
-        <Row k="Supply" v={`${commas(supplyTokens)} — locked at launch`} />
+        <Row k="Supply" v={commas(supplyTokens)} />
         <Row k="Price" v={`${priceXcp} XCP / ${commas(lot)}`} />
         <Row k="Target" v={`${commas(targetXcp)} XCP or refund`} />
-        <div className="flex items-center justify-between gap-4">
-          <dt className="text-gray-500">Minting opens</dt>
-          <dd className="flex items-center gap-1 text-right font-medium tabular-nums text-gray-900">
-            {preannounceOption === "custom"
+        <Row k="Liquidity" v="locked forever, LP burned" />
+        <Row
+          k="Minting opens"
+          v={
+            preannounceOption === "custom"
               ? customBlockInput
                 ? `block ${commas(customBlockNum)}`
                 : "custom block"
-              : PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)?.label}
-            <ScheduleGear
-              option={preannounceOption}
-              onOptionChange={onPreannounceOptionChange}
-              customBlock={customBlockInput}
-              onCustomBlockChange={onCustomBlockChange}
-              blockHeight={blockHeight}
-            />
-          </dd>
-        </div>
-        <Row k="Window" v="1,000 blocks (~7 days)" />
-        <Row k="Minimum community" v={`${XCP69_MIN_PARTICIPANTS}+ addresses`} />
-        <Row k="Liquidity" v="locked forever, LP burned" />
+              : (PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)
+                  ?.label ?? "")
+          }
+        />
       </dl>
     </div>
   );
