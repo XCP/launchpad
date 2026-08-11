@@ -146,7 +146,11 @@ export default function CreatePage() {
     },
     { refreshInterval: 30_000 },
   );
-  const registrationFeeXcp = nameCheck === "available" ? REGISTRATION_FEE_XCP : 0;
+  // Default to the standard fee — true for almost everyone — rather than a
+  // blank dash until a name's been typed and checked; the one case it isn't
+  // owed (you already registered this exact name) is the only one that
+  // clears it.
+  const registrationFeeXcp = nameCheck === "owned" ? 0 : REGISTRATION_FEE_XCP;
 
   const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
   const minCustomBlock =
