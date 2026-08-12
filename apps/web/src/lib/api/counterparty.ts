@@ -696,6 +696,67 @@ export async function fetchMempoolFairminters(): Promise<Fairminter[]> {
   }
 }
 
+/** One unconfirmed mint, as the mempool reports it. */
+export interface MempoolMint {
+  txHash: string;
+  asset: string;
+  source: string;
+  /** Raw token units the minter earns. */
+  earnQuantity: Raw;
+  /** Raw XCP satoshi paid. */
+  paidQuantity: Raw;
+  divisible: boolean;
+}
+
+interface MempoolFairmintEvent {
+  tx_hash: string;
+  params: {
+    asset: string;
+    source: string;
+    earn_quantity: Raw | null;
+    paid_quantity: Raw | null;
+    status?: string;
+    asset_info?: { divisible?: boolean } | null;
+  };
+}
+
+/**
+ * Unconfirmed mints across every launch.
+ *
+ * `earn_quantity` / `paid_quantity` are the per-MINT amounts here, not the
+ * fairminter's running totals, so they are present on a real mint — but the
+ * standard guard still applies (see the repo CLAUDE.md): a malformed or
+ * invalid event can carry null, and null must never reach arithmetic. Those
+ * rows are dropped rather than counted as zero, which would quietly
+ * understate a total the page presents as exact.
+ */
+export async function fetchMempoolFairmints(): Promise<MempoolMint[]> {
+  try {
+    const data = await get<{ result: MempoolFairmintEvent[] }>(
+      `/mempool/events/NEW_FAIRMINT?limit=500`,
+      0,
+    );
+    return data.result
+      .filter(
+        (e) =>
+          // An invalid mint is in the mempool but will never credit anyone.
+          (e.params.status === undefined || e.params.status === "valid") &&
+          e.params.earn_quantity !== null &&
+          e.params.paid_quantity !== null,
+      )
+      .map((e) => ({
+        txHash: e.tx_hash,
+        asset: e.params.asset,
+        source: e.params.source,
+        earnQuantity: e.params.earn_quantity!,
+        paidQuantity: e.params.paid_quantity!,
+        divisible: e.params.asset_info?.divisible ?? true,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchMempoolFairminter(
   asset: string,
 ): Promise<Fairminter | null> {
