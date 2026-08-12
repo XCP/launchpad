@@ -33,6 +33,62 @@ import { PhasePreview } from "@/app/[asset]/_components/phase-preview";
 
 export const revalidate = 30;
 
+/** Long enough to say something, short enough that no platform truncates
+ *  it mid-word. */
+const SHARE_DESCRIPTION_MAX = 200;
+
+/**
+ * The unfurled description: the creator's own words, or failing that the
+ * address behind the launch.
+ *
+ * NOT the standard's terms. Those are identical on every XCP-69 launch, so a
+ * timeline of shared links all said exactly the same thing — the one place
+ * the description has to distinguish this launch from the next one is the
+ * one place it didn't. The terms are on the page itself for anyone who
+ * follows the link.
+ */
+async function shareDescription(asset: string): Promise<string | null> {
+  try {
+    const fairminters = await fetchFairmintersByAsset(asset);
+    const fm =
+      fairminters.find((f) => xcp69Params(f)) ??
+      (await fetchMempoolFairminter(asset));
+    if (!fm) return null;
+
+    const onChain = typeof fm.description === "string" ? fm.description.trim() : "";
+
+    // Our own hosted JSON holds the words; the on-chain field is just the
+    // pointer. Only ever OUR origin — the description is chosen by the
+    // issuer, so following it anywhere else would have our server fetch a
+    // URL a stranger controls. Same rule the browser-side reader applies
+    // (isOurMetadata), inlined so this server path doesn't pull in a client
+    // module for one string comparison.
+    if (onChain.startsWith(`${METADATA_ORIGIN}/`)) {
+      const meta = (await fetch(onChain, { next: { revalidate: 300 } })
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null)) as { description?: unknown } | null;
+      const words = typeof meta?.description === "string" ? meta.description.trim() : "";
+      if (words) return clamp(words, SHARE_DESCRIPTION_MAX);
+    } else if (onChain && !/^https?:\/\//i.test(onChain)) {
+      // A launch composed elsewhere can put real text on-chain.
+      return clamp(onChain, SHARE_DESCRIPTION_MAX);
+    }
+
+    return fm.source ? `Launched by ${fm.source}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Cut on a word boundary; an ellipsis mid-word reads as a bug. */
+function clamp(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= max) return flat;
+  const cut = flat.slice(0, max);
+  const lastSpace = cut.lastIndexOf(" ");
+  return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
 /**
  * Link previews carry the launch's own art. The image URL is our permanent
  * /full/<ASSET> alias, so a card that unfurls today still resolves years
@@ -47,7 +103,7 @@ export async function generateMetadata({
   const asset = decodeURIComponent(raw).toUpperCase();
   if (!/^[B-Z][A-Z]{3,11}$/.test(asset)) return {};
   const title = `${asset} — xcp.fun`;
-  const description = `${asset} on xcp.fun: an XCP-69 launch — 0.01 XCP per 1,000 tokens, sells out or refunds in full, liquidity locked by consensus.`;
+  const description = (await shareDescription(asset)) ?? `${asset} on xcp.fun`;
   const image = metadataImageUrl(asset);
   return {
     title,

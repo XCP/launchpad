@@ -557,7 +557,15 @@ export function ActivityTabs({
           <p className="p-6 text-center text-sm text-gray-500">No holders found.</p>
         ) : (
           <>
-            <ul className="divide-y divide-gray-100">
+            {/* Scrolls sideways on a phone rather than compressing. The row
+                is address + chips + amount, and at 390px those don't fit —
+                but every one of them is load-bearing: the chips say WHO a
+                holder is ("dev", "LP burned") and the address says which
+                one. Squeezing let the chips ride over the address and cover
+                it entirely, which is the worst of both. Given a floor width
+                the row keeps its shape and the reader moves instead. */}
+            <div className="overflow-x-auto">
+            <ul className="min-w-[30rem] divide-y divide-gray-100">
               {holderRows.slice(from, from + PER_PAGE).map((h, i) => {
                 const pct = ratio(h.quantity, holderTotal) * 100;
                 const isPool = h.address === POOL_ROW;
@@ -565,14 +573,14 @@ export function ActivityTabs({
                 return (
                   <li
                     key={h.address}
-                    className="relative flex items-center justify-between overflow-hidden px-4 py-2 text-sm"
+                    className="relative flex items-center justify-between gap-3 overflow-hidden px-4 py-2 text-sm"
                   >
                     <span
                       aria-hidden
                       className="absolute inset-y-0 left-0 bg-purple-50/70"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
-                    <span className="relative z-10 flex items-center gap-2 font-mono text-gray-600">
+                    <span className="relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-gray-600">
                       <span className="w-8 text-right text-xs text-gray-400">
                         {from + i + 1}
                       </span>
@@ -618,7 +626,7 @@ export function ActivityTabs({
                         </span>
                       )}
                     </span>
-                    <span className="relative z-10 text-gray-900">
+                    <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900">
                       {compact(tokenQty(h.quantity, divisible))}{" "}
                       <span className="text-gray-400">
                         ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
@@ -628,6 +636,7 @@ export function ActivityTabs({
                 );
               })}
             </ul>
+            </div>
             {pager}
           </>
         ))}

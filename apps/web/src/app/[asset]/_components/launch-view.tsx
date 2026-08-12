@@ -269,7 +269,7 @@ export function LaunchView({
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
             <ArtLightbox asset={asset} />
             <div className="min-w-0 flex-1">
-              <div className="flex items-start gap-2 sm:pr-24">
+              <div className="flex items-center gap-2 sm:pr-24">
                 <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                   {asset}
                   <StatusPill phase={phase} hasPool={pool !== null} />
@@ -279,9 +279,19 @@ export function LaunchView({
                     </span>
                   )}
                 </h1>
-                {/* In flow on a phone, pinned to the card's corner above it —
-                    the page's own control, so it sits apart from the
-                    project's links. */}
+              </div>
+              {/* Share rides the ADDRESS line on a phone, not the heading. The
+                  heading carries the status pill, and a 32px button against
+                  that is the mismatch that read as a mistake; the address line
+                  is a quiet full-width row with nothing on its right, so the
+                  button lines up against it instead. Above `sm` the button is
+                  absolutely pinned to the card corner, so its position in the
+                  markup here costs nothing there. */}
+              <div className="flex items-center gap-2 sm:pr-24">
+                <div className="flex min-w-0 flex-1 flex-wrap items-baseline">
+                  <IssuerLine source={fm.source} />
+                  <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+                </div>
                 <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
                   <ShareButton
                     asset={asset}
@@ -289,10 +299,6 @@ export function LaunchView({
                     subline={shareSubline}
                   />
                 </div>
-              </div>
-              <div className="flex flex-wrap items-baseline sm:pr-24">
-                <IssuerLine source={fm.source} />
-                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
               </div>
               <IssuerChips
                 source={fm.source}
@@ -310,8 +316,22 @@ export function LaunchView({
 
           {/* The fixed facts (scheduled) or the live number (minting)
               belong with identity — nothing below this card is a "fact
-              about the launch" anymore, just the countdown or the form. */}
-          {!minting && standardTerms && <TermsStrip xcpUsd={xcpUsd} />}
+              about the launch" anymore, just the countdown or the form.
+
+              Desktop only. Every value in this strip is fixed by the
+              standard, so it is character-for-character identical on every
+              XCP-69 launch: price, per-address cap, target, supply. On a
+              phone — where a shared link gets opened, and where space is
+              scarcest — four numbers that say nothing about THIS launch are
+              exactly what should give way. What's left is what differs: the
+              art, the name, who's launching it, and when it opens. The terms
+              are still a tap away in the countdown's own copy and in the
+              docs. */}
+          {!minting && standardTerms && (
+            <div className="hidden sm:block">
+              <TermsStrip xcpUsd={xcpUsd} />
+            </div>
+          )}
           {minting && mints.length > 0 && (
             <div className="mt-5 border-t border-gray-100 pb-2 pt-2">
               <LiveProgress
@@ -556,7 +576,7 @@ export function LaunchView({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
           <ArtLightbox asset={asset} />
           <div className="min-w-0 flex-1">
-            <div className="flex items-start gap-2 sm:pr-24">
+            <div className="flex items-center gap-2 sm:pr-24">
               <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
                 {asset}
                 <StatusPill phase={phase} hasPool={pool !== null} />
@@ -566,6 +586,14 @@ export function LaunchView({
                   </span>
                 )}
               </h1>
+            </div>
+            {/* Share rides the address line on a phone — see the note on the
+                scheduled/minting card above; same reasoning, same shape. */}
+            <div className="flex items-center gap-2 sm:pr-24">
+              <div className="flex min-w-0 flex-1 flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+              </div>
               <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
                 <ShareButton
                   asset={asset}
@@ -577,10 +605,6 @@ export function LaunchView({
                   }
                 />
               </div>
-            </div>
-            <div className="flex flex-wrap items-baseline sm:pr-24">
-              <IssuerLine source={fm.source} />
-              <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
             </div>
             {/* Issuer-history chips ("first launch", "3rd launch") answer
                 "should I trust this creator" — the question before minting.

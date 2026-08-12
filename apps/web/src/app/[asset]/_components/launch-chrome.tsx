@@ -230,8 +230,22 @@ export function BlockMonthYear({ blockIndex }: { blockIndex: number }) {
 
 /* ---------- artwork ---------- */
 
-/** The poster art: compact in the card, full-size in a dialog on click.
- *  The shared Dialog brings focus trapping, Escape, and scroll lock. */
+/**
+ * The poster art: the card's own art panel on a phone, a compact identity
+ * square above `sm`, full-size in a dialog on click. The shared Dialog brings
+ * focus trapping, Escape, and scroll lock.
+ *
+ * A launch link posted somewhere gets opened on a phone, and the art is the
+ * whole first impression — so at mobile widths it stops being a picture
+ * sitting inside the card's padding and becomes the top OF the card, exactly
+ * the way the launch cards on the homepage read. Not viewport-wide: the card
+ * keeps its own margins, and the art fills it to the border.
+ *
+ * COUPLED to the card's mobile `p-6`: the negative margins cancel that
+ * padding, and the top radius matches the card's `rounded-3xl` so the corners
+ * sit on top of the border rather than inside it. If the card's padding or
+ * radius changes, these change with it.
+ */
 export function ArtLightbox({ asset }: { asset: string }) {
   const [open, setOpen] = useState(false);
   return (
@@ -240,13 +254,11 @@ export function ArtLightbox({ asset }: { asset: string }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label={`View ${asset} artwork full size`}
-        className={`group w-full shrink-0 cursor-zoom-in rounded-2xl sm:w-auto ${FOCUS}`}
+        className={`group -mx-6 -mt-6 w-[calc(100%+3rem)] shrink-0 cursor-zoom-in overflow-hidden rounded-t-3xl sm:mx-0 sm:mt-0 sm:w-auto sm:rounded-2xl ${FOCUS}`}
       >
-        {/* A poster on a phone: full width, then the compact identity square
-            once there's a column to sit beside. */}
         <HeroTokenImage
           asset={asset}
-          className={`aspect-square w-full rounded-2xl bg-gray-100 object-cover shadow-sm transition-transform group-hover:scale-[1.03] sm:aspect-auto sm:w-auto sm:size-[5.5rem]`}
+          className={`aspect-square w-full rounded-t-3xl bg-gray-100 object-cover transition-transform sm:aspect-auto sm:size-[5.5rem] sm:w-auto sm:rounded-2xl sm:shadow-sm sm:group-hover:scale-[1.03]`}
         />
       </button>
       <Dialog open={open} onOpenChange={setOpen} title={asset} variant="lightbox">

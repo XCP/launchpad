@@ -56,7 +56,20 @@ function normalizeCoreError(raw: unknown): string {
 function composeError(e: unknown): string {
   const friendly = friendlyError(e)
   if (friendly !== GENERIC_ERROR) return friendly
+
   const raw = (e instanceof Error ? e.message : String(e)).trim()
+
+  // The one core error worth naming ourselves, because it is the first-timer
+  // failure and its own words don't say what's missing. "no utxos found for
+  // 1ABC…" contains none of friendlyError's keywords — not even
+  // "insufficient" — so it fell all the way through to the catch-all, which
+  // is how someone funded with XCP but no bitcoin got told nothing at all.
+  // XCP pays Counterparty's fee; bitcoin pays the miners; a wallet holding
+  // only the first cannot build a transaction.
+  if (NO_SPENDABLE_BTC_PATTERN.test(raw)) {
+    return 'No spendable bitcoin at this address — every transaction needs BTC for the miner fee, on top of any XCP it spends.'
+  }
+
   return raw && raw !== '[object Object]' ? raw : friendly
 }
 
@@ -86,6 +99,11 @@ const UTXO_RACE_RETRY_DELAY_MS = 2_000
 // funds" race above: that one is a timing gap, this one is a selection core
 // will keep making until it is told to stop looking at its mempool.
 const STALE_UTXO_PATTERN = /invalid UTXOs|UTXO not found|transaction not found/i
+
+// Core's way of saying the address has nothing to spend. Deliberately NOT
+// matching "insufficient funds for the target amount", which is the race
+// above and means the coins exist but aren't visible yet.
+const NO_SPENDABLE_BTC_PATTERN = /no utxos found for|no unspent outputs/i
 
 /** One bounded, invisible retry for the UTXO-propagation race: if we JUST
  *  broadcast something and the very next compose fails with exactly the

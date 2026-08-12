@@ -173,7 +173,6 @@ export function LaunchSections({
       <Section
         phase="graduated"
         title="Graduated"
-        blurb="Sold out. Liquidity locked forever."
         empty=""
         rows={of("graduated")}
         total={preview ? graduated.length : totals?.graduated}
@@ -186,7 +185,6 @@ export function LaunchSections({
       <Section
         phase="minting"
         title="Minting"
-        blurb="Open now — all-or-nothing."
         empty="No live launches. Start one — it sells out or everyone gets refunded."
         rows={of("minting")}
         total={totals?.minting}
@@ -199,7 +197,6 @@ export function LaunchSections({
       <Section
         phase="scheduled"
         title="Scheduled"
-        blurb="Announced. Nobody can mint early."
         empty=""
         rows={of("scheduled")}
         total={totals?.scheduled}
@@ -235,7 +232,6 @@ export function LaunchSections({
 function Section({
   phase,
   title,
-  blurb,
   empty,
   rows,
   total,
@@ -246,7 +242,6 @@ function Section({
 }: {
   phase: LaunchPhase;
   title: string;
-  blurb: string;
   empty: string;
   rows: SectionRow[];
   total?: number;
@@ -277,13 +272,7 @@ function Section({
 
   return (
     <section>
-      {/* The blurb is OUT of this row on purpose. Inside it, a sentence and a
-          set of controls competed for the same width, and the sentence always
-          won — so the controls wrapped to their own line even on a desktop
-          with room to spare. A short title can share a row with controls; a
-          sentence cannot, at any length. It sits under the whole row instead,
-          where its length stops mattering. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="flex items-baseline gap-2 text-xl font-bold">
           {title}
           {total !== undefined && total > 0 && (
@@ -328,8 +317,6 @@ function Section({
           </div>
         )}
       </div>
-      <p className="mb-3 mt-0.5 text-xs text-gray-500">{blurb}</p>
-
       {rows.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
           {empty}

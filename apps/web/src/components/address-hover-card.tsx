@@ -155,31 +155,65 @@ export function IssuerChips({
   const chip =
     "rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums";
 
+  // Ordered by how much each says about the creator, because on a phone only
+  // the first two survive. A third and fourth chip wrapped onto their own
+  // line and pushed the launch itself further down the screen — on the page
+  // someone opened from a shared link, the creator's track record is context,
+  // not the headline.
+  const MOBILE_CHIPS = 2;
+  const chips: ReactNode[] = [
+    <span
+      key="ordinal"
+      className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700"
+    >
+      {data.prior === 0
+        ? "first launch"
+        : data.priorCapped
+          ? `${commas(data.prior)}+ launches`
+          : `${ordinal(data.prior + 1)} launch`}
+    </span>,
+  ];
+  if (data.judged > 0) {
+    chips.push(
+      <span key="record" className={chip}>
+        {data.judged > 1
+          ? `${Math.round((data.graduated / data.judged) * 100)}% graduated (${data.graduated}/${data.judged})`
+          : `${data.graduated} graduated · ${data.judged - data.graduated} refunded`}
+      </span>,
+    );
+  }
+  if (data.latest) {
+    chips.push(
+      <Link
+        key="latest"
+        href={`/${data.latest.asset}`}
+        className={`${chip} transition-colors hover:border-purple-300 hover:text-purple-600`}
+      >
+        latest launch {timeAgo(data.latest.at)}
+        {/* The ticker is the widest part of this chip and the least of what
+            it says — "there is a newer one, and it's recent" is the whole
+            point, and the link carries you there either way. */}
+        <span className="hidden sm:inline"> · {data.latest.asset}</span>
+      </Link>,
+    );
+  }
+  if (data.prior === 0 && standing) {
+    chips.push(
+      <span key="standing" className={chip}>
+        {standing}
+      </span>,
+    );
+  }
+
   return (
     <div className="mt-2 flex flex-wrap gap-1.5">
-      <span className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700">
-        {data.prior === 0
-          ? "first launch"
-          : data.priorCapped
-            ? `${commas(data.prior)}+ launches`
-            : `${ordinal(data.prior + 1)} launch`}
-      </span>
-      {data.judged > 0 && (
-        <span className={chip}>
-          {data.judged > 1
-            ? `${Math.round((data.graduated / data.judged) * 100)}% graduated (${data.graduated}/${data.judged})`
-            : `${data.graduated} graduated · ${data.judged - data.graduated} refunded`}
+      {chips.map((c, i) => (
+        // `contents` so the wrapper never becomes a layout box of its own —
+        // the chip stays a direct participant in the flex row above `sm`.
+        <span key={i} className={i < MOBILE_CHIPS ? "contents" : "hidden sm:contents"}>
+          {c}
         </span>
-      )}
-      {data.latest && (
-        <Link
-          href={`/${data.latest.asset}`}
-          className={`${chip} transition-colors hover:border-purple-300 hover:text-purple-600`}
-        >
-          latest launch {timeAgo(data.latest.at)} · {data.latest.asset}
-        </Link>
-      )}
-      {data.prior === 0 && standing && <span className={chip}>{standing}</span>}
+      ))}
       {trailing}
     </div>
   );
