@@ -17,10 +17,30 @@ import { useWallet } from "@/lib/wallet/wallet-context";
  */
 export function HeaderWallet() {
   const { status, address, proofStatus, disconnect } = useWallet();
+  /**
+   * The dot carries the state; only the red one gets words.
+   *
+   * Green and grey said "Signature verified" and "Signature not checked this
+   * session" — a line of jargon in the menu on every single visit, describing
+   * something almost nobody is asking about, and grey is the normal resting
+   * state rather than a problem.
+   *
+   * The red wording changed too. It used to read "Signature did not verify",
+   * which sounds like an accusation and points at the wrong thing: the
+   * dominant cause is an XCP Wallet older than 0.8.2, whose segwit message
+   * signing was broken until 8 Aug — the key is fine, the wallet's signature
+   * format wasn't. So the copy says the thing that actually fixes it. `title`
+   * keeps a short label on the dot for hover and screen readers in all three
+   * states.
+   */
   const proof = {
-    verified: { dot: "bg-green-500", label: "Signature verified" },
-    unverified: { dot: "bg-gray-400", label: "Signature not checked this session" },
-    failed: { dot: "bg-red-500", label: "Signature did not verify" },
+    verified: { dot: "bg-green-500", title: "Signature verified", note: null },
+    unverified: { dot: "bg-gray-400", title: "Signature not checked", note: null },
+    failed: {
+      dot: "bg-red-500",
+      title: "Signature not confirmed",
+      note: "Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it.",
+    },
   }[proofStatus];
   const [copied, setCopied] = useState(false);
   const { onClick, installPrompt } = useConnectAction();
@@ -64,7 +84,7 @@ export function HeaderWallet() {
           <P.Trigger className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-purple-300 hover:text-purple-600 data-[state=open]:border-purple-300 data-[state=open]:text-purple-600">
             <span
               aria-hidden
-              title={proof.label}
+              title={proof.title}
               className={`size-1.5 shrink-0 rounded-full ${proof.dot}`}
             />
             {shortAddress(address)}
@@ -75,10 +95,15 @@ export function HeaderWallet() {
               sideOffset={8}
               className="modal-pop z-50 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg focus:outline-none"
             >
-              <p className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-400">
-                <span aria-hidden className={`size-1.5 shrink-0 rounded-full ${proof.dot}`} />
-                {proof.label}
-              </p>
+              {proof.note && (
+                <p className="flex items-start gap-1.5 px-3 py-1.5 text-xs leading-relaxed text-gray-500">
+                  <span
+                    aria-hidden
+                    className={`mt-1 size-1.5 shrink-0 rounded-full ${proof.dot}`}
+                  />
+                  {proof.note}
+                </p>
+              )}
               <Link
                 href="/profile"
                 className="block rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"

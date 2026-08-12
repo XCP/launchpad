@@ -16,6 +16,31 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "cdn.xcp.io" },
     ],
   },
+  /**
+   * One canonical origin.
+   *
+   * The worker answers on both xcp.fun and launchpad.me-bbe.workers.dev, and
+   * people do end up on the second one — a creator was signing against it
+   * without realising. That split matters beyond tidiness: a wallet
+   * connection proof is bound to the origin that requested it, so a session
+   * started on one host and continued on the other has a proof that cannot
+   * validate. Same site, two identities.
+   *
+   * 308 rather than a temporary redirect: the method is preserved, and this
+   * is a permanent statement about which host is the real one. Any path and
+   * query ride along, so a shared workers.dev link still lands where it meant
+   * to.
+   */
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "launchpad.me-bbe.workers.dev" }],
+        destination: "https://xcp.fun/:path*",
+        permanent: true,
+      },
+    ];
+  },
   // Clean metadata URLs. /j and /i remain permanent aliases — LAUNCHCOIN's
   // on-chain description points at /j/, and descriptions lock forever.
   async rewrites() {
