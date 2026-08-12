@@ -2,14 +2,22 @@
   "name": "launchpad-monorepo",
   "version": "0.0.0",
   "private": true,
-  "workspaces": ["apps/*", "packages/*"],
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev:web": "npm run dev --workspace apps/web",
     "dev:api": "npm run dev --workspace apps/api",
-    "check": "npm run check --workspace apps/web && npm run check --workspace apps/api",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "check": "npm run test && npm run check --workspace apps/web && npm run check --workspace apps/api",
     "deploy:web": "npm run deploy --workspace apps/web",
     "deploy:api": "npm run deploy --workspace apps/api",
     "migrate:api:local": "npm run migrate:local --workspace apps/api",
     "migrate:api:remote": "npm run migrate:remote --workspace apps/api"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10"
   }
 }
