@@ -11,6 +11,7 @@ import { fetchTxFee } from "#api/integrations/mempool";
 import {
   isXcp69,
   launchPhase,
+  MEMPOOL_BLOCK_INDEX,
   windowIsExact,
   xcp69Params,
   type Fairminter,
@@ -63,6 +64,7 @@ export interface SyncResult {
   resolved: number;
   mints_ingested: number;
   events_ingested: number;
+  announce_backfilled: number;
   fees_backfilled: number;
 }
 
@@ -96,6 +98,21 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     // recomputed here, only by the worklist pass, so a first-time decision
     // is never silently overwritten back to NULL on the next tick.
     const pendingVerdict = fm.status === "pending" ? isXcp69(fm, undefined) : null;
+
+    // Capture the announcement block NOW, while the row still knows it. A
+    // pending row's own block_index IS that block; the moment the launch
+    // opens, Counterparty rewrites the field to the opening block and the
+    // fact is gone from the listing forever. It used to be recorded only by
+    // resolveUndecided, which a pending row never reaches — it already has a
+    // verdict — so any launch this indexer first saw while pending kept a
+    // NULL announce_block for life, and sorted as block 0 wherever age was
+    // the measure. Unconfirmed rows carry the mempool sentinel, not a height.
+    const announceBlock =
+      fm.status === "pending" &&
+      fm.block_index > 0 &&
+      fm.block_index < MEMPOOL_BLOCK_INDEX
+        ? fm.block_index
+        : null;
 
     let poolXcpReserve: string | null = null;
     let poolTokenReserve: string | null = null;
@@ -213,11 +230,11 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
            status, phase, earned_quantity, paid_quantity,
            current_deadline_block, mints, minters,
            pool_xcp_reserve, pool_token_reserve, pool_xcp_sats,
-           seen_at_block, updated_at
+           seen_at_block, updated_at, announce_block
          ) VALUES (
            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15,
            ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ${CONFORMANCE_VERSION},
-           ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35
+           ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31, ?32, ?33, ?34, ?35, ?36
          )
          ON CONFLICT(tx_hash) DO UPDATE SET
            status = excluded.status,
@@ -242,7 +259,13 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
              WHEN launches.conformance_version < ${CONFORMANCE_VERSION} THEN NULL
              ELSE launches.conforming
            END,
-           conformance_version = ${CONFORMANCE_VERSION}
+           conformance_version = ${CONFORMANCE_VERSION},
+           -- Write-once. The stored value came from the row while it was
+           -- pending (or from the creation event); the incoming one is NULL
+           -- for every non-pending row, and re-deriving it is impossible
+           -- once Counterparty has rewritten block_index. COALESCE fills the
+           -- gap and never clobbers a fact already known.
+           announce_block = COALESCE(launches.announce_block, excluded.announce_block)
          WHERE launches.status IS NOT excluded.status
             OR launches.phase IS NOT excluded.phase
             OR launches.earned_quantity IS NOT excluded.earned_quantity
@@ -254,6 +277,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
             OR launches.pool_token_reserve IS NOT excluded.pool_token_reserve
             OR launches.pool_xcp_sats IS NOT excluded.pool_xcp_sats
             OR (?23 IS NOT NULL AND launches.conforming IS NULL)
+            OR (?36 IS NOT NULL AND launches.announce_block IS NULL)
             OR launches.conformance_version < ${CONFORMANCE_VERSION}`,
       )
       .bind(
@@ -294,6 +318,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
         poolXcpSats,
         fm.status === "closed" ? fm.block_index : height,
         now,
+        announceBlock,
       )
       .run();
 
@@ -313,6 +338,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
 
   const eventsIngested = await syncAssetEvents(db, eventTargets, height);
   const resolved = await resolveUndecided(db);
+  const announceBackfilled = await backfillAnnounceBlocks(db);
   const feesBackfilled = await backfillMissingFees(db);
 
   return {
@@ -321,8 +347,57 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     resolved,
     mints_ingested: mintsIngested,
     events_ingested: eventsIngested,
+    announce_backfilled: announceBackfilled,
     fees_backfilled: feesBackfilled,
   };
+}
+
+/**
+ * Repairs rows that opened before this indexer recorded their announcement
+ * block — the historical shape of the bug fixed above.
+ *
+ * Pending rows are excluded deliberately: theirs arrives free with the next
+ * upsert, so asking Counterparty about them would buy a subrequest for a fact
+ * already in hand. What's left is the genuinely unrecoverable set — rows past
+ * pending whose block_index has been rewritten — and only the creation event
+ * still knows the answer.
+ *
+ * A one-time worklist that drains to empty and stays there, backed by a
+ * partial index so the probe costs nothing once it has.
+ */
+async function backfillAnnounceBlocks(db: D1Database): Promise<number> {
+  const missing = await q<{ tx_hash: string }>(
+    db,
+    `SELECT tx_hash FROM launches
+      WHERE announce_block IS NULL AND status != 'pending'
+      ORDER BY tx_index LIMIT ?1`,
+    WORKLIST_LIMIT,
+  );
+  if (missing.length === 0) return 0;
+
+  let repaired = 0;
+  for (const row of missing) {
+    const { announceBlock, originalDeadline } = await fetchAnnounceFacts(row.tx_hash);
+    if (announceBlock === null) continue; // event not visible yet — ask again next tick
+
+    // The verdict is left exactly as it stands. It was reached from this same
+    // launch's own pending row, where block_index WAS the announcement block,
+    // so re-deriving it here could only reproduce the same answer at the cost
+    // of reconstructing the whole record. This pass restores a missing fact;
+    // it does not re-judge conformance.
+    const res = await db
+      .prepare(
+        `UPDATE launches
+            SET announce_block = ?1,
+                original_deadline = COALESCE(original_deadline, ?2),
+                updated_at = ?3
+          WHERE tx_hash = ?4 AND announce_block IS NULL`,
+      )
+      .bind(announceBlock, originalDeadline, Math.floor(Date.now() / 1000), row.tx_hash)
+      .run();
+    if ((res.meta.rows_written ?? 0) > 0) repaired += 1;
+  }
+  return repaired;
 }
 
 /** A mint's fee lookup normally happens exactly once, the tick it's first

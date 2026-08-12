@@ -90,7 +90,7 @@ export const XCP69_EXACT = {
  * (core config.MEMPOOL_BLOCK_INDEX); timing clauses that compare against the
  * confirmation block are meaningless until the launch confirms.
  */
-const MEMPOOL_BLOCK_INDEX = 9_999_999;
+export const MEMPOOL_BLOCK_INDEX = 9_999_999;
 
 /** Derived, exact: 690 XCP raised on success (raw sats). */
 export const XCP69_RAISE_SATS =
