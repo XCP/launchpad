@@ -1,4 +1,4 @@
-import type { XcpProvider, XcpWalletEvents, SignPsbtParams, ConnectionProof, ConnectResult } from './types'
+import type { XcpProvider, XcpWalletEvents, SignPsbtParams, ConnectionProof, ConnectResult, WalletAddresses } from './types'
 import { BTC_ADDRESS_REGEX, HEX_REGEX, TXID_REGEX, DISCONNECTED } from './constants'
 
 /** Per-method timeouts: interactive methods get longer, passive methods are short. */
@@ -96,6 +96,34 @@ export class XcpWallet {
 
   async disconnect(): Promise<void> {
     await this.request({ method: 'xcp_disconnect' }, Timeout.fast)
+  }
+
+  /**
+   * The wallet's addresses WITH their public keys.
+   *
+   * Counterparty needs the source pubkey to compose anything whose message
+   * exceeds an OP_RETURN — it falls back to bare multisig, which embeds that
+   * key — and it can only find one itself after the address has spent. A
+   * freshly funded wallet has never spent, so without this a first-ever
+   * launch cannot compose at all.
+   *
+   * Passive and cheap: no prompt, no signature, just the key the wallet
+   * already holds. Returns null on any failure (older extension builds
+   * predate the method) so callers can fall back rather than break.
+   */
+  async getAddresses(): Promise<WalletAddresses | null> {
+    try {
+      const result = await this.request({ method: 'xcp_getAddresses' }, Timeout.fast)
+      if (!result || typeof result !== 'object') return null
+      const { active } = result as { active?: unknown }
+      if (!active || typeof active !== 'object') return null
+      const { address, publicKey } = active as Record<string, unknown>
+      if (typeof address !== 'string' || typeof publicKey !== 'string') return null
+      if (!BTC_ADDRESS_REGEX.test(address) || !HEX_REGEX.test(publicKey)) return null
+      return result as WalletAddresses
+    } catch {
+      return null
+    }
   }
 
   async signMessage(message: string): Promise<string> {

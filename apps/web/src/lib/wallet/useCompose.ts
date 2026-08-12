@@ -216,7 +216,7 @@ async function composeRequest(
 }
 
 export function useCompose() {
-  const { address, connectionProof, signTransaction, broadcastTransaction } = useWallet()
+  const { address, connectionProof, publicKey, signTransaction, broadcastTransaction } = useWallet()
 
   /**
    * The source's public key, for the compose calls that need one.
@@ -230,18 +230,27 @@ export function useCompose() {
    * with the `multisig_pubkey` parameter" — a first-run failure that hit
    * exactly the people least equipped to read it.
    *
-   * The connection proof already carries the key, and pubkeyFromBip322
-   * accepts it only if it hashes to the address it claims. Null for taproot
-   * and for a session with no proof; core's own lookup still covers those
-   * once the address has spent.
+   * Two sources, in this order:
+   *
+   *  1. The wallet, via xcp_getAddresses. Authoritative, needs no signature,
+   *     and covers TAPROOT — which the second source cannot, since a p2tr
+   *     address commits to the tweaked output key while the signable one is
+   *     the internal key. The wallet defaults new accounts to taproot, so
+   *     without this the common case stays broken.
+   *  2. The BIP-322 connection proof, whose witness is [signature, pubkey].
+   *     Covers older extension builds that predate the method. Accepted only
+   *     if the key hashes to the address claiming it.
+   *
+   * Null when neither answers; core's own lookup still covers an address
+   * that has spent before.
    */
-  const multisigPubkey = useMemo(
-    () =>
-      address && connectionProof?.address === address
-        ? pubkeyFromBip322(address, connectionProof.signature)
-        : null,
-    [address, connectionProof],
-  )
+  const multisigPubkey = useMemo(() => {
+    if (!address) return null
+    if (publicKey) return publicKey
+    return connectionProof?.address === address
+      ? pubkeyFromBip322(address, connectionProof.signature)
+      : null
+  }, [address, publicKey, connectionProof])
   const [state, setState] = useState<ComposeState>(INITIAL_STATE)
   const busyRef = useRef(false)
 

@@ -35,6 +35,8 @@ interface WalletContextValue {
   status: XcpWalletStatus
   address: string | null
   connectionProof: ConnectionProof | null
+  /** Active address public key, when the wallet can supply one. */
+  publicKey: string | null
   proofStatus: ProofStatus
   connecting: boolean
   connectError: string | null
@@ -80,6 +82,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [connectError, setConnectError] = useState<string | null>(null)
   const [connectionProof, setConnectionProof] = useState<ConnectionProof | null>(null)
   const [proofStatus, setProofStatus] = useState<ProofStatus>('unverified')
+  const [keyedPublicKey, setKeyedPublicKey] = useState<{
+    address: string
+    publicKey: string
+  } | null>(null)
   const connectingRef = useRef(false)
   const disconnectingRef = useRef(false)
   const walletRef = useRef<XcpWallet | null>(null)
@@ -146,6 +152,39 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       verifiedAddressRef.current = null
     }
   }, [])
+
+  /**
+   * The active address's public key, asked for whenever the address changes.
+   *
+   * Counterparty needs it to compose anything past an OP_RETURN — it falls
+   * back to bare multisig, which embeds the source's key — and core can only
+   * find one itself once the address has SPENT. A freshly funded wallet
+   * never has, which is why a first-ever launch used to fail outright.
+   *
+   * Asked passively: no prompt, no signature. Older extension builds predate
+   * the method and answer null, so callers keep a fallback.
+   */
+  useEffect(() => {
+    if (!address) return
+    let cancelled = false
+    void (async () => {
+      const addresses = await walletRef.current?.getAddresses()
+      if (cancelled) return
+      const match = [addresses?.active, addresses?.legacy, addresses?.segwit].find(
+        (a) => a?.address === address,
+      )
+      if (match) setKeyedPublicKey({ address, publicKey: match.publicKey })
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [address])
+
+  // Stored WITH its address and compared on read, rather than cleared when
+  // the address changes: a key belonging to an account we have since left is
+  // worse than no key at all, and deriving it means there is no window in
+  // which the pair can disagree.
+  const publicKey = keyedPublicKey?.address === address ? keyedPublicKey.publicKey : null
 
   // Detect wallet, subscribe to events, optimistically restore, reconcile
   useEffect(() => {
@@ -404,6 +443,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       status,
       address,
       connectionProof,
+      publicKey,
       proofStatus,
       connecting,
       connectError,

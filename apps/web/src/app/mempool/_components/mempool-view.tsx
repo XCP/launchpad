@@ -16,11 +16,8 @@ const REFRESH_MS = 10_000;
  *  a second fetch inside this window is refused rather than queued. */
 const MANUAL_REFRESH_DEBOUNCE_MS = 10_000;
 
-export function MempoolView({ conformingAssets }: { conformingAssets: string[] }) {
-  const { fairminters, mints, fetchedAt, isLoading, refresh } = useMempool(
-    conformingAssets,
-    REFRESH_MS,
-  );
+export function MempoolView() {
+  const { fairminters, mints, fetchedAt, isLoading, refresh } = useMempool(REFRESH_MS);
 
   const groups = groupMintsByAddress(mints);
   const totals = mempoolTotals(fairminters.length, groups);

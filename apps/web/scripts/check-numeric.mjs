@@ -265,6 +265,13 @@ const EXEMPT = new Map([
     "Bitcoin transaction construction: input values, vbytes and dust thresholds",
   ],
   [
+    "lib/launch-cost.ts",
+    "the same category as inscribe-launch: vbytes and multisig dust thresholds " +
+      "for one transaction, bounded by a few thousand satoshi — derived from " +
+      "core's own chunk size and DEFAULT_MULTISIG_DUST_SIZE, never from an " +
+      "asset quantity",
+  ],
+  [
     "app/dispense/_components/bridge.tsx",
     "XCP dispenser units and Bitcoin sat amounts, bounded by XCP's 2.6M supply — " +
       "whole XCP only on the sell side, so escrow_quantity is an exact integer " +

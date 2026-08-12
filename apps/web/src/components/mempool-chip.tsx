@@ -26,11 +26,9 @@ const REFRESH_MS = 30_000;
  * thousands of transactions and none of them anyone's business here.
  */
 export function MempoolChip({ className = "" }: { className?: string }) {
-  // The chip has no server-rendered conforming set to filter against, so it
-  // counts what the predicate alone can judge. Mints for a launch the chip
-  // hasn't heard of are excluded until the page resolves them, which errs
-  // toward under-counting — the honest direction for a teaser.
-  const { fairminters, mints } = useMempool([], REFRESH_MS);
+  // Same hook, same filtering, same answer as /mempool — the count here and
+  // the count there are one number, not two that happen to agree.
+  const { fairminters, mints } = useMempool(REFRESH_MS);
   const count = fairminters.length + mints.length;
 
   // Nothing queued, or nothing known yet: render nothing at all rather than a

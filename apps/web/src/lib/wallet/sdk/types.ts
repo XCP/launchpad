@@ -34,6 +34,25 @@ export interface SignPsbtParams {
   sighashTypes?: number[]
 }
 
+/** One address the wallet controls, with the key that proves it. */
+export interface WalletAddress {
+  address: string
+  /** Compressed public key, hex. */
+  publicKey: string
+  /** e.g. 'p2pkh', 'p2wpkh', 'p2tr'. */
+  type: string
+}
+
+/**
+ * Response from xcp_getAddresses. `legacy` and `segwit` are present only when
+ * the site has paired-address permission; `active` always is.
+ */
+export interface WalletAddresses {
+  active: WalletAddress
+  legacy?: WalletAddress
+  segwit?: WalletAddress
+}
+
 declare global {
   interface Window {
     xcpwallet?: XcpProvider

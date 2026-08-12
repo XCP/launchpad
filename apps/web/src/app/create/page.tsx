@@ -12,6 +12,8 @@ import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
+import { launchCostSats } from "@/lib/launch-cost";
+import { metadataJsonUrl } from "@/lib/metadata";
 import { SATS } from "@/lib/numeric";
 import { isValidTelegram, isValidX } from "@/lib/social";
 import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
@@ -24,6 +26,9 @@ import {
 } from "@/lib/xcp69";
 
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
+
+/** Longest name the regex above allows: one leading letter plus 11. */
+const MAX_ASSET_NAME_LENGTH = 12;
 
 /**
  * "View launch page", held back until that page will actually render.
@@ -112,18 +117,6 @@ const INSCRIBE_MAX_BYTES = 385 * 1024;
 /** A named-asset registration is a fixed protocol fee, paid in the same
  *  compose transaction — not a separate step. */
 const REGISTRATION_FEE_XCP = 0.5;
-
-/** Measured off a real launch (PARTYKILLER, weight 2136): one input, three
- *  multisig data outputs, one change output. The old 200 treated this as a
- *  plain transfer, which it isn't — the data outputs are most of the tx. */
-const LAUNCH_TX_VBYTES_ESTIMATE = 534;
-
-/** A launch is past the 80-byte OP_RETURN ceiling, so Counterparty encodes
- *  it as bare multisig: three outputs holding 1,000 sats each
- *  (DEFAULT_MULTISIG_DUST_SIZE). Recoverable, but it has to be in the wallet
- *  on the day — and omitting it is what let a funded wallet fail to
- *  compose. */
-const LAUNCH_MULTISIG_DUST_SATS = 3_000;
 
 type NameCheck =
   | "idle"
@@ -231,6 +224,11 @@ export default function CreatePage() {
   const { data: feeRate } = useSWR("btc-feerate-priority", fetchPriorityFeeRate, {
     refreshInterval: 60_000,
   });
+  // Sized from THIS launch's description, which is the only part of the
+  // payload that varies — the standard fixes everything else. Before a name
+  // is typed it quotes the longest allowed one, so the figure can only fall
+  // as you type, never jump up at the moment you commit.
+  const launchDescription = metadataJsonUrl(name || "X".repeat(MAX_ASSET_NAME_LENGTH));
   const { data: btcUsd } = useSWR("btc-usd", fetchBtcUsd, { refreshInterval: 60_000 });
   const { data: xcpUsd } = useSWR("xcp-usd", fetchXcpUsd, { refreshInterval: 60_000 });
   const { data: blockHeight } = useSWR(
@@ -659,16 +657,14 @@ export default function CreatePage() {
                 <div className="flex justify-between">
                   <dt>Bitcoin tx fee</dt>
                   <dd className="tabular-nums text-gray-700">
-                    {commas(feeRate * LAUNCH_TX_VBYTES_ESTIMATE + LAUNCH_MULTISIG_DUST_SATS)}{" "}
+                    {commas(launchCostSats(feeRate, launchDescription))}{" "}
                     sats
                     {btcUsd !== null && btcUsd !== undefined && (
                       <span className="text-gray-400">
                         {" "}
                         (~
                         {usd(
-                          ((feeRate * LAUNCH_TX_VBYTES_ESTIMATE +
-                            LAUNCH_MULTISIG_DUST_SATS) /
-                            SATS) *
+                          (launchCostSats(feeRate, launchDescription) / SATS) *
                             btcUsd,
                         )}
                         )
