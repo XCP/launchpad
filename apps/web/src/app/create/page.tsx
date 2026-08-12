@@ -14,6 +14,7 @@ import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { launchCostSats } from "@/lib/launch-cost";
 import { metadataJsonUrl } from "@/lib/metadata";
+import { registerPending } from "@/lib/pending";
 import { SATS } from "@/lib/numeric";
 import { isValidTelegram, isValidX } from "@/lib/social";
 import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
@@ -410,6 +411,17 @@ export default function CreatePage() {
   // sit above the early return below: hooks cannot run conditionally.
   useEffect(() => {
     if (!launchTxid) return;
+    // Into the dock, the same as a mint or a swap. It was the one action on
+    // the site that broadcast a transaction and then said nothing more about
+    // it — and it is the slowest of them to matter, since a launch has to
+    // confirm before its start block or it fails the standard outright. The
+    // action most worth watching was the only one you couldn't.
+    registerPending({
+      txid: launchTxid,
+      kind: "launch",
+      label: `Launch ${name}`,
+      address: address ?? undefined,
+    });
     // What the launch actually cost: the name registration. Zero when the
     // creator already owned the name, which reports as a conversion with no
     // revenue rather than an invented one.
@@ -418,7 +430,7 @@ export default function CreatePage() {
       "launch created",
       xcpUsd && registrationFeeXcp > 0 ? registrationFeeXcp * xcpUsd : null,
     );
-  }, [launchTxid, registrationFeeXcp, xcpUsd]);
+  }, [launchTxid, registrationFeeXcp, xcpUsd, name, address]);
 
   if (launchTxid) {
     return (

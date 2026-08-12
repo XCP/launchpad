@@ -14,7 +14,7 @@
 
 import { sumRaw } from "@/lib/numeric";
 
-export type PendingKind = "order" | "dispense" | "mint" | "pool";
+export type PendingKind = "order" | "dispense" | "mint" | "pool" | "launch";
 
 export interface PendingItem {
   txid: string;

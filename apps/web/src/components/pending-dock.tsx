@@ -136,7 +136,12 @@ export function PendingDock() {
                     ? "confirmed · escrowed"
                     : item.kind === "dispense"
                       ? "confirmed · XCP delivered"
-                      : "confirmed",
+                      : item.kind === "launch"
+                        ? // Confirming is not opening: a launch is announced
+                          // on-chain first and stays shut until its start
+                          // block, which is the whole point of the standard.
+                          "confirmed · announced"
+                        : "confirmed",
               });
           }
         } catch {
