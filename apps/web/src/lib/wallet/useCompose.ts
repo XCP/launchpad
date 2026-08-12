@@ -16,6 +16,50 @@ type Quantity = number | bigint
 
 const UTXO_REGEX = /^[a-f0-9]{64}:\d+$/
 
+/** friendlyError's catch-all — the one message that says nothing at all. */
+const GENERIC_ERROR = 'Something went wrong — please try again'
+
+/**
+ * Core reports compose failures as a Python repr of a list, even for one
+ * error: `['insufficient XCP balance to pay fee', 'lp_asset must be a
+ * numeric asset']`. Unwrapped into `a; b`, because the brackets and quotes
+ * are noise and — more importantly — because the SECOND error is the one
+ * that usually explains the failure. Anything that isn't that shape is
+ * returned unchanged.
+ */
+function normalizeCoreError(raw: unknown): string {
+  if (Array.isArray(raw)) return raw.map(String).join('; ')
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  const list = /^\[(.*)\]$/s.exec(text)
+  if (!list) return text
+  // An empty list carries no information; let the caller's fallback speak.
+  if (list[1]!.trim() === '') return ''
+  const parts = [...list[1]!.matchAll(/'((?:[^'\\]|\\.)*)'|"((?:[^"\\]|\\.)*)"/g)].map(
+    (m) => (m[1] ?? m[2] ?? '').replace(/\\(['"\\])/g, '$1'),
+  )
+  return parts.length > 0 ? parts.join('; ') : text
+}
+
+/**
+ * The friendly message when one fits, the REAL one when none does.
+ *
+ * friendlyError's fallback is a dead end: it tells a user nothing and leaves
+ * the only copy of the reason in a console.warn, which is no use at all to
+ * someone who hit this on a launch and doesn't have devtools open. Core's
+ * compose errors are specific and actionable — "start_block must be greater
+ * than the current block", "lp_asset must be a numeric asset" — and an
+ * unrecognised error is exactly the case where raw text beats polish.
+ *
+ * Recognised errors keep their friendly wording; this only replaces the
+ * catch-all. friendlyError still logs, so nothing stops being debuggable.
+ */
+function composeError(e: unknown): string {
+  const friendly = friendlyError(e)
+  if (friendly !== GENERIC_ERROR) return friendly
+  const raw = (e instanceof Error ? e.message : String(e)).trim()
+  return raw && raw !== '[object Object]' ? raw : friendly
+}
+
 export type ComposeStatus = 'idle' | 'composing' | 'signing' | 'broadcasting' | 'confirmed' | 'error'
 
 export type ComposeState =
@@ -139,7 +183,7 @@ async function composeRequest(
   const data = await res.json()
 
   if (!res.ok || data.error) {
-    throw new Error(data.error || `Compose failed: ${res.status}`)
+    throw new Error(normalizeCoreError(data.error) || `Compose failed: ${res.status}`)
   }
 
   return data.result.rawtransaction
@@ -188,7 +232,7 @@ export function useCompose() {
       registerSpentUtxos(inputs)
       setState({ status: 'confirmed', txid, error: null })
     } catch (e) {
-      setState({ status: 'error', txid: null, error: friendlyError(e) })
+      setState({ status: 'error', txid: null, error: composeError(e) })
     } finally {
       busyRef.current = false
     }
