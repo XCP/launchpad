@@ -3,6 +3,12 @@ import type { Env } from "#api/env";
 import { fetchFairminter } from "#api/integrations/counterparty";
 
 const POLL_MS = 8_000;
+/** Confirmed trades can only change when a block lands (~10 min), so they ride
+ *  a slower cadence than the mempool does. Polling them every tick would be
+ *  three-quarters wasted requests for information that cannot have moved. */
+const TRADES_MS = 24_000;
+/** Enough tape to fill the visible table; the client paginates locally. */
+const MAX_TRADES = 50;
 const MEMPOOL_BASE = "https://api.counterparty.io:4000/v2";
 /** Individual pending rows are for the "who's minting right now" list —
  *  capped so a launch with an unusually large mempool queue can't bloat
@@ -16,6 +22,19 @@ interface PendingMint {
   quantity: number | string;
 }
 
+/** A confirmed fill on the pair, from either venue. */
+interface RoomTrade {
+  key: string;
+  block: number;
+  time: number;
+  buy: boolean;
+  token_quantity: string;
+  xcp_quantity: string;
+  address: string;
+  venue: "pool" | "book";
+  tx_hash: string;
+}
+
 interface RoomState {
   status: string;
   earned_quantity: string | number | null;
@@ -23,6 +42,9 @@ interface RoomState {
   pending_count: number;
   pending_quantity: number;
   pending: PendingMint[];
+  /** Present once the launch has graduated and a market exists. Omitted
+   *  while minting, when there is nothing to trade. */
+  trades?: RoomTrade[];
 }
 
 type RoomMessage = { type: "state" } & RoomState;
@@ -64,6 +86,12 @@ export class LaunchRoom extends DurableObject<Env> {
     const url = new URL(request.url);
     const txHash = url.searchParams.get("fm");
     if (!txHash) return new Response("missing fm", { status: 400 });
+    // The room is keyed by asset (idFromName), but polling the market needs
+    // the ticker itself, so it is pinned alongside the fairminter.
+    const asset = url.pathname.split("/").filter(Boolean).pop()?.toUpperCase();
+    if (asset && !(await this.ctx.storage.get<string>("asset"))) {
+      await this.ctx.storage.put("asset", asset);
+    }
 
     // First viewer to ever open this room pins which fairminter it polls —
     // every later connection is just a subscriber, never re-asked for it.
@@ -117,11 +145,16 @@ export class LaunchRoom extends DurableObject<Env> {
    *  VISITOR every 10s (LiveProgress, and again independently in the
    *  Mempool tab) — now it runs once per launch, however many are watching. */
   private async poll(txHash: string): Promise<RoomState | null> {
-    const [fm, pending] = await Promise.all([
-      fetchFairminter(txHash),
-      this.fetchPending(txHash),
-    ]);
+    const fm = await fetchFairminter(txHash);
     if (!fm) return null;
+
+    // Closed means the sale is over: no more mints can enter the mempool, so
+    // that fetch is skipped entirely and the market is watched instead. The
+    // two phases never both cost a request.
+    const closed = fm.status === "closed";
+    const pending = closed ? [] : await this.fetchPending(txHash);
+    const trades = closed ? await this.tradesIfDue() : undefined;
+
     return {
       status: fm.status,
       earned_quantity: fm.earned_quantity,
@@ -129,7 +162,86 @@ export class LaunchRoom extends DurableObject<Env> {
       pending_count: pending.length,
       pending_quantity: pending.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0),
       pending: pending.slice(0, MAX_PENDING_ROWS),
+      ...(trades ? { trades } : {}),
     };
+  }
+
+  /** Cached between ticks so the tape refreshes on its own slower clock. The
+   *  cache lives on the instance: if the runtime evicts it, the cost is one
+   *  extra fetch, never a wrong answer. */
+  private tradeCache: { at: number; trades: RoomTrade[] } | null = null;
+
+  private async tradesIfDue(): Promise<RoomTrade[] | undefined> {
+    const now = Date.now();
+    if (this.tradeCache && now - this.tradeCache.at < TRADES_MS) {
+      return this.tradeCache.trades;
+    }
+    const asset = await this.ctx.storage.get<string>("asset");
+    if (!asset) return undefined;
+    const trades = await this.fetchTrades(asset);
+    this.tradeCache = { at: now, trades };
+    return trades;
+  }
+
+  /**
+   * Both venues. Orders here interleave between the pool and the order book,
+   * so a tape built from pool fills alone silently omits real trades at real
+   * prices. `forward_asset` is what the row's primary address receives, which
+   * is what makes the token arriving a buy.
+   */
+  private async fetchTrades(asset: string): Promise<RoomTrade[]> {
+    const encoded = encodeURIComponent(asset);
+    const grab = async (path: string) => {
+      try {
+        const res = await fetch(`${MEMPOOL_BASE}${path}`, {
+          signal: AbortSignal.timeout(8_000),
+        });
+        if (!res.ok) return [];
+        return ((await res.json()) as { result: Record<string, unknown>[] }).result ?? [];
+      } catch {
+        return [];
+      }
+    };
+
+    const [poolRows, bookRows] = await Promise.all([
+      grab(`/pools/${encoded}/XCP/matches?verbose=true&limit=${MAX_TRADES}`),
+      grab(`/orders/${encoded}/XCP/matches?verbose=true&status=completed&limit=${MAX_TRADES}`),
+    ]);
+
+    const shape = (
+      r: Record<string, unknown>,
+      venue: "pool" | "book",
+    ): RoomTrade | null => {
+      const forwardIsToken = r.forward_asset === asset;
+      const token = String(forwardIsToken ? r.forward_quantity : r.backward_quantity);
+      const xcp = String(forwardIsToken ? r.backward_quantity : r.forward_quantity);
+      const address = String(
+        (venue === "pool" ? r.source : r.tx1_address) ?? "",
+      );
+      const txHash = String(r.tx_hash ?? r.tx1_hash ?? r.id ?? "");
+      if (!txHash) return null;
+      return {
+        key: `${venue}-${txHash}-${asset}`,
+        block: Number(r.block_index) || 0,
+        time: Number(r.block_time) || 0,
+        buy: forwardIsToken,
+        token_quantity: token,
+        xcp_quantity: xcp,
+        address,
+        venue,
+        tx_hash: txHash,
+      };
+    };
+
+    return [
+      ...poolRows
+        .filter((r) => r.status === "valid")
+        .map((r) => shape(r, "pool")),
+      ...bookRows.map((r) => shape(r, "book")),
+    ]
+      .filter((t): t is RoomTrade => t !== null)
+      .sort((a, b) => b.block - a.block || b.time - a.time)
+      .slice(0, MAX_TRADES);
   }
 
   /** Unconfirmed is provisional by design — core validates mempool batches

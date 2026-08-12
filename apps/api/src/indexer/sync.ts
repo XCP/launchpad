@@ -6,6 +6,7 @@ import {
   fetchFairmints,
   fetchPool,
 } from "#api/integrations/counterparty";
+import { syncAssetEvents, type GraduatedTarget } from "#api/indexer/events";
 import { fetchTxFee } from "#api/integrations/mempool";
 import {
   isXcp69,
@@ -28,6 +29,7 @@ interface StoredLaunch {
   earned_quantity: string | null;
   mints: number;
   minters: number;
+  pool_xcp_reserve: string | null;
 }
 
 /** One batched read instead of one SELECT per candidate inside the main
@@ -44,7 +46,8 @@ async function fetchStoredByTxHash(
     const placeholders = chunk.map((_, idx) => `?${idx + 1}`).join(",");
     const rows = await q<StoredLaunch>(
       db,
-      `SELECT tx_hash, earned_quantity, mints, minters FROM launches WHERE tx_hash IN (${placeholders})`,
+      `SELECT tx_hash, earned_quantity, mints, minters, pool_xcp_reserve
+         FROM launches WHERE tx_hash IN (${placeholders})`,
       ...chunk,
     );
     for (const row of rows) out.set(row.tx_hash, row);
@@ -59,6 +62,7 @@ export interface SyncResult {
   written: number;
   resolved: number;
   mints_ingested: number;
+  events_ingested: number;
   fees_backfilled: number;
 }
 
@@ -81,6 +85,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
 
   let written = 0;
   let mintsIngested = 0;
+  const eventTargets: GraduatedTarget[] = [];
   const now = Math.floor(Date.now() / 1000);
 
   for (const fm of candidates) {
@@ -293,8 +298,20 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
       .run();
 
     if ((res.meta.rows_written ?? 0) > 0) written += 1;
+
+    // Trades are only possible once a pool exists, and the reserve moving is
+    // the proof that one happened. Comparing against the reserve already
+    // stored means a graduated launch nobody traded costs nothing here —
+    // no feed reads, no MAX() probe, no writes.
+    if (phase === "graduated" && pendingVerdict !== false) {
+      eventTargets.push({
+        asset: fm.asset,
+        poolChanged: poolXcpReserve !== (stored?.pool_xcp_reserve ?? null),
+      });
+    }
   }
 
+  const eventsIngested = await syncAssetEvents(db, eventTargets, height);
   const resolved = await resolveUndecided(db);
   const feesBackfilled = await backfillMissingFees(db);
 
@@ -303,6 +320,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     written,
     resolved,
     mints_ingested: mintsIngested,
+    events_ingested: eventsIngested,
     fees_backfilled: feesBackfilled,
   };
 }

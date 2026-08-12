@@ -139,3 +139,67 @@ export async function fetchPool(asset: string): Promise<CpPool | null> {
     return null;
   }
 }
+
+/** A filled trade against a TOKEN/XCP pair, either side. Both legs arrive in
+ *  one row, which is what makes this cheap: the XCP amount never has to be
+ *  chased through a separate, chain-wide feed. */
+export interface CpMatch {
+  id?: string;
+  tx_hash?: string;
+  tx1_hash?: string;
+  block_index: number;
+  /** Pool match: the trader. The pool itself is the counterparty. */
+  source?: string;
+  /** Order match: `forward_asset` is what THIS address gets (order.py:697). */
+  tx1_address?: string;
+  /** Order match: the other side, who gets `backward_asset`. */
+  tx0_address?: string;
+  forward_asset: string;
+  forward_quantity: number | string;
+  backward_quantity: number | string;
+  /** Real Unix seconds — the bucket a candle folds this fill into. */
+  block_time?: number;
+}
+
+/**
+ * Pool and order-book fills for one asset against XCP, newest first, stopping
+ * as soon as a page reaches `sinceBlock`.
+ *
+ * Counterparty has no "since" filter, but it does return these in descending
+ * block order, so an asset that hasn't traded since the last pass costs one
+ * page and nothing else. `>=` rather than `>`: several fills can share the
+ * boundary block, and the caller's INSERT OR IGNORE makes re-reading that one
+ * block free.
+ */
+async function fetchMatches(path: string, sinceBlock: number): Promise<CpMatch[]> {
+  const rows: CpMatch[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < 20; page++) {
+    const qs = cursor ? `&cursor=${cursor}` : "";
+    let data: { result: CpMatch[]; next_cursor: number | null };
+    try {
+      data = await get(`${path}${path.includes("?") ? "&" : "?"}limit=500${qs}`);
+    } catch {
+      break;
+    }
+    rows.push(...data.result);
+    // Descending order means the oldest row on this page bounds the page: once
+    // it is at or below what we already have, nothing older can be new.
+    const oldest = data.result[data.result.length - 1];
+    if (!oldest || oldest.block_index < sinceBlock) break;
+    cursor = data.next_cursor;
+    if (!cursor) break;
+  }
+  return rows.filter((r) => r.block_index >= sinceBlock);
+}
+
+export function fetchPoolMatches(asset: string, sinceBlock: number): Promise<CpMatch[]> {
+  return fetchMatches(`/pools/${encodeURIComponent(asset)}/XCP/matches?verbose=true`, sinceBlock);
+}
+
+export function fetchOrderMatches(asset: string, sinceBlock: number): Promise<CpMatch[]> {
+  return fetchMatches(
+    `/orders/${encodeURIComponent(asset)}/XCP/matches?status=completed&verbose=true`,
+    sinceBlock,
+  );
+}
