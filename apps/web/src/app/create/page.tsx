@@ -26,6 +26,74 @@ import {
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
 
 /**
+ * "View launch page", held back until that page will actually render.
+ *
+ * Broadcasting is not the same as being visible. For a few seconds after the
+ * wallet returns a txid, Counterparty's own mempool feed hasn't picked the
+ * transaction up yet — and the launch page, finding neither a confirmed
+ * fairminter nor a pending one, correctly 404s. Offering the link in that
+ * window sent people to a dead page seconds after the most important thing
+ * they'd done on the site, and the only way out was a manual refresh they
+ * had no reason to expect would work.
+ *
+ * So the button waits for the answer instead of guessing at a delay: it asks
+ * the same two questions the launch page asks, every couple of seconds, and
+ * only becomes a link once one of them says yes. Polling stops the moment it
+ * does.
+ */
+function ViewLaunchLink({ asset }: { asset: string }) {
+  const { data: visible } = useSWR(
+    ["launch-visible", asset],
+    async () => {
+      // Confirmed first: a launch that made it into a block on the very next
+      // one shouldn't be reported as still pending.
+      const confirmed = await fetch(
+        `${COUNTERPARTY_API_BASE}/assets/${asset}/fairminters`,
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      if (Array.isArray(confirmed?.result) && confirmed.result.length > 0) return true;
+
+      const pending = await fetch(
+        `${COUNTERPARTY_API_BASE}/mempool/events/NEW_FAIRMINTER?limit=500`,
+      )
+        .then((r) => (r.ok ? r.json() : null))
+        .catch(() => null);
+      return (
+        Array.isArray(pending?.result) &&
+        pending.result.some(
+          (e: { params?: { asset?: string } }) => e.params?.asset === asset,
+        )
+      );
+    },
+    {
+      refreshInterval: (latest) => (latest ? 0 : 2_500),
+      revalidateOnFocus: false,
+    },
+  );
+
+  if (!visible) {
+    return (
+      <span className="mt-6 inline-flex items-center gap-2 rounded-md bg-gray-100 px-5 py-2.5 font-medium text-gray-400">
+        {/* A spinner, so the wait reads as work rather than as a dead
+            button someone should give up on. */}
+        <span className="size-3.5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-500" />
+        Waiting for the network…
+      </span>
+    );
+  }
+
+  return (
+    <a
+      href={`/${asset}`}
+      className="mt-6 inline-block rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
+    >
+      View launch page
+    </a>
+  );
+}
+
+/**
  * Inscribed images live in the reveal witness, chunked into 520-byte
  * pushes alongside the fairminter's own CBOR metadata in the same
  * script — both count against Bitcoin's 400,000-weight standardness
@@ -64,12 +132,14 @@ type NameCheck =
  * Pre-announcement lead: minting opens this many blocks after compose time.
  * The standard requires only that the launch confirms strictly before
  * start_block — a launch that confirms late opens instantly and fails
- * conformance — so 36 blocks (~6 hours) is the floor: comfortable headroom
- * at the ordinary median fee rate, below which we just don't let anyone go,
- * preset or custom. Presets cover the common cases; Custom takes a raw
- * block height for scheduling further out (e.g. staggering a batch of
- * launches across weeks) — block, not a date, because the target is
- * consensus state, not a wall-clock time this page can't actually promise.
+ * conformance — so 36 blocks (~6 hours) is the shortest PRESET: comfortable
+ * headroom at the ordinary next-block rate, and the default anyone gets
+ * without thinking about it.
+ *
+ * Custom goes tighter (see CUSTOM_FLOOR_BLOCKS) and pays for it. Custom also
+ * goes further out, for staggering a batch of launches across weeks — a
+ * block, not a date, because the target is consensus state rather than a
+ * wall-clock time this page can't actually promise.
  */
 const PREANNOUNCE_FLOOR_BLOCKS = 36;
 const PREANNOUNCE_PRESETS = [
@@ -78,6 +148,24 @@ const PREANNOUNCE_PRESETS = [
   { id: "week", blocks: 1008, label: "~7 days" },
 ] as const;
 type PreannounceOption = (typeof PREANNOUNCE_PRESETS)[number]["id"] | "custom";
+
+/**
+ * Custom goes tighter than the presets do: ~1 hour, not ~6.
+ *
+ * The constraint is real but it is a FEE problem, not a time problem. The
+ * launch has to confirm before its own start_block — a launch that confirms
+ * after it opens the mint instantly and fails the standard — and at six
+ * blocks of headroom the ordinary next-block rate no longer has room to be
+ * wrong. Rather than forbid the tight end, the tight end pays for the
+ * certainty it needs.
+ */
+const CUSTOM_FLOOR_BLOCKS = 6;
+
+/** ~2 hours. At or under this lead the launch pays double the next-block
+ *  rate: three to six blocks of slack cannot absorb a fee estimate that
+ *  came in low, and the cost of being wrong is the launch itself. */
+const TIGHT_LEAD_BLOCKS = 12;
+const TIGHT_LEAD_FEE_MULTIPLIER = 2;
 
 /** ~10 min/block, the same average the rest of the app assumes. Rough on
  *  purpose — the UI beside this always says "estimate," never "at". */
@@ -155,7 +243,7 @@ export default function CreatePage() {
 
   const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
   const minCustomBlock =
-    blockHeight !== undefined ? blockHeight + PREANNOUNCE_FLOOR_BLOCKS : undefined;
+    blockHeight !== undefined ? blockHeight + CUSTOM_FLOOR_BLOCKS : undefined;
   const scheduleValid =
     preannounceOption !== "custom" ||
     (minCustomBlock !== undefined && customBlockNum >= minCustomBlock);
@@ -250,7 +338,17 @@ export default function CreatePage() {
 
       // Next-block rate: this is a single small transaction, always worth
       // paying to confirm promptly rather than risk it lingering.
-      const submitFeeRate = await fetchPriorityFeeRate();
+      //
+      // Doubled at the tight end. With only a few blocks between broadcast
+      // and start_block there is no room to re-fee: a launch that confirms
+      // after its own start opens the mint instantly and fails the standard.
+      // The multiplier buys the confirmation the schedule depends on, and it
+      // only applies to a lead the creator chose knowing the price.
+      const baseFeeRate = await fetchPriorityFeeRate();
+      const submitFeeRate =
+        startBlock - height <= TIGHT_LEAD_BLOCKS
+          ? baseFeeRate * TIGHT_LEAD_FEE_MULTIPLIER
+          : baseFeeRate;
 
       if (inscribe && isTaproot && address) {
         // 3a. Commit/reveal inscription: the image becomes the permanent
@@ -341,12 +439,7 @@ export default function CreatePage() {
             nobody, you included, can mint. Then it runs for 1,000 blocks (~7
             days): it sells out, or everyone is refunded.
           </p>
-          <a
-            href={`/${name}`}
-            className="mt-6 inline-block rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
-          >
-            View launch page
-          </a>
+          <ViewLaunchLink asset={name} />
         </div>
       </div>
     );
@@ -365,7 +458,13 @@ export default function CreatePage() {
 
   return (
     <div className="mx-auto max-w-4xl">
-      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6">
+      {/* Two columns from `md`, not `lg`. The sidebar is the launch preview —
+          the thing that shows what you're about to publish — and it was
+          dropping to a full-width block below 1024px on windows that had
+          plenty of room for it. At 768px the rail takes 17rem and still
+          leaves the form ~27rem, which is wider than the form needs; it
+          widens to 20rem once there's genuinely space. */}
+      <div className="md:grid md:grid-cols-[minmax(0,1fr)_17rem] md:gap-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-6">
         {/* items-stretch (the grid default) is deliberate here: the right
             cell must be as tall as the form for the sticky preview to have
             room to travel and settle at the viewport's vertical center as
@@ -596,7 +695,7 @@ export default function CreatePage() {
         {/* Live preview — the token as it'll actually look, plus the
             terms worth seeing before you sign rather than the full fixed
             list every launch already shares. */}
-        <div className="mt-6 lg:mt-0">
+        <div className="mt-6 md:mt-0">
           <PreviewCard
             name={name}
             image={image}
@@ -660,7 +759,7 @@ function PreviewCard({
   };
 
   return (
-    <div className="lg:sticky lg:top-1/2 lg:-translate-y-1/2 rounded-3xl border border-gray-200 bg-white p-5">
+    <div className="md:sticky md:top-1/2 md:-translate-y-1/2 rounded-3xl border border-gray-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {image ? (
@@ -742,12 +841,19 @@ function ScheduleGear({
 }) {
   const customNum = Math.round(parseFloat(customBlock)) || 0;
   const minBlock =
-    blockHeight !== undefined ? blockHeight + PREANNOUNCE_FLOOR_BLOCKS : undefined;
+    blockHeight !== undefined ? blockHeight + CUSTOM_FLOOR_BLOCKS : undefined;
   const tooSoon =
     option === "custom" &&
     customBlock !== "" &&
     minBlock !== undefined &&
     customNum < minBlock;
+  // Priced before it's chosen, not discovered on the receipt.
+  const tightLead =
+    option === "custom" &&
+    !tooSoon &&
+    customBlock !== "" &&
+    blockHeight !== undefined &&
+    customNum - blockHeight <= TIGHT_LEAD_BLOCKS;
 
   return (
     <GearPopover active={option !== "short"} label="Launch timing" small>
@@ -797,19 +903,29 @@ function ScheduleGear({
           </div>
           {customBlock === "" ? (
             <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
-              Any future block, {minBlock ? `${commas(minBlock)} or later` : "at least ~6 hours out"} —
-              same floor as the shortest preset.
+              Any future block, {minBlock ? `${commas(minBlock)} or later` : "at least ~1 hour out"} —
+              tighter than the presets go. Under ~2 hours pays double the
+              network fee.
             </p>
           ) : tooSoon ? (
             <p className="mt-1.5 text-[11px] font-medium text-red-600">
               Too soon — needs to be block {minBlock ? commas(minBlock) : "…"} or
-              later (~6 hours out, same floor as the shortest preset).
+              later (~1 hour out). The launch has to confirm before it opens.
             </p>
           ) : (
-            <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
-              ≈ {estimateFromBlocks(customNum - (blockHeight ?? customNum))} from
-              now — an estimate, not a guarantee; block time isn&apos;t exact.
-            </p>
+            <>
+              <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+                ≈ {estimateFromBlocks(customNum - (blockHeight ?? customNum))} from
+                now — an estimate, not a guarantee; block time isn&apos;t exact.
+              </p>
+              {tightLead && (
+                <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-amber-700">
+                  Double network fee at this lead — there aren&apos;t enough
+                  blocks to re-fee if the estimate comes in low, and a launch
+                  that confirms after it opens fails the standard.
+                </p>
+              )}
+            </>
           )}
         </div>
       )}
