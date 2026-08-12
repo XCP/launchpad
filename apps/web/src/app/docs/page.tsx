@@ -3,8 +3,8 @@ import {
   XCP69_MIN_PARTICIPANTS,
   XCP69_OPENING_MULTIPLE,
 } from "@/lib/xcp69";
-import { CopyDocsButton } from "./copy-button";
-import { docsMarkdown } from "./docs-markdown";
+import { CopyDocsButton } from "@/app/docs/_components/copy-button";
+import { docsMarkdown } from "@/app/docs/_lib/docs-markdown";
 import {
   COMPOSE_LAUNCH_SNIPPET,
   COMPOSE_MINT_SNIPPET,
@@ -14,7 +14,7 @@ import {
   EVENTS,
   FEE_ROWS,
   PREDICATE_SNIPPET,
-} from "./snippets";
+} from "@/app/docs/_lib/snippets";
 
 export const metadata = {
   title: "Docs — xcp.fun",

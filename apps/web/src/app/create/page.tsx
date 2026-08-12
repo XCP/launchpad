@@ -1,18 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { GearPopover } from "@/components/ui/popover";
+import { trackTx } from "@/lib/analytics";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { SATS } from "@/lib/numeric";
-import { isValidSocial } from "@/lib/social";
+import { isValidTelegram, isValidX } from "@/lib/social";
 import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
@@ -208,8 +209,8 @@ export default function CreatePage() {
     (nameCheck === "available" || nameCheck === "owned") &&
     image !== null &&
     !imageTooBigToInscribe &&
-    isValidSocial(xProfile) &&
-    isValidSocial(telegram) &&
+    isValidX(xProfile) &&
+    isValidTelegram(telegram) &&
     scheduleValid &&
     walletStatus === "connected" &&
     !submitting &&
@@ -301,6 +302,22 @@ export default function CreatePage() {
   };
 
   const launchTxid = compose.status === "confirmed" ? compose.txid : inscribeTxid;
+
+  // Covers both routes to a launch — the standard compose and the inscribed
+  // one — because launchTxid is whichever of them produced a broadcast. Must
+  // sit above the early return below: hooks cannot run conditionally.
+  useEffect(() => {
+    if (!launchTxid) return;
+    // What the launch actually cost: the name registration. Zero when the
+    // creator already owned the name, which reports as a conversion with no
+    // revenue rather than an invented one.
+    trackTx(
+      launchTxid,
+      "launch created",
+      xcpUsd && registrationFeeXcp > 0 ? registrationFeeXcp * xcpUsd : null,
+    );
+  }, [launchTxid, registrationFeeXcp, xcpUsd]);
+
   if (launchTxid) {
     return (
       <div className="mx-auto max-w-lg space-y-4 text-center">
@@ -505,6 +522,7 @@ export default function CreatePage() {
               placeholder="https://x.com/yourtoken"
               value={xProfile}
               onChange={setXProfile}
+              validate={isValidX}
             />
             <SocialInput
               id="telegram"
@@ -512,6 +530,7 @@ export default function CreatePage() {
               placeholder="https://t.me/yourtoken"
               value={telegram}
               onChange={setTelegram}
+              validate={isValidTelegram}
             />
           </div>
 
@@ -641,7 +660,7 @@ function PreviewCard({
   };
 
   return (
-    <div className="lg:sticky lg:top-1/2 lg:-translate-y-1/2 rounded-3xl border border-gray-200 bg-gray-50 p-5">
+    <div className="lg:sticky lg:top-1/2 lg:-translate-y-1/2 rounded-3xl border border-gray-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
           {image ? (
@@ -804,15 +823,17 @@ function SocialInput({
   placeholder,
   value,
   onChange,
+  validate,
 }: {
   id: string;
   label: string;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
+  validate: (v: string) => boolean;
 }) {
   const [touched, setTouched] = useState(false);
-  const valid = isValidSocial(value);
+  const valid = validate(value);
   const showError = touched && !valid;
   return (
     <div>

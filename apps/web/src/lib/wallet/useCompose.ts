@@ -6,7 +6,7 @@ import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
 import { parseTxInputs, type TxInput } from './raw-tx'
 import { msSinceLastSpend, recentlySpentUtxos, registerSpentUtxos } from './spent-utxos'
 import { quantityParam } from '@/lib/numeric'
-import { COUNTERPARTY_API_BASE } from '@/utils/constants'
+import { COUNTERPARTY_API_BASE } from '@/lib/constants'
 
 /** A compose parameter value; bigint/string carry quantities beyond 2^53. */
 type ComposeValue = string | number | bigint

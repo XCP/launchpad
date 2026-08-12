@@ -1,6 +1,6 @@
 import { fetchXcpUsd } from "@/lib/api/price";
 import { fetchTradeableAssets } from "@/lib/tradeable";
-import { LimitSurface } from "./limit-surface";
+import { LimitSurface } from "@/app/limit/_components/limit-surface";
 
 export const revalidate = 60;
 

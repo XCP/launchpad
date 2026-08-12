@@ -3,6 +3,7 @@
 import { type ReactNode, useState } from "react";
 import { CTA } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
+import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import { useWallet } from "@/lib/wallet/wallet-context";
 
 const CHROME_STORE_URL =
@@ -18,10 +19,36 @@ const CHROME_STORE_URL =
 export function useConnectAction(): { status: ReturnType<typeof useWallet>["status"]; onClick: () => void; installPrompt: ReactNode } {
   const { status, connect } = useWallet();
   const [installOpen, setInstallOpen] = useState(false);
+  const [desktopOnlyOpen, setDesktopOnlyOpen] = useState(false);
+  // The wallet is a browser extension, so "not detected" on a phone is not a
+  // missing install — it is a thing that cannot be installed there. Sending
+  // someone to the Chrome Web Store from a phone is a dead end, so that case
+  // gets an explanation instead of a link.
+  const coarse = useCoarsePointer();
+  const cannotInstall = status === "not_detected" && coarse;
   return {
     status,
-    onClick: () => (status === "not_detected" ? setInstallOpen(true) : connect()),
+    onClick: () =>
+      cannotInstall
+        ? setDesktopOnlyOpen(true)
+        : status === "not_detected"
+          ? setInstallOpen(true)
+          : connect(),
     installPrompt: (
+      <>
+      <Dialog
+        open={desktopOnlyOpen}
+        onOpenChange={setDesktopOnlyOpen}
+        title="Desktop only, for now"
+      >
+        <div className="px-2 pb-2">
+          <p className="text-sm leading-relaxed text-gray-600">
+            Connecting needs the XCP Wallet browser extension, and no mobile
+            browser can run it yet. Everything here is readable on a phone —
+            launches, prices, holders — but minting and trading need a desktop.
+          </p>
+        </div>
+      </Dialog>
       <Dialog
         open={installOpen}
         onOpenChange={setInstallOpen}
@@ -42,6 +69,7 @@ export function useConnectAction(): { status: ReturnType<typeof useWallet>["stat
           </a>
         </div>
       </Dialog>
+      </>
     ),
   };
 }

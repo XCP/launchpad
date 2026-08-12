@@ -1,4 +1,4 @@
-import type { ArtworkInscriptionParams } from './types'
+import type { ArtworkInscriptionParams } from '@/lib/inscriber/types'
 
 export const CP_ISSUANCE_ID = 20
 

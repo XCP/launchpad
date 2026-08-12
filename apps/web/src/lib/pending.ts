@@ -26,6 +26,10 @@ export interface PendingItem {
   address?: string;
   /** Resolved state, set by the dock's poller. */
   resolved?: string;
+  /** When it resolved, so a finished action can retire itself. Stamped by
+   *  updatePending rather than by each call site, which is what keeps it
+   *  impossible to record an outcome without recording when. */
+  resolvedAt?: number;
   /** What this action spends, for optimistic balance display.
    *  A decimal STRING: this row is JSON in localStorage, and a raw quantity
    *  can be larger than JSON.parse would hand back intact on the way out. */
@@ -75,7 +79,36 @@ export function registerPending(item: Omit<PendingItem, "addedAt">) {
 }
 
 export function updatePending(txid: string, patch: Partial<PendingItem>) {
-  write(readPending().map((i) => (i.txid === txid ? { ...i, ...patch } : i)));
+  write(
+    readPending().map((i) => {
+      if (i.txid !== txid) return i;
+      const next = { ...i, ...patch };
+      // Stamp the moment of resolution once, on the transition. Re-stamping
+      // on every later patch would keep pushing the retirement clock back.
+      if (patch.resolved && !i.resolved) next.resolvedAt = Date.now();
+      return next;
+    }),
+  );
+}
+
+/**
+ * Retire actions that finished a while ago.
+ *
+ * The dock exists to answer "did it land?", and once it has, the answer stops
+ * being news. Leaving resolved rows in place turned the dock into a permanent
+ * receipt drawer that only ever grew, and made "3 pending" mean "3 things,
+ * some of which finished yesterday". Resolved rows are still dismissible by
+ * hand — this is just the sweep for the ones nobody bothers to close.
+ */
+export function sweepResolved(maxAgeMs: number) {
+  const now = Date.now();
+  const items = readPending();
+  const keep = items.filter(
+    (i) => !i.resolved || now - (i.resolvedAt ?? i.addedAt) < maxAgeMs,
+  );
+  // Only write when something actually leaves — this runs on a timer, and an
+  // unconditional write would notify every subscriber on every tick.
+  if (keep.length !== items.length) write(keep);
 }
 
 export function dismissPending(txid: string) {

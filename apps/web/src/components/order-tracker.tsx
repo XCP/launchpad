@@ -3,7 +3,7 @@
 import useSWR from "swr";
 import { commasRaw } from "@/lib/format";
 import { parseJsonLossless, type Raw, ratio } from "@/lib/numeric";
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 interface OrderRow {
   status: string;

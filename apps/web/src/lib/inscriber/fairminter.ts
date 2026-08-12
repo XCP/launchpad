@@ -10,9 +10,9 @@
  * works with no fairminter-specific special casing.
  */
 
-import { nameToAssetId } from "./counterparty";
-import { prepareCommit } from "./transactions";
-import type { InscriptionData, PreparedInscriptionCommit } from "./types";
+import { nameToAssetId } from "@/lib/inscriber/counterparty";
+import { prepareCommit } from "@/lib/inscriber/transactions";
+import type { InscriptionData, PreparedInscriptionCommit } from "@/lib/inscriber/types";
 import { XCP69 } from "@/lib/xcp69";
 
 export const CP_FAIRMINTER_ID = 90;

@@ -1,12 +1,46 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Hint } from "@/components/ui/tooltip";
 
 const WS_BASE = "wss://launchpad-api.me-bbe.workers.dev";
 const MAX_BACKOFF_MS = 30_000;
+const VISITOR_KEY = "xcpfun:visitor:v1";
 
 /**
- * How many tabs have xcp.fun open right now, anywhere on the site — one
+ * Hide the badge below this many people.
+ *
+ * "2 online" reads as an empty room and works against the thing the badge is
+ * for. Zero means always show; raise it to 5 or 10 to only surface the number
+ * once it flatters. Deliberately a constant and not a setting — this is a
+ * judgement about the number, not a preference.
+ */
+const MIN_TO_SHOW = 0;
+
+/**
+ * An opaque id that is stable across this browser's tabs, so three tabs count
+ * as one person rather than three.
+ *
+ * It is a random value with nothing derived from the visitor in it, it is sent
+ * only to the presence room, and the server holds it only for as long as the
+ * socket is open — it is a deduplication key, not a profile. Falls back to a
+ * per-tab value when storage is unavailable (private mode, storage disabled),
+ * which degrades to the old tab-counting behaviour rather than failing.
+ */
+function visitorId(): string {
+  try {
+    const existing = localStorage.getItem(VISITOR_KEY);
+    if (existing) return existing;
+    const fresh = crypto.randomUUID();
+    localStorage.setItem(VISITOR_KEY, fresh);
+    return fresh;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
+
+/**
+ * How many people have xcp.fun open right now, anywhere on the site — one
  * WebSocket to a single fixed Durable Object (see apps/api's SitePresence),
  * not per-launch: expected traffic is low enough that a per-page count would
  * mostly read 0 or 1, which says nothing. Renders nothing until the first
@@ -21,6 +55,7 @@ export function SitePresenceBadge() {
     let socket: WebSocket | null = null;
     let stopped = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const id = visitorId();
 
     const connect = () => {
       if (stopped) return;
@@ -28,6 +63,10 @@ export function SitePresenceBadge() {
       socket = ws;
       ws.onopen = () => {
         attemptRef.current = 0;
+        // Identify immediately: until this lands the room counts this socket
+        // as its own anonymous visitor. Sent on every reconnect too, since a
+        // reconnect is a new socket with no memory of the old one.
+        ws.send(JSON.stringify({ type: "hello", id }));
       };
       ws.onmessage = (event) => {
         try {
@@ -56,19 +95,29 @@ export function SitePresenceBadge() {
     };
   }, []);
 
-  // Reserve the pill's footprint from the first paint, even before a count
-  // exists — appearing from nothing shifts everything after it (the Swap /
-  // Limit / Dispense links) sideways the moment the socket answers.
-  // `invisible` keeps the box in flow; only its content fades in.
+  // A fixed overlay now, not a nav item — so there is no layout to reserve
+  // and nothing shifts when the socket answers. It simply isn't there until
+  // there is a number worth showing.
+  if (count === null || count < MIN_TO_SHOW) return null;
+
   return (
-    <span
-      aria-hidden={count === null}
-      className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-500 ${
-        count === null ? "invisible" : ""
-      }`}
-    >
-      <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-green-500" />
-      {count ?? 0} online
-    </span>
+    <div className="fixed bottom-4 left-4 z-40">
+      <Hint
+        content={
+          <>
+            People with xcp.fun open right now, including you. Several tabs
+            from the same browser count once. Closing the tab removes you.
+          </>
+        }
+      >
+        <span
+          tabIndex={0}
+          className="modal-pop inline-flex cursor-default items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-xs font-medium text-gray-500 shadow-lg backdrop-blur focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+        >
+          <span aria-hidden className="size-2 rounded-full bg-green-500" />
+          {count} online
+        </span>
+      </Hint>
+    </div>
   );
 }

@@ -39,6 +39,10 @@ interface ApiLaunchRow {
   paid_quantity: string | null;
   current_deadline_block: number;
   pool_xcp_sats: number;
+  pool_xcp_reserve: string | null;
+  pool_token_reserve: string | null;
+  announce_block: number | null;
+  minters: number;
 }
 
 export interface IndexedLaunch {
@@ -46,6 +50,16 @@ export interface IndexedLaunch {
   phase: LaunchPhase;
   conforming: true; // the API only ever stores rows that passed the verdict
   xcpDepth: bigint;
+  /** Live pool reserves. Their ratio is XCP sats per raw token unit, which
+   *  prices a holding without a per-asset pool lookup. */
+  poolXcpReserve: string | null;
+  poolTokenReserve: string | null;
+  /** The block the launch was ANNOUNCED in — its real age. `fm.block_index`
+   *  is a stand-in for start_block on this path and can't answer that. */
+  announceBlock: number | null;
+  /** Distinct addresses that have minted. The one participation number every
+   *  phase has, which is what makes it the cross-phase column in search. */
+  minters: number;
 }
 
 function toFairminter(row: ApiLaunchRow): Fairminter {
@@ -117,6 +131,132 @@ export async function fetchLaunchFees(asset: string): Promise<FeeSummary | null>
   }
 }
 
+export interface MyLaunch {
+  txHash: string;
+  asset: string;
+  phase: LaunchPhase;
+  status: string;
+  conforming: boolean | null;
+  announceBlock: number | null;
+}
+
+interface ApiMyLaunchRow {
+  tx_hash: string;
+  asset: string;
+  phase: LaunchPhase;
+  status: string;
+  conforming: number | null;
+  announce_block: number | null;
+}
+
+/** A connected wallet's own launches — unfiltered by conformance verdict,
+ *  since this is the creator's own view, not the public index. */
+export async function fetchLaunchesBySource(source: string): Promise<MyLaunch[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/launches/by/${encodeURIComponent(source)}`, {
+      signal: AbortSignal.timeout(3_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiMyLaunchRow[] };
+    if (!Array.isArray(data.result)) return null;
+    return data.result.map((row) => ({
+      txHash: row.tx_hash,
+      asset: row.asset,
+      phase: row.phase,
+      status: row.status,
+      conforming: row.conforming === null ? null : Boolean(row.conforming),
+      announceBlock: row.announce_block,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export interface MintRecord {
+  txHash: string;
+  asset: string;
+  phase: LaunchPhase;
+  divisible: boolean;
+  block: number;
+  earned: string;
+  paid: string;
+}
+
+interface ApiMintRow {
+  tx_hash: string;
+  asset: string;
+  phase: LaunchPhase;
+  divisible: number;
+  block_index: number;
+  earn_quantity: string;
+  paid_quantity: string;
+}
+
+/** An address's mints across every launch. Only apps/api can answer this —
+ *  the on-chain ledger records a mint's XCP leg without naming the asset. */
+export async function fetchMintsBySource(source: string): Promise<MintRecord[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/mints/by/${encodeURIComponent(source)}`, {
+      signal: AbortSignal.timeout(3_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiMintRow[] };
+    if (!Array.isArray(data.result)) return null;
+    return data.result.map((r) => ({
+      txHash: r.tx_hash,
+      asset: r.asset,
+      phase: r.phase,
+      divisible: Boolean(r.divisible),
+      block: r.block_index,
+      earned: r.earn_quantity,
+      paid: r.paid_quantity,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export interface AssetEvent {
+  asset: string;
+  block: number;
+  tokenDelta: string;
+  xcpDelta: string;
+  kind: string;
+}
+
+interface ApiEventRow {
+  asset: string;
+  block_index: number;
+  token_delta: string;
+  xcp_delta: string;
+  kind: string;
+}
+
+/** An address's trades on XCP-69 assets, from the indexer. One request,
+ *  answered by an index — the browser no longer walks the whole ledger. */
+export async function fetchEventsBySource(source: string): Promise<AssetEvent[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/events/by/${encodeURIComponent(source)}`, {
+      signal: AbortSignal.timeout(3_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiEventRow[] };
+    if (!Array.isArray(data.result)) return null;
+    return data.result.map((r) => ({
+      asset: r.asset,
+      block: r.block_index,
+      tokenDelta: r.token_delta,
+      xcpDelta: r.xcp_delta,
+      kind: r.kind,
+    }));
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchIndexedLaunches(
   perPhase: number,
 ): Promise<IndexedLaunch[] | null> {
@@ -133,7 +273,112 @@ export async function fetchIndexedLaunches(
       phase: row.phase,
       conforming: true as const,
       xcpDepth: BigInt(Math.trunc(row.pool_xcp_sats) || 0),
+      poolXcpReserve: row.pool_xcp_reserve,
+      poolTokenReserve: row.pool_token_reserve,
+      announceBlock: row.announce_block,
+      minters: row.minters,
     }));
+  } catch {
+    return null;
+  }
+}
+
+interface ApiCandleRow {
+  bucket_start: number;
+  open: string;
+  high: string;
+  low: string;
+  close: string;
+  volume_xcp: string;
+  trades: number;
+  last_block: number;
+}
+
+/** One OHLCV bucket, prices already divided down to XCP per whole token. */
+export interface ChartCandle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volumeXcpRaw: string;
+  trades: number;
+  lastBlock: number;
+}
+
+/**
+ * The folded price series for a pair.
+ *
+ * Returns null — not an empty array — on any failure OR when the table has
+ * nothing yet, because those are the same situation from the caller's side:
+ * the API is a cache with provenance, and the caller still has the live
+ * Counterparty derivation to fall back to. An empty array would claim
+ * authoritatively that this pair has never traded.
+ *
+ * The prices come back scaled by the `scale` the API reports rather than a
+ * constant copied to this side, so the two can never drift apart.
+ */
+export async function fetchCandles(
+  asset: string,
+  resolution: "1h" | "1d",
+  limit = 500,
+): Promise<ChartCandle[] | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/v2/candles/${encodeURIComponent(asset)}?resolution=${resolution}&limit=${limit}`,
+      { signal: AbortSignal.timeout(3_000), next: { revalidate: 60 } },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: ApiCandleRow[];
+      scale?: string;
+    };
+    if (!data.result || data.result.length === 0) return null;
+    const scale = Number(data.scale ?? "100000000");
+    if (!Number.isFinite(scale) || scale <= 0) return null;
+    return data.result.map((r) => ({
+      time: r.bucket_start,
+      open: Number(r.open) / scale,
+      high: Number(r.high) / scale,
+      low: Number(r.low) / scale,
+      close: Number(r.close) / scale,
+      volumeXcpRaw: r.volume_xcp,
+      trades: r.trades,
+      lastBlock: r.last_block,
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export interface LaunchStats {
+  counts: { scheduled: number; minting: number; graduated: number; refunded: number };
+  total: number;
+  activity: {
+    mints: number;
+    minters: number;
+    /** XCP satoshi paid into every conforming launch, ever. */
+    paid_xcp: number;
+    /** Bitcoin satoshi spent on mint transaction fees. */
+    fee_sats: number;
+  };
+  /** Mints per ~144-block bucket; `bucket` is `block_index / 144`. */
+  daily: { bucket: number; n: number; minters: number }[];
+  blocks_per_bucket: number;
+}
+
+/** How many conforming launches sit in each phase. Null on any failure — the
+ *  homepage shows section counts when it has them and simply omits them when
+ *  it doesn't, rather than rendering a confident zero. */
+export async function fetchLaunchStats(height = 0): Promise<LaunchStats | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/stats?height=${height}`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: LaunchStats };
+    return data.result ?? null;
   } catch {
     return null;
   }

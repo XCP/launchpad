@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Script from "next/script";
 import type { ReactNode } from "react";
-import { HeaderWallet } from "@/components/header-wallet";
 import { PendingDock } from "@/components/pending-dock";
+import { SiteHeader } from "@/components/site-header";
 import { SitePresenceBadge } from "@/components/site-presence";
-import { SwrProvider } from "@/lib/swr-provider";
+import { SessionProvider } from "@/providers/session-context";
+import { SwrProvider } from "@/providers/swr-provider";
 import { WalletProvider } from "@/lib/wallet/wallet-context";
-import "./globals.css";
+import "@/app/globals.css";
 
 export const metadata: Metadata = {
   title: "xcp.fun — XCP-69 Launchpad",
@@ -20,40 +21,29 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="min-h-dvh bg-gray-50 text-gray-900 antialiased">
         <SwrProvider>
         <WalletProvider>
-        <header className="border-b border-gray-200 bg-white">
-          <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-            <div className="flex min-w-0 items-center gap-3 sm:gap-5">
-              <Link href="/" className="text-lg font-bold tracking-tight">
-                xcp<span className="text-purple-600">.fun</span>
-              </Link>
-              <SitePresenceBadge />
-              <nav className="flex items-center gap-3 text-sm font-medium text-gray-600 sm:gap-4">
-                <Link href="/swap" className="hover:text-gray-900">Swap</Link>
-                <Link href="/limit" className="hover:text-gray-900">Limit</Link>
-                <Link href="/dispense" className="hover:text-gray-900">Dispense</Link>
-              </nav>
-            </div>
-            <nav className="flex shrink-0 items-center gap-3 text-sm font-medium text-gray-600 sm:gap-4">
-              <Link href="/faq" className="hidden hover:text-gray-900 sm:inline">
-                FAQ
-              </Link>
-              <Link href="/docs" className="hidden hover:text-gray-900 sm:inline">
-                Docs
-              </Link>
-              <Link
-                href="/create"
-                className="rounded-md bg-gray-900 px-3 py-1.5 text-white hover:bg-gray-700"
-              >
-                Launch
-              </Link>
-              <HeaderWallet />
-            </nav>
-          </div>
-        </header>
-        <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+        <SessionProvider>
+        <SiteHeader />
+        {/* Bottom padding clears the fixed corner overlays — without it the
+            last line of any page sits under the presence badge or the dock. */}
+        <main className="mx-auto max-w-5xl px-4 pb-24 pt-8">{children}</main>
+        {/* Corner overlays: the site's pulse bottom-left, your own money
+            moving bottom-right. */}
+        <SitePresenceBadge />
         <PendingDock />
+        </SessionProvider>
         </WalletProvider>
         </SwrProvider>
+        {/* Fathom Analytics. data-spa="auto" is not optional here: the App
+            Router navigates with the History API, so without it every visit
+            would record as a single pageview no matter how far the visitor
+            went. Default afterInteractive strategy — analytics has no business
+            loading ahead of the app itself. */}
+        <Script
+          src="https://cdn.usefathom.com/script.js"
+          data-site="IBYGVDZY"
+          data-spa="auto"
+          data-honor-dnt="true"
+        />
       </body>
     </html>
   );

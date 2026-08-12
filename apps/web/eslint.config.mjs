@@ -9,10 +9,33 @@ const eslintConfig = defineConfig([
   ...nextTs,
   globalIgnores([".next/**", ".open-next/**", "out/**", "build/**", "next-env.d.ts"]),
   {
+    // Every import addresses a module the same way, so a file's imports read
+    // the same wherever the file happens to sit — and moving a file never
+    // rewrites the imports of its neighbours. Enforced rather than agreed,
+    // because a convention nobody checks is a convention that drifts.
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["./*", "../*"],
+              message: "Use the @/ path alias instead of a relative import.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     // Copied verbatim from the exchange repo's SDK; kept drop-in compatible
-    // (see CLAUDE.md), so its `any`s are upstream's to fix.
-    files: ["src/lib/wallet/sdk/**"],
-    rules: { "@typescript-eslint/no-explicit-any": "off" },
+    // (see CLAUDE.md), so its `any`s are upstream's to fix, and its internal
+    // relative imports are upstream's to keep.
+    files: ["src/lib/wallet/**"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "no-restricted-imports": "off",
+    },
   },
 ]);
 

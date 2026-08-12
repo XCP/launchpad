@@ -1,4 +1,4 @@
-import { XCP_API_BASE } from "@/utils/constants";
+import { XCP_API_BASE } from "@/lib/constants";
 
 /**
  * XCP/USD from the explorer's aggregate feed (daily CMC aggregate; also

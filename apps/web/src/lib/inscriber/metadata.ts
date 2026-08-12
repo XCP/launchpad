@@ -1,5 +1,5 @@
-import { encodeProperties } from './cbor'
-import type { InscriptionProperties } from './types'
+import { encodeProperties } from '@/lib/inscriber/cbor'
+import type { InscriptionProperties } from '@/lib/inscriber/types'
 
 export interface MetadataField {
   key: string

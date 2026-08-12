@@ -8,7 +8,7 @@ import {
   txidFromRawTx,
 } from "@/lib/inscriber";
 import { prepareFairminterInscriptionPsbt } from "@/lib/inscriber/fairminter";
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 const ELECTRS_API_BASE = "https://api.counterparty.io:3000";
 

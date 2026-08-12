@@ -1,7 +1,7 @@
 "use client";
 
 import { parseJsonLossless, type Raw, sumRaw } from "@/lib/numeric";
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 /**
  * Shared client-side API helpers. Before this file, fetchJson and

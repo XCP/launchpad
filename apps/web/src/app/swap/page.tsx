@@ -1,6 +1,6 @@
 import { fetchXcpUsd } from "@/lib/api/price";
 import { fetchTradeableAssets } from "@/lib/tradeable";
-import { TradeSurface } from "./trade-surface";
+import { TradeSurface } from "@/app/swap/_components/trade-surface";
 
 export const revalidate = 60;
 

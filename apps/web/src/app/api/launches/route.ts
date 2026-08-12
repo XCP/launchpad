@@ -7,8 +7,14 @@ import {
   metadataJsonUrl,
 } from "@/lib/metadata";
 
-import { sanitizeHandle } from "@/lib/social";
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import {
+  SESSION_COOKIE,
+  readCookie,
+  readSession,
+  sameOrigin,
+} from "@/lib/session";
+import { sanitizeTelegram, sanitizeX } from "@/lib/social";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
@@ -53,8 +59,8 @@ export async function POST(request: Request) {
   const asset = String(form.get("asset") ?? "").toUpperCase();
   const name = String(form.get("name") ?? "").trim().slice(0, 127);
   const description = String(form.get("description") ?? "").trim();
-  const xHandle = sanitizeHandle(String(form.get("x") ?? ""));
-  const telegram = sanitizeHandle(String(form.get("telegram") ?? ""));
+  const xUrl = sanitizeX(String(form.get("x") ?? ""));
+  const telegramUrl = sanitizeTelegram(String(form.get("telegram") ?? ""));
   const image = form.get("image");
 
   if (!ASSET_NAME_REGEX.test(asset)) {
@@ -108,8 +114,8 @@ export async function POST(request: Request) {
   // hash makes the write-once JSON an integrity commitment: locked on-chain
   // description URL → hashed content.
   const social = [
-    ...(xHandle ? [{ type: "twitter", data: `https://x.com/${xHandle}` }] : []),
-    ...(telegram ? [{ type: "telegram", data: `https://t.me/${telegram}` }] : []),
+    ...(xUrl ? [{ type: "twitter", data: xUrl }] : []),
+    ...(telegramUrl ? [{ type: "telegram", data: telegramUrl }] : []),
   ];
   const json = JSON.stringify({
     asset,
@@ -175,13 +181,24 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Image too large (max 2 MB)" }, { status: 400 });
   }
 
-  const now = Math.floor(Date.now() / 1000);
-  if (
-    !Number.isFinite(issued) ||
-    now - issued > EDIT_MAX_AGE_SECONDS ||
-    issued - now > EDIT_MAX_FUTURE_SKEW_SECONDS
-  ) {
-    return NextResponse.json({ error: "Signature expired — try again" }, { status: 401 });
+  // Two ways to prove who is asking. A session cookie is the normal one: the
+  // wallet's connect-time proof was verified server-side already, so there is
+  // nothing left for the user to sign. The per-request signature remains as a
+  // fallback for when sessions aren't configured or have lapsed — it is
+  // strictly stronger (it commits to the exact payload), just costlier, since
+  // signMessage opens the wallet whereas the connection proof is auto-signed.
+  const sessionAddress = await readSession(readCookie(request, SESSION_COOKIE));
+  const actor = sessionAddress && sameOrigin(request) ? sessionAddress : null;
+
+  if (!actor) {
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      !Number.isFinite(issued) ||
+      now - issued > EDIT_MAX_AGE_SECONDS ||
+      issued - now > EDIT_MAX_FUTURE_SKEW_SECONDS
+    ) {
+      return NextResponse.json({ error: "Signature expired — try again" }, { status: 401 });
+    }
   }
 
   // Recompute the content hash from what was actually received; the client
@@ -200,16 +217,19 @@ export async function PUT(request: Request) {
   const payloadHash = await sha256Hex(new TextEncoder().encode(payload).buffer as ArrayBuffer);
   const message = `xcp-fun-edit\nasset:${asset}\naddress:${address}\nissued:${issued}\npayload:${payloadHash}`;
 
-  try {
-    if (!verifyBip322(address, message, signature)) {
-      return NextResponse.json({ error: "Signature verification failed" }, { status: 401 });
+  if (!actor) {
+    try {
+      if (!verifyBip322(address, message, signature)) {
+        return NextResponse.json({ error: "Signature verification failed" }, { status: 401 });
+      }
+    } catch (e) {
+      return NextResponse.json(
+        { error: e instanceof Error ? e.message : "Unsupported address type" },
+        { status: 400 },
+      );
     }
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Unsupported address type" },
-      { status: 400 },
-    );
   }
+  const editor = actor ?? address;
 
   // Authorization follows on-chain ownership, live — not the launch creator,
   // not a session: whoever owns the asset now curates its metadata.
@@ -223,7 +243,7 @@ export async function PUT(request: Request) {
     | { owner?: string; issuer?: string }
     | null;
   const owner = assetInfo?.owner ?? assetInfo?.issuer;
-  if (!owner || owner !== address) {
+  if (!owner || owner !== editor) {
     return NextResponse.json(
       { error: "Only the asset's current owner can edit its info" },
       { status: 403 },
@@ -250,11 +270,11 @@ export async function PUT(request: Request) {
     });
   }
 
-  const xHandle = sanitizeHandle(xRaw);
-  const telegram = sanitizeHandle(telegramRaw);
+  const xUrl = sanitizeX(xRaw);
+  const telegramUrl = sanitizeTelegram(telegramRaw);
   const social = [
-    ...(xHandle ? [{ type: "twitter", data: `https://x.com/${xHandle}` }] : []),
-    ...(telegram ? [{ type: "telegram", data: `https://t.me/${telegram}` }] : []),
+    ...(xUrl ? [{ type: "twitter", data: xUrl }] : []),
+    ...(telegramUrl ? [{ type: "telegram", data: telegramUrl }] : []),
   ];
   const json = JSON.stringify({
     asset,

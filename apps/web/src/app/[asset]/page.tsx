@@ -7,11 +7,19 @@ import {
   fetchMempoolFairminter,
   fetchOriginalRecord,
   fetchPool,
-  fetchPoolPriceHistory,
-  fetchPoolVolume24h,
+  fetchPriceSeries,
+  fetchHolderConcentration,
+  fetchPairActivity,
+  type PairActivity,
   type PoolVolume,
 } from "@/lib/api/counterparty";
-import { fetchLaunchFees } from "@/lib/api/launchpad-api";
+import {
+  fetchCandles,
+  fetchEventsBySource,
+  fetchLaunchFees,
+  type ChartCandle,
+} from "@/lib/api/launchpad-api";
+import { foldPointsToCandles, type ChartResolution } from "@/lib/candles";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { fetchHolderCount } from "@/lib/api/xcpio";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
@@ -21,8 +29,7 @@ import {
   windowIsExact,
   xcp69Params,
 } from "@/lib/xcp69";
-import { SHOW_NONCONFORMING } from "@/utils/constants";
-import { PhasePreview } from "./phase-preview";
+import { PhasePreview } from "@/app/[asset]/_components/phase-preview";
 
 export const revalidate = 30;
 
@@ -79,10 +86,7 @@ export default async function LaunchPage({
     // Selection is by parameters only: the timing clauses need the creation
     // event, fetched below. (Also, `find(isXcp69)` would hand the array index
     // in as announceBlock.)
-    fairminters.find((f) => xcp69Params(f)) ??
-    (SHOW_NONCONFORMING
-      ? fairminters.find((f) => !f.status.startsWith("invalid"))
-      : undefined);
+    fairminters.find((f) => xcp69Params(f));
 
   // blockHeight is needed up front now: a mempool-sourced fm needs it to
   // compute a real status (mempool-time status is computed against
@@ -134,19 +138,69 @@ export default async function LaunchPage({
       ? fetchLaunchFees(asset)
       : Promise.resolve(null),
   ]);
+  // The creator's own trades on this asset, for the chart's markers. Indexed
+  // by address, so this is one read — and only worth asking once a market
+  // exists to trade in.
+  // Distribution facts. Only meaningful once a market exists, and the holder
+  // list is the same one the Holders tab reads.
+  const concentration = pool
+    ? await fetchHolderConcentration(asset, fm.source, fm.hard_cap)
+    : { top10Pct: 0, devPct: 0 };
+
+  const devTrades =
+    pool !== null
+      ? ((await fetchEventsBySource(fm.source)) ?? [])
+          .filter((e) => e.asset === asset)
+          .map((e) => ({ block: e.block, kind: e.kind === "sell" ? ("sell" as const) : ("buy" as const) }))
+      : [];
+
   const conforming =
     isXcp69(fm, original.announceBlock) &&
     (fm.status !== "closed" || windowIsExact(fm, original.deadline));
   const phase = launchPhase(fm, pool !== null);
-  const emptyVolume: PoolVolume = { volumeXcpRaw: "0", trades: 0 };
-  const [priceHistory, holderCount, poolVolume] =
+  const emptyWindow: PoolVolume = {
+    volumeXcpRaw: "0",
+    trades: 0,
+    buys: 0,
+    sells: 0,
+    buyVolXcpRaw: "0",
+    sellVolXcpRaw: "0",
+    buyers: 0,
+    sellers: 0,
+  };
+  const emptyActivity: PairActivity = {
+    "24h": emptyWindow,
+    "30d": emptyWindow,
+    all: emptyWindow,
+  };
+  // Candles come from apps/api's folded table — one indexed range read
+  // instead of re-paginating both Counterparty match feeds on every view.
+  // Both resolutions, so the chart's range selector needs no round trip.
+  const [tableHourly, tableDaily, holderCount, poolVolume] =
     phase === "graduated"
       ? await Promise.all([
-          fetchPoolPriceHistory(asset),
+          fetchCandles(asset, "1h"),
+          fetchCandles(asset, "1d"),
           fetchHolderCount(asset),
-          pool ? fetchPoolVolume24h(asset) : Promise.resolve(emptyVolume),
+          pool ? fetchPairActivity(asset) : Promise.resolve(emptyActivity),
         ])
-      : [[], null, emptyVolume];
+      : [null, null, null, emptyActivity];
+
+  // The table is a cache with provenance, not a new source of truth. It is
+  // empty for the window between a launch graduating and the indexer's next
+  // tick folding it — exactly when a new market is most worth looking at — so
+  // the live fills still answer when it has nothing.
+  let candles: Record<ChartResolution, ChartCandle[]> = {
+    "1h": tableHourly ?? [],
+    "1d": tableDaily ?? [],
+  };
+  if (phase === "graduated" && (!tableHourly || !tableDaily)) {
+    const fills = await fetchPriceSeries(asset);
+    candles = {
+      "1h": tableHourly ?? foldPointsToCandles(asset, fills, "1h"),
+      "1d": tableDaily ?? foldPointsToCandles(asset, fills, "1d"),
+    };
+  }
 
   return (
     <PhasePreview
@@ -157,10 +211,12 @@ export default async function LaunchPage({
       blockHeight={blockHeight}
       mints={mints}
       pool={pool}
-      priceHistory={priceHistory}
+      candles={candles}
       xcpUsd={xcpUsd}
       btcUsd={btcUsd}
       feeSats={feeSats}
+      devTrades={devTrades}
+      concentration={concentration}
       holderCount={holderCount}
       poolVolume={poolVolume}
     />

@@ -5,7 +5,6 @@ import {
 } from "@/lib/api/counterparty";
 import { big, compareRawDesc, type Raw } from "@/lib/numeric";
 import { isXcp69, windowIsExact, xcp69Params } from "@/lib/xcp69";
-import { SHOW_NONCONFORMING } from "@/utils/constants";
 
 /**
  * Classic Counterparty pools seeded into the picker until the first XCP-69
@@ -33,7 +32,7 @@ export async function fetchTradeableAssets(): Promise<string[]> {
       const conforming =
         isXcp69(fm, original.announceBlock) &&
         windowIsExact(fm, original.deadline);
-      if (!conforming && !SHOW_NONCONFORMING) return null;
+      if (!conforming) return null;
       const xcpDepth = pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b;
       return { asset: fm.asset, xcpDepth };
     }),

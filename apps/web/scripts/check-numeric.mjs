@@ -257,27 +257,26 @@ const EXEMPT = new Map([
   ["lib/numeric.ts", "defines the conversions everything else is required to use"],
   ["lib/format.ts", "renders through Intl, which takes the exact decimal string"],
   [
-    "app/dispense/use-dispense-router.ts",
+    "app/dispense/_lib/use-dispense-router.ts",
     "Bitcoin sat amounts and XCP dispenser units, bounded by XCP's 2.6M supply",
   ],
   [
     "lib/inscribe-launch.ts",
     "Bitcoin transaction construction: input values, vbytes and dust thresholds",
   ],
-  ["app/test/page.tsx", "a scratch harness, not shipped UI"],
   [
-    "app/dispense/bridge.tsx",
+    "app/dispense/_components/bridge.tsx",
     "XCP dispenser units and Bitcoin sat amounts, bounded by XCP's 2.6M supply — " +
       "whole XCP only on the sell side, so escrow_quantity is an exact integer " +
       "and useCompose's quantityParam gate rejects it if it ever isn't",
   ],
   [
-    "app/faq/explainer.tsx",
+    "app/faq/_components/explainer.tsx",
     "a simulator in whole units derived from the XCP-69 constants (690 XCP, " +
       "31M tokens) — no API values, nothing composed",
   ],
   [
-    "app/[asset]/phase-preview.tsx",
+    "app/[asset]/_components/phase-preview.tsx",
     "the design-phase simulator: fabricates a tape from the standard's own " +
       "constants so every lifecycle state can be looked at",
   ],

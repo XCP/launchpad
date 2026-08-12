@@ -10,7 +10,7 @@ export {
   RBF_SEQUENCE,
   REVEAL_FEE_PADDING_BPS,
   STANDARD_REVEAL_WEIGHT_HEADROOM,
-} from './constants'
+} from '@/lib/inscriber/constants'
 
 export {
   hexCodec,
@@ -23,7 +23,7 @@ export {
   signPsbtInput,
   finalizeSignedPsbt,
   txidFromRawTx,
-} from './transactions'
+} from '@/lib/inscriber/transactions'
 
 export {
   prepareBrandInscriptionPsbt,
@@ -31,12 +31,12 @@ export {
   prepareCollectionInscriptionPsbt,
   prepareArtworkInscriptionPsbt,
   estimateArtworkInscriptionRevealWeight,
-} from './inscriber'
+} from '@/lib/inscriber/inscriber'
 
 export {
   CP_ISSUANCE_ID,
   nameToAssetId,
-} from './counterparty'
+} from '@/lib/inscriber/counterparty'
 
 export {
   COUNTERPARTY_SAFE_MIME_TYPES,
@@ -45,7 +45,7 @@ export {
   classifyCounterpartyMimeType,
   isCounterpartySafeMimeType,
   normalizeMimeType,
-} from './mime'
+} from '@/lib/inscriber/mime'
 
 export {
   MAX_COUNTERPARTY_COMPAT_PROPERTIES_BYTES,
@@ -57,16 +57,16 @@ export {
   buildTraitFields,
   normalizeTraitKey,
   validateInscriptionProperties,
-} from './metadata'
+} from '@/lib/inscriber/metadata'
 
 export type {
   CounterpartyContentKind,
-} from './mime'
+} from '@/lib/inscriber/mime'
 
 export type {
   MetadataField,
   TraitFieldsResult,
-} from './metadata'
+} from '@/lib/inscriber/metadata'
 
 export type {
   InscriptionData,
@@ -83,4 +83,4 @@ export type {
   CollectionInscriptionParams,
   ArtworkInscriptionParams,
   PreparedInscriptionCommit,
-} from './types'
+} from '@/lib/inscriber/types'

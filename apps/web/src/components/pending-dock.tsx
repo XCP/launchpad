@@ -7,19 +7,43 @@ import {
   readPending,
   readPendingServer,
   subscribePending,
+  sweepResolved,
   updatePending,
 } from "@/lib/pending";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 const POLL_MS = 30_000;
 
+/** How long a finished action stays on screen before retiring itself. Long
+ *  enough to be read, short enough that the dock is about what's happening
+ *  now rather than what happened earlier. */
+const RESOLVED_TTL_MS = 90_000;
+
+/** Rows rendered before the list scrolls instead of growing. */
+const MAX_ROWS = 6;
+
 /**
- * The persistent pending dock: bottom-left pill that survives navigation,
- * tracking every broadcast action to its real outcome in block terms.
- * Blocks are the honest unit — a state change roughly every ten minutes,
- * not a spinner pretending.
+ * Requests one poll tick may spend, oldest-unresolved first.
+ *
+ * Each unresolved item costs one Counterparty request per tick, so a wallet
+ * that stacked a dozen actions would fire a dozen serial requests every 30
+ * seconds. The cap bounds that: anything past it is simply picked up on a
+ * later tick, which costs a little latency on the least urgent items and
+ * nothing else.
+ */
+const MAX_POLLS_PER_TICK = 8;
+
+/**
+ * The pending dock: bottom-right pill that survives navigation, tracking
+ * every broadcast action to its real outcome in block terms. Blocks are the
+ * honest unit — a state change roughly every ten minutes, not a spinner
+ * pretending.
+ *
+ * Bottom RIGHT because the presence badge sits bottom-left; the two are
+ * different kinds of thing (the site's pulse vs. your own money moving) and
+ * sharing a corner made them read as one widget.
  */
 export function PendingDock() {
   const { status, address } = useWallet();
@@ -30,14 +54,29 @@ export function PendingDock() {
   );
   const [open, setOpen] = useState(false);
 
+  // Retire finished actions on a timer of their own. Tied to the poll loop it
+  // would stop the moment everything resolved — which is exactly when the
+  // sweep still has work left to do.
+  useEffect(() => {
+    sweepResolved(RESOLVED_TTL_MS);
+    const t = setInterval(() => sweepResolved(RESOLVED_TTL_MS), 15_000);
+    return () => clearInterval(t);
+  }, [items]);
+
   // Poll unresolved items: orders resolve through their lifecycle; other
   // kinds resolve when the transaction is parsed into a block.
   useEffect(() => {
     if (items.every((i) => i.resolved)) return;
     let stop = false;
     const poll = async () => {
-      for (const item of items) {
-        if (stop || item.resolved) continue;
+      // Oldest first: the longest-waiting action is the one someone is
+      // actually wondering about.
+      const due = items
+        .filter((i) => !i.resolved)
+        .sort((a, b) => a.addedAt - b.addedAt)
+        .slice(0, MAX_POLLS_PER_TICK);
+      for (const item of due) {
+        if (stop) break;
         try {
           if (item.kind === "order") {
             const res = await fetch(
@@ -121,30 +160,60 @@ export function PendingDock() {
   if (status !== "connected") return null;
   const visible = items.filter((i) => !i.address || i.address === address);
   if (visible.length === 0) return null;
-  const unresolved = visible.filter((i) => !i.resolved).length;
+
+  // Pending first, then whatever just finished — the dock is sorted by what
+  // still needs an answer, not by when it was started.
+  const pending = visible.filter((i) => !i.resolved);
+  const settled = visible.filter((i) => i.resolved);
+  const ordered = [...pending, ...settled];
+  const shown = ordered.slice(0, MAX_ROWS);
+  const overflow = ordered.length - shown.length;
 
   return (
-    <div className="fixed bottom-4 left-4 z-40">
+    <div className="fixed bottom-4 right-4 z-40">
       {open ? (
         <div className="modal-pop w-80 rounded-2xl border border-gray-200 bg-white/95 p-3 shadow-lg backdrop-blur">
           <div className="flex items-center justify-between px-1 pb-2">
             <span className="text-xs font-semibold text-gray-900">
-              Activity
+              {pending.length > 0
+                ? `${pending.length} pending`
+                : "Recently confirmed"}
             </span>
-            <button
-              type="button"
-              onClick={() => setOpen(false)}
-              aria-label="Collapse"
-              className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            >
-              ✕
-            </button>
+            <div className="flex items-center gap-1">
+              {settled.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => settled.forEach((i) => dismissPending(i.txid))}
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+                >
+                  Clear done
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Collapse"
+                className="flex size-6 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
           </div>
-          <ul className="space-y-1.5">
-            {visible.map((item) => (
+          {/* Capped height rather than an unbounded list: a wallet that
+              stacked a dozen actions would otherwise grow a panel taller than
+              the viewport, with the newest rows off-screen. */}
+          <ul className="max-h-72 space-y-1.5 overflow-y-auto">
+            {shown.map((item) => (
               <DockRow key={item.txid} item={item} />
             ))}
           </ul>
+          {overflow > 0 && (
+            // Not "more waiting": the hidden tail is pending-then-settled, so
+            // some of it has already finished. Scroll reaches all of it.
+            <p className="px-1 pt-2 text-[11px] text-gray-400">
+              +{overflow} more below.
+            </p>
+          )}
         </div>
       ) : (
         <button
@@ -152,15 +221,15 @@ export function PendingDock() {
           onClick={() => setOpen(true)}
           className="flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-xs font-medium text-gray-700 shadow-lg backdrop-blur transition-all hover:border-gray-300 active:scale-95"
         >
-          {unresolved > 0 ? (
+          {pending.length > 0 ? (
             <>
               <span className="size-2 animate-pulse rounded-full bg-purple-500" />
-              {unresolved} pending
+              {pending.length} pending
             </>
           ) : (
             <>
               <span className="size-2 rounded-full bg-green-500" />
-              {visible.length} done
+              {settled.length === 1 ? "Confirmed" : `${settled.length} confirmed`}
             </>
           )}
         </button>

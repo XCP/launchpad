@@ -4,7 +4,7 @@ import {
   XCP69_MIN_PARTICIPANTS,
   XCP69_OPENING_MULTIPLE,
 } from "@/lib/xcp69";
-import { StandardPlayground } from "./explainer";
+import { StandardPlayground } from "@/app/faq/_components/explainer";
 
 export const metadata = {
   title: "How it works — xcp.fun",

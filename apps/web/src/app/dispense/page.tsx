@@ -1,6 +1,6 @@
 import { fetchXcpDispensers } from "@/lib/api/counterparty";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { XcpBridge } from "./bridge";
+import { XcpBridge } from "@/app/dispense/_components/bridge";
 
 export const revalidate = 60;
 

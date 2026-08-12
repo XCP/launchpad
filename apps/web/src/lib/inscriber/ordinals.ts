@@ -1,6 +1,6 @@
 import { hex } from '@scure/base'
-import { encodeCbor, encodeProperties } from './cbor'
-import type { InscriptionData } from './types'
+import { encodeCbor, encodeProperties } from '@/lib/inscriber/cbor'
+import type { InscriptionData } from '@/lib/inscriber/types'
 
 function parseInscriptionId(id: string): { txid: Uint8Array; index: number } {
   if (!/^([0-9a-fA-F]{64}i\d+|[0-9a-fA-F]{64}:\d+)$/.test(id)) {

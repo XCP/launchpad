@@ -1,5 +1,5 @@
-import { COUNTERPARTY_API_BASE } from "@/utils/constants";
-import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
+import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
 
 interface Paginated<T> {
@@ -16,6 +16,168 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
   // Not res.json(): JSON.parse rounds integers above 2^53-1; oversized
   // integers arrive as strings instead.
   return parseJsonLossless<T>(await res.text());
+}
+
+/** One balance-changing entry. Credits and debits are the same fact with
+ *  opposite signs, so they're merged into one stream rather than two lists. */
+export interface LedgerEntry {
+  block: number;
+  asset: string;
+  quantity: Raw;
+  direction: 1 | -1;
+  /** `calling_function` on a credit, `action` on a debit. */
+  reason: string;
+  /** Shared by every leg of one action — an `escrowed fairmint` debit and the
+   *  `fairmint refund` credit that answers it carry the same event even though
+   *  they land in different blocks. This is what pairs XCP paid with what it
+   *  bought. */
+  event: string;
+}
+
+interface RawCredit {
+  block_index: number;
+  asset: string;
+  quantity: Raw;
+  calling_function: string;
+  event: string;
+}
+interface RawDebit {
+  block_index: number;
+  asset: string;
+  quantity: Raw;
+  action: string;
+  event: string;
+}
+
+async function pageAll<T>(path: string): Promise<T[]> {
+  const all: T[] = [];
+  let cursor: number | null = null;
+  do {
+    const page: Paginated<T> = await get(
+      `${path}${path.includes("?") ? "&" : "?"}limit=1000${cursor !== null ? `&cursor=${cursor}` : ""}`,
+      30,
+    );
+    all.push(...page.result);
+    cursor = page.next_cursor;
+  } while (cursor !== null);
+  return all;
+}
+
+/** Every credit and debit for an address, oldest first. Paginated to
+ *  exhaustion — a partial ledger produces a confidently wrong cost basis,
+ *  which is worse than none. */
+export async function fetchAddressLedger(address: string): Promise<LedgerEntry[]> {
+  const addr = encodeURIComponent(address);
+  const [credits, debits] = await Promise.all([
+    pageAll<RawCredit>(`/addresses/${addr}/credits`),
+    pageAll<RawDebit>(`/addresses/${addr}/debits`),
+  ]);
+  const entries: LedgerEntry[] = [
+    ...credits.map((c) => ({
+      block: c.block_index,
+      asset: c.asset,
+      quantity: c.quantity,
+      direction: 1 as const,
+      reason: c.calling_function,
+      event: c.event,
+    })),
+    ...debits.map((d) => ({
+      block: d.block_index,
+      asset: d.asset,
+      quantity: d.quantity,
+      direction: -1 as const,
+      reason: d.action,
+      event: d.event,
+    })),
+  ];
+  return entries.sort((a, b) => a.block - b.block);
+}
+
+export interface AddressBalance {
+  asset: string;
+  quantity: Raw;
+}
+
+/** Confirmed balances for an address, keyed by asset. UTXO-attached balances
+ *  are included: they are still the address's holdings. */
+export async function fetchAddressBalances(address: string): Promise<Map<string, Raw>> {
+  const rows = await pageAll<{ asset: string; quantity: Raw }>(
+    `/addresses/${encodeURIComponent(address)}/balances`,
+  );
+  const out = new Map<string, Raw>();
+  for (const r of rows) {
+    const prev = out.get(r.asset);
+    out.set(r.asset, (prev === undefined ? big(r.quantity) : big(prev) + big(r.quantity)).toString());
+  }
+  return out;
+}
+
+export interface HolderConcentration {
+  /** Share of total supply held by the ten largest addresses, 0–100. */
+  top10Pct: number;
+  /** Share held by the launch's creator, 0–100. */
+  devPct: number;
+}
+
+/**
+ * How concentrated the holder base is.
+ *
+ * Measured against TOTAL SUPPLY, not the sum of address balances, because the
+ * pool's own reserve is not an address balance — a graduated XCP-69 launch has
+ * ~31% of supply sitting in the locked pool, and dividing by holders alone
+ * would inflate every percentage by that much and make a normal distribution
+ * look like a cartel.
+ *
+ * Percentages go through ratio(), which divides in BigInt before narrowing:
+ * supply here is 1e16 raw, well past what a double holds exactly.
+ */
+export async function fetchHolderConcentration(
+  asset: string,
+  creator: string,
+  supplyRaw: Raw,
+): Promise<HolderConcentration> {
+  const supply = big(supplyRaw);
+  if (supply <= 0n) return { top10Pct: 0, devPct: 0 };
+  try {
+    const rows = await pageAll<{ address: string | null; quantity: Raw }>(
+      `/assets/${encodeURIComponent(asset)}/balances`,
+    );
+    const held = rows
+      .filter((r) => big(r.quantity) > 0n)
+      .map((r) => ({ address: r.address, qty: big(r.quantity) }));
+
+    const byAddress = new Map<string, bigint>();
+    for (const r of held) {
+      const key = r.address ?? "(utxo)";
+      byAddress.set(key, (byAddress.get(key) ?? 0n) + r.qty);
+    }
+    const sorted = [...byAddress.values()].sort((a, b) => (b > a ? 1 : b < a ? -1 : 0));
+    const top10 = sorted.slice(0, 10).reduce((sum, q) => sum + q, 0n);
+    const dev = byAddress.get(creator) ?? 0n;
+
+    // ratio() scales through bigint division before narrowing, which is the
+    // whole reason it exists — supply here is 1e16.
+    const pct = (part: bigint) => ratio(part, supply) * 100;
+    return { top10Pct: pct(top10), devPct: pct(dev) };
+  } catch {
+    return { top10Pct: 0, devPct: 0 };
+  }
+}
+
+/** One asset's confirmed balance for one address. Answers the only balance
+ *  question the profile actually asks, without paging every asset held. */
+export async function fetchAssetBalance(address: string, asset: string): Promise<string> {
+  try {
+    const data = await get<{ result: { quantity: Raw }[] }>(
+      `/addresses/${encodeURIComponent(address)}/balances/${encodeURIComponent(asset)}`,
+      30,
+    );
+    return (data.result ?? [])
+      .reduce((sum, r) => sum + big(r.quantity), 0n)
+      .toString();
+  } catch {
+    return "0";
+  }
 }
 
 /**
@@ -99,6 +261,8 @@ export interface PoolSnapshot {
   asset_b: string;
   reserve_a: Raw;
   reserve_b: Raw;
+  /** Real Unix seconds, via verbose=true — not derived from block distance. */
+  block_time: number;
 }
 
 export async function fetchPoolPriceHistory(
@@ -110,7 +274,7 @@ export async function fetchPoolPriceHistory(
   let pages = 0;
   do {
     const page: Paginated<PoolSnapshot> = await get(
-      `/pools/${encodeURIComponent(asset)}/XCP/price_history?limit=1000${
+      `/pools/${encodeURIComponent(asset)}/XCP/price_history?verbose=true&limit=1000${
         cursor !== null ? `&cursor=${cursor}` : ""
       }`,
       30,
@@ -205,6 +369,10 @@ export async function fetchXcpDispensers(limit = 10): Promise<Dispenser[]> {
 
 interface PoolMatch {
   status: string;
+  /** The trader. The pool is the counterparty and has no address. */
+  source: string;
+  /** What the trader RECEIVES (ledger/markets.py credits exactly this), so
+   *  the token arriving means they bought it. */
   forward_asset: string;
   forward_quantity: Raw;
   backward_asset: string;
@@ -217,6 +385,16 @@ export interface PoolVolume {
    *  every other raw quantity in this codebase; convert with big(). */
   volumeXcpRaw: Raw;
   trades: number;
+  /** Direction split over the same window. Buys and sells are counted from
+   *  the trader's side; buyers and sellers are DISTINCT addresses, which is
+   *  the number that says whether activity is a crowd or one wallet going
+   *  back and forth. */
+  buys: number;
+  sells: number;
+  buyVolXcpRaw: Raw;
+  sellVolXcpRaw: Raw;
+  buyers: number;
+  sellers: number;
 }
 
 /**
@@ -225,38 +403,273 @@ export interface PoolVolume {
  * matches page newest-first, so this stops as soon as it walks outside the
  * window instead of always paging to `maxPages`.
  */
-export async function fetchPoolVolume24h(
+interface OrderMatch {
+  status: string;
+  /** The order that came in and matched — the aggressor, and the side whose
+   *  direction a buy/sell figure means. */
+  tx1_address: string;
+  /** What tx1 RECEIVES (messages/order.py sets this from tx1's get_asset). */
+  forward_asset: string;
+  forward_quantity: Raw;
+  backward_quantity: Raw;
+  block_time: number;
+}
+
+/**
+ * Trading over the last 24 hours across BOTH venues on the pair.
+ *
+ * A single order here can fill against the pool and against resting orders in
+ * the same execution — the two are interleaved, not alternatives — so counting
+ * only pool matches undercounts real activity. Both are walked and merged.
+ *
+ * Direction is always the taker's: `source` for a pool fill, `tx1_address` for
+ * an order match (tx1 is the incoming order). Counting both sides of a book
+ * match would make buys and sells identical by construction and destroy the
+ * signal the panel exists to show.
+ */
+/** One executed fill, the atom the price series and its candles are made of. */
+export interface PricePoint {
+  block: number;
+  /** Real Unix seconds (verbose=true), not derived from block distance. */
+  time: number;
+  /** XCP per whole token. XCP-69 mandates divisible, so both legs share the
+   *  same 1e8 scale and the ratio needs no divisibility correction. */
+  price: number;
+  /** XCP that changed hands in this fill — the height of a volume bar. */
+  volumeXcpRaw: Raw;
+  venue: "pool" | "book";
+}
+
+/**
+ * Every fill on the pair, both venues, oldest first.
+ *
+ * This replaces reading `/pools/{asset}/XCP/price_history`, which records one
+ * snapshot per POOL RESERVE change. Orders here interleave between the pool
+ * and the book, so a fill against resting orders never moves the reserves and
+ * was therefore invisible to that feed — the chart was silently missing an
+ * entire venue, at prices that genuinely traded.
+ *
+ * Building from fills also gives each point its own volume, which reserve
+ * snapshots cannot carry.
+ */
+export async function fetchPriceSeries(
   asset: string,
-  maxPages = 3,
-): Promise<PoolVolume> {
-  const cutoff = Math.floor(Date.now() / 1000) - 86_400;
-  let volumeXcpRaw = 0n;
-  let trades = 0;
-  let cursor: number | null = null;
-  let pages = 0;
-  let inWindow = true;
-  do {
-    const page: Paginated<PoolMatch> = await get(
-      `/pools/${encodeURIComponent(asset)}/XCP/matches?limit=200${
-        cursor !== null ? `&cursor=${cursor}` : ""
-      }`,
-      30,
-    );
-    for (const m of page.result) {
-      if (m.block_time < cutoff) {
-        inWindow = false;
-        break;
+  maxPages = 8,
+): Promise<PricePoint[]> {
+  const points: PricePoint[] = [];
+
+  const walk = async <T extends { block_time: number }>(
+    path: string,
+    take: (m: T) => void,
+  ) => {
+    let cursor: number | null = null;
+    let pages = 0;
+    do {
+      let page: Paginated<T>;
+      try {
+        page = await get(
+          `${path}${path.includes("?") ? "&" : "?"}limit=200${cursor !== null ? `&cursor=${cursor}` : ""}`,
+          60,
+        );
+      } catch {
+        return;
       }
-      if (m.status !== "valid") continue;
-      volumeXcpRaw += big(
-        m.forward_asset === "XCP" ? m.forward_quantity : m.backward_quantity,
-      );
-      trades++;
+      for (const m of page.result) take(m);
+      cursor = page.next_cursor;
+      pages++;
+    } while (cursor !== null && pages < maxPages);
+  };
+
+  const add = (
+    block: number,
+    time: number,
+    xcpLeg: bigint,
+    tokenLeg: bigint,
+    venue: "pool" | "book",
+  ) => {
+    if (xcpLeg <= 0n || tokenLeg <= 0n) return;
+    points.push({
+      block,
+      time,
+      price: ratio(xcpLeg, tokenLeg),
+      volumeXcpRaw: xcpLeg.toString(),
+      venue,
+    });
+  };
+
+  const encoded = encodeURIComponent(asset);
+  await Promise.all([
+    walk<PoolMatch & { block_index: number }>(
+      `/pools/${encoded}/XCP/matches?verbose=true`,
+      (m) => {
+        if (m.status !== "valid") return;
+        const sold = m.forward_asset === "XCP";
+        add(
+          m.block_index,
+          m.block_time,
+          big(sold ? m.forward_quantity : m.backward_quantity),
+          big(sold ? m.backward_quantity : m.forward_quantity),
+          "pool",
+        );
+      },
+    ),
+    walk<OrderMatch & { block_index: number }>(
+      `/orders/${encoded}/XCP/matches?verbose=true&status=completed`,
+      (m) => {
+        const sold = m.forward_asset === "XCP";
+        add(
+          m.block_index,
+          m.block_time,
+          big(sold ? m.forward_quantity : m.backward_quantity),
+          big(sold ? m.backward_quantity : m.forward_quantity),
+          "book",
+        );
+      },
+    ),
+  ]);
+
+  return points.sort((a, b) => a.time - b.time || a.block - b.block);
+}
+
+export type ActivityWindow = "24h" | "30d" | "all";
+
+export interface PairActivity {
+  "24h": PoolVolume;
+  "30d": PoolVolume;
+  all: PoolVolume;
+}
+
+interface Tally {
+  volume: bigint;
+  trades: number;
+  buys: number;
+  sells: number;
+  buyVol: bigint;
+  sellVol: bigint;
+  buyers: Set<string>;
+  sellers: Set<string>;
+}
+const emptyTally = (): Tally => ({
+  volume: 0n,
+  trades: 0,
+  buys: 0,
+  sells: 0,
+  buyVol: 0n,
+  sellVol: 0n,
+  buyers: new Set(),
+  sellers: new Set(),
+});
+const settle = (t: Tally): PoolVolume => ({
+  volumeXcpRaw: t.volume.toString(),
+  trades: t.trades,
+  buys: t.buys,
+  sells: t.sells,
+  buyVolXcpRaw: t.buyVol.toString(),
+  sellVolXcpRaw: t.sellVol.toString(),
+  buyers: t.buyers.size,
+  sellers: t.sellers.size,
+});
+
+/**
+ * Trading across BOTH venues on the pair, bucketed into 24h, 30d and all-time.
+ *
+ * A single order here can fill against the pool and against resting orders in
+ * the same execution — the two are interleaved, not alternatives — so counting
+ * only pool matches undercounts real activity. Direction is always the
+ * taker's: `source` for a pool fill, `tx1_address` for an order match. Counting
+ * both sides of a book match would make buys and sells identical by
+ * construction and destroy the signal.
+ *
+ * One pass fills all three windows. Fetching per-window would re-read the same
+ * rows three times to answer three nested questions about them.
+ */
+export async function fetchPairActivity(
+  asset: string,
+  maxPages = 8,
+): Promise<PairActivity> {
+  const now = Math.floor(Date.now() / 1000);
+  const dayCutoff = now - 86_400;
+  const monthCutoff = now - 30 * 86_400;
+  const windows = { "24h": emptyTally(), "30d": emptyTally(), all: emptyTally() };
+
+  const record = (
+    taker: string | undefined,
+    soldTokens: boolean,
+    xcpLeg: bigint,
+    at: number,
+  ) => {
+    const targets: Tally[] = [windows.all];
+    if (at >= monthCutoff) targets.push(windows["30d"]);
+    if (at >= dayCutoff) targets.push(windows["24h"]);
+    for (const t of targets) {
+      t.volume += xcpLeg;
+      t.trades++;
+      if (soldTokens) {
+        t.sells++;
+        t.sellVol += xcpLeg;
+        if (taker) t.sellers.add(taker);
+      } else {
+        t.buys++;
+        t.buyVol += xcpLeg;
+        if (taker) t.buyers.add(taker);
+      }
     }
-    cursor = page.next_cursor;
-    pages++;
-  } while (inWindow && cursor !== null && pages < maxPages);
-  return { volumeXcpRaw: volumeXcpRaw.toString(), trades };
+  };
+
+  /** Walk one matches feed to exhaustion, bounded. Both are newest-first. */
+  const walk = async <T extends { block_time: number }>(
+    path: string,
+    take: (m: T) => void,
+  ) => {
+    let cursor: number | null = null;
+    let pages = 0;
+    do {
+      let page: Paginated<T>;
+      try {
+        page = await get(
+          `${path}${path.includes("?") ? "&" : "?"}limit=200${cursor !== null ? `&cursor=${cursor}` : ""}`,
+          60,
+        );
+      } catch {
+        return;
+      }
+      for (const m of page.result) take(m);
+      cursor = page.next_cursor;
+      pages++;
+    } while (cursor !== null && pages < maxPages);
+  };
+
+  const encoded = encodeURIComponent(asset);
+  await Promise.all([
+    walk<PoolMatch>(`/pools/${encoded}/XCP/matches?verbose=true`, (m) => {
+      if (m.status !== "valid") return;
+      const sold = m.forward_asset === "XCP";
+      record(
+        m.source,
+        sold,
+        big(sold ? m.forward_quantity : m.backward_quantity),
+        m.block_time,
+      );
+    }),
+    walk<OrderMatch>(
+      `/orders/${encoded}/XCP/matches?verbose=true&status=completed`,
+      (m) => {
+        const sold = m.forward_asset === "XCP";
+        record(
+          m.tx1_address,
+          sold,
+          big(sold ? m.forward_quantity : m.backward_quantity),
+          m.block_time,
+        );
+      },
+    ),
+  ]);
+
+  return {
+    "24h": settle(windows["24h"]),
+    "30d": settle(windows["30d"]),
+    all: settle(windows.all),
+  };
 }
 
 interface MempoolFairminterEvent {
@@ -267,36 +680,38 @@ interface MempoolFairminterEvent {
   params: Omit<Fairminter, "earned_quantity" | "paid_quantity" | "confirmed">;
 }
 
-/**
- * A fairminter that's been broadcast but hasn't confirmed yet, shaped as an
- * ordinary Fairminter so it can go straight through the normal LaunchView
- * pipeline — no separate "pending" page. /assets/{asset}/fairminters only
- * ever returns confirmed rows, so a launch page for a still-in-mempool
- * fairminter 404s unless something checks the mempool event stream
- * separately. No asset filter on that endpoint, but NEW_FAIRMINTER is a
- * low-volume event — one page is always enough in practice. No caching:
- * mempool state is only worth reading fresh, and this only runs on the
- * 404-fallback path anyway.
- *
- * `status` here is whatever counterparty-core computed at mempool-parse
- * time against its MEMPOOL_BLOCK_INDEX sentinel, which makes any future
- * start_block look already-reached — always "open", never "pending". The
- * caller must recompute status from the real chain height instead of
- * trusting this one. `confirmed: false` (not set here — the caller adds
- * it) is what makes isXcp69's pre-announcement check pass optimistically
- * pre-confirmation, the same path a mempool `block_index` sentinel takes.
- */
-export async function fetchMempoolFairminter(
-  asset: string,
-): Promise<Fairminter | null> {
+export async function fetchMempoolFairminters(): Promise<Fairminter[]> {
   try {
     const data = await get<{ result: MempoolFairminterEvent[] }>(
       `/mempool/events/NEW_FAIRMINTER?limit=500`,
       0,
     );
-    const event = data.result.find((e) => e.params.asset === asset);
-    if (!event) return null;
-    return { ...event.params, earned_quantity: null, paid_quantity: null };
+    return data.result.map((e) => ({
+      ...e.params,
+      earned_quantity: null,
+      paid_quantity: null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function fetchMempoolFairminter(
+  asset: string,
+): Promise<Fairminter | null> {
+  const all = await fetchMempoolFairminters();
+  return all.find((fm) => fm.asset === asset) ?? null;
+}
+
+/** Real Unix seconds for a block. Counterparty stores block_time; nothing
+ *  here needs to guess at ten-minute averages. */
+export async function fetchBlockTime(blockIndex: number): Promise<number | null> {
+  try {
+    const data = await get<{ result: { block_time?: number } | null }>(
+      `/blocks/${blockIndex}`,
+      3600,
+    );
+    return data.result?.block_time ?? null;
   } catch {
     return null;
   }

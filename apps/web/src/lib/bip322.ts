@@ -1,6 +1,7 @@
 /**
- * BIP-322 "simple" signature verification for the two script types the XCP
- * Wallet extension produces: p2wpkh (ECDSA) and p2tr key-path (schnorr).
+ * BIP-322 "simple" signature verification for the three script types the XCP
+ * Wallet extension produces: p2pkh (legacy ECDSA), p2wpkh (ECDSA) and p2tr
+ * key-path (schnorr).
  *
  * The scheme: build a virtual `to_spend` transaction whose single output is
  * the signer's scriptPubKey and whose input commits to the tagged hash of the
@@ -28,6 +29,109 @@ function taggedHash(tag: string, data: Uint8Array): Uint8Array {
   buf.set(tagHash, tagHash.length);
   buf.set(data, tagHash.length * 2);
   return sha256(buf);
+}
+
+/** The script types the XCP Wallet extension can produce a signature for and
+ *  this module knows how to check. Anything else is "can't verify", which is
+ *  a different answer from "the signature is wrong" — see canVerifyBip322. */
+const VERIFIABLE = new Set(["pkh", "sh", "wpkh", "tr"]);
+
+/**
+ * Whether a BIP-322 signature from this address is checkable here at all.
+ * Callers need this to tell an unverifiable address type apart from a failed
+ * verification: the first is a gap in coverage, the second is a red flag.
+ */
+export function canVerifyBip322(address: string): boolean {
+  try {
+    const decoded = Address().decode(address);
+    return !!decoded && VERIFIABLE.has(decoded.type);
+  } catch {
+    return false;
+  }
+}
+
+function hash256(data: Uint8Array): Uint8Array {
+  return sha256(sha256(data));
+}
+
+function concatBytes(parts: Uint8Array[]): Uint8Array {
+  const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let offset = 0;
+  for (const p of parts) {
+    out.set(p, offset);
+    offset += p.length;
+  }
+  return out;
+}
+
+function u32le(n: number): Uint8Array {
+  const b = new Uint8Array(4);
+  b[0] = n & 0xff;
+  b[1] = (n >> 8) & 0xff;
+  b[2] = (n >> 16) & 0xff;
+  b[3] = (n >> 24) & 0xff;
+  return b;
+}
+
+function compactSize(n: number): Uint8Array {
+  if (n < 0xfd) return Uint8Array.of(n);
+  if (n <= 0xffff) return Uint8Array.of(0xfd, n & 0xff, (n >> 8) & 0xff);
+  throw new Error("CompactSize too large for BIP-322 scripts");
+}
+
+/**
+ * The `to_spend` transaction, serialized. Legacy verification can't reuse the
+ * btc-signer Transaction path the segwit branches take: it needs this exact
+ * byte string to derive the prevout hash the legacy sighash commits to.
+ */
+function serializeToSpend(messageHash: Uint8Array, scriptPubKey: Uint8Array): Uint8Array {
+  const scriptSig = new Uint8Array(2 + 32); // OP_0 PUSH32 <hash>
+  scriptSig[0] = 0x00;
+  scriptSig[1] = 0x20;
+  scriptSig.set(messageHash, 2);
+  return concatBytes([
+    u32le(0), // nVersion
+    compactSize(1), // input count
+    new Uint8Array(32), // prevout hash: all zeros
+    Uint8Array.of(0xff, 0xff, 0xff, 0xff), // prevout index
+    compactSize(scriptSig.length),
+    scriptSig,
+    u32le(0), // nSequence
+    compactSize(1), // output count
+    new Uint8Array(8), // amount: 0
+    compactSize(scriptPubKey.length),
+    scriptPubKey,
+    u32le(0), // nLockTime
+  ]);
+}
+
+/**
+ * Pre-segwit sighash for the BIP-322 `to_sign` spend: the classic preimage
+ * with the input's scriptSig replaced by the scriptPubKey being spent, double
+ * SHA-256'd. Every field but the prevout hash is fixed by BIP-322.
+ */
+function legacySighash(
+  prevoutHash: Uint8Array,
+  scriptPubKey: Uint8Array,
+  hashType: number,
+): Uint8Array {
+  return hash256(
+    concatBytes([
+      u32le(0), // nVersion
+      compactSize(1), // input count
+      prevoutHash, // natural order, as written into to_sign
+      u32le(0), // prevout index
+      compactSize(scriptPubKey.length),
+      scriptPubKey, // scriptSig := scriptPubKey for signing
+      u32le(0), // nSequence
+      compactSize(1), // output count
+      new Uint8Array(8), // amount: 0
+      compactSize(1),
+      Uint8Array.of(0x6a), // OP_RETURN
+      u32le(0), // nLockTime
+      u32le(hashType),
+    ]),
+  );
 }
 
 /** Serialized witness stack: varint count, then varint-length-prefixed items. */
@@ -105,8 +209,16 @@ export function verifyBip322(
   message: string,
   signatureBase64: string,
 ): boolean {
+  // Spelled out rather than checked against VERIFIABLE so the union narrows —
+  // the taproot branch below needs `decoded.pubkey` to be known to exist.
   const decoded = Address().decode(address);
-  if (!decoded || (decoded.type !== "wpkh" && decoded.type !== "tr")) {
+  if (
+    !decoded ||
+    (decoded.type !== "pkh" &&
+      decoded.type !== "sh" &&
+      decoded.type !== "wpkh" &&
+      decoded.type !== "tr")
+  ) {
     throw new Error(`Unsupported address type for BIP-322: ${decoded?.type ?? "unknown"}`);
   }
   const scriptPubKey = OutScript.encode(decoded);
@@ -118,20 +230,46 @@ export function verifyBip322(
     return false;
   }
 
-  const toSign = buildToSignTx(message, scriptPubKey);
-
   try {
-    if (decoded.type === "wpkh") {
+    // Legacy addresses (the common Counterparty case — plain `1…`, plus the
+    // Counterwallet and FreeWallet variants) sign a pre-segwit sighash, not a
+    // BIP-143 one, so this branch builds the preimage directly rather than
+    // going through the btc-signer transaction the witness branches use.
+    // Uncompressed pubkeys are accepted: old Counterwallet keys are.
+    if (decoded.type === "pkh") {
+      if (stack.length !== 2) return false;
+      const [sigWithType, pubkey] = stack;
+      if (pubkey.length !== 33 && pubkey.length !== 65) return false;
+      if (sigWithType.length < 9) return false;
+      if (!bytesEqual(ripemd160(sha256(pubkey)), decoded.hash)) return false;
+      const hashType = sigWithType[sigWithType.length - 1];
+      const der = sigWithType.subarray(0, -1);
+      const messageHash = taggedHash(TAG, new TextEncoder().encode(message));
+      const prevoutHash = hash256(serializeToSpend(messageHash, scriptPubKey));
+      const digest = legacySighash(prevoutHash, scriptPubKey, hashType);
+      const sig = secp256k1.Signature.fromDER(der);
+      return secp256k1.verify(sig.toCompactRawBytes(), digest, pubkey, { lowS: false });
+    }
+
+    const toSign = buildToSignTx(message, scriptPubKey);
+
+    // p2wpkh and p2sh-p2wpkh share one sighash (BIP-143 witness v0 over the
+    // classic p2pkh scriptCode); they differ only in what the address commits
+    // to — the pubkey hash directly, or the hash of the p2wpkh redeem script.
+    if (decoded.type === "wpkh" || decoded.type === "sh") {
       if (stack.length !== 2) return false;
       const [sigWithType, pubkey] = stack;
       if (pubkey.length !== 33 || sigWithType.length < 9) return false;
-      // The witness pubkey must be the one the address commits to.
       const pubkeyHash = ripemd160(sha256(pubkey));
-      if (!bytesEqual(pubkeyHash, decoded.hash)) return false;
+      if (decoded.type === "wpkh") {
+        if (!bytesEqual(pubkeyHash, decoded.hash)) return false;
+      } else {
+        const redeemScript = OutScript.encode({ type: "wpkh", hash: pubkeyHash });
+        if (!bytesEqual(ripemd160(sha256(redeemScript)), decoded.hash)) return false;
+      }
       const hashType = sigWithType[sigWithType.length - 1];
       const der = sigWithType.subarray(0, -1);
-      // BIP-143: scriptCode for p2wpkh is the classic p2pkh script.
-      const scriptCode = OutScript.encode({ type: "pkh", hash: decoded.hash });
+      const scriptCode = OutScript.encode({ type: "pkh", hash: pubkeyHash });
       const digest = toSign.preimageWitnessV0(0, scriptCode, hashType, 0n);
       const sig = secp256k1.Signature.fromDER(der);
       return secp256k1.verify(sig.toCompactRawBytes(), digest, pubkey, { lowS: false });

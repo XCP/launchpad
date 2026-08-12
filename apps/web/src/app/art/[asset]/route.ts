@@ -1,5 +1,5 @@
 import { getMetadataBucket } from "@/lib/metadata";
-import { CDN_BASE } from "@/utils/constants";
+import { CDN_BASE } from "@/lib/constants";
 
 /**
  * Resolves a launch's hero art wherever it actually lives: cdn.xcp.io if

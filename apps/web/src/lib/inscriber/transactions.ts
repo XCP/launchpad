@@ -1,6 +1,6 @@
 import * as btc from '@scure/btc-signer'
 import { hex } from '@scure/base'
-import { buildInscriptionScript } from './ordinals'
+import { buildInscriptionScript } from '@/lib/inscriber/ordinals'
 import {
   COMMIT_TX_VSIZE,
   COUNTERPARTY_MARKER_OP_RETURN,
@@ -9,7 +9,7 @@ import {
   P2PKH_DUST_SATS,
   RBF_SEQUENCE,
   REVEAL_FEE_PADDING_BPS,
-} from './constants'
+} from '@/lib/inscriber/constants'
 import type {
   CommitFundingPsbtResult,
   FundingUtxo,
@@ -18,7 +18,7 @@ import type {
   PreparedInscriptionCommit,
   RevealPsbtResult,
   RevealWeightEstimate,
-} from './types'
+} from '@/lib/inscriber/types'
 
 export { hex as hexCodec }
 

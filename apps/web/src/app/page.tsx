@@ -1,6 +1,8 @@
 import Link from "next/link";
-import { TokenImage } from "@/components/token-image";
-import { fetchIndexedLaunches } from "@/lib/api/launchpad-api";
+import { HomeToolbar } from "@/app/_components/home-toolbar";
+import { LaunchSections, type SectionRow } from "@/app/_components/launch-sections";
+import type { SearchRow } from "@/app/_components/launch-search";
+import { fetchIndexedLaunches, fetchLaunchStats } from "@/lib/api/launchpad-api";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
@@ -9,42 +11,48 @@ import {
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
 import {
-  blocksEta,
-  compact,
   fromSats,
-  shortAddress,
-  tokenQty,
-  usd,
 } from "@/lib/format";
-import { big } from "@/lib/numeric";
+import { big, ratio } from "@/lib/numeric";
 import {
-  type Fairminter,
   isXcp69,
-  type LaunchPhase,
   launchPhase,
-  openingMultiple,
   saleProgress,
-  saleTarget,
   windowIsExact,
   xcp69Params,
   XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
-import { SHOW_NONCONFORMING } from "@/utils/constants";
 
 export const revalidate = 60;
 
-const MAX_PER_SECTION = 12;
+/**
+ * Rows fetched per phase — and the window every section pages through.
+ *
+ * One number rather than three, chosen so each section's page size divides it
+ * exactly: graduated pages by 8 (three pages), minting by 24 (one), scheduled
+ * by 12 (two). Nothing is fetched that no page can reach, and no section ends
+ * on a stub page.
+ *
+ * It is deliberately a window and not the whole table. The front page shows a
+ * ranked slice, says so in each heading ("8 of 47"), and search reaches the
+ * rest — so this bounds the payload and the D1 read no matter how many
+ * launches exist. Keep it a common multiple of the page sizes in
+ * launch-sections.tsx if either changes.
+ */
+const SECTION_WINDOW = 24;
 
 export default async function HomePage() {
-  const [blockHeight, xcpUsd] = await Promise.all([fetchBlockHeight(), fetchXcpUsd()]);
+  const [blockHeight, xcpUsd, stats] = await Promise.all([
+    fetchBlockHeight(),
+    fetchXcpUsd(),
+    fetchLaunchStats(),
+  ]);
 
   // launchpad-api mirrors exactly this query — a launches table read instead
-  // of a fan-out over every fairminter on the chain. It only ever stores
-  // conforming rows, so the relaxed (SHOW_NONCONFORMING) view still needs
-  // the live path; everywhere else, a miss or a timeout falls through to
-  // the same derivation this page always did, so the site works with the
-  // API down, empty, or simply not caught up yet.
-  const indexed = SHOW_NONCONFORMING ? null : await fetchIndexedLaunches(MAX_PER_SECTION);
+  // of a fan-out over every fairminter on the chain. A miss or a timeout
+  // falls through to the same derivation this page always did, so the site
+  // works with the API down, empty, or simply not caught up yet.
+  const indexed = await fetchIndexedLaunches(SECTION_WINDOW);
 
   const phased =
     indexed ??
@@ -56,11 +64,7 @@ export default async function HomePage() {
       // Filtering on the full predicate would reject every launch that has
       // already opened, since its row no longer reports the block it was
       // announced in.
-      const listed = fairminters.filter((fm) =>
-        SHOW_NONCONFORMING
-          ? Boolean(fm.asset) && !fm.status.startsWith("invalid")
-          : xcp69Params(fm),
-      );
+      const listed = fairminters.filter((fm) => xcp69Params(fm));
 
       // Newest first; the pool row is the graduated-vs-refunded oracle, only
       // worth a lookup for closed pool fairminters.
@@ -92,67 +96,82 @@ export default async function HomePage() {
             const xcpDepth = big(
               pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
             );
-            return { fm, phase: launchPhase(fm, pool !== null), conforming, xcpDepth };
+            return {
+              fm,
+              phase: launchPhase(fm, pool !== null),
+              conforming,
+              xcpDepth,
+              poolXcpReserve: pool
+                ? String(pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b)
+                : null,
+              poolTokenReserve: pool
+                ? String(pool.asset_a === fm.asset ? pool.reserve_a : pool.reserve_b)
+                : null,
+              announceBlock: original.announceBlock,
+              // Only apps/api counts distinct minters; the live path is the
+              // fallback and reports none rather than guessing.
+              minters: 0,
+            };
           }),
         )
-      ).filter((p) => SHOW_NONCONFORMING || p.conforming);
+      ).filter((p) => p.conforming);
     })());
 
-  const byPhase = (phase: LaunchPhase) =>
-    phased.filter((p) => p.phase === phase).slice(0, MAX_PER_SECTION);
-  const minting = byPhase("minting");
-  const scheduled = byPhase("scheduled");
-  const refunded = byPhase("refunded");
-  // Featured: graduated first, ranked by pool depth, top 8.
-  const graduated = phased
-    .filter((p) => p.phase === "graduated")
-    .sort((a, b) => (b.xcpDepth === a.xcpDepth ? 0 : b.xcpDepth > a.xcpDepth ? 1 : -1))
-    .slice(0, 8);
+  // Rows carry the derived numbers so the client never re-derives them and
+  // the ordering can never disagree with what a card prints.
+  const rows: SectionRow[] = phased
+    .filter((p) => p.fm.asset)
+    .map((p) => {
+      const xcpReserve = big(p.poolXcpReserve ?? 0);
+      const tokenReserve = big(p.poolTokenReserve ?? 0);
+      // Price is the pool's own ratio; supply is fixed by the standard, so
+      // market cap is that price across the whole hard cap.
+      const priceXcp = tokenReserve > 0n ? ratio(xcpReserve, tokenReserve) : 0;
+      return {
+        fm: p.fm,
+        phase: p.phase,
+        conforming: p.conforming,
+        priceXcp,
+        marketCapXcp: priceXcp * fromSats(p.fm.hard_cap),
+        minters: p.minters ?? 0,
+        announceBlock: p.announceBlock ?? 0,
+        progress: saleProgress(p.fm),
+      };
+    });
+
+  const searchRows: SearchRow[] = rows.map((r) => ({
+    asset: r.fm.asset,
+    // Only when it says something the asset name doesn't.
+    name:
+      r.fm.asset_longname && r.fm.asset_longname !== r.fm.asset
+        ? r.fm.asset_longname
+        : null,
+    phase: r.phase as SearchRow["phase"],
+    source: r.fm.source,
+    announceBlock: r.announceBlock,
+    minters: r.minters,
+    marketCapXcp: r.marketCapXcp,
+    progress: r.progress,
+    startBlock: r.fm.start_block,
+  }));
 
   return (
-    <div className="space-y-12">
-      {phased.length === 0 && <FirstLaunchHero />}
+    <div className="space-y-10">
+      <HomeToolbar rows={searchRows} height={blockHeight} xcpUsd={xcpUsd} />
 
-      {graduated.length > 0 && (
-        <Section
-          title="Graduated"
-          empty=""
-          items={graduated}
-          render={({ fm, conforming, xcpDepth }) => (
-            <GraduatedCard
-              fm={fm}
-              conforming={conforming}
-              xcpDepth={xcpDepth}
-              xcpUsd={xcpUsd}
-            />
-          )}
-        />
-      )}
-      <Section
-        title="Minting"
-        empty="No live launches. Start one — it sells out or everyone gets refunded."
-        items={minting}
-        render={({ fm, conforming }) => (
-          <MintingCard fm={fm} conforming={conforming} blockHeight={blockHeight} />
-        )}
-      />
-      {scheduled.length > 0 && (
-        <Section
-          title="Scheduled"
-          empty=""
-          items={scheduled}
-          render={({ fm, conforming }) => (
-            <ScheduledCard fm={fm} conforming={conforming} blockHeight={blockHeight} />
-          )}
-        />
-      )}
-      <Section
-        title="Graveyard"
-        empty="Nothing here. That's good."
-        items={refunded}
-        render={({ fm, conforming }) => (
-          <RefundedCard fm={fm} conforming={conforming} />
-        )}
+      {rows.length === 0 && <FirstLaunchHero />}
+
+      <LaunchSections
+        rows={rows}
+        totals={
+          stats ? {
+            graduated: stats.counts.graduated,
+            minting: stats.counts.minting,
+            scheduled: stats.counts.scheduled,
+          } : undefined
+        }
+        height={blockHeight}
+        xcpUsd={xcpUsd}
       />
     </div>
   );
@@ -178,214 +197,8 @@ function FirstLaunchHero() {
   );
 }
 
-function Section({
-  title,
-  empty,
-  items,
-  render,
-}: {
-  title: string;
-  empty: string;
-  items: { fm: Fairminter; conforming: boolean; xcpDepth: bigint }[];
-  render: (item: {
-    fm: Fairminter;
-    conforming: boolean;
-    xcpDepth: bigint;
-  }) => React.ReactNode;
-}) {
-  if (items.length === 0 && !empty) return null;
-  return (
-    <section>
-      <h2 className="mb-4 text-xl font-bold">{title}</h2>
-      {items.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-          {empty}
-        </p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
-          {items.map((item) => (
-            <div key={item.fm.tx_hash}>{render(item)}</div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
 
-/**
- * Media-first card: the art is the card; identity and one stat ride a bottom
- * gradient, phase chips sit top-left, and (while minting) the progress bar
- * runs along the image's bottom edge.
- */
-function CardShell({
-  fm,
-  conforming,
-  chip,
-  headline,
-  progress,
-  children,
-}: {
-  fm: Fairminter;
-  conforming: boolean;
-  chip?: React.ReactNode;
-  headline?: string;
-  progress?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <Link
-      href={`/${fm.asset}`}
-      className={`group block overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-md ${
-        conforming ? "holo-border" : "border border-gray-200"
-      }`}
-    >
-      <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
-        <TokenImage
-          asset={fm.asset}
-          large
-          className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
-        />
-        {chip && <div className="absolute left-2 top-2">{chip}</div>}
-        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent p-3 pt-10">
-          <div className="flex items-baseline justify-between gap-2">
-            <span className="truncate text-lg font-bold text-white">
-              {fm.asset_longname ?? fm.asset}
-            </span>
-            {headline && (
-              <span className="shrink-0 text-xs font-medium text-white/80">{headline}</span>
-            )}
-          </div>
-        </div>
-        {progress !== undefined && (
-          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/30">
-            <div
-              className="h-full bg-purple-500"
-              style={{ width: `${Math.min(100, progress * 100)}%` }}
-            />
-          </div>
-        )}
-      </div>
-      <div className="p-3 text-xs text-gray-600">{children}</div>
-    </Link>
-  );
-}
 
-function Chip({ tone, children }: { tone: "dark" | "blue" | "green" | "gray"; children: React.ReactNode }) {
-  const tones = {
-    dark: "bg-black/60 text-white",
-    blue: "bg-blue-600/80 text-white",
-    green: "bg-green-600/80 text-white",
-    gray: "bg-black/40 text-white/90",
-  } as const;
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur-sm ${tones[tone]}`}>
-      {children}
-    </span>
-  );
-}
 
-function MintingCard({
-  fm,
-  conforming,
-  blockHeight,
-}: {
-  fm: Fairminter;
-  conforming: boolean;
-  blockHeight: number;
-}) {
-  const progress = saleProgress(fm);
-  const deadline = fm.soft_cap_deadline_block || fm.end_block;
-  return (
-    <CardShell
-      fm={fm}
-      conforming={conforming}
-      progress={progress}
-      headline={`${(progress * 100).toFixed(1)}%`}
-      chip={
-        <Chip tone="dark">
-          {deadline > 0 ? `${blocksEta(deadline - blockHeight)} left` : "minting"}
-        </Chip>
-      }
-    >
-      {compact(tokenQty(fm.earned_quantity, fm.divisible))} of{" "}
-      {big(fm.soft_cap) > 0n || big(fm.hard_cap) > 0n
-        ? compact(tokenQty(saleTarget(fm), fm.divisible))
-        : "∞"}{" "}
-      minted · by {shortAddress(fm.source)}
-    </CardShell>
-  );
-}
 
-function ScheduledCard({
-  fm,
-  conforming,
-  blockHeight,
-}: {
-  fm: Fairminter;
-  conforming: boolean;
-  blockHeight: number;
-}) {
-  return (
-    <CardShell
-      fm={fm}
-      conforming={conforming}
-      headline={`opens ${blocksEta(fm.start_block - blockHeight)}`}
-      chip={<Chip tone="blue">upcoming</Chip>}
-    >
-      Minting opens at block {fm.start_block.toLocaleString()} — announced on-chain,
-      nobody can mint early
-    </CardShell>
-  );
-}
 
-function GraduatedCard({
-  fm,
-  conforming,
-  xcpDepth,
-  xcpUsd,
-}: {
-  fm: Fairminter;
-  conforming: boolean;
-  xcpDepth: bigint;
-  xcpUsd: number | null;
-}) {
-  const multiple = openingMultiple(fm);
-  return (
-    <CardShell
-      fm={fm}
-      conforming={conforming}
-      headline={
-        xcpDepth > 0n
-          ? `${compact(fromSats(xcpDepth))} XCP deep`
-          : multiple
-            ? `${multiple.toFixed(2)}× at open`
-            : undefined
-      }
-      chip={<Chip tone="green">graduated</Chip>}
-    >
-      {xcpDepth > 0n ? (
-        <>
-          Sold out · liquidity locked forever
-          {xcpUsd ? ` · ≈ ${usd(fromSats(xcpDepth) * xcpUsd)}` : ""}
-        </>
-      ) : (
-        "Minted out"
-      )}
-    </CardShell>
-  );
-}
-
-function RefundedCard({ fm, conforming }: { fm: Fairminter; conforming: boolean }) {
-  const progress = saleProgress(fm);
-  return (
-    <CardShell
-      fm={fm}
-      conforming={conforming}
-      headline={`${(progress * 100).toFixed(1)}% reached`}
-      chip={<Chip tone="gray">refunded</Chip>}
-    >
-      {compact(fromSats(fm.paid_quantity))} XCP{" "}
-      {big(fm.pool_quantity) > 0n ? "refunded by the protocol" : "collected"}
-    </CardShell>
-  );
-}

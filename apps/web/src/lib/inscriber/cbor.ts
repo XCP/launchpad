@@ -1,4 +1,4 @@
-import type { InscriptionProperties } from './types'
+import type { InscriptionProperties } from '@/lib/inscriber/types'
 
 /** Encode CBOR for the limited value set used by Ordinals metadata and XCP fields. */
 export function encodeCbor(value: unknown): Uint8Array {

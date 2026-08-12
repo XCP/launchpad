@@ -1,7 +1,33 @@
 'use client'
 
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
-import { detectProvider, XcpWallet, friendlyError, type XcpProvider, type ConnectionProof, type ConnectResult } from './sdk'
+import { detectProvider, XcpWallet, friendlyError, validateProof, UNAUTHORIZED, type XcpProvider, type ConnectionProof, type ConnectResult } from './sdk'
+import { canVerifyBip322, verifyBip322 } from '@/lib/bip322'
+
+/**
+ * How much we actually know about the connected address's key:
+ *  - 'verified' — this session saw a fresh proof and its BIP-322 signature checked out.
+ *  - 'unverified' — nothing to check. A restored session, an accountsChanged
+ *    switch, or an address type we can't verify; xcp_accounts carries no proof,
+ *    so this is the normal resting state, not a warning.
+ *  - 'failed' — a proof WAS supplied and did not verify. The only genuinely
+ *    suspicious state, and the one that gates metadata editing.
+ */
+export type ProofStatus = 'unverified' | 'verified' | 'failed'
+
+/** Check a proof against the address that supplied it. An address type we
+ *  can't verify reports 'unverified', never 'failed' — a coverage gap and a
+ *  bad signature are different claims and must not look the same. */
+async function checkProof(proof: ConnectionProof, addr: string): Promise<ProofStatus> {
+  if (!canVerifyBip322(addr)) return 'unverified'
+  const check = await validateProof(proof, window.location.origin, addr, {
+    verifySignature: async (message, signature, address) => {
+      try { return verifyBip322(address, message, signature) } catch { return false }
+    },
+  })
+  if (!check.valid) console.warn('[wallet] connection proof did not verify:', check.reason)
+  return check.valid ? 'verified' : 'failed'
+}
 
 type XcpWalletStatus = 'not_detected' | 'disconnected' | 'connected'
 
@@ -9,6 +35,7 @@ interface WalletContextValue {
   status: XcpWalletStatus
   address: string | null
   connectionProof: ConnectionProof | null
+  proofStatus: ProofStatus
   connecting: boolean
   connectError: string | null
   connect: () => Promise<void>
@@ -52,24 +79,72 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [connecting, setConnecting] = useState(false)
   const [connectError, setConnectError] = useState<string | null>(null)
   const [connectionProof, setConnectionProof] = useState<ConnectionProof | null>(null)
+  const [proofStatus, setProofStatus] = useState<ProofStatus>('unverified')
   const connectingRef = useRef(false)
   const disconnectingRef = useRef(false)
   const walletRef = useRef<XcpWallet | null>(null)
   // Mirrors `address` for event handlers, which must compare the current
   // account without reaching into a state updater (updaters stay pure).
   const addressRef = useRef<string | null>(null)
+  /** Addresses already put through reverify, so a 15s reconcile tick doesn't
+   *  re-ask the wallet for a proof it has already answered. */
+  const verifiedAddressRef = useRef<string | null>(null)
 
   /** Adopt an address as the connected account. Proof follows the
    *  address: a fresh proof replaces, a switch without one invalidates.
    *  Stable (setters and refs only) so the mount effect can close over it. */
-  const adopt = useCallback((addr: string, proof: ConnectionProof | null) => {
-    if (proof) setConnectionProof(proof)
-    else if (addressRef.current !== addr) setConnectionProof(null)
+  const adopt = useCallback((addr: string, proof: ConnectionProof | null, status: ProofStatus = 'unverified') => {
+    if (proof) {
+      setConnectionProof(proof)
+      setProofStatus(status)
+    } else if (addressRef.current !== addr) {
+      setConnectionProof(null)
+      setProofStatus('unverified')
+    }
     addressRef.current = addr
     setAddress(addr)
     setStatus('connected')
     setConnectError(null)
     storageSet(STORAGE_KEY, addr)
+  }, [])
+
+  /**
+   * Fetch and check a proof for an address we adopted without one — a reload's
+   * optimistic restore, or an accountsChanged switch (neither event carries a
+   * proof). Without this the badge would be honest but useless: it could only
+   * ever be green in the seconds after an explicit Connect click.
+   *
+   * xcp_accounts is asked first because it is non-interactive, and a non-empty
+   * answer proves the origin is still approved — which is what makes the
+   * xcp_requestAccounts that follows silent, since the extension returns the
+   * stored grant plus a fresh proof without prompting. An empty answer is
+   * ambiguous (cold service worker, locked wallet, or genuinely revoked), so
+   * we stay unverified rather than risk springing an approval popup nobody
+   * asked for; the reconcile loop retries once the worker is warm.
+   */
+  const reverify = useCallback(async (addr: string) => {
+    const wallet = walletRef.current
+    if (!wallet || verifiedAddressRef.current === addr) return
+    verifiedAddressRef.current = addr
+    try {
+      const accounts = await wallet.getAccounts()
+      if (!accounts.includes(addr)) {
+        verifiedAddressRef.current = null
+        return
+      }
+      const result = await wallet.connect()
+      // The active address can move while this is in flight; a proof for an
+      // address we've since left says nothing about the one we're on.
+      if (addressRef.current !== addr || !result.proof) return
+      const status = await checkProof(result.proof, addr)
+      if (addressRef.current !== addr) return
+      setConnectionProof(result.proof)
+      setProofStatus(status)
+    } catch {
+      // Locked, revoked, rate-limited, or the worker died — leave the address
+      // adopted and unverified, and allow a later attempt.
+      verifiedAddressRef.current = null
+    }
   }, [])
 
   // Detect wallet, subscribe to events, optimistically restore, reconcile
@@ -86,13 +161,16 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         return
       }
       adopt(accounts[0], null)
+      void reverify(accounts[0])
     }
 
     const onDisconnect = () => {
       if (cancelled) return
       addressRef.current = null
+      verifiedAddressRef.current = null
       setAddress(null)
       setConnectionProof(null)
+      setProofStatus('unverified')
       setStatus('disconnected')
       storageRemove(STORAGE_KEY)
     }
@@ -118,7 +196,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       try {
         const accounts = await wallet.getAccounts()
         if (cancelled || disconnectingRef.current) return
-        if (accounts.length > 0) adopt(accounts[0], null)
+        if (accounts.length > 0) {
+          adopt(accounts[0], null)
+          void reverify(accounts[0])
+        }
       } catch {
         // transient — next tick retries
       }
@@ -175,7 +256,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       walletRef.current?.off('accountsChanged', onAccountsChanged)
       walletRef.current?.off('disconnect', onDisconnect)
     }
-  }, [adopt])
+  }, [adopt, reverify])
 
   const connect = async () => {
     if (connectingRef.current) return
@@ -217,7 +298,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
       if (disconnectingRef.current) return
       if (result && result.accounts.length > 0) {
-        adopt(result.accounts[0], result.proof)
+        const addr = result.accounts[0]
+        // The proof is the only cryptographic tie between "the extension says
+        // this address" and "this address's key signed for us, right now, for
+        // this origin". Verifying it here does NOT gate connecting: this code
+        // runs in the same page that received the proof, so it can't be the
+        // security boundary (the metadata write path re-verifies server-side
+        // against live on-chain ownership, and that is the real gate). What it
+        // buys is an honest answer about what we actually know — and an
+        // address type we can't check is a coverage gap, not a red flag, so it
+        // must not be reported the same way as a signature that didn't verify.
+        const status = result.proof ? await checkProof(result.proof, addr) : 'unverified'
+        verifiedAddressRef.current = addr
+        adopt(addr, result.proof, status)
       } else {
         setConnectError('The wallet returned no account — open the extension and try again')
       }
@@ -231,6 +324,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
 
   const disconnect = async () => {
     disconnectingRef.current = true
+    verifiedAddressRef.current = null
     const wallet = walletRef.current
     if (wallet) {
       try {
@@ -242,19 +336,53 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     addressRef.current = null
     setAddress(null)
     setConnectionProof(null)
+    setProofStatus('unverified')
     setStatus('disconnected')
     setConnectError(null)
     storageRemove(STORAGE_KEY)
   }
 
+  /**
+   * The optimistic restore is what keeps a reload from reading as a logout —
+   * a cold MV3 service worker answers xcp_accounts with [] even for a live
+   * grant, so an empty answer can never be trusted to mean "revoked". The
+   * cost is that a grant which really WAS revoked still looks connected here,
+   * and the first thing the user learns is an opaque "not connected" error on
+   * whatever they were trying to do.
+   *
+   * A 4100 from a signing call is the unambiguous answer that passive polling
+   * can't give: the wallet itself says this origin isn't authorized. Treat it
+   * as the disconnect we couldn't detect earlier, so the UI offers Connect
+   * instead of failing the same way again.
+   */
+  const onUnauthorized = () => {
+    addressRef.current = null
+    verifiedAddressRef.current = null
+    setAddress(null)
+    setConnectionProof(null)
+    setProofStatus('unverified')
+    setStatus('disconnected')
+    setConnectError('Wallet is no longer connected to this site — reconnect to continue')
+    storageRemove(STORAGE_KEY)
+  }
+
+  const withAuthCheck = async <T,>(run: () => Promise<T>): Promise<T> => {
+    try {
+      return await run()
+    } catch (e) {
+      if ((e as { code?: number })?.code === UNAUTHORIZED) onUnauthorized()
+      throw e
+    }
+  }
+
   const signMessage = (message: string): Promise<string> => {
     if (!walletRef.current) throw new Error('Wallet not available')
-    return walletRef.current.signMessage(message)
+    return withAuthCheck(() => walletRef.current!.signMessage(message))
   }
 
   const signTransaction = (hex: string): Promise<string> => {
     if (!walletRef.current) throw new Error('Wallet not available')
-    return walletRef.current.signTransaction(hex)
+    return withAuthCheck(() => walletRef.current!.signTransaction(hex))
   }
 
   const signPsbt = (
@@ -263,7 +391,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     sighashTypes?: number[],
   ): Promise<string> => {
     if (!walletRef.current) throw new Error('Wallet not available')
-    return walletRef.current.signPsbt(hex, signInputs, sighashTypes)
+    return withAuthCheck(() => walletRef.current!.signPsbt(hex, signInputs, sighashTypes))
   }
 
   const broadcastTransaction = (hex: string): Promise<string> => {
@@ -276,6 +404,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       status,
       address,
       connectionProof,
+      proofStatus,
       connecting,
       connectError,
       connect,

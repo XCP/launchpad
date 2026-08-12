@@ -1,6 +1,6 @@
-import { buildIssuanceMetadata } from './counterparty'
-import { buildInscriptionScript } from './ordinals'
-import { estimateRevealWeight, prepareCommit } from './transactions'
+import { buildIssuanceMetadata } from '@/lib/inscriber/counterparty'
+import { buildInscriptionScript } from '@/lib/inscriber/ordinals'
+import { estimateRevealWeight, prepareCommit } from '@/lib/inscriber/transactions'
 import type {
   ArtistInscriptionParams,
   ArtworkInscriptionParams,
@@ -10,7 +10,7 @@ import type {
   InscriptionProperties,
   PreparedInscriptionCommit,
   RevealWeightEstimate,
-} from './types'
+} from '@/lib/inscriber/types'
 
 const ESTIMATE_PUBKEY = new Uint8Array(32)
 
