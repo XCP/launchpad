@@ -80,6 +80,13 @@ const INSUFFICIENT_UTXO_PATTERN = /insufficient funds for the target amount|no u
 const UTXO_RACE_RETRY_WINDOW_MS = 8_000
 const UTXO_RACE_RETRY_DELAY_MS = 2_000
 
+// Core complaining about the UTXOs it selected itself — the shapes the wallet
+// extension's own compose fallback matches on
+// (core/counterparty/compose.ts::isUtxoError). Distinct from the "insufficient
+// funds" race above: that one is a timing gap, this one is a selection core
+// will keep making until it is told to stop looking at its mempool.
+const STALE_UTXO_PATTERN = /invalid UTXOs|UTXO not found|transaction not found/i
+
 /** One bounded, invisible retry for the UTXO-propagation race: if we JUST
  *  broadcast something and the very next compose fails with exactly the
  *  "not enough" shape core raises when it can't cover the amount, wait a
@@ -252,8 +259,8 @@ export function useCompose() {
       return
     }
     const excludeUtxos = recentlySpentUtxos()
-    run(async () => {
-      const hex = await composeRequest(
+    const composeWith = (allowUnconfirmed: boolean) =>
+      composeRequest(
         `addresses/${address}`,
         type,
         params,
@@ -266,7 +273,7 @@ export function useCompose() {
           // BTC/XCP" for a second action, even though chaining off that
           // change is exactly what a real wallet does. This is what let
           // users stack a mint, then a swap, then a launch, back to back.
-          allow_unconfirmed_inputs: 'true',
+          allow_unconfirmed_inputs: allowUnconfirmed ? 'true' : 'false',
           // Belt-and-suspenders against the SAME UTXO being offered twice in
           // quick succession: core's own UTXOLocks guard is an in-memory,
           // per-process singleton that explicitly does not cross workers, so
@@ -278,6 +285,22 @@ export function useCompose() {
         },
         feeRateOverride,
       )
+
+    run(async () => {
+      let hex: string
+      try {
+        hex = await composeWith(true)
+      } catch (e) {
+        // The cost of allow_unconfirmed_inputs, and the fallback the wallet
+        // extension already runs: core can offer a UTXO from its own mempool
+        // view and then refuse the very selection it made, which surfaces as
+        // a dead end on an address whose CONFIRMED coins would have composed
+        // fine. Dropping to confirmed-only gives up chaining off pending
+        // change — but only after the unconfirmed attempt has already
+        // failed, so it costs nothing that was working.
+        if (!STALE_UTXO_PATTERN.test(e instanceof Error ? e.message : String(e))) throw e
+        hex = await composeWith(false)
+      }
       return { hex, inputs: parseTxInputs(hex) }
     })
   }
