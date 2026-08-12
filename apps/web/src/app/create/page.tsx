@@ -113,11 +113,17 @@ const INSCRIBE_MAX_BYTES = 385 * 1024;
  *  compose transaction — not a separate step. */
 const REGISTRATION_FEE_XCP = 0.5;
 
-/** A fairminter compose is one input, one output, no special script —
- *  close enough to a plain transfer for the "how much will this cost"
- *  estimate this line exists to give, not an exact preview of the final
- *  composed size. */
-const LAUNCH_TX_VBYTES_ESTIMATE = 200;
+/** Measured off a real launch (PARTYKILLER, weight 2136): one input, three
+ *  multisig data outputs, one change output. The old 200 treated this as a
+ *  plain transfer, which it isn't — the data outputs are most of the tx. */
+const LAUNCH_TX_VBYTES_ESTIMATE = 534;
+
+/** A launch is past the 80-byte OP_RETURN ceiling, so Counterparty encodes
+ *  it as bare multisig: three outputs holding 1,000 sats each
+ *  (DEFAULT_MULTISIG_DUST_SIZE). Recoverable, but it has to be in the wallet
+ *  on the day — and omitting it is what let a funded wallet fail to
+ *  compose. */
+const LAUNCH_MULTISIG_DUST_SATS = 3_000;
 
 type NameCheck =
   | "idle"
@@ -653,13 +659,17 @@ export default function CreatePage() {
                 <div className="flex justify-between">
                   <dt>Bitcoin tx fee</dt>
                   <dd className="tabular-nums text-gray-700">
-                    {feeRate} sat/vB
+                    {commas(feeRate * LAUNCH_TX_VBYTES_ESTIMATE + LAUNCH_MULTISIG_DUST_SATS)}{" "}
+                    sats
                     {btcUsd !== null && btcUsd !== undefined && (
                       <span className="text-gray-400">
                         {" "}
                         (~
                         {usd(
-                          ((feeRate * LAUNCH_TX_VBYTES_ESTIMATE) / SATS) * btcUsd,
+                          ((feeRate * LAUNCH_TX_VBYTES_ESTIMATE +
+                            LAUNCH_MULTISIG_DUST_SATS) /
+                            SATS) *
+                            btcUsd,
                         )}
                         )
                       </span>
