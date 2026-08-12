@@ -82,14 +82,16 @@ const SORTS: Record<string, SortOption[]> = {
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
   scheduled: [
-    { id: "soonest", label: "Opens soonest", by: (a, b) => a.fm.start_block - b.fm.start_block },
+    { id: "soonest", label: "Soonest", by: (a, b) => a.fm.start_block - b.fm.start_block },
     { id: "newest", label: "Newest", by: (a, b) => b.fm.start_block - a.fm.start_block },
   ],
 };
 
-/** Scheduled launches have a creator, a start block and nothing else to line
- *  up — a table of that is three columns of not much, so it isn't offered. */
-const TABULAR = new Set(["graduated", "minting"]);
+/** Every section tabulates. Scheduled has less to line up than the others —
+ *  no progress, no raise — but the toggle is one page-level choice, and a
+ *  section that silently ignored it read as a broken control rather than as
+ *  a section with nothing to show. */
+const TABULAR = new Set(["graduated", "minting", "scheduled"]);
 
 /**
  * How many a section shows before paging, by phase.
@@ -301,15 +303,17 @@ function Section({
                     key={v}
                     type="button"
                     aria-pressed={view === v}
+                    aria-label={v === "grid" ? "Grid view" : "Table view"}
+                    title={v === "grid" ? "Grid view" : "Table view"}
                     onClick={() => {
                       onView(v);
                       setPage(0);
                     }}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
-                      view === v ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                    className={`rounded-full p-1.5 transition-colors ${
+                      view === v ? "bg-gray-900 text-white" : "text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                     }`}
                   >
-                    {v === "grid" ? "Grid" : "Table"}
+                    <ViewIcon view={v} />
                   </button>
                 ))}
               </div>
@@ -506,9 +510,15 @@ function LaunchTable({
   xcpUsd: number | null;
 }) {
   const graduated = phase === "graduated";
+  const scheduled = phase === "scheduled";
+  // Scheduled has no progress and no raise — nothing has been minted — so it
+  // lines up the only three facts it actually has rather than padding the row
+  // with columns of zero.
   const head = graduated
     ? ["Market cap", "Price", "Age", "Minters"]
-    : ["Progress", "Raised", "Minters", "Closes"];
+    : scheduled
+      ? ["Opens", "Closes", "Announced"]
+      : ["Progress", "Raised", "Minters", "Closes"];
 
   return (
     // Its own scroller: a wide table must never make the page scroll sideways.
@@ -563,6 +573,12 @@ function LaunchTable({
                     <Cell>{age(r.announceBlock, height)}</Cell>
                     <Cell>{commas(r.minters)}</Cell>
                   </>
+                ) : scheduled ? (
+                  <>
+                    <Cell>{blocksEta(r.fm.start_block - height)}</Cell>
+                    <Cell>{deadline > 0 ? blocksEta(deadline - height) : "—"}</Cell>
+                    <Cell>{age(r.announceBlock, height)}</Cell>
+                  </>
                 ) : (
                   <>
                     <Cell>{(r.progress * 100).toFixed(1)}%</Cell>
@@ -577,6 +593,36 @@ function LaunchTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Grid and table, drawn rather than shipped as an icon dependency — the same
+ *  approach the header's burger takes. The labels moved to aria-label and
+ *  title, so the control stays named for a screen reader and on hover. */
+function ViewIcon({ view }: { view: View }) {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none">
+      {view === "grid" ? (
+        // Four panes.
+        <g fill="currentColor">
+          <rect x="1.5" y="1.5" width="5.5" height="5.5" rx="1.5" />
+          <rect x="9" y="1.5" width="5.5" height="5.5" rx="1.5" />
+          <rect x="1.5" y="9" width="5.5" height="5.5" rx="1.5" />
+          <rect x="9" y="9" width="5.5" height="5.5" rx="1.5" />
+        </g>
+      ) : (
+        // Stacked rows, each with a leading cell — a list of records rather
+        // than plain text lines, which would read as a paragraph icon.
+        <g fill="currentColor">
+          <rect x="1.5" y="2.5" width="3" height="2.5" rx="1" />
+          <rect x="6" y="2.5" width="8.5" height="2.5" rx="1" />
+          <rect x="1.5" y="6.75" width="3" height="2.5" rx="1" />
+          <rect x="6" y="6.75" width="8.5" height="2.5" rx="1" />
+          <rect x="1.5" y="11" width="3" height="2.5" rx="1" />
+          <rect x="6" y="11" width="8.5" height="2.5" rx="1" />
+        </g>
+      )}
+    </svg>
   );
 }
 
