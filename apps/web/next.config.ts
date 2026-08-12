@@ -32,11 +32,24 @@ const nextConfig: NextConfig = {
    * to.
    */
   async redirects() {
+    const fromWorkersDev = [
+      { type: "host" as const, value: "launchpad.me-bbe.workers.dev" },
+    ];
     return [
+      // Two rules, not one. `/:path*` matches zero segments as well, and with
+      // an ABSOLUTE destination Next has nothing to substitute for the empty
+      // match — the bare root redirected to the literal `https://xcp.fun/:path*`.
+      // `/:path+` requires at least one segment; the root gets its own rule.
       {
-        source: "/:path*",
-        has: [{ type: "host", value: "launchpad.me-bbe.workers.dev" }],
-        destination: "https://xcp.fun/:path*",
+        source: "/",
+        has: fromWorkersDev,
+        destination: "https://xcp.fun/",
+        permanent: true,
+      },
+      {
+        source: "/:path+",
+        has: fromWorkersDev,
+        destination: "https://xcp.fun/:path+",
         permanent: true,
       },
     ];
