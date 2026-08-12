@@ -200,6 +200,74 @@ function buildToSignTx(message: string, scriptPubKey: Uint8Array): Transaction {
 }
 
 /**
+ * The signer's public key, recovered from a BIP-322 signature.
+ *
+ * WHY THIS EXISTS. Counterparty encodes any message over 80 bytes as bare
+ * multisig (composer.py::determine_encoding), and a multisig output embeds
+ * the SOURCE's public key so the source can recover its own dust. Core looks
+ * that key up by scanning the address's transactions — which only works once
+ * the address has SPENT something, because that is the first time a key
+ * appears on chain. A freshly funded address has never spent, so core raises
+ * "Pubkey not found for …, please provide it with the `multisig_pubkey`
+ * parameter" and every launch from a brand-new wallet fails.
+ *
+ * The connection proof already carries the key: a p2pkh/p2wpkh BIP-322
+ * witness is [signature, pubkey]. Nothing here is trusted on the wallet's
+ * say-so — the key is accepted only if it hashes to the address it claims,
+ * which is the same check verifyBip322 makes before checking the signature.
+ *
+ * Taproot returns null deliberately. A p2tr address commits to the TWEAKED
+ * output key, and the key the wallet can actually sign the multisig leg with
+ * is the untweaked internal one; handing core the wrong one of those two
+ * would publish a recovery key that recovers nothing. Those addresses fall
+ * back to core's own lookup, which is correct once they have spent.
+ */
+export function pubkeyFromBip322(
+  address: string,
+  signatureBase64: string,
+): string | null {
+  let decoded: ReturnType<ReturnType<typeof Address>["decode"]>;
+  try {
+    decoded = Address().decode(address);
+  } catch {
+    return null;
+  }
+  if (!decoded) return null;
+  if (decoded.type !== "pkh" && decoded.type !== "wpkh" && decoded.type !== "sh") {
+    return null;
+  }
+
+  let stack: Uint8Array[];
+  try {
+    stack = decodeWitnessStack(base64.decode(signatureBase64));
+  } catch {
+    return null;
+  }
+  if (stack.length !== 2) return null;
+
+  const pubkey = stack[1]!;
+  // p2pkh tolerates the uncompressed keys old Counterwallet seeds produce;
+  // the witness types never carry one.
+  const compressed = pubkey.length === 33;
+  if (!compressed && !(decoded.type === "pkh" && pubkey.length === 65)) return null;
+
+  const pubkeyHash = ripemd160(sha256(pubkey));
+  if (decoded.type === "sh") {
+    // p2sh-p2wpkh: the address commits to the hash of the redeem script, not
+    // to the key hash directly.
+    const redeemScript = OutScript.encode({ type: "wpkh", hash: pubkeyHash });
+    if (!bytesEqual(ripemd160(sha256(redeemScript)), decoded.hash)) return null;
+  } else if (!bytesEqual(pubkeyHash, decoded.hash)) {
+    return null;
+  }
+
+  return bytesToHex(pubkey);
+}
+
+const bytesToHex = (b: Uint8Array) =>
+  Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+
+/**
  * Verify a BIP-322 simple signature. Returns false on any mismatch; throws
  * only for unsupported address types (so callers can distinguish "wrong
  * signature" from "can't verify this address kind").

@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useWallet } from './wallet-context'
 import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
 import { parseTxInputs, type TxInput } from './raw-tx'
 import { msSinceLastSpend, recentlySpentUtxos, registerSpentUtxos } from './spent-utxos'
+import { pubkeyFromBip322 } from '@/lib/bip322'
 import { quantityParam } from '@/lib/numeric'
 import { COUNTERPARTY_API_BASE } from '@/lib/constants'
 
@@ -215,7 +216,32 @@ async function composeRequest(
 }
 
 export function useCompose() {
-  const { address, signTransaction, broadcastTransaction } = useWallet()
+  const { address, connectionProof, signTransaction, broadcastTransaction } = useWallet()
+
+  /**
+   * The source's public key, for the compose calls that need one.
+   *
+   * Counterparty encodes any message over 80 bytes as bare multisig, and a
+   * multisig output embeds the source's pubkey so the source can recover its
+   * own dust. Core finds that key by scanning the address's transactions,
+   * which only works after the address has SPENT — the first moment a key
+   * appears on chain. A freshly funded wallet has never spent, so every
+   * launch from one failed on "Pubkey not found for …, please provide it
+   * with the `multisig_pubkey` parameter" — a first-run failure that hit
+   * exactly the people least equipped to read it.
+   *
+   * The connection proof already carries the key, and pubkeyFromBip322
+   * accepts it only if it hashes to the address it claims. Null for taproot
+   * and for a session with no proof; core's own lookup still covers those
+   * once the address has spent.
+   */
+  const multisigPubkey = useMemo(
+    () =>
+      address && connectionProof?.address === address
+        ? pubkeyFromBip322(address, connectionProof.signature)
+        : null,
+    [address, connectionProof],
+  )
   const [state, setState] = useState<ComposeState>(INITIAL_STATE)
   const busyRef = useRef(false)
 
@@ -300,6 +326,11 @@ export function useCompose() {
           // excludes whatever WE know we just spent, regardless of which
           // worker answers.
           ...(excludeUtxos.length > 0 ? { exclude_utxos: excludeUtxos.join(',') } : {}),
+          // Harmless when it isn't needed: core reads this only if the
+          // message is too big for an OP_RETURN and it falls back to
+          // multisig, so a mint or a swap ignores it and a launch depends
+          // on it.
+          ...(multisigPubkey ? { multisig_pubkey: multisigPubkey } : {}),
         },
         feeRateOverride,
       )
