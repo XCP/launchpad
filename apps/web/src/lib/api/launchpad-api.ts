@@ -401,9 +401,13 @@ interface ApiMinterRow {
 
 /** The rewards leaderboard — who has minted, most first. Counted per mint
  *  TRANSACTION, the unit the reward is actually paid in. */
-export async function fetchMinterEarnings(limit = 25): Promise<MinterEarning[]> {
+export async function fetchMinterEarnings(
+  limit = 25,
+  source?: string,
+): Promise<MinterEarning[]> {
   try {
-    const res = await fetch(`${API_BASE}/v2/minters?limit=${limit}`, {
+    const qs = `limit=${limit}${source ? `&source=${encodeURIComponent(source)}` : ""}`;
+    const res = await fetch(`${API_BASE}/v2/minters?${qs}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });

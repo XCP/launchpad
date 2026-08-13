@@ -348,7 +348,16 @@ export interface MinterEarning {
  * draws — a mint against some other fairminter is a real Counterparty
  * transaction and none of this programme's business.
  */
-export function minterEarnings(db: D1Database, limit: number): Promise<MinterEarning[]> {
+export function minterEarnings(
+  db: D1Database,
+  limit: number,
+  source?: string,
+): Promise<MinterEarning[]> {
+  // One query for both callers. A profile asking about itself and the
+  // leaderboard listing everyone must never report different totals for the
+  // same address, which two queries would eventually manage.
+  const where = source ? "AND m.source = ?2" : "";
+  const binds: (number | string)[] = source ? [limit, source] : [limit];
   return q<MinterEarning>(
     db,
     `SELECT m.source,
@@ -357,9 +366,10 @@ export function minterEarnings(db: D1Database, limit: number): Promise<MinterEar
             CAST(SUM(CAST(m.paid_quantity AS INTEGER)) AS TEXT) AS paid
        FROM launch_mints m
        JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+      WHERE 1 = 1 ${where}
       GROUP BY m.source
       ORDER BY mints DESC, paid DESC
       LIMIT ?1`,
-    limit,
+    ...binds,
   );
 }

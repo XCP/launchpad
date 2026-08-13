@@ -75,7 +75,8 @@ launchesRoute.get("/v2/launches/by/:source", async (c) => {
 // TRANSACTION, which is the unit the reward is paid in.
 launchesRoute.get("/v2/minters", async (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 25) || 25, 100);
-  const result = await minterEarnings(c.env.DB, limit);
+  const source = c.req.query("source") || undefined;
+  const result = await minterEarnings(c.env.DB, limit, source);
   return J(c, { result, result_count: result.length }, 60);
 });
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
+import { RewardsCard } from "@/app/profile/_components/rewards-card";
 import { ConnectButton } from "@/components/connect-button";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { shortAddress } from "@/lib/format";
@@ -120,6 +121,8 @@ export function ProfileView({ viewing }: { viewing?: string }) {
           again.
         </p>
       )}
+
+      <RewardsCard address={address} isSelf={isSelf} />
 
       <div className="rounded-2xl border border-gray-200 bg-white">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>

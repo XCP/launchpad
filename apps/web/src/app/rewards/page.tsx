@@ -5,6 +5,17 @@ import { fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
 import { commas, fromSats, shortAddress } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
 import { XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
+import {
+  BOUNTIES,
+  MINT_CAP,
+  MINTS_PER_MINT,
+  MINTS_PRICE_XCP,
+  POOL_MINTS,
+  POOL_XCP,
+  SATS_PER_XCP,
+  TYPICAL_MINT_FEE_SATS,
+  mintsEarned,
+} from "@/lib/rewards";
 
 export const metadata: Metadata = {
   title: "Rewards — xcp.fun",
@@ -13,31 +24,6 @@ export const metadata: Metadata = {
 };
 
 export const revalidate = 60;
-
-/* ---------------------------------------------------------------- *
- * Programme terms. One place, so the page and any future payout
- * script read the same numbers rather than two copies that drift.
- * ---------------------------------------------------------------- */
-
-/** Paid per mint transaction, whatever its size. */
-const MINTS_PER_MINT = 100;
-/** Ceiling on the whole programme: 10,000 x 100 = 1,000,000 MINTS. */
-const MINT_CAP = 10_000;
-/** The seeded MINTS/XCP pool that prices the reward. */
-const POOL_MINTS = 1_000_000;
-const POOL_XCP = 1_000;
-/** XCP per MINTS implied by the pool ratio. */
-const MINTS_PRICE_XCP = POOL_XCP / POOL_MINTS;
-/** What a mint transaction costs in Bitcoin fees, measured across every
- *  mint on the site so far. */
-const TYPICAL_MINT_FEE_SATS = 273;
-const SATS_PER_XCP = 2_446;
-
-const BOUNTIES = [
-  { place: "1st", xcp: 300 },
-  { place: "2nd", xcp: 200 },
-  { place: "3rd", xcp: 100 },
-] as const;
 
 const raiseXcp = XCP69_RAISE_SATS / 1e8;
 
@@ -197,7 +183,7 @@ export default async function RewardsPage() {
                       {commas(fromSats(m.paid))} XCP
                     </td>
                     <td className="px-4 py-3 text-right font-medium tabular-nums text-gray-900">
-                      {commas(m.mints * MINTS_PER_MINT)}
+                      {commas(mintsEarned(m.mints))}
                       <span className="ml-1 text-[11px] font-normal text-gray-400">MINTS</span>
                     </td>
                   </tr>
