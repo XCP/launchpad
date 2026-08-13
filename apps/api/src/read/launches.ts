@@ -7,6 +7,7 @@ import {
   getLaunch,
   getLaunchesBySource,
   getMintsBySource,
+  minterEarnings,
   listLaunches,
   listMinters,
   sumFees,
@@ -68,6 +69,14 @@ launchesRoute.get("/v2/launches/by/:source", async (c) => {
   const source = c.req.param("source");
   const result = await getLaunchesBySource(c.env.DB, source);
   return J(c, { result, result_count: result.length }, 15);
+});
+
+// The rewards leaderboard: who has minted, most first. Counted per mint
+// TRANSACTION, which is the unit the reward is paid in.
+launchesRoute.get("/v2/minters", async (c) => {
+  const limit = Math.min(Number(c.req.query("limit") ?? 25) || 25, 100);
+  const result = await minterEarnings(c.env.DB, limit);
+  return J(c, { result, result_count: result.length }, 60);
 });
 
 launchesRoute.get("/v2/launches/:asset", async (c) => {

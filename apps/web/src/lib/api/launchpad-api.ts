@@ -383,3 +383,40 @@ export async function fetchLaunchStats(height = 0): Promise<LaunchStats | null> 
     return null;
   }
 }
+
+export interface MinterEarning {
+  source: string;
+  mints: number;
+  launches: number;
+  /** Raw XCP satoshi committed. */
+  paid: string;
+}
+
+interface ApiMinterRow {
+  source: string;
+  mints: number;
+  launches: number;
+  paid: string;
+}
+
+/** The rewards leaderboard — who has minted, most first. Counted per mint
+ *  TRANSACTION, the unit the reward is actually paid in. */
+export async function fetchMinterEarnings(limit = 25): Promise<MinterEarning[]> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/minters?limit=${limit}`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { result?: ApiMinterRow[] };
+    if (!Array.isArray(data.result)) return [];
+    return data.result.map((r) => ({
+      source: r.source,
+      mints: r.mints,
+      launches: r.launches,
+      paid: r.paid,
+    }));
+  } catch {
+    return [];
+  }
+}

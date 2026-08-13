@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
-import { fetchLaunchStats } from "@/lib/api/launchpad-api";
-import { commas } from "@/lib/format";
+import { fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
+import { commas, fromSats, shortAddress } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
 import { XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
 
@@ -50,7 +50,10 @@ const raiseXcp = XCP69_RAISE_SATS / 1e8;
  */
 export default async function RewardsPage() {
   const height = await fetchBlockHeight().catch(() => 0);
-  const stats = await fetchLaunchStats(height).catch(() => null);
+  const [stats, earners] = await Promise.all([
+    fetchLaunchStats(height).catch(() => null),
+    fetchMinterEarnings(25).catch(() => []),
+  ]);
   const mintsSoFar = stats?.activity.mints ?? 0;
   const graduated = stats?.counts.graduated ?? 0;
   const remaining = Math.max(0, MINT_CAP - mintsSoFar);
@@ -125,57 +128,9 @@ export default async function RewardsPage() {
           launch itself raises.
         </p>
 
-        <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
-          <table className="w-full min-w-[30rem] text-sm">
-            <thead>
-              <tr className="border-b border-gray-100 text-left">
-                <th scope="col" className={`px-4 py-2.5 ${LABEL}`}>
-                  Place
-                </th>
-                <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  Bounty
-                </th>
-                <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  On top of the raise
-                </th>
-                <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {BOUNTIES.map((b, i) => {
-                const claimed = graduated > i;
-                return (
-                  <tr key={b.place}>
-                    <td className="px-4 py-3 font-semibold text-gray-900">
-                      {b.place} to graduate
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium tabular-nums text-gray-900">
-                      {commas(b.xcp)} XCP
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-500">
-                      +{Math.round((b.xcp / raiseXcp) * 100)}%
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {claimed ? (
-                        <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700">
-                          claimed
-                        </span>
-                      ) : (
-                        <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-500">
-                          unclaimed
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Podium graduated={graduated} raiseXcp={raiseXcp} />
 
-        <p className="mt-3 text-xs leading-relaxed text-gray-500">
+        <p className="mt-4 text-xs leading-relaxed text-gray-500">
           Graduating means selling out: {commas(raiseXcp)} XCP raised from at
           least {XCP69_MIN_PARTICIPANTS} different addresses, at which point
           the pool is created and its liquidity is burned. A launch that misses
@@ -184,6 +139,73 @@ export default async function RewardsPage() {
             How that works
           </Link>
         </p>
+      </section>
+
+      {/* ---------------- who has earned what ---------------- */}
+      <section>
+        <h2 className="text-lg font-bold">Earned so far</h2>
+        <p className="mt-2 text-sm leading-relaxed text-gray-600">
+          Every mint on a conforming launch, counted. Ranked by mints, because
+          that is the unit the reward is paid in.
+        </p>
+
+        {earners.length === 0 ? (
+          <p className="mt-4 rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+            Nobody has minted yet. The first row here is available.
+          </p>
+        ) : (
+          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <th scope="col" className={`px-4 py-2.5 ${LABEL}`}>
+                    Minter
+                  </th>
+                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
+                    Mints
+                  </th>
+                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
+                    Launches
+                  </th>
+                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
+                    Committed
+                  </th>
+                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
+                    Earned
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {earners.map((m, i) => (
+                  <tr key={m.source} className="hover:bg-gray-50">
+                    <td className="whitespace-nowrap px-4 py-3">
+                      <span className="mr-2 text-xs text-gray-400 tabular-nums">{i + 1}</span>
+                      <Link
+                        href={`/profile/${m.source}`}
+                        className="font-mono text-xs text-gray-600 hover:text-purple-700"
+                      >
+                        {shortAddress(m.source)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-700">
+                      {commas(m.mints)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-500">
+                      {commas(m.launches)}
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-gray-500">
+                      {commas(fromSats(m.paid))} XCP
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium tabular-nums text-gray-900">
+                      {commas(m.mints * MINTS_PER_MINT)}
+                      <span className="ml-1 text-[11px] font-normal text-gray-400">MINTS</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
       {/* ---------------- the small print ---------------- */}
@@ -216,6 +238,64 @@ export default async function RewardsPage() {
           </Term>
         </dl>
       </section>
+    </div>
+  );
+}
+
+/**
+ * The three bounties as a podium.
+ *
+ * Ordered 2nd–1st–3rd left to right, the way a real podium stands, with the
+ * step heights carrying the prize sizes. It reads as a race rather than a
+ * price list — which is the point, since all three are unclaimed and the
+ * whole thing is an invitation to be first.
+ */
+function Podium({ graduated, raiseXcp }: { graduated: number; raiseXcp: number }) {
+  // Visual order, not rank order.
+  const layout = [
+    { i: 1, height: "h-20", accent: "from-gray-300 to-gray-200", ring: "ring-gray-300" },
+    { i: 0, height: "h-28", accent: "from-amber-300 to-amber-200", ring: "ring-amber-400" },
+    { i: 2, height: "h-14", accent: "from-orange-300/70 to-orange-200/70", ring: "ring-orange-300" },
+  ];
+
+  return (
+    <div className="mt-5 grid grid-cols-3 items-end gap-2 sm:gap-4">
+      {layout.map(({ i, height, accent, ring }) => {
+        const b = BOUNTIES[i]!;
+        const claimed = graduated > i;
+        return (
+          <div key={b.place} className="flex flex-col items-center">
+            <div
+              className={`mb-2 flex size-9 items-center justify-center rounded-full bg-white text-sm font-bold text-gray-700 ring-2 ${ring}`}
+            >
+              {i + 1}
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+                {commas(b.xcp)}
+              </div>
+              <div className={LABEL}>XCP</div>
+            </div>
+            <div className="mt-1 text-[11px] text-gray-400 tabular-nums">
+              +{Math.round((b.xcp / raiseXcp) * 100)}% on the raise
+            </div>
+            {/* The step. Height encodes the prize; the label sits inside it. */}
+            <div
+              className={`mt-2 flex w-full ${height} items-start justify-center rounded-t-xl bg-gradient-to-b ${accent} pt-2`}
+            >
+              {claimed ? (
+                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                  claimed
+                </span>
+              ) : (
+                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                  open
+                </span>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

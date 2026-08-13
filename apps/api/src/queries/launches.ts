@@ -326,3 +326,40 @@ export function mintsByBucket(db: D1Database, sinceBlock: number): Promise<MintB
     sinceBlock,
   );
 }
+
+export interface MinterEarning {
+  source: string;
+  mints: number;
+  /** Distinct launches this address has minted, so the leaderboard can show
+   *  breadth as well as volume — 69 addresses is what a launch needs. */
+  launches: number;
+  /** Raw XCP satoshi committed across those mints. */
+  paid: string;
+}
+
+/**
+ * Who has minted, most first — the rewards leaderboard.
+ *
+ * Counted per MINT TRANSACTION rather than per lot, because that is the unit
+ * the reward is paid in: the Bitcoin fee a minter is being refunded is
+ * charged per transaction, whatever quantity it carries.
+ *
+ * Conforming launches only, the same editorial line the rest of the site
+ * draws — a mint against some other fairminter is a real Counterparty
+ * transaction and none of this programme's business.
+ */
+export function minterEarnings(db: D1Database, limit: number): Promise<MinterEarning[]> {
+  return q<MinterEarning>(
+    db,
+    `SELECT m.source,
+            COUNT(*) AS mints,
+            COUNT(DISTINCT m.launch_tx) AS launches,
+            CAST(SUM(CAST(m.paid_quantity AS INTEGER)) AS TEXT) AS paid
+       FROM launch_mints m
+       JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+      GROUP BY m.source
+      ORDER BY mints DESC, paid DESC
+      LIMIT ?1`,
+    limit,
+  );
+}
