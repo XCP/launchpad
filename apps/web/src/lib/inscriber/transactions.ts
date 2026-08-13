@@ -150,6 +150,13 @@ export function buildCommitFundingPsbt(params: {
   }
 }
 
+/**
+ * CAUTION for Counterparty inscriptions: core's indexer reads the envelope from input 0's witness
+ * alone (`extract_data_from_witness` is only called for `vtxinwit[0]`). A parentUtxo is added as
+ * input 0 here, which pushes the envelope to input 1 -- fine for pure-ord inscriptions, but a
+ * Counterparty message inscribed with a parent would silently never be indexed. Reorder the
+ * inputs before ever combining `parentUtxo` with an `xcp` metaprotocol reveal.
+ */
 export function buildRevealPsbt(params: {
   pubkey: Uint8Array
   commitTxid: string
