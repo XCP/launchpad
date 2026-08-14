@@ -19,7 +19,7 @@ const MANUAL_REFRESH_DEBOUNCE_MS = 10_000;
 type Tab = "mints" | "fairminters";
 
 export function MempoolView() {
-  const { fairminters, mints, fetchedAt, isLoading, refresh } = useMempool(REFRESH_MS);
+  const { fairminters, mints, isLoading, refresh } = useMempool(REFRESH_MS);
 
   const groups = groupMintsByAddress(mints);
 
@@ -48,7 +48,7 @@ export function MempoolView() {
             Fairminters {fairminters.length > 0 && `(${fairminters.length})`}
           </SegmentedTrigger>
         </SegmentedList>
-        <RefreshButton fetchedAt={fetchedAt} onRefresh={refresh} />
+        <RefreshButton onRefresh={refresh} />
       </div>
 
       <TabsContent value="mints" className="mt-4">
@@ -163,34 +163,21 @@ export function MempoolView() {
 /**
  * Refresh, wearing the settings-gear's clothes: the same quiet icon button in
  * the same corner the swap tabs keep theirs, so the page reads as familiar UI
- * rather than growing its own freshness strip. The age hasn't vanished — it
- * lives in the tooltip, and the auto-poll keeps the page current regardless.
+ * rather than growing its own freshness strip. No age readout anywhere — the
+ * auto-poll keeps the page current, and the button is for impatience.
  */
-function RefreshButton({
-  fetchedAt,
-  onRefresh,
-}: {
-  fetchedAt: number | null;
-  onRefresh: () => void;
-}) {
+function RefreshButton({ onRefresh }: { onRefresh: () => void }) {
   const [now, setNow] = useState(() => Date.now());
   const [lastManual, setLastManual] = useState(0);
 
-  // One timer drives both the tooltip's age and the cooldown, so they can
-  // never disagree about what time it is.
+  // The timer exists so the cooldown visibly ends — without it nothing
+  // re-renders the button back to life.
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1_000);
     return () => clearInterval(t);
   }, []);
 
   const cooling = now - lastManual < MANUAL_REFRESH_DEBOUNCE_MS;
-  const seconds = fetchedAt === null ? null : Math.max(0, Math.round((now - fetchedAt) / 1000));
-  const age =
-    seconds === null
-      ? "loading"
-      : seconds < 2
-        ? "updated just now"
-        : `updated ${seconds}s ago`;
 
   return (
     <button
@@ -202,7 +189,6 @@ function RefreshButton({
       }}
       aria-disabled={cooling}
       aria-label="Refresh"
-      title={cooling ? "Just refreshed — give it a moment" : `Refresh — ${age}`}
       className={`flex size-7 items-center justify-center rounded-full transition-colors ${FOCUS} ${
         cooling
           ? "cursor-default text-gray-300"

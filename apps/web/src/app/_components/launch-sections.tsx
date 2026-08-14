@@ -304,7 +304,6 @@ function Section({
                     type="button"
                     aria-pressed={view === v}
                     aria-label={v === "grid" ? "Grid view" : "Table view"}
-                    title={v === "grid" ? "Grid view" : "Table view"}
                     onClick={() => {
                       onView(v);
                       setPage(0);
@@ -597,8 +596,8 @@ function LaunchTable({
 }
 
 /** Grid and table, drawn rather than shipped as an icon dependency — the same
- *  approach the header's burger takes. The labels moved to aria-label and
- *  title, so the control stays named for a screen reader and on hover. */
+ *  approach the header's burger takes. The labels live in aria-label, so the
+ *  control stays named for a screen reader. */
 function ViewIcon({ view }: { view: View }) {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none">

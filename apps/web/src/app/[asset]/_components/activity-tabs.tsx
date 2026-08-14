@@ -72,7 +72,6 @@ export function ActivityTabs({
   issuerSource,
   blockHeight,
   poolTokensRaw,
-  lpAsset,
 }: {
   asset: string;
   mints: Fairmint[];
@@ -89,7 +88,6 @@ export function ActivityTabs({
    *  roughly a third of it is locked away. Passed in so it can be shown in
    *  the ranking where it belongs. */
   poolTokensRaw?: Raw;
-  lpAsset?: string;
 }) {
   const { address } = useWallet();
   const compose = useCompose();
@@ -595,14 +593,7 @@ export function ActivityTabs({
                           <span className="font-sans font-medium text-gray-900">
                             Locked pool
                           </span>
-                          <span
-                            className="shrink-0 rounded-full border border-green-200 bg-green-50 px-1.5 py-px text-[10px] font-medium text-green-700"
-                            title={
-                              lpAsset
-                                ? `${lpAsset} was minted to the unspendable address — this side of the pool can never be withdrawn`
-                                : undefined
-                            }
-                          >
+                          <span className="shrink-0 rounded-full border border-green-200 bg-green-50 px-1.5 py-px text-[10px] font-medium text-green-700">
                             LP burned
                           </span>
                         </>

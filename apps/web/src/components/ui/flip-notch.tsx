@@ -26,7 +26,6 @@ export function FlipNotch({
         type="button"
         onClick={onFlip}
         aria-label={label}
-        title={label}
         className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-gray-50 text-gray-500 shadow-[0_0_0_4px_white] hover:bg-gray-100 hover:text-purple-600 active:scale-95"
       >
         <span

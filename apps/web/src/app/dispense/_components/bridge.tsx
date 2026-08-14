@@ -489,9 +489,6 @@ function LoadCard({
                 key={p.label}
                 type="button"
                 disabled={!p.available}
-                title={
-                  p.available ? undefined : "This route doesn't have that much left"
-                }
                 onClick={() => {
                   setXcpAmount(String(p.k * unitXcp));
                   setLastEdited("xcp");
@@ -620,9 +617,7 @@ function LoadCard({
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt title="Each route is its own Bitcoin transaction — the router weighs this against cheaper but shallower routes">
-                TX fees{plan.length > 1 ? ` · ${plan.length} txs` : ""}
-              </dt>
+              <dt>TX fees{plan.length > 1 ? ` · ${plan.length} txs` : ""}</dt>
               <dd>
                 ~{(plan.length * legFeeSats).toLocaleString()} sats
                 {btcUsd
@@ -1038,9 +1033,7 @@ function UnloadCard({
         <div className="px-2 pt-2">
           <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
             <div className="flex justify-between">
-              <dt title="Inventory priced at or under yours — at the same price, earlier dispensers vend first">
-                Queue
-              </dt>
+              <dt>Queue</dt>
               <dd className="font-medium tabular-nums text-gray-700">
                 {queueAheadXcp > 0
                   ? `${queueAheadXcp.toLocaleString()} XCP ahead of you`
@@ -1122,7 +1115,6 @@ function RouteBook({
           return (
             <li
               key={r.source}
-              title={r.source}
               className={`relative overflow-hidden rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
                 t ? "border-purple-200 bg-purple-50" : "border-transparent"
               }`}
@@ -1245,7 +1237,6 @@ function SellRow({
     <li className="relative">
       <button
         type="button"
-        title={`${r.source} — click to match this price`}
         onClick={() => onPick(Math.round(r.price))}
         className="relative w-full overflow-hidden rounded-lg border border-transparent py-1.5 pl-2.5 pr-8 text-left text-xs transition-colors hover:border-amber-300 hover:bg-amber-50/50 active:scale-[0.99]"
       >

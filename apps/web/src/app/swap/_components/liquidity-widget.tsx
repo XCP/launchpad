@@ -510,7 +510,7 @@ export function LiquidityWidget({
               <button
                 type="button"
                 onClick={() => setRateInverted((v) => !v)}
-                title="Invert rate"
+                aria-label="Invert rate"
                 className="text-gray-600 hover:text-gray-900"
               >
                 {rateInverted
@@ -537,9 +537,7 @@ export function LiquidityWidget({
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt title="Below this the transaction is void — nothing is debited">
-                    Min LP · slippage {lqSlippage}%
-                  </dt>
+                  <dt>Min LP · slippage {lqSlippage}%</dt>
                   <dd className="tabular-nums">
                     {commasRaw(
                       reduceByPercent(
@@ -638,9 +636,7 @@ export function LiquidityWidget({
               </div>
               {approx(outTokenRaw) > 0 && (
                 <div className="flex justify-between">
-                  <dt title="Below this the transaction is void — nothing is debited">
-                    Min received · slippage {lqSlippage}%
-                  </dt>
+                  <dt>Min received · slippage {lqSlippage}%</dt>
                   <dd className="tabular-nums">
                     {commasRaw(reduceByPercent(outTokenRaw, lqSlippage))}{" "}
                     {asset} +{" "}

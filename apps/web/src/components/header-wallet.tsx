@@ -29,16 +29,14 @@ export function HeaderWallet() {
    * which sounds like an accusation and points at the wrong thing: the
    * dominant cause is an XCP Wallet older than 0.8.2, whose segwit message
    * signing was broken until 8 Aug — the key is fine, the wallet's signature
-   * format wasn't. So the copy says the thing that actually fixes it. `title`
-   * keeps a short label on the dot for hover and screen readers in all three
-   * states.
+   * format wasn't. So the copy says the thing that actually fixes it, in the
+   * popover's note; the dot itself is just the lamp.
    */
   const proof = {
-    verified: { dot: "bg-green-500", title: "Signature verified", note: null },
-    unverified: { dot: "bg-gray-400", title: "Signature not checked", note: null },
+    verified: { dot: "bg-green-500", note: null },
+    unverified: { dot: "bg-gray-400", note: null },
     failed: {
       dot: "bg-red-500",
-      title: "Signature not confirmed",
       note: "Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it.",
     },
   }[proofStatus];
@@ -84,7 +82,6 @@ export function HeaderWallet() {
           <P.Trigger className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-purple-300 hover:text-purple-600 data-[state=open]:border-purple-300 data-[state=open]:text-purple-600">
             <span
               aria-hidden
-              title={proof.title}
               className={`size-1.5 shrink-0 rounded-full ${proof.dot}`}
             />
             {shortAddress(address)}

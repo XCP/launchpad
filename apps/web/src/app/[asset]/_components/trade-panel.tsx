@@ -557,13 +557,7 @@ export function TradePanel({
         <div className="px-2 pt-2">
           <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
             <div className="flex justify-between">
-              <dt
-                title={`Enforced by the order itself — a better fill refunds the difference in ${
-                  side === "buy" ? "XCP" : asset
-                }`}
-              >
-                Min received
-              </dt>
+              <dt>Min received</dt>
               <dd className="font-medium tabular-nums text-gray-700">
                 {side === "buy"
                   ? `${commasRaw(limitAmountExact)} ${asset}`
@@ -572,9 +566,7 @@ export function TradePanel({
             </div>
             {fillPct !== null && (
               <div className="flex justify-between">
-                <dt title="What the pool and book can deliver at your limit right now — the rest rests as an open order until taken or expired">
-                  Fills now
-                </dt>
+                <dt>Fills now</dt>
                 <dd
                   className={limitFillsNow ? "font-medium text-green-700" : ""}
                 >

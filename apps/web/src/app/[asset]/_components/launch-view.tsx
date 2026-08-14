@@ -114,18 +114,6 @@ export function LaunchView({
   const first = history[0];
   const firstPrice = first?.open ?? 0;
   const change = firstPrice > 0 && spot > 0 ? (spot / firstPrice - 1) * 100 : null;
-  // What the percentage is actually measured over: the span the price history
-  // covers, which for a launch this young is "since the pool opened". Both
-  // ends are real block_time values already in hand, so this needs no clock —
-  // reading one during render would make the label re-compute unpredictably.
-  const lastSnapshot = history[history.length - 1];
-  const changeWindow = (() => {
-    if (!first?.time || !lastSnapshot?.time) return "since launch";
-    const days = (lastSnapshot.time - first.time) / 86_400;
-    if (days < 1.5) return "since launch";
-    if (days < 45) return `over ${Math.round(days)}d`;
-    return `over ${Math.round(days / 30)}mo`;
-  })();
   // The highest price the pool ever printed, and where spot sits against it.
   // Free — the same history the chart already renders.
   // The high wick, not the close: a peak a candle traded at and gave back is
@@ -651,11 +639,9 @@ export function LaunchView({
               <Factoid
                 label="Price"
                 value={xcpPriceLabel(spot)}
-                // The change moves down to the sub line and takes the place of
-                // "since launch". At eight decimals the price is the widest
-                // thing on the row, and hanging a percentage off it made it
-                // wider still; the window it was measured over is a caption,
-                // not a headline, so the number itself sits there instead.
+                // The change lives on the sub line: at eight decimals the
+                // price is the widest thing on the row, and hanging a
+                // percentage off it made it wider still.
                 sub={
                   <>
                     {xcpUsd ? usd(spot * xcpUsd) : null}
@@ -663,7 +649,6 @@ export function LaunchView({
                     {change !== null && (
                       <span
                         className={change >= 0 ? "text-green-600" : "text-red-600"}
-                        title={`Change ${changeWindow}`}
                       >
                         {change >= 0 ? "+" : ""}
                         {change.toFixed(1)}%
@@ -774,7 +759,6 @@ export function LaunchView({
         divisible={fm.divisible}
         issuerSource={fm.source}
         poolTokensRaw={pool ? String(poolTokensRaw) : undefined}
-        lpAsset={pool?.lp_asset}
       />
       </LaunchRoomProvider>
       </div>
