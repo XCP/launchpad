@@ -67,7 +67,6 @@ export async function inscribeLaunch(opts: {
   lpAsset: string;
   startBlock: number;
   softCapDeadlineBlock: number;
-  jsonUrl: string;
   imageData: Uint8Array;
   mimeType: string;
   feeRate: number;
