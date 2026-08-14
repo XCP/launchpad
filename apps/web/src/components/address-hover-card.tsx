@@ -45,24 +45,32 @@ export function IssuerChips({
       // clauses need each launch's creation event, because a row that has
       // opened no longer reports the block it was announced in.
       //
-      // "Prior" has to mean prior IN TIME, not merely "not this one". Judging
-      // against everything the creator ever launched made each of two launches
-      // call the other its predecessor — both read "2nd launch", and the older
-      // one cited a launch from its own future. The creator's whole list is in
-      // this same response, so the current launch's own timestamp is the cutoff.
-      // An unconfirmed launch has no block_time yet and is genuinely newest,
-      // so it counts everything before it.
+      // "Prior" has to mean prior IN CHAIN ORDER, not merely "not this one".
+      // Judging against everything the creator ever launched made each of two
+      // launches call the other its predecessor — both read "2nd launch", and
+      // the older one cited a launch from its own future. The cutoff is the
+      // current launch's tx_index, NOT its block_time: five launches announced
+      // in one block share a timestamp, and a strict time cutoff made each
+      // exclude the other four, so all five claimed the same ordinal. tx_index
+      // is the chain's own total order, within a block and across them. An
+      // unconfirmed launch has no confirmed tx_index in this listing and is
+      // genuinely newest, so it counts everything before it.
       const rows = d.result ?? [];
-      const currentTime = rows.find((r) => r.asset === currentAsset)?.block_time ?? Infinity;
-      const shaped = rows
+      const currentIdx = rows.find((r) => r.asset === currentAsset)?.tx_index ?? Infinity;
+      const priorRows = rows
         .filter(
           (r) =>
             r.asset !== currentAsset &&
             xcp69Params(r) &&
-            (r.block_time ?? 0) < currentTime,
+            (r.tx_index ?? 0) < currentIdx,
         )
-        .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0))
-        .slice(0, 8);
+        .sort((a, b) => (b.tx_index ?? 0) - (a.tx_index ?? 0));
+      // Full conformance costs one event fetch per launch, so only the eight
+      // most recent are judged all the way down (they also feed the record
+      // chip). The rest count on their parameters alone — the ordinal used to
+      // saturate here instead, reading "9th launch" on every launch past a
+      // creator's ninth.
+      const shaped = priorRows.slice(0, 8);
       const verdicts = await Promise.all(
         shaped.map(async (r) => {
           if (r.status === "pending")
@@ -109,11 +117,13 @@ export function IssuerChips({
       // On the newest launch itself there is nothing newer to offer, so the
       // chip falls back to the one before it.
       const newer = rows
-        .filter((r) => r.asset !== currentAsset && xcp69Params(r) && (r.block_time ?? 0) > currentTime)
-        .sort((a, b) => (b.block_time ?? 0) - (a.block_time ?? 0));
+        .filter((r) => r.asset !== currentAsset && xcp69Params(r) && (r.tx_index ?? 0) > currentIdx)
+        .sort((a, b) => (b.tx_index ?? 0) - (a.tx_index ?? 0));
       const latest = newer[0];
       return {
-        prior: prior.length,
+        // Everything before this launch: the judged recent eight (minus any
+        // that failed conformance) plus the params-only remainder.
+        prior: priorRows.length - shaped.length + prior.length,
         priorCapped: (d.result ?? []).length >= 100,
         judged: judged.length,
         graduated: judged.filter((p) => p === "graduated").length,
