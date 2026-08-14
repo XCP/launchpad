@@ -4,6 +4,7 @@ import Link from "next/link";
 import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
 import { MempoolChip } from "@/components/mempool-chip";
+import { RewardsChip } from "@/components/rewards-chip";
 
 /**
  * The site header.
@@ -83,15 +84,21 @@ export function SiteHeader() {
             that overlaps the links beside it is worse than one that doesn't
             claim to be centred. Narrower screens get it inline, below. */}
         <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
-          <div className="pointer-events-auto">
+          {/* Rewards is always on; mempool joins it only when something is
+              queued, so the pair re-centres itself as one unit. */}
+          <div className="pointer-events-auto flex items-center gap-2">
+            <RewardsChip />
             <MempoolChip />
           </div>
         </div>
 
         <div className="flex shrink-0 items-center gap-4 text-sm font-medium text-gray-600">
           {/* Beside the burger on a phone, and beside the links in the band
-              between — the same chip, just not pretending to be centred. */}
-          <MempoolChip className="lg:hidden" />
+              between — the same chips, just not pretending to be centred. */}
+          <span className="flex items-center gap-2 lg:hidden">
+            <RewardsChip />
+            <MempoolChip />
+          </span>
           <nav className="hidden items-center gap-4 sm:flex">
             {SECONDARY.map((l) => (
               <Link key={l.href} href={l.href} className="hover:text-gray-900">

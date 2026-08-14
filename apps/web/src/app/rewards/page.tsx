@@ -28,11 +28,8 @@ export const revalidate = 60;
 const raiseXcp = XCP69_RAISE_SATS / 1e8;
 
 /**
- * Deliberately not in the nav.
- *
- * The page is real and reachable, so it can be linked from a post or a chat
- * when the programme opens — but until then nothing on the site points at
- * it. Publishing and announcing are separate decisions.
+ * Not in the nav — the header's green rewards chip is the one pointer to
+ * this page, beside the mempool chip.
  */
 export default async function RewardsPage() {
   const height = await fetchBlockHeight().catch(() => 0);
@@ -110,11 +107,10 @@ export default async function RewardsPage() {
         <h2 className="text-lg font-bold">The graduation bounty</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-600">
           No XCP-69 launch has graduated yet. The first three to do it earn
-          their creator an XCP bounty on top of the {commas(raiseXcp)} XCP the
-          launch itself raises.
+          their creator an XCP bounty.
         </p>
 
-        <Podium graduated={graduated} raiseXcp={raiseXcp} />
+        <Podium graduated={graduated} />
 
         <p className="mt-4 text-xs leading-relaxed text-gray-500">
           Graduating means selling out: {commas(raiseXcp)} XCP raised from at
@@ -236,7 +232,7 @@ export default async function RewardsPage() {
  * price list — which is the point, since all three are unclaimed and the
  * whole thing is an invitation to be first.
  */
-function Podium({ graduated, raiseXcp }: { graduated: number; raiseXcp: number }) {
+function Podium({ graduated }: { graduated: number }) {
   // Visual order, not rank order.
   const layout = [
     { i: 1, height: "h-20", accent: "from-gray-300 to-gray-200", ring: "ring-gray-300" },
@@ -261,9 +257,6 @@ function Podium({ graduated, raiseXcp }: { graduated: number; raiseXcp: number }
                 {commas(b.xcp)}
               </div>
               <div className={LABEL}>XCP</div>
-            </div>
-            <div className="mt-1 text-[11px] text-gray-400 tabular-nums">
-              +{Math.round((b.xcp / raiseXcp) * 100)}% on the raise
             </div>
             {/* The step. Height encodes the prize; the label sits inside it. */}
             <div
