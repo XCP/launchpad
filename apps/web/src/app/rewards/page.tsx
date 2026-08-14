@@ -67,14 +67,8 @@ export default async function RewardsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
-      <div>
-        <h1 className="text-2xl font-bold">XCP Rewards</h1>
-        <p className="mt-1 text-sm text-gray-600">
-          The first three launches to graduate earn their creator an XCP
-          bounty. And every mint along the way earns MINTS.
-        </p>
-      </div>
-
+      {/* No page title — the chip that brought you here already said XCP
+          Rewards, and the bounty section opens the page. */}
       {/* ---------------- the bounty ---------------- */}
       <section>
         <h2 className="text-lg font-bold">The graduation bounty</h2>
