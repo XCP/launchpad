@@ -76,7 +76,11 @@ launchesRoute.get("/v2/launches/by/:source", async (c) => {
 launchesRoute.get("/v2/minters", async (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 25) || 25, 100);
   const source = c.req.query("source") || undefined;
-  const result = await minterEarnings(c.env.DB, limit, source);
+  // Offset paging for the leaderboard. The aggregate scans the same rows
+  // whatever the offset, so a deep page costs what page one costs — and the
+  // 60s cache means D1 sees each (limit, offset) at most once a minute.
+  const offset = Math.min(Math.max(0, Number(c.req.query("offset") ?? 0) || 0), 100_000);
+  const result = await minterEarnings(c.env.DB, limit, source, offset);
   return J(c, { result, result_count: result.length }, 60);
 });
 

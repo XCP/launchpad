@@ -404,9 +404,10 @@ interface ApiMinterRow {
 export async function fetchMinterEarnings(
   limit = 25,
   source?: string,
+  offset = 0,
 ): Promise<MinterEarning[]> {
   try {
-    const qs = `limit=${limit}${source ? `&source=${encodeURIComponent(source)}` : ""}`;
+    const qs = `limit=${limit}${offset > 0 ? `&offset=${offset}` : ""}${source ? `&source=${encodeURIComponent(source)}` : ""}`;
     const res = await fetch(`${API_BASE}/v2/minters?${qs}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
