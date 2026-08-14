@@ -58,7 +58,7 @@ export default async function RewardsPage() {
         <h2 className="text-lg font-bold">The graduation bounty</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-600">
           {graduated === 0
-            ? "No XCP-69 launch has graduated yet. The first three to do it earn their creator an XCP bounty."
+            ? "No XCP-69 launch has graduated yet. The first three to do it earn a bounty."
             : graduated === 1
               ? "One bounty is claimed — two are still open for the next launches to graduate."
               : graduated === 2
