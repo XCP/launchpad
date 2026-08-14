@@ -365,15 +365,20 @@ export function ActivityTabs({
           </p>
         ) : (
           <>
-            {/* The row grid's middle columns are fixed-width (7rem/9rem/4.5rem)
-                and don't shrink, so below ~34rem the row needs more space
-                than the viewport has. Scrolling that overflow here — inside
-                a bounded, min-width wrapper — keeps every row's own
-                overflow-hidden (used for the progress-bar fill) clipping
-                only the fill, not the columns themselves. */}
+            {/* The address column has a 16.5rem FLOOR, not a shrinkable 1fr:
+                shortAddress() is already the shortest honest form, so when
+                the "dev" and "no history" chips both land on one row the row
+                gets wider — never the address shorter. The floor is sized to
+                identicon + 13-char address + both chips; with it, the row's
+                minimum is 41.5rem (2 + 16.5 + 6 + 6.5 + 4.5 tracks, 4rem of
+                gaps, 2rem padding — keep the wrapper's min-w in step), which
+                still fits the max-w-2xl card on desktop. Anything narrower
+                scrolls here — inside a bounded wrapper — so every row's own
+                overflow-hidden (used for the progress-bar fill) clips only
+                the fill, not the columns themselves. */}
             <div className="overflow-x-auto">
-              <div className="min-w-[34rem]">
-                <div className="grid grid-cols-[2rem_minmax(0,1fr)_7rem_9rem_4.5rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+              <div className="min-w-[41.5rem]">
+                <div className="grid grid-cols-[2rem_minmax(16.5rem,1fr)_6rem_6.5rem_4.5rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
                   <span />
                   <span>Address</span>
                   <span className="text-right">Amount</span>
@@ -386,7 +391,7 @@ export function ActivityTabs({
                     return (
                       <li
                         key={r.source}
-                        className="relative grid grid-cols-[2rem_minmax(0,1fr)_7rem_9rem_4.5rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
+                        className="relative grid grid-cols-[2rem_minmax(16.5rem,1fr)_6rem_6.5rem_4.5rem] items-center gap-x-4 overflow-hidden px-4 py-2 text-sm"
                       >
                         <span
                           aria-hidden
@@ -396,13 +401,13 @@ export function ActivityTabs({
                         <span className="relative z-10 text-left text-xs text-gray-400 tabular-nums">
                           {from + i + 1}
                         </span>
-                        <span className="relative z-10 flex min-w-0 items-center gap-2">
+                        <span className="relative z-10 flex items-center gap-2">
                           <AddressHoverCard
                             source={r.source}
-                            className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700"
+                            className="flex items-center gap-2 font-mono text-gray-600 hover:text-purple-700"
                           >
                             <Identicon address={r.source} />
-                            <span className="truncate">{shortAddress(r.source)}</span>
+                            <span className="whitespace-nowrap">{shortAddress(r.source)}</span>
                           </AddressHoverCard>
                           {/* Outside the link: an ancestor's underline paints
                               through descendant text regardless of the
