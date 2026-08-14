@@ -13,10 +13,15 @@ export function RewardsChip({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/rewards"
-      title="MINTS for every mint, and an XCP bounty for the first launches to graduate"
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 bg-green-50 px-2.5 py-1 text-xs font-medium text-green-800 transition-colors hover:border-green-300 ${FOCUS} ${className}`}
     >
-      Rewards
+      {/* The mempool chip's light, in green: the pair reads as two lamps on
+          one dashboard. */}
+      <span className="relative flex size-1.5 shrink-0">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-75" />
+        <span className="relative inline-flex size-1.5 rounded-full bg-green-500" />
+      </span>
+      <span>XCP Rewards</span>
     </Link>
   );
 }

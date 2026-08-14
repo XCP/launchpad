@@ -18,9 +18,9 @@ import {
 } from "@/lib/rewards";
 
 export const metadata: Metadata = {
-  title: "Rewards — xcp.fun",
+  title: "XCP Rewards — xcp.fun",
   description:
-    "MINTS for every mint, and an XCP bounty for the first three launches to graduate.",
+    "An XCP bounty for the first three launches to graduate, and MINTS for every mint.",
 };
 
 export const revalidate = 60;
@@ -46,13 +46,39 @@ export default async function RewardsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-10">
       <div>
-        <h1 className="text-2xl font-bold">Rewards</h1>
+        <h1 className="text-2xl font-bold">XCP Rewards</h1>
         <p className="mt-1 text-sm text-gray-600">
-          Minting costs you a Bitcoin transaction fee. We pay it back in
-          MINTS — and there is an XCP bounty for the first three launches to
-          make it all the way.
+          The first three launches to graduate earn their creator an XCP
+          bounty — and every mint along the way earns MINTS that pay back its
+          Bitcoin fee.
         </p>
       </div>
+
+      {/* ---------------- the bounty ---------------- */}
+      <section>
+        <h2 className="text-lg font-bold">The graduation bounty</h2>
+        <p className="mt-2 text-sm leading-relaxed text-gray-600">
+          {graduated === 0
+            ? "No XCP-69 launch has graduated yet. The first three to do it earn their creator an XCP bounty."
+            : graduated === 1
+              ? "One bounty is claimed — two are still open for the next launches to graduate."
+              : graduated === 2
+                ? "Two bounties are claimed — one is still open for the next launch to graduate."
+                : "All three bounties have been claimed."}
+        </p>
+
+        <Podium graduated={graduated} />
+
+        <p className="mt-4 text-xs leading-relaxed text-gray-500">
+          Graduating means selling out: {commas(raiseXcp)} XCP raised from at
+          least {XCP69_MIN_PARTICIPANTS} different addresses, at which point
+          the pool is created and its liquidity is burned. A launch that misses
+          its target refunds every satoshi by consensus and does not count.{" "}
+          <Link href="/faq" className="text-purple-600 hover:underline">
+            How that works
+          </Link>
+        </p>
+      </section>
 
       {/* ---------------- the ongoing reward ---------------- */}
       <section>
@@ -100,27 +126,6 @@ export default async function RewardsPage() {
             {commas(remaining)} still to claim
           </p>
         </div>
-      </section>
-
-      {/* ---------------- the bounty ---------------- */}
-      <section>
-        <h2 className="text-lg font-bold">The graduation bounty</h2>
-        <p className="mt-2 text-sm leading-relaxed text-gray-600">
-          No XCP-69 launch has graduated yet. The first three to do it earn
-          their creator an XCP bounty.
-        </p>
-
-        <Podium graduated={graduated} />
-
-        <p className="mt-4 text-xs leading-relaxed text-gray-500">
-          Graduating means selling out: {commas(raiseXcp)} XCP raised from at
-          least {XCP69_MIN_PARTICIPANTS} different addresses, at which point
-          the pool is created and its liquidity is burned. A launch that misses
-          its target refunds every satoshi by consensus and does not count.{" "}
-          <Link href="/faq" className="text-purple-600 hover:underline">
-            How that works
-          </Link>
-        </p>
       </section>
 
       {/* ---------------- who has earned what ---------------- */}
@@ -229,8 +234,8 @@ export default async function RewardsPage() {
  *
  * Ordered 2nd–1st–3rd left to right, the way a real podium stands, with the
  * step heights carrying the prize sizes. It reads as a race rather than a
- * price list — which is the point, since all three are unclaimed and the
- * whole thing is an invitation to be first.
+ * price list — which is the point while bounties are open: the whole thing
+ * is an invitation to take the next step.
  */
 function Podium({ graduated }: { graduated: number }) {
   // Visual order, not rank order.
