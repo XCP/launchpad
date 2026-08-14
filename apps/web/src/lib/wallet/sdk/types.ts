@@ -32,6 +32,12 @@ export interface SignPsbtParams {
   hex: string
   signInputs?: Record<string, number[]>
   sighashTypes?: number[]
+  /**
+   * For an inscription commit: the reveal's tapleaf script and the taproot internal key, hex.
+   * The XCP Wallet re-derives the commit address and message from these and refuses to sign on
+   * any mismatch -- without them a commit is unprovable BTC movement and is blocked outright.
+   */
+  inscription?: { revealScript: string; tapInternalKey: string }
 }
 
 /** One address the wallet controls, with the key that proves it. */

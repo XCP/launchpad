@@ -150,10 +150,12 @@ export class XcpWallet {
     psbtHex: string,
     signInputs?: Record<string, number[]>,
     sighashTypes?: number[],
+    inscription?: SignPsbtParams['inscription'],
   ): Promise<string> {
     const params: SignPsbtParams = { hex: psbtHex }
     if (signInputs) params.signInputs = signInputs
     if (sighashTypes) params.sighashTypes = sighashTypes
+    if (inscription) params.inscription = inscription
     const result = await this.durableRequest({
       method: 'xcp_signPsbt',
       params: [params],

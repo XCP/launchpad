@@ -5,6 +5,7 @@ import {
   buildRevealPsbt,
   BURN_ADDRESS,
   finalizeSignedPsbt,
+  hexCodec,
   txidFromRawTx,
 } from "@/lib/inscriber";
 import { prepareFairminterInscriptionPsbt } from "@/lib/inscriber/fairminter";
@@ -66,12 +67,16 @@ export async function inscribeLaunch(opts: {
   lpAsset: string;
   startBlock: number;
   softCapDeadlineBlock: number;
-  jsonUrl: string;
   imageData: Uint8Array;
   mimeType: string;
   feeRate: number;
   address: string;
-  signPsbt: (hex: string, signInputs?: Record<string, number[]>) => Promise<string>;
+  signPsbt: (
+    hex: string,
+    signInputs?: Record<string, number[]>,
+    sighashTypes?: number[],
+    inscription?: { revealScript: string; tapInternalKey: string },
+  ) => Promise<string>;
   broadcast: (hex: string) => Promise<string>;
   onStep: (step: InscribeStep) => void;
 }): Promise<{ commitTxid: string; revealTxid: string }> {
@@ -100,7 +105,13 @@ export async function inscribeLaunch(opts: {
   });
 
   onStep("sign-commit");
-  const signedCommit = await opts.signPsbt(commit.psbtHex, { [address]: [0] });
+  // The commit is unprovable BTC movement without its envelope: the wallet re-derives the commit
+  // address and message from these and refuses on any mismatch, so honest commits sign and
+  // anything else cannot.
+  const signedCommit = await opts.signPsbt(commit.psbtHex, { [address]: [0] }, undefined, {
+    revealScript: hexCodec.encode(prepared.revealScript),
+    tapInternalKey: hexCodec.encode(prepared.tapInternalKey),
+  });
   const commitRawTx = finalizeSignedPsbt(signedCommit);
   const commitTxid = txidFromRawTx(commitRawTx);
 

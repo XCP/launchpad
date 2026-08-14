@@ -363,7 +363,6 @@ export default function CreatePage() {
           lpAsset: generateLpAssetName(),
           startBlock,
           softCapDeadlineBlock: startBlock + XCP69.DEADLINE_BLOCKS,
-          jsonUrl: upload.json_url,
           imageData: new Uint8Array(await image.arrayBuffer()),
           mimeType: image.type,
           feeRate: submitFeeRate,

@@ -30,8 +30,6 @@ export interface FairminterInscriptionParams {
   startBlock: number;
   /** startBlock + XCP69.DEADLINE_BLOCKS, exactly */
   softCapDeadlineBlock: number;
-  /** hosted CIP-25 JSON — rides in the ord metadata for ecosystem parsers */
-  jsonUrl: string;
   imageData: Uint8Array;
   mimeType: string;
   feeRate: number;
@@ -65,10 +63,12 @@ export function buildFairminterInscriptionMetadata(
     assetNameToId(params.lpAsset),
   ];
 
+  // The minimal permanent record: the name explorers cannot derive from the numeric id in the
+  // xcp array, and the standard that groups every launch. Deliberately no URL — a link would rot
+  // on an artifact that cannot, and anything wanting the hosted JSON derives it from the name.
   return {
-    asset: params.asset,
     name: params.asset,
-    description: params.jsonUrl,
+    standard: "XCP-69",
     xcp,
   };
 }
