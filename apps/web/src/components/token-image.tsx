@@ -44,14 +44,17 @@ function Monogram({ asset, large, className }: { asset: string; large: boolean; 
  * hasn't crawled — not a 404 — and the header marking it as such isn't
  * CORS-exposed, so `onError` never fires and a CDN-first chain stops dead on
  * the placeholder without ever reaching the real art. Asking our own R2 first
- * sidesteps the ambiguity entirely: it 404s honestly when we don't have the
- * image, which advances the chain the way a fallback is supposed to work.
+ * sidesteps the ambiguity entirely — and on a miss the route 302s straight
+ * to the CDN (`fb` names the size) instead of 404ing, so a page of chips for
+ * assets we never hosted doesn't fill the console with errors on the way to
+ * the same image.
  *
  * It is also the correct authority. Every launch created here uploads its art
  * to R2 at creation, before the CDN has ever seen the asset — so when both
  * have something, ours is the original and the CDN's is a copy at best.
  *
- * Chain: our original → CDN full-size (large only) → CDN icon → monogram.
+ * Chain: our original (redirecting to the CDN on miss) → CDN icon directly
+ * (only if our Worker itself errors) → monogram.
  */
 export function TokenImage({
   asset,
@@ -63,8 +66,8 @@ export function TokenImage({
   large?: boolean;
 }) {
   const sources = large
-    ? [`/i/${asset}`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
-    : [`/i/${asset}`, `${CDN_BASE}/img/icon/${asset}`];
+    ? [`/i/${asset}?fb=full`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
+    : [`/i/${asset}?fb=icon`, `${CDN_BASE}/img/icon/${asset}`];
 
   // Reset the fallback chain when the identity this component is showing
   // changes — TokenImage instances can be reused across a different asset
