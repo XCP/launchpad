@@ -25,9 +25,7 @@ export const revalidate = 0;
  */
 export default function MempoolPage() {
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
-      <h1 className="text-2xl font-bold">Mempool</h1>
-
+    <div className="mx-auto max-w-3xl">
       <MempoolView />
     </div>
   );

@@ -45,8 +45,10 @@ export function MempoolChip({ className = "" }: { className?: string }) {
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75" />
         <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
       </span>
-      <span>mempool</span>
-      <span className="tabular-nums">{count}</span>
+      {/* Same count grammar as the tabs on /mempool — "Mints (3)" — so the
+          chip and the page it opens read as one system. */}
+      <span>Mempool</span>
+      <span className="tabular-nums">({count})</span>
     </Link>
   );
 }
