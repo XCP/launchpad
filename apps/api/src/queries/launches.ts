@@ -352,12 +352,15 @@ export function minterEarnings(
   db: D1Database,
   limit: number,
   source?: string,
+  offset = 0,
 ): Promise<MinterEarning[]> {
   // One query for both callers. A profile asking about itself and the
   // leaderboard listing everyone must never report different totals for the
   // same address, which two queries would eventually manage.
-  const where = source ? "AND m.source = ?2" : "";
-  const binds: (number | string)[] = source ? [limit, source] : [limit];
+  const where = source ? "AND m.source = ?3" : "";
+  const binds: (number | string)[] = source
+    ? [limit, offset, source]
+    : [limit, offset];
   return q<MinterEarning>(
     db,
     `SELECT m.source,
@@ -369,7 +372,7 @@ export function minterEarnings(
       WHERE 1 = 1 ${where}
       GROUP BY m.source
       ORDER BY mints DESC, paid DESC
-      LIMIT ?1`,
+      LIMIT ?1 OFFSET ?2`,
     ...binds,
   );
 }

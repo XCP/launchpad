@@ -1,21 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { fetchBlockHeight } from "@/lib/api/counterparty";
+import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
 import { fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
-import { commas, fromSats, shortAddress } from "@/lib/format";
+import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
+import { commas, price as priceFmt } from "@/lib/format";
+import { ratio } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
+import { TokenImage } from "@/components/token-image";
 import { XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
 import {
   BOUNTIES,
   MINT_CAP,
   MINTS_PER_MINT,
   MINTS_PRICE_XCP,
-  POOL_MINTS,
-  POOL_XCP,
   SATS_PER_XCP,
   TYPICAL_MINT_FEE_SATS,
-  mintsEarned,
 } from "@/lib/rewards";
+import { EarnersTable } from "@/app/rewards/_components/earners-table";
 
 export const metadata: Metadata = {
   title: "XCP Rewards — xcp.fun",
@@ -33,15 +34,36 @@ const raiseXcp = XCP69_RAISE_SATS / 1e8;
  */
 export default async function RewardsPage() {
   const height = await fetchBlockHeight().catch(() => 0);
-  const [stats, earners] = await Promise.all([
+  const [stats, earners, mintsPool, xcpUsd, btcUsd] = await Promise.all([
     fetchLaunchStats(height).catch(() => null),
     fetchMinterEarnings(25).catch(() => []),
+    // The MINTS/XCP pool is live on-chain; its reserve ratio IS the price.
+    // The constant in lib/rewards is the seeded ratio, kept as the fallback
+    // so an API hiccup never renders a reward worth zero.
+    fetchPool("MINTS").catch(() => null),
+    fetchXcpUsd().catch(() => null),
+    fetchBtcUsd().catch(() => null),
   ]);
   const mintsSoFar = stats?.activity.mints ?? 0;
   const graduated = stats?.counts.graduated ?? 0;
   const remaining = Math.max(0, MINT_CAP - mintsSoFar);
-  const rewardXcp = MINTS_PER_MINT * MINTS_PRICE_XCP;
-  const feeXcp = TYPICAL_MINT_FEE_SATS / SATS_PER_XCP;
+
+  // XCP per MINTS from live reserves (both sides are 8-decimal raw, so the
+  // raw ratio needs no scale correction). reserve_a/b follow the pool's own
+  // asset order, so pick the XCP side by name rather than by position.
+  const livePrice = mintsPool
+    ? mintsPool.asset_a === "XCP"
+      ? ratio(mintsPool.reserve_a, mintsPool.reserve_b)
+      : ratio(mintsPool.reserve_b, mintsPool.reserve_a)
+    : null;
+  const mintsPriceXcp = livePrice && livePrice > 0 ? livePrice : MINTS_PRICE_XCP;
+  const rewardXcp = MINTS_PER_MINT * mintsPriceXcp;
+
+  // Sats per XCP from the same feeds the rest of the site prices with; the
+  // measured constant stands in only when a feed is down.
+  const satsPerXcp =
+    btcUsd && xcpUsd && xcpUsd > 0 ? (xcpUsd / btcUsd) * 1e8 : SATS_PER_XCP;
+  const feeXcp = TYPICAL_MINT_FEE_SATS / satsPerXcp;
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
@@ -81,12 +103,20 @@ export default async function RewardsPage() {
 
       {/* ---------------- the ongoing reward ---------------- */}
       <section>
-        <h2 className="text-lg font-bold">{commas(MINTS_PER_MINT)} MINTS for every mint</h2>
+        <div className="flex items-center gap-3">
+          <TokenImage
+            asset="MINTS"
+            className="size-10 shrink-0 rounded-lg object-cover"
+          />
+          <h2 className="text-lg font-bold">
+            {commas(MINTS_PER_MINT)} MINTS for every mint
+          </h2>
+        </div>
         <p className="mt-2 text-sm leading-relaxed text-gray-600">
           Mint any XCP-69 launch and earn {commas(MINTS_PER_MINT)} MINTS. It
           doesn&apos;t matter which launch, and it doesn&apos;t matter how much
-          you mint — one transaction, one reward. The first{" "}
-          {commas(MINT_CAP)} mints are covered.
+          you mint — one transaction, one reward (valid for the first{" "}
+          {commas(MINT_CAP)} mint transactions).
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -94,7 +124,7 @@ export default async function RewardsPage() {
           <Stat
             label="Worth"
             value={`${rewardXcp.toFixed(2)} XCP`}
-            hint="at the pool price"
+            hint="at the live pool price"
           />
           <Stat
             label="Your fee"
@@ -135,94 +165,38 @@ export default async function RewardsPage() {
           that is the unit the reward is paid in.
         </p>
 
-        {earners.length === 0 ? (
-          <p className="mt-4 rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
-            Nobody has minted yet. The first row here is available.
-          </p>
-        ) : (
-          <div className="mt-4 overflow-x-auto rounded-xl border border-gray-200 bg-white">
-            <table className="w-full min-w-[32rem] text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 text-left">
-                  <th scope="col" className={`px-4 py-2.5 ${LABEL}`}>
-                    Minter
-                  </th>
-                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                    Mints
-                  </th>
-                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                    Launches
-                  </th>
-                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                    Committed
-                  </th>
-                  <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                    Earned
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {earners.map((m, i) => (
-                  <tr key={m.source} className="hover:bg-gray-50">
-                    <td className="whitespace-nowrap px-4 py-3">
-                      <span className="mr-2 text-xs text-gray-400 tabular-nums">{i + 1}</span>
-                      <Link
-                        href={`/profile/${m.source}`}
-                        className="font-mono text-xs text-gray-600 hover:text-purple-700"
-                      >
-                        {shortAddress(m.source)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-700">
-                      {commas(m.mints)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-500">
-                      {commas(m.launches)}
-                    </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-gray-500">
-                      {commas(fromSats(m.paid))} XCP
-                    </td>
-                    <td className="px-4 py-3 text-right font-medium tabular-nums text-gray-900">
-                      {commas(mintsEarned(m.mints))}
-                      <span className="ml-1 text-[11px] font-normal text-gray-400">MINTS</span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <EarnersTable initial={earners} />
       </section>
 
-      {/* ---------------- the small print ---------------- */}
+      {/* ---------------- the small print, in the site's FAQ grammar ---------------- */}
       <section>
-        <h2 className={`mb-3 ${LABEL}`}>How it works</h2>
-        <dl className="space-y-3 text-sm leading-relaxed text-gray-600">
-          <Term term="What MINTS is">
-            A Counterparty asset with a fixed, locked supply of 100,000,000 —
-            no more can ever be issued. It was itself a free fairminter, minted
-            out by 1,376 people. A{" "}
-            {commas(POOL_MINTS)} MINTS / {commas(POOL_XCP)} XCP pool sets the
-            price at {MINTS_PRICE_XCP} XCP each, so{" "}
+        <h2 className="text-lg font-bold">FAQ</h2>
+        <div className="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+          <Faq q="What is MINTS?" open>
+            The first fairminter ever created on Counterparty — block 866,297,
+            before any other, and it minted out free to 1,376 addresses. The
+            supply is 100,000,000, locked forever; no more can ever be issued.
+            The live MINTS/XCP pool prices the reward: right now 1 MINTS
+            trades at {priceFmt(mintsPriceXcp)} XCP, so{" "}
             {commas(MINTS_PER_MINT)} MINTS is {rewardXcp.toFixed(2)} XCP.
-          </Term>
-          <Term term="Why per transaction, not per token">
+          </Faq>
+          <Faq q="Why per transaction, not per token?">
             The Bitcoin fee you pay is per transaction, so the reward is too.
             Minting one lot and minting the full 1% cost you the same fee and
             earn the same {commas(MINTS_PER_MINT)} MINTS — there is nothing to
             gain by splitting a mint into smaller pieces.
-          </Term>
-          <Term term="When you get paid">
+          </Faq>
+          <Faq q="When do I get paid?">
             Rewards accrue as you mint and are sent out in batches. Nothing
             expires; the count above is what is left of the programme.
-          </Term>
-          <Term term="The XCP you commit is not a cost">
-            A mint escrows XCP against the launch. If it graduates you hold the
-            tokens; if it refunds you get every satoshi back. The only thing a
-            mint actually costs you is the Bitcoin fee — which is the part this
-            programme covers.
-          </Term>
-        </dl>
+          </Faq>
+          <Faq q="Doesn't minting cost me the XCP?">
+            No — a mint escrows XCP against the launch. If it graduates you
+            hold the tokens; if it refunds you get every satoshi back. The
+            only thing a mint actually costs you is the Bitcoin fee — which is
+            the part this programme covers.
+          </Faq>
+        </div>
       </section>
     </div>
   );
@@ -291,11 +265,19 @@ function Stat({ label, value, hint }: { label: string; value: string; hint: stri
   );
 }
 
-function Term({ term, children }: { term: string; children: React.ReactNode }) {
+function Faq({
+  q,
+  open = false,
+  children,
+}: {
+  q: string;
+  open?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <div>
-      <dt className="font-medium text-gray-900">{term}</dt>
-      <dd className="mt-0.5">{children}</dd>
-    </div>
+    <details className="p-4" open={open}>
+      <summary className="cursor-pointer text-sm font-medium text-gray-900">{q}</summary>
+      <p className="mt-2 text-sm leading-relaxed text-gray-600">{children}</p>
+    </details>
   );
 }
