@@ -183,7 +183,7 @@ export function PositionsTab({ address, demo }: { address: string; demo?: Portfo
                     <span className="text-right tabular-nums text-gray-900">
                       {money(p.valueXcpSats)}
                     </span>
-                    <span className="text-right tabular-nums" title={p.withheld}>
+                    <span className="text-right tabular-nums">
                       <Pnl sats={p.unrealizedXcpSats} format={money} />
                     </span>
                   </li>

@@ -228,9 +228,7 @@ export function MintPanel({
         <div className="px-2 pt-2">
           <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
             <div className="flex justify-between">
-              <dt title="Escrowed by the protocol, not sent to the creator">
-                If it fails to launch
-              </dt>
+              <dt>If it fails to launch</dt>
               <dd className="font-medium text-gray-700">
                 full XCP refund, automatic
               </dd>

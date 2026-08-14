@@ -38,7 +38,6 @@ export function MempoolChip({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/mempool"
-      title="Transactions broadcast but not yet confirmed"
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:border-amber-300 ${FOCUS} ${className}`}
     >
       <span className="relative flex size-1.5 shrink-0">

@@ -414,7 +414,6 @@ export function SwapWidget({
   // it sits beside the mode tabs (the Uniswap placement). Auto is marked.
   const slippageControl = (
     <span
-      title="Max slippage — adjust via the gear beside the tabs"
       className={
         !slippageAuto && customSlip > 0
           ? "font-medium text-purple-600"
@@ -498,7 +497,7 @@ export function SwapWidget({
           <button
             type="button"
             onClick={() => setRateInverted((v) => !v)}
-            title="Invert rate"
+            aria-label="Invert rate"
             className="text-gray-600 hover:text-gray-900"
           >
             {rateText}
