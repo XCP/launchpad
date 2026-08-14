@@ -7,15 +7,19 @@ import { big, compareRawDesc, type Raw } from "@/lib/numeric";
 import { isXcp69, windowIsExact, xcp69Params } from "@/lib/xcp69";
 
 /**
- * Classic Counterparty pools seeded into the picker until the first XCP-69
- * graduates exist — real liquidity beats an empty placeholder. Each is
- * verified live (dropped if its pool disappears).
+ * The house pools beside the graduates: PEPECASH (the classic) and MINTS
+ * (the rewards asset — the same MINTS/XCP pool that prices the programme).
+ * Each verified live (dropped if its pool disappears). Divisible assets
+ * only: BITCORN/XCP is real and liquid but BITCORN is indivisible, and
+ * every trading surface here does its money math at 8 decimals — listing
+ * it without threading divisibility through swap/liquidity/limit would
+ * misprice it by 1e8.
  */
-const LEGACY_POOLS = ["PEPECASH"];
+const SPECIAL_POOLS = ["PEPECASH", "MINTS"];
 
 /**
- * Tradeable = graduated XCP-69 (conforming, with a live pool) plus verified
- * legacy pools, deepest first. One leg is always XCP.
+ * Tradeable = graduated XCP-69 (conforming, with a live pool) plus the
+ * verified special pools, deepest first. One leg is always XCP.
  */
 export async function fetchTradeableAssets(): Promise<string[]> {
   const fairminters = await fetchAllFairminters();
@@ -41,12 +45,12 @@ export async function fetchTradeableAssets(): Promise<string[]> {
     .filter((p): p is { asset: string; xcpDepth: Raw } => p !== null)
     .sort((a, b) => compareRawDesc(a.xcpDepth, b.xcpDepth))
     .map((p) => p.asset);
-  const legacy = (
+  const specials = (
     await Promise.all(
-      LEGACY_POOLS.filter((a) => !graduates.includes(a)).map(async (a) =>
+      SPECIAL_POOLS.filter((a) => !graduates.includes(a)).map(async (a) =>
         (await fetchPool(a)) ? a : null,
       ),
     )
   ).filter((a): a is string => a !== null);
-  return [...graduates, ...legacy];
+  return [...graduates, ...specials];
 }
