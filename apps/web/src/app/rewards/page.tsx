@@ -49,8 +49,7 @@ export default async function RewardsPage() {
         <h1 className="text-2xl font-bold">XCP Rewards</h1>
         <p className="mt-1 text-sm text-gray-600">
           The first three launches to graduate earn their creator an XCP
-          bounty — and every mint along the way earns MINTS that pay back its
-          Bitcoin fee.
+          bounty. And every mint along the way earns MINTS.
         </p>
       </div>
 
