@@ -256,11 +256,9 @@ function Podium({ graduated }: { graduated: number }) {
             >
               {i + 1}
             </div>
-            <div className="text-center">
-              <div className="text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
-                {commas(b.xcp)}
-              </div>
-              <div className={LABEL}>XCP</div>
+            <div className="whitespace-nowrap text-center text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+              {commas(b.xcp)}{" "}
+              <span className="text-sm font-medium text-gray-500">XCP</span>
             </div>
             {/* The step. Height encodes the prize; the label sits inside it. */}
             <div
