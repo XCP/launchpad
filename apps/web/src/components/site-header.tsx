@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
-import { MempoolChip } from "@/components/mempool-chip";
+import { MempoolChip, useMempoolCount } from "@/components/mempool-chip";
 import { RewardsChip } from "@/components/rewards-chip";
 
 /**
@@ -40,12 +40,25 @@ const SECONDARY = [
   { href: "/docs", label: "Docs" },
 ];
 
-/** Mempool is a chip in the header rather than a link in this row — but the
- *  phone menu still needs it as a destination, since a chip is a teaser and
- *  the menu is the actual index of the site. */
-const MENU_EXTRA = { href: "/mempool", label: "Mempool" };
+/** Both chips are links in the header rather than in this row — but the phone
+ *  menu still needs them as destinations, since a chip is a teaser and the
+ *  menu is the actual index of the site. Rewards especially: on a phone the
+ *  chip is the ONLY way to reach it, and the chip stands aside whenever
+ *  mempool is up, so without this entry the page would be unreachable for
+ *  exactly as long as something is queued. */
+const MENU_EXTRA = [
+  { href: "/rewards", label: "XCP Rewards" },
+  { href: "/mempool", label: "Mempool" },
+];
 
 export function SiteHeader() {
+  // Below `lg` the chips sit inline, in the row's remaining space — and there
+  // is only ever enough of it for one. Two at once pushed the wordmark until
+  // 🎉 XCP.FUN began to truncate, which is the one thing in the row that can't
+  // give way. So the pair becomes a priority: queued work outranks a standing
+  // offer, and rewards steps aside for the minute or two mempool is up.
+  const queued = useMempoolCount() > 0;
+
   return (
     <header className="border-b border-gray-200 bg-white">
       {/* `relative` so the mempool chip can be centred on the HEADER rather
@@ -94,10 +107,10 @@ export function SiteHeader() {
 
         <div className="flex shrink-0 items-center gap-4 text-sm font-medium text-gray-600">
           {/* Beside the burger on a phone, and beside the links in the band
-              between — the same chips, just not pretending to be centred. */}
-          <span className="flex items-center gap-2 lg:hidden">
-            <RewardsChip />
-            <MempoolChip />
+              between — the same chips, just not pretending to be centred, and
+              never both at once. */}
+          <span className="flex items-center lg:hidden">
+            {queued ? <MempoolChip /> : <RewardsChip />}
           </span>
           <nav className="hidden items-center gap-4 sm:flex">
             {SECONDARY.map((l) => (
@@ -156,7 +169,7 @@ function MobileMenu() {
             </DM.Item>
           ))}
           <DM.Separator className="my-1.5 h-px bg-gray-100" />
-          {[MENU_EXTRA, ...SECONDARY].map((l) => (
+          {[...MENU_EXTRA, ...SECONDARY].map((l) => (
             <DM.Item key={l.href} asChild>
               <Link href={l.href} className={item}>
                 {l.label}

@@ -12,6 +12,20 @@ import { FOCUS } from "@/components/ui/tokens";
 const REFRESH_MS = 30_000;
 
 /**
+ * The chip's own condition, exported so a caller that has to lay out *around*
+ * the chip can ask the same question instead of guessing at it — the header
+ * has room for exactly one chip on a phone, and needs to know whether this one
+ * is claiming it. Same hook, same key, so asking costs no extra poll.
+ *
+ * Same filtering as /mempool too: the count here and the count there are one
+ * number, not two that happen to agree.
+ */
+export function useMempoolCount() {
+  const { fairminters, mints } = useMempool(REFRESH_MS);
+  return fairminters.length + mints.length;
+}
+
+/**
  * The header's mempool indicator, shown ONLY when something is queued.
  *
  * Deliberately not a banner — that would shout on every page about something
@@ -26,10 +40,7 @@ const REFRESH_MS = 30_000;
  * thousands of transactions and none of them anyone's business here.
  */
 export function MempoolChip({ className = "" }: { className?: string }) {
-  // Same hook, same filtering, same answer as /mempool — the count here and
-  // the count there are one number, not two that happen to agree.
-  const { fairminters, mints } = useMempool(REFRESH_MS);
-  const count = fairminters.length + mints.length;
+  const count = useMempoolCount();
 
   // Nothing queued, or nothing known yet: render nothing at all rather than a
   // placeholder that would pop into a number a moment later.

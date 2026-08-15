@@ -6,8 +6,10 @@ import { FOCUS } from "@/components/ui/tokens";
  * in the same shape and register so the pair reads as one family of ambient
  * signals: amber for what's queued, green for what's on offer.
  *
- * Unlike its sibling it is always on (for now): the programme is live whether
- * or not anyone is minting this minute, so there is no empty state to hide.
+ * Unlike its sibling it has no empty state of its own: the programme is live
+ * whether or not anyone is minting this minute. It can still be withheld from
+ * above — the header drops it on narrow screens while mempool is up, where
+ * there is room for one chip and queued work is the more urgent of the two.
  */
 export function RewardsChip({ className = "" }: { className?: string }) {
   return (
