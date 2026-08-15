@@ -20,6 +20,9 @@ export default defineConfig({
       // subpath exports, so tests import modules exactly as the app does
       // rather than through relative paths that could drift.
       "@/": `${here("./apps/web/src")}/`,
+      // apps/api's own subpath imports, so the worker's pure layers are
+      // testable on the same terms as the web app's.
+      "#api/": `${here("./apps/api/src")}/`,
       "@launchpad/xcp69/xcp69": here("./packages/xcp69/src/xcp69.ts"),
       "@launchpad/xcp69/numeric": here("./packages/xcp69/src/numeric.ts"),
       "@launchpad/xcp69/candles": here("./packages/xcp69/src/candles.ts"),

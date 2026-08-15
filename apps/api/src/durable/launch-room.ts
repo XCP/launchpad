@@ -2,7 +2,13 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "#api/env";
 import { fetchFairminter } from "#api/integrations/counterparty";
 
-const POLL_MS = 8_000;
+/** Was 8s. A room polls Counterparty on behalf of everyone watching that
+ *  launch, so this is a per-LAUNCH cost, not a per-viewer one — but it is
+ *  still someone else's public node, and a busy day means many rooms awake at
+ *  once. 15s is most of the way to the same "it updates while I watch" feel
+ *  for roughly half the requests, which is a good trade to have already made
+ *  before a launch is the reason anyone notices. */
+const POLL_MS = 15_000;
 /** Confirmed trades can only change when a block lands (~10 min), so they ride
  *  a slower cadence than the mempool does. Polling them every tick would be
  *  three-quarters wasted requests for information that cannot have moved. */

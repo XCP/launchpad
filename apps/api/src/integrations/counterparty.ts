@@ -63,6 +63,92 @@ export async function fetchAllFairminters(): Promise<CpFairminter[]> {
   return rows;
 }
 
+/** Mempool shapes. `params` is field-for-field the record /fairminters
+ *  returns once confirmed, minus the two fields that only exist once mints
+ *  happen — the same equivalence the web app relies on. */
+interface MempoolFairminterEvent {
+  tx_hash: string;
+  params: Omit<CpFairminter, "earned_quantity" | "paid_quantity">;
+}
+
+interface MempoolFairmintEvent {
+  tx_hash: string;
+  params: {
+    asset: string;
+    source: string;
+    earn_quantity: number | string | null;
+    paid_quantity: number | string | null;
+    status?: string;
+    asset_info?: { divisible?: boolean } | null;
+  };
+}
+
+/** One unconfirmed mint, in the shape the browser already expects — camelCase
+ *  here and nowhere else in this worker, because this is the one payload the
+ *  client consumes verbatim rather than mapping. */
+export interface MempoolMint {
+  txHash: string;
+  asset: string;
+  source: string;
+  earnQuantity: number | string;
+  paidQuantity: number | string;
+  divisible: boolean;
+}
+
+/** Unconfirmed launches. Empty on any failure: the mempool is a nice-to-have
+ *  signal, and a Counterparty hiccup should leave the header chip absent, not
+ *  the page broken. */
+export async function fetchMempoolFairminters(): Promise<CpFairminter[]> {
+  try {
+    const data = await get<{ result: MempoolFairminterEvent[] }>(
+      `/mempool/events/NEW_FAIRMINTER?limit=500`,
+    );
+    return data.result.map((e) => ({
+      ...e.params,
+      earned_quantity: null,
+      paid_quantity: null,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Unconfirmed mints across every launch.
+ *
+ * `earn_quantity` / `paid_quantity` are per-MINT amounts here, not the
+ * fairminter's running totals, so they are present on a real mint — but the
+ * standing guard still applies: a malformed or invalid event can carry null,
+ * and null must never reach arithmetic. Those rows are dropped rather than
+ * counted as zero, which would quietly understate a total the page presents as
+ * exact.
+ */
+export async function fetchMempoolFairmints(): Promise<MempoolMint[]> {
+  try {
+    const data = await get<{ result: MempoolFairmintEvent[] }>(
+      `/mempool/events/NEW_FAIRMINT?limit=500`,
+    );
+    return data.result
+      .filter(
+        (e) =>
+          // An invalid mint sits in the mempool but will never credit anyone.
+          (e.params.status === undefined || e.params.status === "valid") &&
+          e.params.earn_quantity !== null &&
+          e.params.paid_quantity !== null,
+      )
+      .map((e) => ({
+        txHash: e.tx_hash,
+        asset: e.params.asset,
+        source: e.params.source,
+        earnQuantity: e.params.earn_quantity!,
+        paidQuantity: e.params.paid_quantity!,
+        divisible: e.params.asset_info?.divisible ?? true,
+      }));
+  } catch {
+    return [];
+  }
+}
+
 /** One fairminter by tx_hash — O(1), for the live room's poll tick. Never
  *  used by the main indexer pass, which already has every row from the
  *  bulk listing; this is only for the single asset someone is watching. */

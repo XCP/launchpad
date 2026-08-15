@@ -100,6 +100,17 @@ export async function listLaunches(
   return perPhaseRows.flatMap((r) => r.results);
 }
 
+/** Every conforming launch's ticker — the membership test /v2/mempool needs
+ *  to decide which unconfirmed mints this site has an opinion about. A single
+ *  column off the partial index, not the full rows the client used to download
+ *  to answer the same question. */
+export function conformingAssets(db: D1Database): Promise<string[]> {
+  return q<{ asset: string }>(
+    db,
+    `SELECT asset FROM launches WHERE conforming = 1`,
+  ).then((rows) => rows.map((r) => r.asset));
+}
+
 export interface PhaseCount {
   phase: string;
   n: number;

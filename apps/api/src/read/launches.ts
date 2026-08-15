@@ -1,5 +1,11 @@
 import { getCandles, RESOLUTIONS } from "#api/queries/candles";
+import { isXcp69, type Fairminter } from "@launchpad/xcp69/xcp69";
 import {
+  fetchMempoolFairminters,
+  fetchMempoolFairmints,
+} from "#api/integrations/counterparty";
+import {
+  conformingAssets,
   countByPhase,
   readMintTotals,
   readMintBuckets,
@@ -140,6 +146,62 @@ launchesRoute.get("/v2/launches/:asset/minters", async (c) => {
   const limit = Math.min(Number(c.req.query("limit") ?? 200) || 200, 1000);
   const result = await listMinters(c.env.DB, launch.tx_hash, limit);
   return J(c, { result, result_count: result.length }, 15);
+});
+
+/**
+ * The unconfirmed view of the chain, filtered to what this site covers.
+ *
+ * This exists to stop a launch from clobbering Counterparty. The header chip
+ * carries this poll, the header is on every page, so it ran once per OPEN TAB
+ * every 30 seconds — two `limit=500` mempool requests each, straight from the
+ * browser to a public Counterparty node. A thousand tabs is ~66 requests a
+ * second at someone else's server. It is precisely the pattern LaunchRoom was
+ * built to remove from the asset page, reintroduced site-wide by putting the
+ * chip in the header.
+ *
+ * Behind the edge cache the same thousand tabs become about one Counterparty
+ * request per colo per TTL. The filtering moves here too, which costs the
+ * browser nothing and saves it a second request: the conforming set is a D1
+ * read on this side, where the client had to fetch the whole launch index to
+ * learn the same thing.
+ *
+ * The verdict is the shared predicate, not a re-implementation — the same
+ * isXcp69 the indexer and the web app both use. A mempool row is judged with
+ * no announcement block, which is correct: the timing clause passes for an
+ * unconfirmed row because it cannot have opened before it confirmed.
+ *
+ * 15s rather than the 30s the client used to poll at. The cost of freshness
+ * is now paid once per colo instead of once per tab, so it can afford to be
+ * better than what it replaces.
+ */
+const MEMPOOL_TTL = 15;
+
+launchesRoute.get("/v2/mempool", async (c) => {
+  const [rawFairminters, rawMints] = await Promise.all([
+    fetchMempoolFairminters(),
+    fetchMempoolFairmints(),
+  ]);
+
+  const fairminters = rawFairminters.filter((fm) =>
+    isXcp69(fm as unknown as Fairminter, undefined),
+  );
+
+  // A launch still in the mempool can already have mints queued behind it, so
+  // the covered set is what D1 knows plus what was just judged above. Same
+  // two-part rule the client used, with the indexed half now a query instead
+  // of a download.
+  const covered = new Set(await conformingAssets(c.env.DB));
+  for (const fm of fairminters) covered.add(fm.asset);
+  const mints = rawMints.filter((m) => covered.has(m.asset));
+
+  return J(
+    c,
+    {
+      result: { fairminters, mints, fetched_at: Math.floor(Date.now() / 1000) },
+      result_count: fairminters.length + mints.length,
+    },
+    MEMPOOL_TTL,
+  );
 });
 
 launchesRoute.get("/v2/launches/:asset/fees", async (c) => {

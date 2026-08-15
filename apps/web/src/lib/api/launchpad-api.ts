@@ -7,8 +7,25 @@
  * fact lives.
  */
 import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
+import type { MempoolMint } from "@/lib/api/counterparty";
 
-const API_BASE = "https://launchpad-api.me-bbe.workers.dev";
+/**
+ * The custom domain, for the same reason next.config.ts 308s every
+ * workers.dev URL to xcp.fun: one canonical origin. api.xcp.fun is the
+ * documented public API and the host that appears in docs and examples, so it
+ * should be the host the site itself calls.
+ *
+ * NOT for a caching reason, despite the folklore. The Cache API is widely
+ * described as a no-op on workers.dev subdomains; measured against this
+ * worker on a fresh cache key it is not — both hosts returned
+ * cf-cache-status: HIT identically. The edge cache in apps/api's read router
+ * works on either. If that ever changes, this comment is the place that was
+ * checked.
+ *
+ * workers.dev stays enabled regardless: the LaunchRoom and SitePresence
+ * sockets still connect there, and a WebSocket has nothing to cache.
+ */
+const API_BASE = "https://api.xcp.fun";
 
 interface ApiLaunchRow {
   tx_hash: string;
@@ -125,6 +142,50 @@ export async function fetchLaunchFees(asset: string): Promise<FeeSummary | null>
       totalFeeSats: data.result.total_fee_sats,
       counted: data.result.counted,
       mints: data.result.mints,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface MempoolSnapshot {
+  fairminters: Fairminter[];
+  mints: MempoolMint[];
+  /** Server-side fetch time, seconds. The client turns it into "updated Ns
+   *  ago", and it comes from the response rather than from arrival so every
+   *  tab sharing one cached answer agrees on its age. */
+  fetchedAt: number;
+}
+
+/**
+ * The mempool, already filtered to XCP-69.
+ *
+ * This used to be two Counterparty requests plus a launch-index download, run
+ * independently by every open tab — the header chip carries the poll and the
+ * header is on every page. Behind the API's edge cache it is one request, and
+ * a thousand tabs collapse into roughly one Counterparty call per colo.
+ *
+ * Returns null on any failure so the caller can hold its last good answer
+ * rather than blink the chip out over one bad request.
+ */
+export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/mempool`, {
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: {
+        fairminters?: Fairminter[];
+        mints?: MempoolMint[];
+        fetched_at?: number;
+      };
+    };
+    if (!data.result) return null;
+    return {
+      fairminters: data.result.fairminters ?? [],
+      mints: data.result.mints ?? [],
+      fetchedAt: (data.result.fetched_at ?? 0) * 1000,
     };
   } catch {
     return null;
