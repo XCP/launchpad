@@ -9,26 +9,29 @@ import r2IncrementalCache from "@opennextjs/cloudflare/overrides/incremental-cac
  * index down — not the fan-out itself, but running it once per visitor.
  */
 /**
- * KNOWN, UNFIXED FROM CODE: every cached page ships
- * `stale-while-revalidate=2592000` — thirty days — no matter what
- * `expireTime` says in next.config.ts.
+ * NO LONGER OBSERVED (adapter 1.20.2, measured 2026-08-15). This note used to
+ * read "KNOWN, UNFIXED FROM CODE: every cached page ships
+ * stale-while-revalidate=2592000 — thirty days", with the consequence that the
+ * first load after a deploy could show the old page while a reload showed the
+ * new one, which had already been mistaken for a failed deploy.
  *
- * The adapter writes that number itself. In
- * @opennextjs/aws/dist/core/routing/util.js, `fixSWRCacheHeader` substitutes
- * the literal 2592000, and the cache-HIT branch rebuilds the header as
- * `s-maxage=${remainingTtl}, stale-while-revalidate=2592000` unconditionally.
- * Next's own config never gets a say, and there is no override hook.
+ * Six consecutive requests to `/` — one STALE then five HIT, confirmed via
+ * x-nextjs-cache — all returned `public, s-maxage=30,
+ * stale-while-revalidate=60`. That is Next's own value surviving intact, not
+ * the adapter's.
  *
- * What it costs: past the freshness window a browser may serve the copy it
- * already has and revalidate behind your back, so the first load after a
- * deploy can show the old page while the reload shows the new one. It reads
- * exactly like a deploy that failed, and it has already been mistaken for
- * one.
+ * The literal is still in the source, so this is "not currently reached"
+ * rather than "removed upstream". In
+ * @opennextjs/aws/dist/core/routing/util.js the HIT branch is guarded by
+ * `NEXT_CACHE === "HIT" && _lastModified > 0`, and _lastModified comes from
+ * the AsyncLocalStorage store, which is evidently not populated on this
+ * runtime — so the rewrite at that branch never runs and the header is left
+ * alone. A future adapter that starts populating it would bring the behaviour
+ * back, which is why the reference stays here rather than being deleted.
  *
- * The fix is a zone-level Cloudflare Transform Rule rewriting Cache-Control
- * on HTML responses — dashboard, not code. Worth pairing with the existing
- * Cache Rule that makes api.xcp.fun serve stale responses, since that is the
- * same zone and the same class of surprise.
+ * The zone-level Transform Rule this note used to recommend is therefore NOT
+ * needed today. Re-measure before adding one: `curl -sI https://xcp.fun/ |
+ * grep -i cache-control`, twice, so the second request is a cache HIT.
  */
 export default defineCloudflareConfig({
   incrementalCache: r2IncrementalCache,
