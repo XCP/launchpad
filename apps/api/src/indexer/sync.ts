@@ -24,6 +24,9 @@ const FEE_LOOKUP_CONCURRENCY = 10;
 // IN (...) built from a candidate list so this stays safe regardless of how
 // many launches xcp.fun ends up tracking.
 const SQL_VAR_LIMIT = 100;
+// How many launch upserts ride in one batch. Same bound as the mint inserts'
+// INSERT_CHUNK, for the same reason.
+const UPSERT_CHUNK = 100;
 
 interface StoredLaunch {
   tx_hash: string;
@@ -89,6 +92,12 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   let mintsIngested = 0;
   const eventTargets: GraduatedTarget[] = [];
   const now = Math.floor(Date.now() / 1000);
+  // Collected through the loop and sent together below. Awaiting each upsert
+  // inside the loop made the tick one sequential D1 round trip PER LAUNCH —
+  // the same shape fetchStoredByTxHash exists to avoid on the read side, left
+  // in place on the write side. The statements are unchanged and still
+  // delta-guarded; only the number of trips to the database changes.
+  const upserts: D1PreparedStatement[] = [];
 
   for (const fm of candidates) {
     // Pending rows can be judged immediately — their own block_index IS the
@@ -218,7 +227,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
       }
     }
 
-    const res = await db
+    const upsert = db
       .prepare(
         `INSERT INTO launches (
            tx_hash, tx_index, asset, asset_longname, source, divisible,
@@ -319,10 +328,8 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
         fm.status === "closed" ? fm.block_index : height,
         now,
         announceBlock,
-      )
-      .run();
-
-    if ((res.meta.rows_written ?? 0) > 0) written += 1;
+      );
+    upserts.push(upsert);
 
     // Trades are only possible once a pool exists, and the reserve moving is
     // the proof that one happened. Comparing against the reserve already
@@ -334,6 +341,16 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
         poolChanged: poolXcpReserve !== (stored?.pool_xcp_reserve ?? null),
       });
     }
+  }
+
+  // Chunked for the same reason the mint inserts are: a batch is one implicit
+  // transaction and D1 bounds how much one can carry, so the limit belongs on
+  // the batch rather than on however many launches the chain happens to hold.
+  // Rolling back a chunk is harmless here — every statement is an idempotent
+  // upsert that the next tick, five minutes later, simply repeats.
+  for (let i = 0; i < upserts.length; i += UPSERT_CHUNK) {
+    const results = await db.batch(upserts.slice(i, i + UPSERT_CHUNK));
+    written += results.filter((r) => (r.meta.rows_written ?? 0) > 0).length;
   }
 
   const eventsIngested = await syncAssetEvents(db, eventTargets, height);
