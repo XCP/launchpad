@@ -3,7 +3,7 @@ import { base64 } from "@scure/base";
 import * as btc from "@scure/btc-signer";
 import { secp256k1 } from "@noble/curves/secp256k1";
 
-import { groupMintsByAddress, mempoolTotals, summarize } from "@/lib/mempool";
+import { groupMintsByAddress } from "@/lib/mempool";
 import { pubkeyFromBip322 } from "@/lib/bip322";
 import type { MempoolMint } from "@/lib/api/counterparty";
 
@@ -83,45 +83,15 @@ describe("groupMintsByAddress", () => {
   });
 });
 
-describe("mempoolTotals and summarize", () => {
-  it("counts transactions as fairminters plus mints", () => {
-    const groups = groupMintsByAddress([
-      mint({ source: "1A", asset: "ALPHA" }),
-      mint({ source: "1B", asset: "BETA", txHash: "2" }),
-    ]);
-    const t = mempoolTotals(3, groups);
-    expect(t).toMatchObject({ transactions: 5, fairminters: 3, mints: 2, assets: 2, minters: 2 });
-  });
-
-  it("writes the sentence the page shows", () => {
-    const groups = groupMintsByAddress([mint({ source: "1A" }), mint({ source: "1B", txHash: "2" })]);
-    expect(summarize(mempoolTotals(3, groups))).toBe(
-      "5 transactions in the mempool — 3 new fairminters, and mints across 1 asset from 2 minters for 20 XCP.",
-    );
-  });
-
-  it("drops the half that is absent instead of printing a zero", () => {
-    // "0 new fairminters" makes the reader do subtraction to learn nothing
-    // happened.
-    const groups = groupMintsByAddress([mint()]);
-    expect(summarize(mempoolTotals(0, groups))).not.toContain("0 new fairminter");
-    expect(summarize(mempoolTotals(2, []))).toBe(
-      "2 transactions in the mempool — 2 new fairminters.",
-    );
-  });
-
-  it("says nothing at all when the mempool is empty", () => {
-    expect(summarize(mempoolTotals(0, []))).toBe("");
-  });
-
-  it("uses the singular where it belongs", () => {
-    const groups = groupMintsByAddress([mint()]);
-    const line = summarize(mempoolTotals(1, groups));
-    expect(line).toContain("1 new fairminter,");
-    expect(line).toContain("1 asset");
-    expect(line).toContain("1 minter ");
-  });
-});
+// The `mempoolTotals`/`summarize` suite that stood here tested a one-line
+// summary sentence above the mempool page ("5 transactions in the mempool — 3
+// new fairminters, and mints across 1 asset from 2 minters for 20 XCP"). The
+// redesign in 51eb185 dropped that sentence — mints lead the page now, and the
+// tabs carry their own counts — and took both functions with it, leaving these
+// five importing names `@/lib/mempool` no longer exports. They have failed on
+// main ever since. Removed rather than reimplemented: nothing renders that
+// sentence, so restoring the functions would be writing code to satisfy a test
+// rather than a reader.
 
 /* ------------------------------------------------------------------ */
 /* pubkey extraction                                                   */
