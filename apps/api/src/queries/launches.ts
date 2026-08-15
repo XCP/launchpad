@@ -1,4 +1,5 @@
 import { one, q } from "#api/db";
+import type { LaunchPhase } from "@launchpad/xcp69/xcp69";
 
 export interface LaunchRow {
   tx_hash: string;
@@ -51,61 +52,52 @@ const COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
   pool_token_reserve, pool_xcp_sats, seen_at_block, updated_at`;
 
 /**
- * The sort key each phase is actually judged by.
+ * The phases, in the order the index page stacks them.
  *
- * Not one order for everything: the question "which of these is doing best"
- * has a different answer per phase, and a shared key answers it wrong for two
- * of the three.
+ * This is also the query plan. One statement per phase, each a seek into
+ * idx_launches_rank that stops at its own LIMIT, so the rows this reads are
+ * bounded by what it returns rather than by how big the table is.
  *
- *  - graduated: MARKET CAP. Every XCP-69 token has the same fixed supply, so
- *    ordering by price and ordering by market cap are the same ordering — and
- *    price is the pool's own ratio. This is NOT pool depth, which was the old
- *    key: two pools holding equal XCP can be priced very differently, so depth
- *    ranked the biggest pool rather than the most valuable token.
- *  - minting: PROGRESS toward the soft cap, fullest first — the launches
- *    closest to actually happening.
- *  - scheduled: START BLOCK, latest first.
+ * It replaced a single window function — ROW_NUMBER() OVER (PARTITION BY phase
+ * ORDER BY <rank>) — which was 66% of every row this database read: 204 rows
+ * per call from a 44-row table to return about 36, because a computed rank
+ * cannot be indexed and SQLite had to sort the whole conforming set to find
+ * the top of each phase. The rank now lives in the `rank_key` generated column
+ * (migration 0009), which is the only definition of it; nothing here restates
+ * the arithmetic, so the two cannot drift.
  *
- * REAL division is fine here and only here: this is a ranking, never a
- * displayed or transacted amount. `tx_index` breaks ties so the order is
- * fully deterministic — two launches that round to the same key must not swap
- * places between two renders of the same data.
+ * `LaunchPhase` is a closed union of exactly these four, so enumerating them
+ * cannot silently drop a phase the way a hardcoded list of an open set would.
  */
-const PHASE_RANK = `CASE phase
-  WHEN 'graduated' THEN
-    CASE WHEN CAST(pool_token_reserve AS REAL) > 0
-         THEN CAST(pool_xcp_reserve AS REAL) / CAST(pool_token_reserve AS REAL)
-         ELSE 0 END
-  WHEN 'minting' THEN
-    CASE WHEN CAST(soft_cap AS REAL) > 0
-         THEN CAST(earned_quantity AS REAL) / CAST(soft_cap AS REAL)
-         ELSE 0 END
-  ELSE start_block
-END`;
+const PHASE_ORDER: readonly LaunchPhase[] = [
+  "graduated",
+  "minting",
+  "scheduled",
+  "refunded",
+] as const;
 
-/** The index page in one query: up to `perPhase` conforming launches per
- *  phase, each phase in the order that phase is actually judged by. */
-export function listLaunches(
+/** The index page: up to `perPhase` conforming launches per phase, each phase
+ *  ranked by the key that phase is actually judged by (see migration 0009).
+ *
+ *  One `batch`, so four statements still cost one round trip — the point is to
+ *  read fewer rows, not to trade a sort for four trips to the database. */
+export async function listLaunches(
   db: D1Database,
   perPhase: number,
 ): Promise<LaunchRow[]> {
-  return q<LaunchRow>(
-    db,
-    `WITH ranked AS (
-       SELECT *, ROW_NUMBER() OVER (
-         PARTITION BY phase
-         ORDER BY ${PHASE_RANK} DESC, tx_index DESC
-       ) AS rn
-       FROM launches
-       WHERE conforming = 1
-     )
-     SELECT ${COLUMNS} FROM ranked
-     WHERE rn <= ?1
-     ORDER BY CASE phase
-       WHEN 'graduated' THEN 0 WHEN 'minting' THEN 1
-       WHEN 'scheduled' THEN 2 ELSE 3 END, rn`,
-    perPhase,
+  const stmt = db.prepare(
+    `SELECT ${COLUMNS} FROM launches
+      WHERE conforming = 1 AND phase = ?1
+      ORDER BY rank_key DESC, tx_index DESC
+      LIMIT ?2`,
   );
+  const perPhaseRows = await db.batch<LaunchRow>(
+    PHASE_ORDER.map((phase) => stmt.bind(phase, perPhase)),
+  );
+  // Concatenated in PHASE_ORDER, which is what the old query's trailing
+  // ORDER BY CASE phase ... produced — the ordering is now structural rather
+  // than something the database has to sort for.
+  return perPhaseRows.flatMap((r) => r.results);
 }
 
 export interface PhaseCount {
