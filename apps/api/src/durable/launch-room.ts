@@ -1,4 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
+import { compareRawDesc, sumRaw } from "@launchpad/xcp69/numeric";
 import type { Env } from "#api/env";
 import { fetchFairminter } from "#api/integrations/counterparty";
 
@@ -46,7 +47,8 @@ interface RoomState {
   earned_quantity: string | number | null;
   paid_quantity: string | number | null;
   pending_count: number;
-  pending_quantity: number;
+  /** Raw token units queued, as a string — see the sum that builds it. */
+  pending_quantity: string;
   pending: PendingMint[];
   /** Present once the launch has graduated and a market exists. Omitted
    *  while minting, when there is nothing to trade. */
@@ -166,7 +168,13 @@ export class LaunchRoom extends DurableObject<Env> {
       earned_quantity: fm.earned_quantity,
       paid_quantity: fm.paid_quantity,
       pending_count: pending.length,
-      pending_quantity: pending.reduce((sum, p) => sum + (Number(p.quantity) || 0), 0),
+      // sumRaw, not a Number reduce. These are token earn amounts, and a
+      // launch's hard cap is 1e16 — above 2^53, where the gap between
+      // representable integers is 2. A queue of large mints could therefore
+      // total to a number that is quietly off, on a figure the page presents
+      // as exact. A string on the wire for the same reason every other
+      // quantity in this repo is one.
+      pending_quantity: sumRaw(pending.map((p) => p.quantity)).toString(),
       pending: pending.slice(0, MAX_PENDING_ROWS),
       ...(trades ? { trades } : {}),
     };
@@ -271,7 +279,10 @@ export class LaunchRoom extends DurableObject<Env> {
           source: e.params.source ?? "",
           quantity: e.params.earn_quantity ?? 0,
         }))
-        .sort((a, b) => (Number(b.quantity) || 0) - (Number(a.quantity) || 0));
+        // compareRawDesc compares digits; subtracting two Numbers would first
+        // round both onto the same value at 1e16 magnitudes and then return 0,
+        // silently ordering the largest mints arbitrarily.
+        .sort((a, b) => compareRawDesc(a.quantity, b.quantity));
     } catch {
       return [];
     }

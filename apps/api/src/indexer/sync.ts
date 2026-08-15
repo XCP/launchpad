@@ -1,3 +1,4 @@
+import { big } from "@launchpad/xcp69/numeric";
 import { one, q } from "#api/db";
 import {
   fetchAllFairminters,
@@ -140,7 +141,14 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
         const tokenReserve = xcpIsA ? pool.reserve_b : pool.reserve_a;
         poolXcpReserve = String(xcpReserve);
         poolTokenReserve = String(tokenReserve);
-        poolXcpSats = Number(xcpReserve) || 0;
+        // Through big() rather than Number() straight off the wire: the
+        // reserve arrives as a lossless string when it is large, and big()
+        // is the one place that parsing is defined. Narrowing to a Number
+        // afterwards is safe HERE and only here — this is an XCP balance, and
+        // XCP's whole supply is ~2.6e14 satoshi, two orders below 2^53. A
+        // token reserve would not survive the same treatment, which is why
+        // pool_token_reserve stays a string.
+        poolXcpSats = Number(big(xcpReserve));
       }
     }
     const phase = launchPhase(fm, hasPool);
@@ -366,11 +374,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   // above could have changed the summary. On a quiet tick this is skipped
   // entirely, which is the whole reason materialising /v2/stats pays for
   // itself rather than just moving the cost from read time to write time.
-  const stale = rollupIsStale({
-    mints_ingested: mintsIngested,
-    fees_backfilled: feesBackfilled,
-    resolved,
-  });
+  const stale = rollupIsStale({ mintsIngested, feesBackfilled, resolved });
   const rollup = stale ? await refreshRollup(db) : null;
 
   return {

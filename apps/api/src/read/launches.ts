@@ -1,14 +1,14 @@
 import { getCandles, RESOLUTIONS } from "#api/queries/candles";
-import { isXcp69, type Fairminter } from "@launchpad/xcp69/xcp69";
+import { isXcp69 } from "@launchpad/xcp69/xcp69";
 import {
   fetchMempoolFairminters,
   fetchMempoolFairmints,
 } from "#api/integrations/counterparty";
 import {
-  conformingAssets,
+  listConformingAssets,
   countByPhase,
-  readMintTotals,
-  readMintBuckets,
+  getMintTotals,
+  listMintBuckets,
   getEventsBySource,
   getLaunch,
   getLaunchesBySource,
@@ -18,7 +18,7 @@ import {
   listMinters,
   sumFees,
 } from "#api/queries/launches";
-import { J, router } from "./respond";
+import { J, router } from "#api/read/respond";
 
 export const launchesRoute = router();
 
@@ -34,17 +34,22 @@ launchesRoute.get("/v2/launches", async (c) => {
  *  lately" chart stays a chart rather than a timeline. */
 const ACTIVITY_BUCKETS = 28;
 const BLOCKS_PER_DAY = 144;
-/** The cron interval, in seconds — see the note at the response below. */
+/** Edge-cache lifetimes, in seconds, kept together so the site's freshness
+ *  policy reads as one decision rather than as numbers scattered per route.
+ *  STATS_TTL matches the cron interval; nothing it summarises can change
+ *  faster than that. MEMPOOL_TTL is the one route whose upstream is someone
+ *  else's public node, so its TTL is as much politeness as performance. */
 const STATS_TTL = 300;
+const MEMPOOL_TTL = 15;
 
 launchesRoute.get("/v2/stats", async (c) => {
   const height = Number(c.req.query("height") ?? 0) || 0;
   const since = height > 0 ? Math.max(0, height - ACTIVITY_BUCKETS * BLOCKS_PER_DAY) : 0;
   const [rows, totals, buckets] = await Promise.all([
     countByPhase(c.env.DB),
-    readMintTotals(c.env.DB),
+    getMintTotals(c.env.DB),
     // Whole buckets, so the window is expressed in the unit the rollup stores.
-    readMintBuckets(c.env.DB, Math.floor(since / BLOCKS_PER_DAY)),
+    listMintBuckets(c.env.DB, Math.floor(since / BLOCKS_PER_DAY)),
   ]);
   const counts: Record<string, number> = {
     scheduled: 0,
@@ -170,27 +175,28 @@ launchesRoute.get("/v2/launches/:asset/minters", async (c) => {
  * no announcement block, which is correct: the timing clause passes for an
  * unconfirmed row because it cannot have opened before it confirmed.
  *
- * 15s rather than the 30s the client used to poll at. The cost of freshness
- * is now paid once per colo instead of once per tab, so it can afford to be
- * better than what it replaces.
+ * MEMPOOL_TTL is 15s rather than the 30s the client used to poll at. The cost
+ * of freshness is now paid once per colo instead of once per tab, so it can
+ * afford to be better than what it replaces.
  */
-const MEMPOOL_TTL = 15;
-
 launchesRoute.get("/v2/mempool", async (c) => {
   const [rawFairminters, rawMints] = await Promise.all([
     fetchMempoolFairminters(),
     fetchMempoolFairmints(),
   ]);
 
-  const fairminters = rawFairminters.filter((fm) =>
-    isXcp69(fm as unknown as Fairminter, undefined),
-  );
+  // No cast. CpFairminter is structurally a Fairminter, and the indexer calls
+  // isXcp69 on one directly for exactly that reason — so if the two ever drift
+  // apart, this must fail to compile rather than be waved through. A cast here
+  // would silence the compiler at the one boundary where this repo's editorial
+  // policy is actually applied.
+  const fairminters = rawFairminters.filter((fm) => isXcp69(fm, undefined));
 
   // A launch still in the mempool can already have mints queued behind it, so
   // the covered set is what D1 knows plus what was just judged above. Same
   // two-part rule the client used, with the indexed half now a query instead
   // of a download.
-  const covered = new Set(await conformingAssets(c.env.DB));
+  const covered = new Set(await listConformingAssets(c.env.DB));
   for (const fm of fairminters) covered.add(fm.asset);
   const mints = rawMints.filter((m) => covered.has(m.asset));
 

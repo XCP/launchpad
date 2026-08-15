@@ -6,6 +6,7 @@
   "exports": {
     "./xcp69": "./src/xcp69.ts",
     "./numeric": "./src/numeric.ts",
-    "./candles": "./src/candles.ts"
+    "./candles": "./src/candles.ts",
+    "./mempool": "./src/mempool.ts"
   }
 }

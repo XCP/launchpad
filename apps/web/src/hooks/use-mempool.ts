@@ -1,9 +1,7 @@
 "use client";
 
 import useSWR from "swr";
-import type { MempoolMint } from "@/lib/api/counterparty";
-import { fetchMempoolSnapshot } from "@/lib/api/launchpad-api";
-import type { Fairminter } from "@/lib/xcp69";
+import { fetchMempoolSnapshot, type MempoolSnapshot } from "@/lib/api/launchpad-api";
 
 /** One SWR key for the whole site, so the header chip and the page share a
  *  single poll instead of running two. */
@@ -12,13 +10,6 @@ const KEY = "mempool";
 /** Long enough that a burst of navigation doesn't refetch, short enough that
  *  it never suppresses a real refresh. */
 const DEDUPE_MS = 2_000;
-
-export interface MempoolSnapshot {
-  fairminters: Fairminter[];
-  mints: MempoolMint[];
-  /** When this data came back, for "updated Ns ago". */
-  fetchedAt: number;
-}
 
 /**
  * The unconfirmed view of the chain, filtered to what this site covers.
@@ -45,15 +36,7 @@ export interface MempoolSnapshot {
 export function useMempool(refreshMs: number) {
   const { data, isLoading, mutate } = useSWR<MempoolSnapshot | null>(
     KEY,
-    async () => {
-      const snap = await fetchMempoolSnapshot();
-      if (!snap) return null;
-      return {
-        fairminters: snap.fairminters,
-        mints: snap.mints,
-        fetchedAt: snap.fetchedAt || Date.now(),
-      };
-    },
+    fetchMempoolSnapshot,
     {
       refreshInterval: refreshMs,
       dedupingInterval: DEDUPE_MS,

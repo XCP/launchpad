@@ -1,3 +1,4 @@
+import type { MempoolMint } from "@launchpad/xcp69/mempool";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
@@ -696,17 +697,11 @@ export async function fetchMempoolFairminters(): Promise<Fairminter[]> {
   }
 }
 
-/** One unconfirmed mint, as the mempool reports it. */
-export interface MempoolMint {
-  txHash: string;
-  asset: string;
-  source: string;
-  /** Raw token units the minter earns. */
-  earnQuantity: Raw;
-  /** Raw XCP satoshi paid. */
-  paidQuantity: Raw;
-  divisible: boolean;
-}
+/** Imported and re-exported, so this module stays the one import site callers
+ *  know while the declaration itself lives where apps/api can reach it too —
+ *  see @launchpad/xcp69/mempool. Both halves are needed: a bare `export ... from`
+ *  would not put the name in scope for this file's own signatures. */
+export type { MempoolMint };
 
 interface MempoolFairmintEvent {
   tx_hash: string;

@@ -104,11 +104,12 @@ export async function listLaunches(
  *  to decide which unconfirmed mints this site has an opinion about. A single
  *  column off the partial index, not the full rows the client used to download
  *  to answer the same question. */
-export function conformingAssets(db: D1Database): Promise<string[]> {
-  return q<{ asset: string }>(
+export async function listConformingAssets(db: D1Database): Promise<string[]> {
+  const rows = await q<{ asset: string }>(
     db,
     `SELECT asset FROM launches WHERE conforming = 1`,
-  ).then((rows) => rows.map((r) => r.asset));
+  );
+  return rows.map((r) => r.asset);
 }
 
 export interface PhaseCount {
@@ -344,7 +345,7 @@ export function mintsByBucket(db: D1Database): Promise<MintBucket[]> {
  *  migration 0010. Null only if the rollup row is somehow missing; the
  *  migration seeds it, so the caller's fallback is a belt-and-braces zero
  *  rather than an expected state. */
-export function readMintTotals(db: D1Database): Promise<ActivityTotals | null> {
+export function getMintTotals(db: D1Database): Promise<ActivityTotals | null> {
   return one<ActivityTotals>(
     db,
     `SELECT mints, minters, paid_xcp, fee_sats FROM mint_totals WHERE id = 1`,
@@ -362,7 +363,7 @@ export function readMintTotals(db: D1Database): Promise<ActivityTotals | null> {
  * window opened mid-bucket — a bar that looked like a quiet day but was really
  * a clipped one. Whole buckets is both cheaper and the more honest chart.
  */
-export function readMintBuckets(db: D1Database, sinceBucket: number): Promise<MintBucket[]> {
+export function listMintBuckets(db: D1Database, sinceBucket: number): Promise<MintBucket[]> {
   return q<MintBucket>(
     db,
     `SELECT bucket, n, minters FROM mint_buckets

@@ -3,6 +3,7 @@
  * poller reads through here; every read route answers from D1.
  */
 import { parseJsonLossless } from "@launchpad/xcp69/numeric";
+import type { MempoolMint } from "@launchpad/xcp69/mempool";
 
 const BASE = "https://api.counterparty.io:4000/v2";
 
@@ -83,17 +84,7 @@ interface MempoolFairmintEvent {
   };
 }
 
-/** One unconfirmed mint, in the shape the browser already expects — camelCase
- *  here and nowhere else in this worker, because this is the one payload the
- *  client consumes verbatim rather than mapping. */
-export interface MempoolMint {
-  txHash: string;
-  asset: string;
-  source: string;
-  earnQuantity: number | string;
-  paidQuantity: number | string;
-  divisible: boolean;
-}
+export type { MempoolMint } from "@launchpad/xcp69/mempool";
 
 /** Unconfirmed launches. Empty on any failure: the mempool is a nice-to-have
  *  signal, and a Counterparty hiccup should leave the header chip absent, not

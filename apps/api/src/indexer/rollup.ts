@@ -42,11 +42,11 @@ export interface RollupResult {
  * and cost exactly what this is meant to save.
  */
 export function rollupIsStale(counts: {
-  mints_ingested: number;
-  fees_backfilled: number;
+  mintsIngested: number;
+  feesBackfilled: number;
   resolved: number;
 }): boolean {
-  return counts.mints_ingested > 0 || counts.fees_backfilled > 0 || counts.resolved > 0;
+  return counts.mintsIngested > 0 || counts.feesBackfilled > 0 || counts.resolved > 0;
 }
 
 export async function refreshRollup(db: D1Database): Promise<RollupResult> {

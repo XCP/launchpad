@@ -185,7 +185,11 @@ export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
     return {
       fairminters: data.result.fairminters ?? [],
       mints: data.result.mints ?? [],
-      fetchedAt: (data.result.fetched_at ?? 0) * 1000,
+      // Seconds on the wire, milliseconds here — the unit changes at this
+      // boundary and nowhere else, so callers can treat it like any other
+      // Date.now() value. Falls back to arrival time if the field is absent,
+      // since "updated Ns ago" reading 1970 is worse than being a moment off.
+      fetchedAt: data.result.fetched_at ? data.result.fetched_at * 1000 : Date.now(),
     };
   } catch {
     return null;

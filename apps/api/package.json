@@ -11,7 +11,8 @@
   },
   "scripts": {
     "dev": "wrangler dev",
-    "check": "tsc --noEmit",
+    "check": "tsc --noEmit && eslint",
+    "lint": "eslint",
     "deploy": "wrangler deploy",
     "migrate:local": "wrangler d1 migrations apply launchpad-db --local",
     "migrate:remote": "wrangler d1 migrations apply launchpad-db --remote"

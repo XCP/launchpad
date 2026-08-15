@@ -8,9 +8,13 @@
  * silently narrow a 64-bit quantity to a double, on identifiers that name
  * money.
  *
- * A script rather than a test file because this repo has no test runner and
- * one check command; Node runs TypeScript directly, so it can import the real
- * module rather than a copy that could drift from it.
+ * A script rather than a test file. That used to be because the repo had no
+ * test runner; it has one now (vitest, and the predicate's own cases live
+ * there). What keeps this separate is the second half: a scan of every source
+ * file in two apps is a lint pass wearing a test's clothes, and it belongs in
+ * `npm run check` beside tsc and eslint rather than in a suite that is
+ * supposed to run in milliseconds. Node runs TypeScript directly, so it can
+ * still import the real module rather than a copy that could drift from it.
  *
  * Not everything numeric is money. Block heights, tx indices, vbytes, retry
  * counts and array lengths are counts, nowhere near 2^53, and converting them
@@ -27,6 +31,13 @@ const SRC = join(ROOT, "src");
 // xcp69.ts and numeric.ts moved to the shared package the API worker also
 // reads from (see @launchpad/xcp69); the app's own copy is a re-export.
 const XCP69_SRC = join(ROOT, "..", "..", "packages", "xcp69", "src");
+// The API worker, scanned on the same terms. It was outside this check for as
+// long as it has existed, which made the rule half a rule: the repo's standing
+// instruction is that ALL standard math is in raw integer satoshi units, and
+// apps/api reads the same quantities off the same API and writes them to D1.
+// A `Number(...)` on a pool reserve is exactly as wrong there as here, and
+// until now nothing said so.
+const API_SRC = join(ROOT, "..", "api", "src");
 
 const failures = [];
 const check = (name, actual, expected) => {
@@ -315,8 +326,20 @@ function sourceFiles(dir) {
   return out;
 }
 
-const key = (file) => relative(SRC, file).split(sep).join("/");
-const files = sourceFiles(SRC).filter((file) => !EXEMPT.has(key(file)));
+// Web files keep their bare path so the exemptions above read unchanged; API
+// files carry an `api:` prefix, because "indexer/sync.ts" and "lib/format.ts"
+// sitting in one list with no way to tell which app they belong to is how an
+// exemption gets granted to the wrong file.
+const key = (file) =>
+  (file.startsWith(API_SRC)
+    ? `api:${relative(API_SRC, file)}`
+    : relative(SRC, file)
+  )
+    .split(sep)
+    .join("/");
+const files = [...sourceFiles(SRC), ...sourceFiles(API_SRC)].filter(
+  (file) => !EXEMPT.has(key(file)),
+);
 
 if (files.length < 50) {
   failures.push(`only found ${files.length} source files — the scan is not reaching the tree`);

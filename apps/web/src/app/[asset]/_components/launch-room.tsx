@@ -26,7 +26,9 @@ export interface RoomState {
   earned_quantity: string | number | null;
   paid_quantity: string | number | null;
   pending_count: number;
-  pending_quantity: number;
+  /** Raw token units queued, as a string — the room sums these with sumRaw
+   *  because a launch's 1e16 hard cap is above the safe integer range. */
+  pending_quantity: string;
   pending: PendingMint[];
   /** Only once graduated — while minting there is no market. */
   trades?: RoomTrade[];
