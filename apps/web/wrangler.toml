@@ -13,6 +13,21 @@ compatibility_flags = ["nodejs_compat"]
 # zone-owning account routed at {www.,}xcp.fun/j/* and /i/*, forwarding to
 # https://launchpad.me-bbe.workers.dev with the same path.
 
+# Workers Logs. apps/api has had this on since it was written; this worker
+# never did, which is why its p99 (1.3s wall) could be described but not
+# explained — there was no per-route timing to look at, only account-wide
+# quantiles. CPU is the one meter that scales with visitors, so the worker
+# serving them is the one that most needs to be legible when a launch brings
+# ten times the traffic.
+#
+# head_sampling_rate is explicit rather than defaulted: at ~79k requests a day
+# full sampling is far inside the included allowance, but a surge is exactly
+# when logs multiply and exactly when they are worth having. If volume ever
+# becomes the problem, turn this down — do not turn observability off.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"

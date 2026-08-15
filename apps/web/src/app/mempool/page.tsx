@@ -7,9 +7,18 @@ export const metadata: Metadata = {
     "XCP-69 launches and mints sitting in the Bitcoin mempool, not yet confirmed.",
 };
 
-/** The page shell is static; everything on it is polled by the client. A
- *  cached render of a mempool would be a contradiction. */
-export const revalidate = 0;
+/* No revalidate directive on purpose, which is the opposite of what used to be
+ * here. `export const revalidate = 0` opts a route into DYNAMIC rendering —
+ * re-rendered per request, never cached — and it was written to express "a
+ * cached render of a mempool would be a contradiction". But nothing on this
+ * page is rendered from mempool data: MempoolView is a client component that
+ * polls for everything, and this file fetches nothing. So the directive bought
+ * a server render per visitor of a shell that is identical every time, which
+ * is exactly the cost that matters when a launch brings a surge of them.
+ *
+ * With no directive the shell is prerendered and served from cache, and the
+ * mempool stays as live as it ever was — the client's poll is what makes it
+ * live, and that is untouched. */
 
 /**
  * What's queued but not yet confirmed.
