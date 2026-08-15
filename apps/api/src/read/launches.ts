@@ -28,6 +28,8 @@ launchesRoute.get("/v2/launches", async (c) => {
  *  lately" chart stays a chart rather than a timeline. */
 const ACTIVITY_BUCKETS = 28;
 const BLOCKS_PER_DAY = 144;
+/** The cron interval, in seconds — see the note at the response below. */
+const STATS_TTL = 300;
 
 launchesRoute.get("/v2/stats", async (c) => {
   const height = Number(c.req.query("height") ?? 0) || 0;
@@ -58,7 +60,17 @@ launchesRoute.get("/v2/stats", async (c) => {
         blocks_per_bucket: BLOCKS_PER_DAY,
       },
     },
-    60,
+    // Matched to the indexer's own cadence rather than set to the 60s every
+    // other route uses. These three are the only unavoidable full aggregates
+    // in the database — COUNT(DISTINCT) and a computed GROUP BY both need a
+    // temp b-tree no index can remove, so the per-call cost grows with
+    // launch_mints forever and the only lever is how often it is paid. The
+    // cron writes every 5 minutes, so a shorter TTL cannot make this fresher;
+    // it can only re-derive the same answer more times. This does little at
+    // today's traffic (the route is asked ~366 times a day, barely above the
+    // 288 a 5-minute TTL allows) — it is a ceiling on what heavy traffic could
+    // cost, not a saving today.
+    STATS_TTL,
   );
 });
 
