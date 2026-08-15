@@ -266,11 +266,17 @@ export interface ActivityTotals {
 }
 
 /**
- * Site-wide minting activity.
+ * Site-wide minting activity, computed from scratch.
  *
- * Aggregates, so a full pass over launch_mints is inherent — no index avoids
- * a COUNT or a SUM. Bounded instead by caching the answer at the edge, since
- * "how much has been raised in total" is a number nobody needs to the second.
+ * A full pass over launch_mints is inherent — no index avoids a COUNT or a
+ * SUM, and COUNT(DISTINCT) needs a temp b-tree besides. That is why this no
+ * longer runs at read time: /v2/stats reads `readMintTotals` below, and this
+ * runs only when the indexer sees something that could have changed the
+ * answer. See migration 0010.
+ *
+ * It remains the single definition of what the number MEANS. The rollup stores
+ * this query's result rather than accumulating its own counters, so the two
+ * cannot disagree — re-deriving always lands where a live query would.
  *
  * Only conforming launches count. A non-conforming fairminter's mints are
  * real, but this site's numbers describe XCP-69, and mixing the two would
@@ -296,15 +302,21 @@ export interface MintBucket {
 }
 
 /**
- * Mints grouped into roughly-daily buckets of 144 blocks.
+ * Mints grouped into roughly-daily buckets of 144 blocks, computed from
+ * scratch — the rollup's source, not the read path. See `readMintBuckets`.
  *
  * Blocks, not timestamps: launch_mints records the block a mint landed in and
  * nothing else, and 144 blocks is a Bitcoin day by design. The bucket is
  * therefore approximate against a wall clock and exact against the chain,
  * which is the right way round for this — the chart is labelled as
  * approximate rather than pretending to calendar precision.
+ *
+ * Every bucket, with no lower bound: the rollup stores the whole history and
+ * the route slices the window it wants. A window baked in here would go stale
+ * every block as height advances, which would mean recomputing constantly for
+ * a reason unrelated to whether any mint actually happened.
  */
-export function mintsByBucket(db: D1Database, sinceBlock: number): Promise<MintBucket[]> {
+export function mintsByBucket(db: D1Database): Promise<MintBucket[]> {
   return q<MintBucket>(
     db,
     `SELECT m.block_index / 144 AS bucket,
@@ -312,10 +324,39 @@ export function mintsByBucket(db: D1Database, sinceBlock: number): Promise<MintB
             COUNT(DISTINCT m.source) AS minters
        FROM launch_mints m
        JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
-      WHERE m.block_index >= ?1
       GROUP BY bucket
       ORDER BY bucket`,
-    sinceBlock,
+  );
+}
+
+/** The stored totals — one row by primary key, which is the entire point of
+ *  migration 0010. Null only if the rollup row is somehow missing; the
+ *  migration seeds it, so the caller's fallback is a belt-and-braces zero
+ *  rather than an expected state. */
+export function readMintTotals(db: D1Database): Promise<ActivityTotals | null> {
+  return one<ActivityTotals>(
+    db,
+    `SELECT mints, minters, paid_xcp, fee_sats FROM mint_totals WHERE id = 1`,
+  );
+}
+
+/**
+ * The stored buckets from `sinceBucket` on, oldest first.
+ *
+ * `bucket` is the primary key, so this is an indexed range scan bounded by the
+ * chart's own window rather than by how many mints exist.
+ *
+ * The window is applied in whole buckets, where the live query filtered by
+ * block and then grouped. That made the oldest bar a partial day whenever the
+ * window opened mid-bucket — a bar that looked like a quiet day but was really
+ * a clipped one. Whole buckets is both cheaper and the more honest chart.
+ */
+export function readMintBuckets(db: D1Database, sinceBucket: number): Promise<MintBucket[]> {
+  return q<MintBucket>(
+    db,
+    `SELECT bucket, n, minters FROM mint_buckets
+      WHERE bucket >= ?1 ORDER BY bucket`,
+    sinceBucket,
   );
 }
 

@@ -1,8 +1,8 @@
 import { getCandles, RESOLUTIONS } from "#api/queries/candles";
 import {
-  activityTotals,
   countByPhase,
-  mintsByBucket,
+  readMintTotals,
+  readMintBuckets,
   getEventsBySource,
   getLaunch,
   getLaunchesBySource,
@@ -36,8 +36,9 @@ launchesRoute.get("/v2/stats", async (c) => {
   const since = height > 0 ? Math.max(0, height - ACTIVITY_BUCKETS * BLOCKS_PER_DAY) : 0;
   const [rows, totals, buckets] = await Promise.all([
     countByPhase(c.env.DB),
-    activityTotals(c.env.DB),
-    mintsByBucket(c.env.DB, since),
+    readMintTotals(c.env.DB),
+    // Whole buckets, so the window is expressed in the unit the rollup stores.
+    readMintBuckets(c.env.DB, Math.floor(since / BLOCKS_PER_DAY)),
   ]);
   const counts: Record<string, number> = {
     scheduled: 0,
@@ -53,23 +54,21 @@ launchesRoute.get("/v2/stats", async (c) => {
       result: {
         counts,
         total,
-        activity: totals[0] ?? { mints: 0, minters: 0, paid_xcp: 0, fee_sats: 0 },
+        activity: totals ?? { mints: 0, minters: 0, paid_xcp: 0, fee_sats: 0 },
         // Bucket index is `block / 144`; the client turns it back into an
         // approximate day using the height it already has.
         daily: buckets,
         blocks_per_bucket: BLOCKS_PER_DAY,
       },
     },
-    // Matched to the indexer's own cadence rather than set to the 60s every
-    // other route uses. These three are the only unavoidable full aggregates
-    // in the database — COUNT(DISTINCT) and a computed GROUP BY both need a
-    // temp b-tree no index can remove, so the per-call cost grows with
-    // launch_mints forever and the only lever is how often it is paid. The
-    // cron writes every 5 minutes, so a shorter TTL cannot make this fresher;
-    // it can only re-derive the same answer more times. This does little at
-    // today's traffic (the route is asked ~366 times a day, barely above the
-    // 288 a 5-minute TTL allows) — it is a ceiling on what heavy traffic could
-    // cost, not a saving today.
+    // Matched to the indexer's own cadence rather than the 60s every other
+    // route uses: the cron writes every 5 minutes, so a shorter TTL cannot
+    // make this fresher — it can only re-serve the same answer more times.
+    //
+    // This used to be the cost control, back when the route ran three full
+    // aggregates per request. Since migration 0010 those are materialised and
+    // a miss costs a primary-key lookup plus a short indexed range, so the TTL
+    // is now about freshness honesty rather than about cost.
     STATS_TTL,
   );
 });

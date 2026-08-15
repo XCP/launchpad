@@ -7,6 +7,7 @@ import {
   fetchPool,
 } from "#api/integrations/counterparty";
 import { syncAssetEvents, type GraduatedTarget } from "#api/indexer/events";
+import { refreshRollup, rollupIsStale } from "#api/indexer/rollup";
 import { fetchTxFee } from "#api/integrations/mempool";
 import {
   isXcp69,
@@ -69,6 +70,9 @@ export interface SyncResult {
   events_ingested: number;
   announce_backfilled: number;
   fees_backfilled: number;
+  /** Rows the /v2/stats rollup rewrote. 0 on a tick where nothing that feeds
+   *  it moved — which should be most of them. */
+  rollup_written: number;
 }
 
 const FEE_BACKFILL_LIMIT = 15;
@@ -358,6 +362,17 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   const announceBackfilled = await backfillAnnounceBlocks(db);
   const feesBackfilled = await backfillMissingFees(db);
 
+  // Last, because it summarises everything above — and only when something
+  // above could have changed the summary. On a quiet tick this is skipped
+  // entirely, which is the whole reason materialising /v2/stats pays for
+  // itself rather than just moving the cost from read time to write time.
+  const stale = rollupIsStale({
+    mints_ingested: mintsIngested,
+    fees_backfilled: feesBackfilled,
+    resolved,
+  });
+  const rollup = stale ? await refreshRollup(db) : null;
+
   return {
     candidates: candidates.length,
     written,
@@ -366,6 +381,9 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     events_ingested: eventsIngested,
     announce_backfilled: announceBackfilled,
     fees_backfilled: feesBackfilled,
+    rollup_written: rollup
+      ? rollup.totals_written + rollup.buckets_written
+      : 0,
   };
 }
 
