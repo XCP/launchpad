@@ -746,6 +746,23 @@ function UnloadCard({
     { refreshInterval: 30_000 },
   );
 
+  // The cheapest open dispenser — the price yours has to beat to vend first.
+  //
+  // Computed rather than read off the front of the list: the feed arrives
+  // sorted by price ascending today, but a rule that depends on someone else's
+  // sort order is a rule that breaks silently when the sort changes. Empty
+  // remainders are excluded because a dispenser with nothing left cannot take
+  // a sale, so it is not competition.
+  const floorSats = (() => {
+    const live = dispensers.filter((r) => r.give_remaining > 0 && r.price > 0);
+    if (live.length === 0) return null;
+    const cheapest = Math.min(...live.map((r) => r.price));
+    // Undercut by the smallest unit that exists. Clamped at 1: a book whose
+    // floor is already 1 sat cannot be undercut, and offering to sell at zero
+    // is not a price.
+    return Math.max(1, Math.round(cheapest) - 1);
+  })();
+
   const priceSats = Math.round(parseFloat(price)) || (marketSats ?? 0);
   // Whole XCP only: these dispensers vend 1 XCP at a time, so a fractional
   // remainder could never vend — it would just sit until close.
@@ -879,29 +896,32 @@ function UnloadCard({
           focusable
           label="Price · sats per XCP"
           topRight={
-            marketSats ? (
+            floorSats !== null ? (
+              // Both buttons read off the BOOK, not off the USD market rate.
+              // What decides whether a dispenser sells is where it sits
+              // against the other dispensers, so the one-tap prices are the
+              // two useful positions relative to them: undercut everyone, or
+              // sit clearly above and wait. The USD market rate is still on
+              // screen — the footer prices your ask against it — it just is
+              // not what these set.
+              //
+              // Same order as the limit form: the row reads outward, with the
+              // most aggressive price at the right-hand end nearest the field.
               <span className="flex items-center gap-1">
-                {/* Same order as the limit form's price presets: the row reads
-                    outward from the market, so Market sits at the right-hand
-                    end and each step left asks for more premium. */}
-                {[10, 5, 1].map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() =>
-                      setPrice(String(Math.round(marketSats * (1 + p / 100))))
-                    }
-                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
-                  >
-                    +{p}%
-                  </button>
-                ))}
                 <button
                   type="button"
-                  onClick={() => setPrice(String(marketSats))}
+                  onClick={() => setPrice(String(Math.round(floorSats * 1.1)))}
                   className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                 >
-                  Market
+                  +10%
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPrice(String(floorSats))}
+                  title="One satoshi under the cheapest open dispenser"
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  Floor
                 </button>
               </span>
             ) : undefined

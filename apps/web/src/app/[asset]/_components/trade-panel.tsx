@@ -39,10 +39,12 @@ import { LIMIT_EXPIRATIONS, useSwapSettings } from "@/app/swap/_components/swap-
 
 const ORDER_VBYTES = 250;
 /** Price nudges off the pool spot: buyers bid under, sellers ask over. */
-/** In DISPLAY order, largest nudge first. The row reads outward from the
- *  market: the Market button sits at the right-hand end, nearest the price it
- *  sets, and each step left is a step further away from it. */
-const PRICE_PRESETS = [10, 5, 1];
+/** In DISPLAY order, to the left of the Market button — so the row reads
+ *  outward from the market, with Market at the right-hand end nearest the
+ *  price it sets. One nudge, not a ladder: 1% and 5% were close enough to
+ *  market that the typed price was easier than picking the right chip, and
+ *  three near-identical buttons cost more attention than they saved. */
+const PRICE_PRESETS = [10];
 const fmtPriceInput = (x: number) => x.toFixed(8).replace(/\.?0+$/, "");
 const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
