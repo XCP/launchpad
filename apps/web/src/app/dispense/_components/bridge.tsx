@@ -770,8 +770,14 @@ function UnloadCard({
   const wholeEscrow = Math.floor(typedEscrow);
   const escrowRaw = wholeEscrow * SATS;
   const btcIfSold = priceSats > 0 ? (escrowRaw / SATS) * (priceSats / SATS) : 0;
-  const perXcpUsd = btcUsd ? (priceSats / SATS) * btcUsd : null;
-  const vsMarket = perXcpUsd && xcpUsd ? (perXcpUsd / xcpUsd - 1) * 100 : null;
+  // Against the cheapest open dispenser, which is what decides whether this
+  // ask vends at all — buyers fill cheapest-first, so position in the book is
+  // the whole story. The USD market rate was the old comparison and it made
+  // this line contradict itself: the book sits well above spot, so the
+  // cheapest possible ask still reported a premium. (The per-XCP USD figure
+  // that fed that comparison went with it; nothing else read it.)
+  const vsFloor =
+    floorSats !== null && priceSats > 0 ? (priceSats / floorSats - 1) * 100 : null;
   const insufficient =
     balance !== undefined && escrowRaw > 0 && escrowRaw > balance;
 
@@ -929,31 +935,39 @@ function UnloadCard({
           footer={
             <>
               <span>
-                {vsMarket !== null && Math.abs(vsMarket) >= 0.5 ? (
+                {/* Measured against the FLOOR, not the USD market rate.
+                    Against market this line was actively misleading: the whole
+                    dispenser book trades well above spot, so pricing at the
+                    cheapest position in it still read "+50% premium" — the
+                    Floor button and this label describing the same number in
+                    opposite terms. What a seller needs to know is whether they
+                    are ahead of the queue or behind it, and only the book can
+                    say that. */}
+                {vsFloor !== null && Math.abs(vsFloor) >= 0.5 ? (
                   <span
                     className={
-                      vsMarket > 0
-                        ? "font-medium text-green-600"
-                        : "font-medium text-amber-600"
+                      vsFloor > 0
+                        ? "font-medium text-amber-600"
+                        : "font-medium text-green-600"
                     }
                   >
-                    {vsMarket > 0
-                      ? `+${vsMarket.toFixed(0)}% premium`
-                      : `−${Math.abs(vsMarket).toFixed(0)}% · sells fast`}
+                    {vsFloor > 0
+                      ? `+${vsFloor.toFixed(0)}% over floor · waits`
+                      : `−${Math.abs(vsFloor).toFixed(0)}% under floor · sells first`}
                   </span>
-                ) : vsMarket !== null ? (
-                  <span>at market</span>
+                ) : vsFloor !== null ? (
+                  <span>at the floor</span>
                 ) : (
                   <span>&nbsp;</span>
                 )}
               </span>
-              {marketSats && (
+              {floorSats !== null && (
                 <button
                   type="button"
                   className="text-gray-500 hover:text-purple-600"
-                  onClick={() => setPrice(String(marketSats))}
+                  onClick={() => setPrice(String(floorSats))}
                 >
-                  Market: {marketSats.toLocaleString()}
+                  Floor: {floorSats.toLocaleString()}
                 </button>
               )}
             </>
