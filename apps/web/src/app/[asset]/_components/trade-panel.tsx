@@ -10,7 +10,7 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
-import { commasRaw, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import { commasRaw, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
 import {
   approx,
   parseUnitsToRaw,
@@ -605,7 +605,7 @@ export function TradePanel({
               <div className="flex justify-between">
                 <dt>TX fee</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
-                  {feeRate} sat/vB
+                  {satsPerVb(feeRate)} sat/vB
                   {btcUsd !== undefined && (
                     <span className="text-gray-400">
                       {" "}

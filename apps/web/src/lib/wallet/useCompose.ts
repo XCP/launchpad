@@ -130,8 +130,24 @@ async function withUtxoRaceRetry<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * The floor every rate here is clamped to, in sat/vB.
+ *
+ * Bitcoin Core's default minrelaytxfee is 1000 sat/kvB — one satoshi per
+ * vbyte — so a transaction priced under this is not slow, it simply does not
+ * relay. mempool.space's precise estimates DO go below it (hourFee 0.571 and
+ * economyFee 0.2 at the time of writing), which is honest about what would
+ * confirm eventually and useless as something to broadcast.
+ */
+const MIN_RELAY_SAT_VB = 1
+
 /** Fetch next-block median fee rate from mempool.space (cached 30s).
- *  Exported so surfaces can show the rate a compose will actually pay. */
+ *  Exported so surfaces can show the rate a compose will actually pay.
+ *
+ *  Fractional, not rounded. Counterparty accepts a fractional sat_per_vbyte
+ *  and prices the transaction from it, so rounding 1.06 up to 1 sat/vB — or
+ *  worse, 1.5 up to 2 — was paying for precision the estimate already had.
+ *  Only the relay floor is applied. */
 let cachedFeeRate: number | null = null
 let feeRateTimestamp = 0
 
@@ -142,7 +158,7 @@ export async function fetchMedianFeeRate(): Promise<number> {
     const res = await fetch('https://mempool.space/api/v1/fees/mempool-blocks')
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: { medianFee: number }[] = await res.json()
-    cachedFeeRate = Math.max(Math.round(data[0]?.medianFee ?? 3), 1)
+    cachedFeeRate = Math.max(data[0]?.medianFee ?? 3, MIN_RELAY_SAT_VB)
     feeRateTimestamp = now
     return cachedFeeRate
   } catch {
@@ -158,15 +174,20 @@ let fastFeeTimestamp = 0
  * MUST confirm promptly — e.g. a launch scheduled with a tight
  * pre-announcement lead, where confirming after start_block would open the
  * mint instantly and fail the standard. Degrades to median + a bump.
+ *
+ * /precise rather than /recommended: the two return the same shape, but
+ * /recommended rounds UP to whole sat/vB. At a quiet moment that is the
+ * difference between 1.562 and 2 — a third more fee for no more speed, on
+ * exactly the transactions this function exists to price well.
  */
 export async function fetchPriorityFeeRate(): Promise<number> {
   const now = Date.now()
   if (cachedFastFee && now - fastFeeTimestamp < 30_000) return cachedFastFee
   try {
-    const res = await fetch('https://mempool.space/api/v1/fees/recommended')
+    const res = await fetch('https://mempool.space/api/v1/fees/precise')
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const data: { fastestFee: number } = await res.json()
-    cachedFastFee = Math.max(Math.round(data.fastestFee ?? 0), 1)
+    cachedFastFee = Math.max(data.fastestFee ?? 0, MIN_RELAY_SAT_VB)
     fastFeeTimestamp = now
     return cachedFastFee
   } catch {

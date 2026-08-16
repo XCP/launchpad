@@ -68,6 +68,20 @@ export function price(n: number): string {
   return n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
 }
 
+/**
+ * A fee rate in sat/vB.
+ *
+ * Rates are fractional now — mempool.space's precise estimates and
+ * Counterparty's sat_per_vbyte both carry decimals, and rounding them away was
+ * costing real fee. But the raw double is not a thing to show a person:
+ * 1.5620000000000003 is the same rate as 1.56 and reads as a bug. Two decimals
+ * is finer than any fee decision anyone makes, and whole rates still print
+ * whole — 2, not 2.00.
+ */
+export function satsPerVb(n: number): string {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
 /** USD display: compact for big figures, cents only where they matter. */
 export function usd(n: number): string {
   if (n >= 1000) return `$${compact(n)}`;

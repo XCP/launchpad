@@ -14,7 +14,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { fetchBalance, fetchJson } from "@/lib/client";
-import { commasRaw, compact as compactFmt, price as formatPrice, usd as usdFmt } from "@/lib/format";
+import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
 import {
   approx,
   maxRaw,
@@ -556,7 +556,7 @@ export function SwapWidget({
               <div className="flex justify-between">
                 <dt>TX fee</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
-                  {feeRate} sat/vB
+                  {satsPerVb(feeRate)} sat/vB
                   {btcUsd !== undefined && (
                     <span className="text-gray-400">
                       {" "}

@@ -12,7 +12,7 @@ import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
-import { commas, commasRaw, shortAddress, usd as usdFmt } from "@/lib/format";
+import { commas, commasRaw, satsPerVb, shortAddress, usd as usdFmt } from "@/lib/format";
 import {
   approx,
   big,
@@ -125,10 +125,10 @@ export function XcpBridge({
     readSettings,
     readSettingsServer,
   );
-  const customFee = Math.min(
-    Math.round(parseFloat(settings.customFeeRate) || 0),
-    500,
-  );
+  // Not rounded: a typed 1.5 sat/vB is a rate Counterparty accepts and prices
+  // from, so rounding it to 2 would overrule the number the user chose in the
+  // one place they went out of their way to choose it.
+  const customFee = Math.min(parseFloat(settings.customFeeRate) || 0, 500);
   const [flips, setFlips] = useState(0);
   const flip = () => {
     setFlips((f) => f + 1);
@@ -214,10 +214,10 @@ function DispenseSettingsGear() {
   const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
     refreshInterval: 30_000,
   });
-  const customFee = Math.min(
-    Math.round(parseFloat(settings.customFeeRate) || 0),
-    500,
-  );
+  // Not rounded: a typed 1.5 sat/vB is a rate Counterparty accepts and prices
+  // from, so rounding it to 2 would overrule the number the user chose in the
+  // one place they went out of their way to choose it.
+  const customFee = Math.min(parseFloat(settings.customFeeRate) || 0, 500);
   return (
     <GearPopover active={customFee > 0} label="Dispense settings">
       <div className="flex items-center justify-between">
@@ -298,8 +298,11 @@ function LoadCard({
   // Miner fees are part of the price: every leg is its own transaction, so
   // the planner weighs a cheap-but-shallow route against the extra ~LEG_VBYTES
   // fee another transaction costs.
+  // /precise, matching the composer: this estimate decides whether an extra
+  // leg is worth its fee, so it should weigh the fee the transaction will
+  // actually pay rather than a rounded-up one.
   const { data: feeRec } = useSWR<{ halfHourFee: number }>(
-    "https://mempool.space/api/v1/fees/recommended",
+    "https://mempool.space/api/v1/fees/precise",
     (url: string) => fetchJson(url),
     { refreshInterval: 60_000 },
   );
@@ -1191,7 +1194,7 @@ function UnloadCard({
               <div className="flex justify-between">
                 <dt>TX fee</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
-                  {sellFeeRate} sat/vB
+                  {satsPerVb(sellFeeRate)} sat/vB
                   {btcUsd !== null && (
                     <span className="text-gray-400">
                       {" "}

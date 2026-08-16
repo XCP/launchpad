@@ -11,7 +11,7 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
 import { fetchBalance, fetchJson } from "@/lib/client";
-import { commas, commasRaw, usd as usdFmt } from "@/lib/format";
+import { commas, commasRaw, satsPerVb, usd as usdFmt } from "@/lib/format";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
@@ -243,7 +243,7 @@ export function MintPanel({
               <div className="flex justify-between">
                 <dt>TX fee</dt>
                 <dd>
-                  {medianFeeRate} sat/vB
+                  {satsPerVb(medianFeeRate)} sat/vB
                   {btcUsd !== undefined && (
                     <span className="text-gray-500">
                       {" "}
