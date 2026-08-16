@@ -239,13 +239,42 @@ check("approx is the deliberate way back to a double", approx("10000000000000000
 /* Static check: raw arithmetic on money-named identifiers             */
 /* ------------------------------------------------------------------ */
 
-/** Operators that convert to a double before the arithmetic starts. */
+/**
+ * Operations that can put a DIFFERENT number back than the one they were
+ * given. That is the whole test, and it is narrower than "touches Math".
+ *
+ * In:  Number/parseFloat/parseInt coerce a string to a double, and floor,
+ *      round, ceil and pow all produce a value that was not an operand.
+ *      Every one of them can drop a digit that mattered.
+ *
+ * Out: min, max and abs return an operand unchanged — min and max pick one,
+ *      abs drops a sign. There is no result to round, so no exact quantity
+ *      can become inexact by passing through them.
+ *
+ * lib/candles.ts is the worked example: it folds a bucket's high and low with
+ * Math.max/Math.min and its volume with big(), and both are right — the sum
+ * creates a number, the high does not. Treating those alike made this check
+ * demand exemptions for correct code, and an exemption granted to correct
+ * code is how a rule stops being read.
+ *
+ * The residual risk is coercion rather than selection: Math.min over RAW
+ * string quantities converts before comparing, so a collection of raw amounts
+ * still wants compareRawDesc. That is a types question a regex cannot answer,
+ * and it was not answering it before either.
+ */
 const RAW_NUMERIC =
-  /\b(Number\(|parseFloat\(|parseInt\(|Math\.(floor|round|ceil|abs|min|max|pow)\()/g;
+  /\b(Number\(|parseFloat\(|parseInt\(|Math\.(floor|round|ceil|pow)\()/g;
 
-/** Identifiers that mark a value as money rather than a count or an index. */
+/**
+ * Identifiers that mark a value as money rather than a count or an index.
+ *
+ * `price`, `spot` and `satoshirate` are money: a sats-per-XCP price is an
+ * amount someone pays. Their absence was a real hole — the dispenser bridge's
+ * floor is derived with Math.round(Math.min(...rows.map(r => r.price))), and
+ * nothing in this file could see that line.
+ */
 const MONEY =
-  /quantity|amount|satoshi|sats|supply|balance|reserve|escrow|earned|paid|payout|premint|hard_cap|soft_cap|give_|get_|_remaining/i;
+  /quantity|amount|satoshi|sats|supply|balance|reserve|escrow|earned|paid|payout|premint|hard_cap|soft_cap|give_|get_|_remaining|price|spot|satoshirate/i;
 
 /**
  * A line that has already gone through the numeric layer. `approx` and `ratio`
@@ -286,7 +315,13 @@ const EXEMPT = new Map([
     "app/dispense/_components/bridge.tsx",
     "XCP dispenser units and Bitcoin sat amounts, bounded by XCP's 2.6M supply — " +
       "whole XCP only on the sell side, so escrow_quantity is an exact integer " +
-      "and useCompose's quantityParam gate rejects it if it ever isn't",
+      "and useCompose's quantityParam gate rejects it if it ever isn't. Now also " +
+      "covers dispenser PRICES (floorPrice, the undercut, the +10% nudge): those " +
+      "are sats per XCP, four figures in practice and bounded by the same supply " +
+      "on both sides of the division. The bound is what this exemption rests on, " +
+      "so it holds only while this file trades XCP and BTC — a launch token's " +
+      "1e16 hard cap would not survive any of it, and putting token quantities " +
+      "in here means splitting the file rather than widening this line",
   ],
   [
     "app/faq/_components/explainer.tsx",
@@ -347,6 +382,40 @@ if (files.length < 50) {
 
 // The detector reads lines, so it is worth knowing it still reacts.
 check("would catch a new one", violationsIn("const fee = Number(row.quantity) * 2;"), 1);
+
+// ...and that it still draws the lines it is supposed to draw. Without these
+// the two rules above are just prose: widening RAW_NUMERIC back to every Math
+// call, or dropping `price` from MONEY, would both still pass silently.
+check(
+  "a price is money",
+  violationsIn("const floor = Math.round(Math.min(...rows.map((r) => r.price)));"),
+  1,
+);
+check(
+  "a spot price is money",
+  violationsIn("const px = Math.floor(spot * 1.1);"),
+  1,
+);
+check(
+  "min selects, it does not round",
+  violationsIn("const lowest = Math.min(a.quantity, b.quantity);"),
+  0,
+);
+check(
+  "max selects, it does not round",
+  violationsIn("const deepest = Math.max(1, ...rows.map((r) => r.give_remaining));"),
+  0,
+);
+check(
+  "abs drops a sign, it does not round",
+  violationsIn("const gap = Math.abs(paid_quantity);"),
+  0,
+);
+check(
+  "a count is still not money",
+  violationsIn("const n = Math.floor(rows.length / 2);"),
+  0,
+);
 check("leaves block heights alone", violationsIn("const b = Number(tx.block_index);"), 0);
 check("does not read comments as code", violationsIn("// Number(quantity) in a comment"), 0);
 check("accepts the numeric layer", violationsIn("const total = approx(sumRaw(quantities));"), 0);
