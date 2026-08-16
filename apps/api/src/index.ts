@@ -3,6 +3,7 @@ import type { Env } from "#api/env";
 import { syncLaunches } from "#api/indexer/sync";
 import { launchesRoute } from "#api/read/launches";
 import { mintClosed } from "#api/telegram/format";
+import { announceLive } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
 import { fetchBlockHeight } from "#api/integrations/counterparty";
@@ -83,14 +84,41 @@ app.post("/admin/replay", async (c) => {
   const depth = await stub.enqueue(
     claimed.map((item) => ({
       a: item.a,
-      // Never collapsed. A replay is the feed it would have been, and it
-      // would not have been a digest — these arrived days apart.
+      // Never collapsed. A replay is the feed it would have been, and it would
+      // not have been a digest — these arrived days apart.
       mintOf: null,
-      earned: "0",
-      paid: "0",
+      earned: item.mint?.earned ?? "0",
+      paid: item.mint?.paid ?? "0",
     })),
   );
   return c.json({ queued: claimed.length, skipped: backlog.length - claimed.length, depth });
+});
+
+/**
+ * Turn the live feed on or off.
+ *
+ * Off by default, and it matters that it is: with the past unclaimed the first
+ * tick would announce the entire backlog itself — out of order, without the
+ * replay's pacing, and into whatever the channel already had. The order is
+ * replay, then this.
+ *
+ * Also the off switch. If the feed starts saying something wrong at three in
+ * the morning, one call stops it without a deploy, and the announced table
+ * keeps its place so nothing is repeated when it comes back.
+ */
+app.post("/admin/live", async (c) => {
+  if (!authed(c.req.header("x-admin-token"), c.env.ADMIN_TOKEN)) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const on = c.req.query("off") ? "0" : "1";
+  await c.env.DB.prepare(
+    `INSERT INTO announce_state (key, value) VALUES ('live', ?1)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value
+       WHERE announce_state.value IS NOT excluded.value`,
+  )
+    .bind(on)
+    .run();
+  return c.json({ live: on === "1" });
 });
 
 /** Queue depth and a way to abandon a replay that was a mistake. */
@@ -153,7 +181,20 @@ export default {
   fetch: app.fetch,
   async scheduled(_event, env, ctx) {
     ctx.waitUntil(
-      withLock(env.DB, 110, () => runScheduledJob("sync_launches", () => syncLaunches(env.DB))),
+      withLock(env.DB, 110, async () => {
+        await runScheduledJob("sync_launches", () => syncLaunches(env.DB));
+        // After the indexer, never inside it. The feed reads committed state
+        // rather than the tick's own deltas, so an announcement can only
+        // describe something D1 already believes — and a tick that dies
+        // half-done leaves nothing announced that did not happen.
+        //
+        // Inside the same lock, because two overlapping ticks both claiming
+        // keys is the one race the announced table cannot settle on its own.
+        await runScheduledJob("announce", async () => {
+          const height = await fetchBlockHeight();
+          return announceLive(env, height);
+        });
+      }),
     );
   },
 } satisfies ExportedHandler<Env>;

@@ -36,6 +36,13 @@ export interface BacklogItem {
    *  and opens before anything is minted from it. */
   rank: number;
   a: Announcement;
+  /**
+   * Set only on mints, and only so the queue can collapse a run of them into
+   * one line when it falls behind. The ticker, because that is what a digest
+   * is addressed to; and the amounts, because a digest sums them and parsing
+   * them back out of rendered text would be absurd.
+   */
+  mint: { asset: string; earned: string; paid: string } | null;
 }
 
 const RANK = { launch: 0, open: 1, mint: 2, trade: 3, closed: 4 };
@@ -139,6 +146,7 @@ export async function buildBacklog(
       key: `launch:${l.tx_hash}`,
       block: announced,
       rank: RANK.launch,
+      mint: null,
       a: newLaunch({
         asset: l.asset,
         startBlock: l.start_block,
@@ -156,6 +164,7 @@ export async function buildBacklog(
         key: `open:${l.tx_hash}`,
         block: l.start_block,
         rank: RANK.open,
+        mint: null,
         a: mintOpen(l.asset),
       });
     }
@@ -167,6 +176,7 @@ export async function buildBacklog(
         key: `closed:${l.tx_hash}`,
         block: lastBlockFor(mints, l.tx_hash, l.start_block),
         rank: RANK.closed,
+        mint: null,
         a: mintClosed({
           asset: l.asset,
           graduated: l.phase === "graduated",
@@ -195,6 +205,7 @@ export async function buildBacklog(
       key: `mint:${m.tx_hash}`,
       block: m.block_index,
       rank: RANK.mint,
+      mint: { asset: m.asset, earned: earned.toString(), paid: m.paid_quantity },
       a: mint({
         asset: m.asset,
         earnedRaw: earned,
@@ -212,6 +223,7 @@ export async function buildBacklog(
       key: `trade:${t.event}`,
       block: t.block_index,
       rank: RANK.trade,
+      mint: null,
       a: trade({
         asset: t.asset,
         buy: t.kind === "buy",
