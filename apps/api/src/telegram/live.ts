@@ -12,6 +12,7 @@
  * minus the announced table, which means a missed tick is repaired by the next
  * one and a replay is just the first run of the same code.
  */
+import { ratio } from "@launchpad/xcp69/numeric";
 import { q } from "#api/db";
 import type { Env } from "#api/env";
 import { fetchMempoolFairmints } from "#api/integrations/counterparty";
@@ -107,7 +108,11 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
       const cap = BigInt(l.soft_cap);
       if (cap <= 0n) continue;
       const earned = BigInt(l.earned_quantity ?? "0");
-      const mintedPct = Number((earned * 10_000n) / cap) / 100;
+      // ratio() rather than a hand-rolled Number() on the division: it is the
+      // module that exists to say "a double is the right answer here", it
+      // scales through bigint so oversized operands keep their significant
+      // figures, and the numeric check knows it is the sanctioned path.
+      const mintedPct = ratio(earned, cap) * 100;
 
       const blocksLeft = l.current_deadline_block - height;
       if (blocksLeft > 0 && blocksLeft <= CLOSING_BLOCKS) {
@@ -125,8 +130,7 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
       // climbing to it.
       const mark = [...NEAR_MARKS].reverse().find((m) => mintedPct >= m);
       if (mark !== undefined) {
-        const pendingPct =
-          Number(((pendingByAsset.get(l.asset) ?? 0n) * 10_000n) / cap) / 100;
+        const pendingPct = ratio(pendingByAsset.get(l.asset) ?? 0n, cap) * 100;
         items.push({
           key: `near:${l.tx_hash}:${mark}`,
           a: nearingSoldOut(l.asset, mintedPct, pendingPct),

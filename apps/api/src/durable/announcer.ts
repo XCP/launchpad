@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "#api/env";
-import { mintDigest, type Announcement } from "#api/telegram/format";
+import { nextAnnouncement, type Queued } from "#api/telegram/digest";
 import { send } from "#api/telegram/send";
 
 /**
@@ -36,16 +36,7 @@ const DIGEST_THRESHOLD = 25;
  *  bounded outage into unbounded storage. The oldest go. */
 const MAX_QUEUE = 500;
 
-interface Queued {
-  a: Announcement;
-  /** Set for mints so a run on one launch can be collapsed; null otherwise,
-   *  which is what marks an event as never-collapsible. */
-  mintOf: string | null;
-  /** Raw token and XCP amounts, carried so a digest can be summed without
-   *  parsing them back out of the rendered text. */
-  earned: string;
-  paid: string;
-}
+export type { Queued } from "#api/telegram/digest";
 
 export class Announcer extends DurableObject<Env> {
   /**
@@ -97,7 +88,7 @@ export class Announcer extends DurableObject<Env> {
       return;
     }
 
-    const { announcement, rest } = this.next(queue);
+    const { announcement, rest } = nextAnnouncement(queue, DIGEST_THRESHOLD);
     const result = await send(token, chat, announcement);
 
     if (!result.ok && result.retryAfter !== null) {
@@ -115,35 +106,6 @@ export class Announcer extends DurableObject<Env> {
     }
     await this.ctx.storage.put("queue", rest);
     if (rest.length > 0) await this.ctx.storage.setAlarm(Date.now() + SEND_INTERVAL_MS);
-  }
-
-  /**
-   * The next thing to say, and what is left after saying it.
-   *
-   * Below the threshold this is just the head of the queue. Above it, a run of
-   * consecutive mints on the same launch becomes one line — which is the
-   * honest way to fall behind: the feed keeps up, and the size bar is drawn on
-   * the run's TOTAL, so the shape still reads as the size of what happened
-   * rather than the size of whichever mint happened to be first.
-   */
-  private next(queue: Queued[]): { announcement: Announcement; rest: Queued[] } {
-    const head = queue[0]!;
-    if (queue.length < DIGEST_THRESHOLD || head.mintOf === null) {
-      return { announcement: head.a, rest: queue.slice(1) };
-    }
-    let n = 0;
-    let earned = 0n;
-    let paid = 0n;
-    while (n < queue.length && queue[n]!.mintOf === head.mintOf) {
-      earned += BigInt(queue[n]!.earned);
-      paid += BigInt(queue[n]!.paid);
-      n++;
-    }
-    if (n === 1) return { announcement: head.a, rest: queue.slice(1) };
-    return {
-      announcement: mintDigest(head.mintOf, n, earned, paid),
-      rest: queue.slice(n),
-    };
   }
 
   private async read(): Promise<Queued[]> {
