@@ -39,7 +39,10 @@ import { LIMIT_EXPIRATIONS, useSwapSettings } from "@/app/swap/_components/swap-
 
 const ORDER_VBYTES = 250;
 /** Price nudges off the pool spot: buyers bid under, sellers ask over. */
-const PRICE_PRESETS = [1, 5, 10];
+/** In DISPLAY order, largest nudge first. The row reads outward from the
+ *  market: the Market button sits at the right-hand end, nearest the price it
+ *  sets, and each step left is a step further away from it. */
+const PRICE_PRESETS = [10, 5, 1];
 const fmtPriceInput = (x: number) => x.toFixed(8).replace(/\.?0+$/, "");
 const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
@@ -101,12 +104,23 @@ export function TradePanel({
     { refreshInterval: 60_000 },
   );
   // A price: a double, from exact division of the reserves.
-  const spot = pool
+  const spotRatio = pool
     ? ratio(
         pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b,
         pool.asset_a === asset ? pool.reserve_a : pool.reserve_b,
       )
     : null;
+  // ...but only if it is actually a price. `ratio` answers 0 for a zero
+  // denominator rather than throwing, so a pool row with an empty reserve
+  // arrives here as the number 0 — which is not "free", it is "no market".
+  // Narrowing at the source rather than at each use: every reader downstream
+  // already treats null as "no market", so this is the single place the
+  // distinction has to be drawn, and the price presets that hang off it stop
+  // offering to set an order to zero.
+  const spot =
+    spotRatio !== null && Number.isFinite(spotRatio) && spotRatio > 0
+      ? spotRatio
+      : null;
 
   // The resting book: best counter-order beats the pool with no fee. One
   // page covers today's books; revisit pagination if depth ever grows.
@@ -332,13 +346,6 @@ export function TradePanel({
           topRight={
             spot !== null ? (
               <span className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setLimitPrice(fmtPriceInput(spot))}
-                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
-                >
-                  Market
-                </button>
                 {PRICE_PRESETS.map((p) => (
                   <button
                     key={p}
@@ -356,6 +363,13 @@ export function TradePanel({
                     {p}%
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setLimitPrice(fmtPriceInput(spot))}
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  Market
+                </button>
               </span>
             ) : undefined
           }

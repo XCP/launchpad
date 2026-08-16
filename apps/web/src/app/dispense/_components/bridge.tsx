@@ -881,14 +881,10 @@ function UnloadCard({
           topRight={
             marketSats ? (
               <span className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setPrice(String(marketSats))}
-                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
-                >
-                  Market
-                </button>
-                {[1, 5, 10].map((p) => (
+                {/* Same order as the limit form's price presets: the row reads
+                    outward from the market, so Market sits at the right-hand
+                    end and each step left asks for more premium. */}
+                {[10, 5, 1].map((p) => (
                   <button
                     key={p}
                     type="button"
@@ -900,6 +896,13 @@ function UnloadCard({
                     +{p}%
                   </button>
                 ))}
+                <button
+                  type="button"
+                  onClick={() => setPrice(String(marketSats))}
+                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                >
+                  Market
+                </button>
               </span>
             ) : undefined
           }
