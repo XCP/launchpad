@@ -1,0 +1,275 @@
+/**
+ * What the channel actually says.
+ *
+ * Kept pure and separate from anything that sends: the wording and the size
+ * bars are the product here, and they are the part worth having tests for.
+ * Nothing in this file talks to Telegram, D1, or the clock.
+ *
+ * The genre this is leaning into is the buy-bot feed — a row of emoji whose
+ * length IS the size, so the channel is readable as a shape at a glance and
+ * only rewards reading if something looks big. That only works if the scale is
+ * consistent, so every bar in here counts the same unit.
+ */
+import { formatExact, rawToDecimalString, big } from "@launchpad/xcp69/numeric";
+import { XCP69 } from "@launchpad/xcp69/xcp69";
+
+/**
+ * One XCP mints 100,000 tokens at the standard's fixed price, so 100k tokens
+ * and 1 XCP are the same quantity said two ways. Sizing the bar per 100k
+ * therefore means one emoji-pair per XCP, which is why the floor and the cap
+ * below land on round XCP numbers rather than arbitrary token counts.
+ */
+const TOKENS_PER_EMOJI_PAIR = 100_000n;
+
+/** Below this, nothing is announced. 10k tokens is a tenth of an XCP — small
+ *  enough that it is dust, large enough that a real mint never trips it. */
+export const MIN_TOKENS = 10_000n;
+
+/**
+ * A full bar is a maximum mint, by construction rather than by taste.
+ *
+ * The standard caps a single mint at MAX_MINT_PER_TX — 1,000,000 tokens, or
+ * 10 XCP — so deriving the cap from it means the longest bar the feed can
+ * produce for a mint is exactly the largest mint the chain can accept. Pick a
+ * number by hand and it is either unreachable or hit early; this one cannot
+ * drift from the standard because it IS the standard.
+ */
+const MINT_PAIR_CAP = Number(
+  BigInt(XCP69.MAX_MINT_PER_TX) / 100_000_000n / TOKENS_PER_EMOJI_PAIR,
+);
+
+/** Trades have no protocol ceiling — supply is 100M, so a whale could produce
+ *  a bar of any length. 30 emoji is a visual limit, not a meaningful one, and
+ *  it lines up a 1.5M-token trade with a max mint plus half again. */
+const TRADE_PAIR_CAP = 15;
+
+/** Mints are purple squares and trades are the market's own green and red
+ *  circles. Two different shapes, not two shades of the same one: at a glance
+ *  down the channel the question is "is this a mint or a trade", and 🟩 beside
+ *  🟢 answers it too slowly. Purple is the site's accent. */
+export const MINT_EMOJI = "🟪";
+export const BUY_EMOJI = "🟢";
+export const SELL_EMOJI = "🔴";
+/** The wordmark's own emoji, so a graduation reads as the site celebrating. */
+export const GRADUATE_EMOJI = "🎉";
+
+/** Raw token units (8 decimals) to whole tokens. Amounts arrive as raw
+ *  quantities everywhere in this repo; the bar is sized on whole tokens. */
+const wholeTokens = (raw: bigint) => raw / 100_000_000n;
+
+/**
+ * The size bar. Two emoji per 100k whole tokens, at least one pair for
+ * anything announced at all, capped so a whale does not produce a message
+ * Telegram truncates.
+ */
+export function sizeBar(emoji: string, rawTokens: bigint, cap: number): string {
+  const tokens = wholeTokens(rawTokens);
+  const pairs = tokens / TOKENS_PER_EMOJI_PAIR;
+  const clamped = pairs < 1n ? 1 : pairs > BigInt(cap) ? cap : Number(pairs);
+  return emoji.repeat(clamped * 2);
+}
+
+/** Whole tokens, grouped, no decimals — 1,250,000 rather than 1250000.00. */
+export function tokens(raw: bigint): string {
+  return formatExact(rawToDecimalString(raw, 8), { maximumFractionDigits: 0 });
+}
+
+/** XCP to at most 2 decimals: raised totals are read, not transacted. */
+export function xcp(raw: bigint): string {
+  return formatExact(rawToDecimalString(raw, 8), { maximumFractionDigits: 2 });
+}
+
+/** ~10 minutes a block, said the way a person would say it. */
+export function blocksEta(blocks: number): string {
+  if (blocks <= 0) return "now";
+  const minutes = blocks * 10;
+  if (minutes < 60) return `~${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `~${hours}h`;
+  return `~${Math.round(hours / 24)}d`;
+}
+
+const link = (asset: string) => `https://xcp.fun/${asset}`;
+
+/**
+ * The token's own artwork, which is what makes this a feed rather than a log.
+ *
+ * /full/<ASSET> is the metadata image the launch itself carries — the same one
+ * the site and the on-chain description point at, so the channel shows what a
+ * holder sees. Telegram fetches it by URL; a launch without artwork just
+ * answers 404 and the caller falls back to a plain message.
+ */
+export const imageUrl = (asset: string) => `https://xcp.fun/full/${asset}`;
+
+/**
+ * A message and the picture to hang it on.
+ *
+ * Every announcement carries the token's image except the ones that are not
+ * about one token — there is no artwork for "the queue got long".
+ */
+export interface Announcement {
+  text: string;
+  photo: string | null;
+}
+
+const withPhoto = (asset: string, text: string): Announcement => ({
+  text,
+  photo: imageUrl(asset),
+});
+
+export interface LaunchFacts {
+  asset: string;
+  startBlock: number;
+  softCapRaw: bigint;
+  hardCapRaw: bigint;
+  height: number;
+}
+
+export function newLaunch(f: LaunchFacts): Announcement {
+  const away = f.startBlock - f.height;
+  const when =
+    away > 0
+      ? `Opens at block ${f.startBlock.toLocaleString("en-US")} (${blocksEta(away)})`
+      : `Open now`;
+  return withPhoto(
+    f.asset,
+    [
+      `🚀 <b>${f.asset}</b> announced`,
+      when,
+      `${xcp(f.softCapRaw)} XCP soft cap · ${tokens(f.hardCapRaw)} supply`,
+      link(f.asset),
+    ].join("\n"),
+  );
+}
+
+export interface MintFacts {
+  asset: string;
+  earnedRaw: bigint;
+  paidRaw: bigint;
+  source: string;
+  /** Progress toward the soft cap after this mint, 0–1, or null if uncapped. */
+  progress: number | null;
+}
+
+export function mint(f: MintFacts): Announcement {
+  const pct =
+    f.progress === null ? "" : ` · ${Math.min(100, Math.round(f.progress * 100))}% to soft cap`;
+  return withPhoto(
+    f.asset,
+    [
+      sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP),
+      `<b>${f.asset}</b> minted`,
+      `${tokens(f.earnedRaw)} tokens · ${xcp(f.paidRaw)} XCP${pct}`,
+      `${short(f.source)}`,
+    ].join("\n"),
+  );
+}
+
+/** A run of mints on one launch, collapsed because the queue got long. The
+ *  bar is sized on the TOTAL so the shape still reads as the size of what
+ *  happened, not the size of the last one. */
+export function mintDigest(
+  asset: string,
+  count: number,
+  earnedRaw: bigint,
+  paidRaw: bigint,
+): Announcement {
+  return withPhoto(
+    asset,
+    [
+      sizeBar(MINT_EMOJI, earnedRaw, MINT_PAIR_CAP),
+      `<b>${asset}</b> · ${count} mints`,
+      `${tokens(earnedRaw)} tokens · ${xcp(paidRaw)} XCP`,
+    ].join("\n"),
+  );
+}
+
+export function mintOpen(asset: string): Announcement {
+  return withPhoto(
+    asset,
+    [`🔔 <b>${asset}</b> is OPEN`, `Minting has started`, link(asset)].join("\n"),
+  );
+}
+
+export function mintClosing(
+  asset: string,
+  blocks: number,
+  earnedRaw: bigint,
+  softCapRaw: bigint,
+): Announcement {
+  const pct = softCapRaw > 0n ? ` · ${percent(earnedRaw, softCapRaw)}%` : "";
+  return withPhoto(
+    asset,
+    [
+      `⏳ <b>${asset}</b> closes in ${blocks} block${blocks === 1 ? "" : "s"} (${blocksEta(blocks)})`,
+      `${xcp(earnedRaw)} / ${xcp(softCapRaw)} XCP${pct}`,
+      link(asset),
+    ].join("\n"),
+  );
+}
+
+export interface CloseFacts {
+  asset: string;
+  graduated: boolean;
+  earnedRaw: bigint;
+  mints: number;
+  minters: number;
+}
+
+/**
+ * No size bar on either outcome, deliberately.
+ *
+ * A graduation raises 690 XCP, which on the mint scale would be 1,380 emoji —
+ * and even capped it would be a wall that says nothing the number beside it
+ * does not. The bar exists to make ONE event's size legible at a glance
+ * against its neighbours; a launch closing is not that kind of event, it is
+ * the end of hundreds of them. It gets the wordmark's own 🎉 instead.
+ */
+export function mintClosed(f: CloseFacts): Announcement {
+  return withPhoto(
+    f.asset,
+    f.graduated
+      ? [
+          `${GRADUATE_EMOJI} <b>${f.asset}</b> GRADUATED ${GRADUATE_EMOJI}`,
+          `${xcp(f.earnedRaw)} XCP raised · ${f.minters} minters · ${f.mints} mints`,
+          `Pool is live`,
+          link(f.asset),
+        ].join("\n")
+      : [
+          `💔 <b>${f.asset}</b> refunded`,
+          `${xcp(f.earnedRaw)} XCP raised · ${f.minters} minters · soft cap not met`,
+          `Everyone is repaid`,
+          link(f.asset),
+        ].join("\n"),
+  );
+}
+
+export interface TradeFacts {
+  asset: string;
+  buy: boolean;
+  tokenRaw: bigint;
+  xcpRaw: bigint;
+  venue: "pool" | "book";
+}
+
+export function trade(f: TradeFacts): Announcement {
+  return withPhoto(
+    f.asset,
+    [
+      sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
+      `<b>${f.asset}</b> ${f.buy ? "bought" : "sold"}`,
+      `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP · ${f.venue}`,
+      link(f.asset),
+    ].join("\n"),
+  );
+}
+
+function percent(part: bigint, whole: bigint): number {
+  if (whole <= 0n) return 0;
+  // Basis points in bigint, then one division at the end — a percentage of two
+  // raw quantities should not go through a double just to be rounded.
+  return Number((big(part) * 10_000n) / whole) / 100;
+}
+
+const short = (addr: string) =>
+  addr.length > 12 ? `${addr.slice(0, 6)}…${addr.slice(-4)}` : addr;
