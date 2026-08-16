@@ -63,6 +63,16 @@ class_name = "LaunchRoom"
 name = "SITE_PRESENCE"
 class_name = "SitePresence"
 
+# The Telegram queue. Also one fixed instance: it exists to hold a rate limit
+# that belongs to the channel, and a second one would only race the first.
+[[durable_objects.bindings]]
+name = "ANNOUNCER"
+class_name = "Announcer"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["LaunchRoom", "SitePresence"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Announcer"]

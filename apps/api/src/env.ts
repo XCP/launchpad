@@ -1,3 +1,4 @@
+import type { Announcer } from "#api/durable/announcer";
 import type { LaunchRoom } from "#api/durable/launch-room";
 import type { SitePresence } from "#api/durable/site-presence";
 
@@ -5,6 +6,9 @@ export interface Env {
   DB: D1Database;
   LAUNCH_ROOM: DurableObjectNamespace<LaunchRoom>;
   SITE_PRESENCE: DurableObjectNamespace<SitePresence>;
+  /** One instance, site-wide — the rate limit being managed belongs to the
+   *  channel, so several queues would just race into the same ceiling. */
+  ANNOUNCER: DurableObjectNamespace<Announcer>;
   /** Bot token for the announce channel. A secret — `wrangler secret put`,
    *  never wrangler.toml. Absent in dev, which switches announcing off rather
    *  than failing: a local tick should not post to the real channel. */

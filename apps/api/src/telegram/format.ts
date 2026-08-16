@@ -79,6 +79,23 @@ export function xcp(raw: bigint): string {
   return formatExact(rawToDecimalString(raw, 8), { maximumFractionDigits: 2 });
 }
 
+/**
+ * A TOKEN quantity said in XCP.
+ *
+ * soft_cap, hard_cap and earned_quantity are all counts of the token, not of
+ * XCP — the standard's soft cap is 69,000,000 tokens. Printing those beside
+ * the word XCP claimed a launch was raising 69 million XCP, which is more
+ * than the asset's entire supply and read as plausible because the number had
+ * a unit next to it.
+ *
+ * The conversion is exact and comes from the standard's own fixed price:
+ * 1,000-token lots at 0.01 XCP, so 100,000 tokens is 1 XCP. Both sides are
+ * 8-decimal raw, so this is a division by the lot ratio and nothing else.
+ */
+export function xcpOfTokens(tokenRaw: bigint): string {
+  return xcp(tokenRaw / 100_000n);
+}
+
 /** ~10 minutes a block, said the way a person would say it. */
 export function blocksEta(blocks: number): string {
   if (blocks <= 0) return "now";
@@ -136,7 +153,7 @@ export function newLaunch(f: LaunchFacts): Announcement {
     [
       `🚀 <b>${f.asset}</b> announced`,
       when,
-      `${xcp(f.softCapRaw)} XCP soft cap · ${tokens(f.hardCapRaw)} supply`,
+      `${xcpOfTokens(f.softCapRaw)} XCP soft cap · ${tokens(f.hardCapRaw)} supply`,
       link(f.asset),
     ].join("\n"),
   );
@@ -202,11 +219,57 @@ export function mintClosing(
     asset,
     [
       `⏳ <b>${asset}</b> closes in ${blocks} block${blocks === 1 ? "" : "s"} (${blocksEta(blocks)})`,
-      `${xcp(earnedRaw)} / ${xcp(softCapRaw)} XCP${pct}`,
+      `${xcpOfTokens(earnedRaw)} / ${xcpOfTokens(softCapRaw)} XCP${pct}`,
       link(asset),
     ].join("\n"),
   );
 }
+
+/**
+ * The last stretch, when selling out stops being hypothetical.
+ *
+ * Fires once per launch, on the way past a progress mark. Live-only and never
+ * replayed: half of what makes it worth reading is what is sitting in the
+ * mempool right now, and there is no history of that — a mempool is only ever
+ * the present. Replaying "90% minted, 4% pending" for a launch that closed
+ * last week would be inventing a fact rather than recalling one.
+ *
+ * The pending share is what separates this from the countdown. At 90% minted
+ * the question is not "is there time" but "is there any left", and unconfirmed
+ * mints are the part of the answer no block explorer shows you yet.
+ */
+export function nearingSoldOut(
+  asset: string,
+  mintedPct: number,
+  pendingPct: number,
+): Announcement {
+  // Every figure derived from the ones actually printed, so the three add to
+  // 100. Deriving the remainder from the raw percentages instead lets rounding
+  // put 90 + 4 + 5 on one line, and a reader who adds them up is not wrong to
+  // conclude the bot cannot count.
+  //
+  // Minted floors and pending rounds, both deliberately: overstating how much
+  // is gone discourages a mint that would still have landed, and understating
+  // what is queued is the direction that costs someone a transaction.
+  const minted = Math.floor(mintedPct);
+  const pendingShown = pendingPct >= 1 ? Math.round(pendingPct) : 0;
+  const open = Math.max(0, 100 - minted - pendingShown);
+  const pending =
+    pendingShown > 0 ? `${pendingShown}% more is in the mempool` : `nothing pending yet`;
+  return withPhoto(
+    asset,
+    [
+      `🔥 <b>${asset}</b> is ${minted}% minted`,
+      `${pending} · ${open}% still open`,
+      link(asset),
+    ].join("\n"),
+  );
+}
+
+/** The marks a launch can cross on the way to selling out. One message each,
+ *  claimed by `near:<tx_hash>:<mark>`, so a launch that stalls at 91% does not
+ *  repeat and one that jumps 80→95 in a block says the higher thing once. */
+export const NEAR_MARKS = [75, 90, 95, 99] as const;
 
 export interface CloseFacts {
   asset: string;
@@ -231,13 +294,13 @@ export function mintClosed(f: CloseFacts): Announcement {
     f.graduated
       ? [
           `${GRADUATE_EMOJI} <b>${f.asset}</b> GRADUATED ${GRADUATE_EMOJI}`,
-          `${xcp(f.earnedRaw)} XCP raised · ${f.minters} minters · ${f.mints} mints`,
+          `${xcpOfTokens(f.earnedRaw)} XCP raised · ${f.minters} minters · ${f.mints} mints`,
           `Pool is live`,
           link(f.asset),
         ].join("\n")
       : [
           `💔 <b>${f.asset}</b> refunded`,
-          `${xcp(f.earnedRaw)} XCP raised · ${f.minters} minters · soft cap not met`,
+          `${xcpOfTokens(f.earnedRaw)} XCP raised · ${f.minters} minters · soft cap not met`,
           `Everyone is repaid`,
           link(f.asset),
         ].join("\n"),

@@ -3,7 +3,20 @@ import type { Env } from "#api/env";
 import { syncLaunches } from "#api/indexer/sync";
 import { launchesRoute } from "#api/read/launches";
 import { mintClosed } from "#api/telegram/format";
+import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
+import { fetchBlockHeight } from "#api/integrations/counterparty";
+
+export { Announcer } from "#api/durable/announcer";
+
+/** Length-then-value, so a wrong token does not leak its length by failing
+ *  faster on a short one. Not constant time, but this guards a channel post,
+ *  not a key. */
+function authed(supplied: string | undefined, expected: string | undefined): boolean {
+  const a = supplied ?? "";
+  const b = expected ?? "";
+  return b.length > 0 && a.length === b.length && a === b;
+}
 import { runScheduledJob } from "#api/scheduler/job";
 import { withLock } from "#api/scheduler/lock";
 
@@ -25,10 +38,73 @@ app.route("/", launchesRoute);
  * would send when `dry` is set, which is how the wording gets reviewed without
  * posting.
  */
+/**
+ * Replay the whole backlog into the channel, oldest first.
+ *
+ * `?dry=1` returns every message it would send, in order, without sending or
+ * claiming anything — which is how a couple of hundred messages get reviewed
+ * before any of them are read by a person.
+ *
+ * A live run claims each key in `announced` as it enqueues, so the indexer
+ * that takes over afterwards sees the past as already said and starts from
+ * whatever happens next. Claiming and queueing in the same pass is what makes
+ * running this twice harmless: the second run finds every key taken and
+ * enqueues nothing.
+ */
+app.post("/admin/replay", async (c) => {
+  if (!authed(c.req.header("x-admin-token"), c.env.ADMIN_TOKEN)) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const height = await fetchBlockHeight();
+  const backlog = await buildBacklog(c.env.DB, height);
+
+  if (c.req.query("dry")) {
+    return c.json({
+      count: backlog.length,
+      estimated_minutes: Math.ceil((backlog.length * 3.5) / 60),
+      items: backlog.map((b) => ({ key: b.key, block: b.block, text: b.a.text })),
+    });
+  }
+
+  // Claim first, enqueue what was actually claimed. The other order would
+  // double-post on a retry: enqueued but unclaimed is invisible to the next
+  // run, and it would queue them all again.
+  const claimed: typeof backlog = [];
+  for (const item of backlog) {
+    const res = await c.env.DB.prepare(
+      `INSERT OR IGNORE INTO announced (key, at) VALUES (?1, ?2)`,
+    )
+      .bind(item.key, Math.floor(Date.now() / 1000))
+      .run();
+    if ((res.meta.rows_written ?? 0) > 0) claimed.push(item);
+  }
+
+  const stub = c.env.ANNOUNCER.get(c.env.ANNOUNCER.idFromName("global"));
+  const depth = await stub.enqueue(
+    claimed.map((item) => ({
+      a: item.a,
+      // Never collapsed. A replay is the feed it would have been, and it
+      // would not have been a digest — these arrived days apart.
+      mintOf: null,
+      earned: "0",
+      paid: "0",
+    })),
+  );
+  return c.json({ queued: claimed.length, skipped: backlog.length - claimed.length, depth });
+});
+
+/** Queue depth and a way to abandon a replay that was a mistake. */
+app.post("/admin/queue", async (c) => {
+  if (!authed(c.req.header("x-admin-token"), c.env.ADMIN_TOKEN)) {
+    return c.json({ error: "unauthorized" }, 401);
+  }
+  const stub = c.env.ANNOUNCER.get(c.env.ANNOUNCER.idFromName("global"));
+  if (c.req.query("drain")) return c.json({ dropped: await stub.drain() });
+  return c.json({ depth: await stub.depth() });
+});
+
 app.post("/admin/announce-test", async (c) => {
-  const supplied = c.req.header("x-admin-token") ?? "";
-  const expected = c.env.ADMIN_TOKEN ?? "";
-  if (!expected || supplied.length !== expected.length || supplied !== expected) {
+  if (!authed(c.req.header("x-admin-token"), c.env.ADMIN_TOKEN)) {
     return c.json({ error: "unauthorized" }, 401);
   }
   const sample = mintClosed({

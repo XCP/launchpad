@@ -11,7 +11,9 @@ import {
   GRADUATE_EMOJI,
   MINT_EMOJI,
   MIN_TOKENS,
+  NEAR_MARKS,
   SELL_EMOJI,
+  nearingSoldOut,
   blocksEta,
   imageUrl,
   mint,
@@ -205,6 +207,104 @@ describe("the mint bar's cap is the standard's own ceiling", () => {
       progress: null,
     });
     expect(max.text.match(new RegExp(MINT_EMOJI, "gu"))).toHaveLength(20);
+  });
+});
+
+describe("nearing sold out", () => {
+  it("leads with how much is minted and names the pending share", () => {
+    const m = nearingSoldOut("A", 90.4, 4.2);
+    expect(m.text).toContain("90% minted");
+    expect(m.text).toContain("4% more is in the mempool");
+    expect(m.text).toContain("6% still open"); // 100 − 90 − 4, from the shown figures
+  });
+
+  it("says so plainly when nothing is pending", () => {
+    // "0% is in the mempool" reads as a measurement failure rather than as
+    // an empty mempool.
+    expect(nearingSoldOut("A", 92, 0).text).toContain("nothing pending yet");
+  });
+
+  it("floors the minted share rather than rounding it up", () => {
+    // 99.6% announced as "100% minted" beside a live mint button is a worse
+    // lie than being half a point pessimistic.
+    expect(nearingSoldOut("A", 99.6, 0).text).toContain("99% minted");
+  });
+
+  it("never shows a negative remainder when the mempool overshoots", () => {
+    const m = nearingSoldOut("A", 96, 9);
+    expect(m.text).toContain("0% still open");
+    expect(m.text).not.toContain("-");
+  });
+
+  it("prints three numbers that add to 100", () => {
+    // A reader adds them up. If rounding lets them sum to 99 the bot looks
+    // like it cannot count, so the remainder is derived from what is shown.
+    for (const [minted, pending] of [
+      [90.4, 4.2],
+      [75.9, 1.1],
+      [99.2, 0.4],
+      [80, 12.5],
+    ] as const) {
+      const t = nearingSoldOut("A", minted, pending).text;
+      const nums = [...t.matchAll(/(\d+)%/g)].map((m) => Number(m[1]));
+      // minted + pending(if shown) + open, where an unshown pending is 0.
+      const sum = nums.reduce((a, b) => a + b, 0);
+      expect(sum).toBe(100);
+    }
+  });
+
+  it("has marks that only ever go up", () => {
+    expect([...NEAR_MARKS]).toEqual([...NEAR_MARKS].sort((a, b) => a - b));
+  });
+});
+
+describe("token quantities are never labelled XCP", () => {
+  // The bug this caught in a dry run: soft_cap, hard_cap and earned_quantity
+  // are counts of the TOKEN. Printed beside "XCP" they claimed a launch was
+  // raising 69,000,000 XCP — more than the asset's entire supply — and it read
+  // as plausible because the number had a unit next to it.
+  const SOFT_CAP_TOKENS = 6_900_000_000_000_000n; // 69M tokens = 690 XCP
+
+  it("says 690 XCP for the standard's soft cap, not 69,000,000", () => {
+    const m = newLaunch({
+      asset: "A",
+      startBlock: 10,
+      softCapRaw: SOFT_CAP_TOKENS,
+      hardCapRaw: raw(100_000_000n),
+      height: 0,
+    });
+    expect(m.text).toContain("690 XCP soft cap");
+    expect(m.text).not.toContain("69,000,000 XCP");
+  });
+
+  it("reports a full raise as 690 XCP on close", () => {
+    const m = mintClosed({
+      asset: "A",
+      graduated: true,
+      earnedRaw: SOFT_CAP_TOKENS,
+      mints: 142,
+      minters: 69,
+    });
+    expect(m.text).toContain("690 XCP raised");
+  });
+
+  it("counts down the close in XCP too", () => {
+    const m = mintClosing("A", 5, SOFT_CAP_TOKENS / 2n, SOFT_CAP_TOKENS);
+    expect(m.text).toContain("345 / 690 XCP");
+  });
+
+  it("still calls the token amount tokens on a mint", () => {
+    // The mint line is the one place both units appear, so it is the one
+    // place a mix-up would be invisible.
+    const m = mint({
+      asset: "A",
+      earnedRaw: raw(100_000n),
+      paidRaw: 100_000_000n,
+      source: "x",
+      progress: null,
+    });
+    expect(m.text).toContain("100,000 tokens");
+    expect(m.text).toContain("1 XCP");
   });
 });
 
