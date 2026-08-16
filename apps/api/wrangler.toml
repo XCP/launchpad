@@ -25,6 +25,13 @@ routes = [
 [observability]
 enabled = true
 
+# The announce channel. The id of a public channel is public — it is in the
+# t.me link — so it belongs here where it can be read and changed, rather than
+# in a secret nobody can inspect. The BOT TOKEN is the secret, and is set with
+# `wrangler secret put TELEGRAM_BOT_TOKEN`.
+[vars]
+TELEGRAM_CHAT_ID = "-1004326432550"
+
 # Blocks land every ~10 minutes, and Counterparty's /fairminters list has no
 # server-side filter beyond status — every tick re-lists the chain's ENTIRE
 # fairminter universe (not just xcp.fun's own tracked set), so this job's
