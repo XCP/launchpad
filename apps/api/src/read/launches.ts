@@ -196,9 +196,19 @@ launchesRoute.get("/v2/mempool", async (c) => {
   // the covered set is what D1 knows plus what was just judged above. Same
   // two-part rule the client used, with the indexed half now a query instead
   // of a download.
-  const covered = new Set(await listConformingAssets(c.env.DB));
-  for (const fm of fairminters) covered.add(fm.asset);
-  const mints = rawMints.filter((m) => covered.has(m.asset));
+  //
+  // Only when there is something to filter. An empty mempool is the normal
+  // state — most of the time nothing is queued at all — and reading every
+  // conforming launch to decide which of zero mints to keep was this
+  // database's single largest read: ~77,000 rows a day answering a question
+  // with no rows in it. The set is a membership test, so with nothing to test
+  // there is nothing to fetch.
+  let mints = rawMints;
+  if (rawMints.length > 0) {
+    const covered = new Set(await listConformingAssets(c.env.DB));
+    for (const fm of fairminters) covered.add(fm.asset);
+    mints = rawMints.filter((m) => covered.has(m.asset));
+  }
 
   return J(
     c,

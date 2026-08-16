@@ -3,7 +3,7 @@ import type { Env } from "#api/env";
 import { syncLaunches } from "#api/indexer/sync";
 import { launchesRoute } from "#api/read/launches";
 import { mintClosed } from "#api/telegram/format";
-import { announceLive } from "#api/telegram/live";
+import { announceLive, claimKeys } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
 import { fetchBlockHeight } from "#api/integrations/counterparty";
@@ -69,16 +69,10 @@ app.post("/admin/replay", async (c) => {
 
   // Claim first, enqueue what was actually claimed. The other order would
   // double-post on a retry: enqueued but unclaimed is invisible to the next
-  // run, and it would queue them all again.
-  const claimed: typeof backlog = [];
-  for (const item of backlog) {
-    const res = await c.env.DB.prepare(
-      `INSERT OR IGNORE INTO announced (key, at) VALUES (?1, ?2)`,
-    )
-      .bind(item.key, Math.floor(Date.now() / 1000))
-      .run();
-    if ((res.meta.rows_written ?? 0) > 0) claimed.push(item);
-  }
+  // run, and it would queue them all again. Batched — a backlog is hundreds
+  // of keys, and hundreds of sequential round trips is a request that times
+  // out for no reason.
+  const claimed = await claimKeys(c.env.DB, backlog);
 
   const stub = c.env.ANNOUNCER.get(c.env.ANNOUNCER.idFromName("global"));
   const depth = await stub.enqueue(
