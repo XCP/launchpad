@@ -53,6 +53,34 @@ async function fetchBusyDispensers(): Promise<Set<string>> {
 }
 
 /**
+ * The cheapest price anyone can actually deal at, in sats per XCP.
+ *
+ * The reference for both sides of this form. The USD market rate is not: the
+ * dispenser book trades well above spot — roughly $2.25 against a $1.50 market
+ * as this was written — so measuring against it told a buyer they were paying
+ * a 50% premium for the cheapest XCP available, and told a seller their most
+ * competitive possible ask was a premium too. A number that reports the same
+ * verdict at every price a user could pick is not informing the decision, and
+ * it made the Floor button and the line beneath it describe one price in
+ * opposite terms.
+ *
+ * Computed with Math.min rather than taken from the head of the list. The feed
+ * arrives sorted price-ascending, but a rule that leans on someone else's sort
+ * breaks silently the day it changes, and this one decides what a user is
+ * shown and what a button sets. Empty dispensers are excluded — one that
+ * cannot take a sale is not competition, and cannot be undercut.
+ *
+ * Null when there is nothing open, which is the honest answer: with no book
+ * there is no floor, and every caller hides its comparison rather than
+ * inventing one.
+ */
+function floorPrice(rows: Dispenser[]): number | null {
+  const live = rows.filter((r) => r.give_remaining > 0 && r.price > 0);
+  if (live.length === 0) return null;
+  return Math.round(Math.min(...live.map((r) => r.price)));
+}
+
+/**
  * The XCP bridge: dispensers aren't DEX orders — they're the on/off-ramp
  * between the Bitcoin side of your wallet and the Counterparty side. Load
  * sends BTC through the cheapest dispenser route and XCP lands next block;
@@ -344,7 +372,22 @@ function LoadCard({
     : [];
 
   const perXcpUsd = d && btcUsd ? (blendedSatsPerXcp / SATS) * btcUsd : null;
-  const vsMarket = perXcpUsd && xcpUsd ? (perXcpUsd / xcpUsd - 1) * 100 : null;
+  // How far this route's blended rate sits above the cheapest dispenser in it.
+  // Zero for a small order that the cheapest one fills alone, and it climbs as
+  // the order gets big enough to walk up the book — which is the cost this
+  // number exists to surface, and one the buyer controls by ordering less.
+  //
+  // Against the floor rather than the USD market rate, matching the sell side.
+  // Every dispenser purchase reads as a large premium over spot, including the
+  // cheapest one available, so that comparison said the same thing whatever
+  // the buyer did — a warning label on the page rather than a fact about
+  // this order. `open` and not `dispensers`: a dispenser with a pending
+  // mempool trigger is not routable, so it is not this route's floor either.
+  const floorSats = floorPrice(open);
+  const vsFloor =
+    floorSats !== null && blendedSatsPerXcp > 0
+      ? (blendedSatsPerXcp / floorSats - 1) * 100
+      : null;
 
   const busy = router.phase === "running";
 
@@ -586,13 +629,10 @@ function LoadCard({
           <span className="text-gray-600">
             1 XCP = {Math.round(blendedSatsPerXcp).toLocaleString()} sats
             {perXcpUsd && <span className="text-gray-400"> ({usdFmt(perXcpUsd)})</span>}
-            {vsMarket !== null && Math.abs(vsMarket) >= 1 && (
-              <span
-                className={`font-medium ${vsMarket <= 0 ? "text-green-600" : "text-amber-600"}`}
-              >
+            {vsFloor !== null && vsFloor >= 1 && (
+              <span className="font-medium text-amber-600">
                 {" "}
-                · {Math.abs(vsMarket).toFixed(0)}%{" "}
-                {vsMarket <= 0 ? "below" : "above"} market
+                · {vsFloor.toFixed(0)}% over floor
               </span>
             )}
           </span>
@@ -746,22 +786,13 @@ function UnloadCard({
     { refreshInterval: 30_000 },
   );
 
-  // The cheapest open dispenser — the price yours has to beat to vend first.
-  //
-  // Computed rather than read off the front of the list: the feed arrives
-  // sorted by price ascending today, but a rule that depends on someone else's
-  // sort order is a rule that breaks silently when the sort changes. Empty
-  // remainders are excluded because a dispenser with nothing left cannot take
-  // a sale, so it is not competition.
-  const floorSats = (() => {
-    const live = dispensers.filter((r) => r.give_remaining > 0 && r.price > 0);
-    if (live.length === 0) return null;
-    const cheapest = Math.min(...live.map((r) => r.price));
-    // Undercut by the smallest unit that exists. Clamped at 1: a book whose
-    // floor is already 1 sat cannot be undercut, and offering to sell at zero
-    // is not a price.
-    return Math.max(1, Math.round(cheapest) - 1);
-  })();
+  // Two different numbers, kept apart because they answer different questions.
+  // `floorSats` is where the competition sits and is what a price is measured
+  // against; `undercutSats` is what the buttons SET — one satoshi below it, by
+  // the smallest unit that exists, so this dispenser vends first. Clamped at
+  // 1: a book already at a satoshi cannot be undercut, and zero is not a price.
+  const floorSats = floorPrice(dispensers);
+  const undercutSats = floorSats === null ? null : Math.max(1, floorSats - 1);
 
   const priceSats = Math.round(parseFloat(price)) || (marketSats ?? 0);
   // Whole XCP only: these dispensers vend 1 XCP at a time, so a fractional
@@ -902,7 +933,7 @@ function UnloadCard({
           focusable
           label="Price · sats per XCP"
           topRight={
-            floorSats !== null ? (
+            undercutSats !== null && floorSats !== null ? (
               // Both buttons read off the BOOK, not off the USD market rate.
               // What decides whether a dispenser sells is where it sits
               // against the other dispensers, so the one-tap prices are the
@@ -917,13 +948,14 @@ function UnloadCard({
                 <button
                   type="button"
                   onClick={() => setPrice(String(Math.round(floorSats * 1.1)))}
+                  title="Ten percent above the cheapest open dispenser"
                   className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                 >
                   +10%
                 </button>
                 <button
                   type="button"
-                  onClick={() => setPrice(String(floorSats))}
+                  onClick={() => setPrice(String(undercutSats))}
                   title="One satoshi under the cheapest open dispenser"
                   className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                 >
@@ -961,12 +993,16 @@ function UnloadCard({
                   <span>&nbsp;</span>
                 )}
               </span>
-              {floorSats !== null && (
+              {floorSats !== null && undercutSats !== null && (
                 <button
                   type="button"
                   className="text-gray-500 hover:text-purple-600"
-                  onClick={() => setPrice(String(floorSats))}
+                  onClick={() => setPrice(String(undercutSats))}
                 >
+                  {/* Shows where the competition is; sets one satoshi under
+                      it. Naming it for the number it reports rather than the
+                      one it writes, because the reported number is the fact —
+                      the undercut is just how you beat it. */}
                   Floor: {floorSats.toLocaleString()}
                 </button>
               )}
