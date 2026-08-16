@@ -206,7 +206,6 @@ export function mint(f: MintFacts): Announcement {
   // phone shows and wrapped anyway, so the break is happening either way —
   // better to choose where it lands than to let Telegram choose.
   const lines = [
-    sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP),
     `${assetLink(f.asset)} minted`,
     `${tokens(f.earnedRaw)} tokens · ${xcp(f.paidRaw)} XCP`,
   ];
@@ -214,6 +213,12 @@ export function mint(f: MintFacts): Announcement {
     lines.push(`${Math.min(100, Math.round(f.progress * 100))}% to soft cap`);
   }
   lines.push(addressLink(f.source));
+  // The bar goes LAST on anything with a size. Leading with it pushed the
+  // ticker down a line and made every message open with the same block of
+  // colour, so the eye had to travel past the decoration to reach the fact.
+  // Trailing, the name is the first thing read and the bar is what the eye
+  // lands on afterwards — which is the order the information is wanted in.
+  lines.push(sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP));
   return withPhoto(f.asset, lines.join("\n"));
 }
 
@@ -229,9 +234,9 @@ export function mintDigest(
   return withPhoto(
     asset,
     [
-      sizeBar(MINT_EMOJI, earnedRaw, MINT_PAIR_CAP),
       `${assetLink(asset)} · ${count} mints`,
       `${tokens(earnedRaw)} tokens · ${xcp(paidRaw)} XCP`,
+      sizeBar(MINT_EMOJI, earnedRaw, MINT_PAIR_CAP),
     ].join("\n"),
   );
 }
@@ -296,10 +301,18 @@ export function nearingSoldOut(
   );
 }
 
-/** The marks a launch can cross on the way to selling out. One message each,
- *  claimed by `near:<tx_hash>:<mark>`, so a launch that stalls at 91% does not
- *  repeat and one that jumps 80→95 in a block says the higher thing once. */
-export const NEAR_MARKS = [75, 90, 95, 99] as const;
+/**
+ * One mark, at 90%.
+ *
+ * A ladder of them (75/90/95/99 was the first attempt) turns a rare signal
+ * into a running commentary: four messages about one launch, each saying
+ * roughly what the last one said, and the fourth arriving when there is
+ * nothing left to act on anyway. Once is what makes it worth reading.
+ *
+ * Claimed as `near:<tx_hash>:90`, so a launch that hovers at 91% for a day
+ * does not repeat it.
+ */
+export const NEAR_MARKS = [90] as const;
 
 export interface CloseFacts {
   asset: string;
@@ -348,9 +361,9 @@ export function trade(f: TradeFacts): Announcement {
   return withPhoto(
     f.asset,
     [
-      sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
       `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
+      sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
     ].join("\n"),
   );
 }

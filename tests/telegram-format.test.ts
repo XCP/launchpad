@@ -176,6 +176,48 @@ describe("messages", () => {
   });
 });
 
+describe("the size bar sits last", () => {
+  // Leading with it pushed the ticker down a line and opened every message
+  // with the same block of colour, so the eye travelled past the decoration
+  // to reach the fact. Position is easy to flip back by accident while
+  // editing the lines around it, and nothing else would notice.
+  const lastLineOf = (text: string) => text.split("\n").at(-1)!;
+
+  it("on a mint", () => {
+    const m = mint({
+      asset: "A",
+      earnedRaw: raw(200_000n),
+      paidRaw: raw(2n),
+      source: "1FUNbtWSVaeUbxRC4cbCXeWiBJHrfxr2FS",
+      progress: 0.5,
+    });
+    expect(lastLineOf(m.text)).toBe(MINT_EMOJI.repeat(4));
+  });
+
+  it("on a digest", () => {
+    const d = mintDigest("A", 12, raw(300_000n), raw(3n));
+    expect(lastLineOf(d.text)).toBe(MINT_EMOJI.repeat(6));
+  });
+
+  it("on a buy and a sell", () => {
+    const buy = trade({ asset: "A", buy: true, tokenRaw: raw(100_000n), xcpRaw: raw(1n), venue: "pool" });
+    const sell = trade({ asset: "A", buy: false, tokenRaw: raw(100_000n), xcpRaw: raw(1n), venue: "pool" });
+    expect(lastLineOf(buy.text)).toBe(BUY_EMOJI.repeat(2));
+    expect(lastLineOf(sell.text)).toBe(SELL_EMOJI.repeat(2));
+  });
+
+  it("and the ticker is on the first line, where it is read first", () => {
+    const m = mint({
+      asset: "MINTCOIN",
+      earnedRaw: raw(100_000n),
+      paidRaw: raw(1n),
+      source: "x",
+      progress: null,
+    });
+    expect(m.text.split("\n")[0]).toContain("MINTCOIN");
+  });
+});
+
 describe("token artwork", () => {
   it("hangs every per-token announcement on the launch's own image", () => {
     // The image is what makes this a feed rather than a log, so a message
