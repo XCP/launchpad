@@ -5,6 +5,7 @@ import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
 import { MempoolChip, useMempoolCount } from "@/components/mempool-chip";
 import { RewardsChip } from "@/components/rewards-chip";
+import { TELEGRAM_URL, TelegramChip } from "@/components/telegram-chip";
 
 /**
  * The site header.
@@ -98,10 +99,15 @@ export function SiteHeader() {
             claim to be centred. Narrower screens get it inline, below. */}
         <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
           {/* Rewards is always on; mempool joins it only when something is
-              queued, so the pair re-centres itself as one unit. */}
+              queued, so the group re-centres itself as one unit. Telegram sits
+              last — the two before it are about this site's own state, and it
+              is the one that leaves. That also makes it the only chip whose
+              position is fixed: second normally, third when the mempool has
+              something to say. */}
           <div className="pointer-events-auto flex items-center gap-2">
             <RewardsChip />
             <MempoolChip />
+            <TelegramChip />
           </div>
         </div>
 
@@ -109,8 +115,14 @@ export function SiteHeader() {
           {/* Beside the burger on a phone, and beside the links in the band
               between — the same chips, just not pretending to be centred, and
               never both at once. */}
-          <span className="flex items-center lg:hidden">
+          {/* Telegram survives the one-chip rule because it costs almost
+              nothing to keep: below `lg` it is the logo alone, no label, so it
+              adds an icon's width rather than a word's. The status chip still
+              takes turns beside it — that constraint was about text, and this
+              does not spend any. */}
+          <span className="flex items-center gap-2 lg:hidden">
             {queued ? <MempoolChip /> : <RewardsChip />}
+            <TelegramChip />
           </span>
           <nav className="hidden items-center gap-4 sm:flex">
             {SECONDARY.map((l) => (
@@ -177,6 +189,13 @@ function MobileMenu() {
             </DM.Item>
           ))}
           <DM.Separator className="my-1.5 h-px bg-gray-100" />
+          {/* An external destination, so it says so — the menu is the index of
+              the site and this is the one row that leaves it. */}
+          <DM.Item asChild>
+            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className={item}>
+              Telegram ↗
+            </a>
+          </DM.Item>
           <DM.Item asChild>
             <Link href="/create" className={item}>
               Create a launch

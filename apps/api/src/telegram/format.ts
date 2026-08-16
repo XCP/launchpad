@@ -205,7 +205,12 @@ export function mint(f: MintFacts): Announcement {
   // Progress on its own line. On the amounts line it pushed past the width a
   // phone shows and wrapped anyway, so the break is happening either way —
   // better to choose where it lands than to let Telegram choose.
+  // The bar leads. It was moved to the end and moved back: trailing reads
+  // better as a single message, but a channel is read as a column, and the
+  // size is the thing worth spotting without stopping to read. Up top it
+  // lines up down the left edge and the feed can be scanned by shape alone.
   const lines = [
+    sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP),
     `${assetLink(f.asset)} minted`,
     `${tokens(f.earnedRaw)} tokens · ${xcp(f.paidRaw)} XCP`,
   ];
@@ -213,12 +218,6 @@ export function mint(f: MintFacts): Announcement {
     lines.push(`${Math.min(100, Math.round(f.progress * 100))}% to soft cap`);
   }
   lines.push(addressLink(f.source));
-  // The bar goes LAST on anything with a size. Leading with it pushed the
-  // ticker down a line and made every message open with the same block of
-  // colour, so the eye had to travel past the decoration to reach the fact.
-  // Trailing, the name is the first thing read and the bar is what the eye
-  // lands on afterwards — which is the order the information is wanted in.
-  lines.push(sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP));
   return withPhoto(f.asset, lines.join("\n"));
 }
 
@@ -234,9 +233,9 @@ export function mintDigest(
   return withPhoto(
     asset,
     [
+      sizeBar(MINT_EMOJI, earnedRaw, MINT_PAIR_CAP),
       `${assetLink(asset)} · ${count} mints`,
       `${tokens(earnedRaw)} tokens · ${xcp(paidRaw)} XCP`,
-      sizeBar(MINT_EMOJI, earnedRaw, MINT_PAIR_CAP),
     ].join("\n"),
   );
 }
@@ -361,9 +360,9 @@ export function trade(f: TradeFacts): Announcement {
   return withPhoto(
     f.asset,
     [
+      sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
       `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
-      sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
     ].join("\n"),
   );
 }
