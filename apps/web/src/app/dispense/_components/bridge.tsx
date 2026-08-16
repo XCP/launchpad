@@ -13,7 +13,15 @@ import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { Dispenser } from "@/lib/api/counterparty";
 import { commas, commasRaw, shortAddress, usd as usdFmt } from "@/lib/format";
-import { approx, SATS } from "@/lib/numeric";
+import {
+  approx,
+  big,
+  minRaw,
+  parseUnitsToRaw,
+  percentOf,
+  SATS,
+  SATS_PER_UNIT,
+} from "@/lib/numeric";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -74,10 +82,26 @@ async function fetchBusyDispensers(): Promise<Set<string>> {
  * there is no floor, and every caller hides its comparison rather than
  * inventing one.
  */
+/**
+ * Sats per whole XCP for one dispenser, derived from the two raw integers it
+ * is actually defined by rather than from the API's pre-divided `price`.
+ *
+ * `satoshirate` is what a vend costs and `give_quantity` is what it gives, so
+ * this is the quotient of two exact quantities. Taking `price` instead would
+ * mean accepting a division someone else already did in a double, and then
+ * rounding it again here.
+ */
+function perXcpSats(r: Dispenser): bigint {
+  const give = big(r.give_quantity);
+  if (give <= 0n) return 0n;
+  return (big(r.satoshirate) * SATS_PER_UNIT) / give;
+}
+
 function floorPrice(rows: Dispenser[]): number | null {
-  const live = rows.filter((r) => r.give_remaining > 0 && r.price > 0);
+  const live = rows.filter((r) => big(r.give_remaining) > 0n && perXcpSats(r) > 0n);
   if (live.length === 0) return null;
-  return Math.round(Math.min(...live.map((r) => r.price)));
+  const cheapest = live.reduce((lo, r) => minRaw(lo, perXcpSats(r)), perXcpSats(live[0]));
+  return approx(cheapest);
 }
 
 /**
@@ -283,33 +307,46 @@ function LoadCard({
 
   const d = open[0];
   const unitXcp = d ? d.give_quantity / SATS : 1;
+  // How many whole vends each route still holds. Both operands are raw
+  // quantities, so the division is done in bigint: truncating division on
+  // non-negative integers IS floor, and doing it exactly means the count never
+  // depends on two large sat figures having survived a double.
   const capsAll = open.map((r) =>
-    Math.max(0, Math.floor(r.give_remaining / r.give_quantity)),
+    Math.max(0, Number(big(r.give_remaining) / big(r.give_quantity))),
   );
   // Max fillable = the MAX_LEGS deepest routes combined.
   const capacity = [...capsAll]
     .sort((a, b) => b - a)
     .slice(0, MAX_LEGS)
     .reduce((s, c) => s + c, 0);
-  const typedXcp = parseFloat(xcpAmount) || 0;
-  const typedBtcSats = Math.round((parseFloat(btcAmount) || 0) * SATS);
+  // Typed amounts become raw units through the same parser every other input
+  // in this app uses, rather than parseFloat. It truncates past 8 decimals
+  // instead of rounding, which is the right direction for a field that
+  // decides what to send: never more than the user wrote.
+  const typedXcpRaw = parseUnitsToRaw(xcpAmount) ?? 0n;
+  const typedBtcSatsRaw = parseUnitsToRaw(btcAmount) ?? 0n;
   // BTC side floors against cheapest-first fill, as the protocol prices a
   // payment (get_must_give floors — overpay is kept). Approximate inverse;
   // the plan below recomputes exactly from the unit count.
-  const unitsForSats = (sats: number) => {
+  const unitsForSats = (sats: bigint) => {
     let left = sats;
     let units = 0;
     for (let i = 0; i < open.length && i < MAX_LEGS; i++) {
-      const take = Math.min(capsAll[i], Math.floor(left / open[i].satoshirate));
+      const perUnit = big(open[i].satoshirate);
+      if (perUnit <= 0n) continue;
+      const take = Math.min(capsAll[i], Number(left / perUnit));
       units += take;
-      left -= take * open[i].satoshirate;
+      left -= big(take) * perUnit;
     }
     return Math.min(units, capacity);
   };
   const n = d
     ? lastEdited === "xcp"
-      ? Math.max(0, Math.min(capacity, Math.round(typedXcp / unitXcp)))
-      : Math.max(0, unitsForSats(typedBtcSats))
+      ? // Raw XCP over raw XCP-per-vend, in bigint. Truncating rather than
+        // rounding to nearest, so a typed amount can never plan MORE vends
+        // than it pays for.
+        Math.max(0, Math.min(capacity, Number(typedXcpRaw / big(d.give_quantity))))
+      : Math.max(0, unitsForSats(typedBtcSatsRaw))
     : 0;
   // Fee-aware split: enumerate every route subset (≤ MAX_LEGS legs, first 8
   // routes), fill cheapest-first within the subset, minimize
@@ -319,7 +356,7 @@ function LoadCard({
     if (n === 0 || open.length === 0) return [];
     const routes = open.slice(0, 8);
     const caps = routes.map((r) =>
-      Math.max(0, Math.floor(r.give_remaining / r.give_quantity)),
+      Math.max(0, Number(big(r.give_remaining) / big(r.give_quantity))),
     );
     const subsets: number[][] = [];
     for (let a = 0; a < routes.length; a++) {
@@ -357,20 +394,40 @@ function LoadCard({
     }
     return best;
   })();
+  // Raw counterpart of `snapped`, for the "adjusts to" comparison below. That
+  // asks whether the plan matches what was typed, and a double subtraction
+  // answers it with an epsilon; raw units answer it with equality.
+  const snappedRaw = d ? big(n) * big(d.give_quantity) : 0n;
   const snapped = n * unitXcp;
   const btcSats = plan.reduce((s, l) => s + l.btcSats, 0);
   const btc = btcSats / SATS;
-  const blendedSatsPerXcp = snapped > 0 ? btcSats / snapped : d ? d.price : 0;
+  // Sats per whole XCP across the whole plan, from raw sats over raw XCP so
+  // the headline rate is a quotient of two exact quantities rather than of two
+  // doubles. Falls back to the cheapest route's own rate before an amount is
+  // typed, which is what the row is showing at that point.
+  const blendedRaw =
+    snappedRaw > 0n
+      ? (big(btcSats) * SATS_PER_UNIT) / snappedRaw
+      : d
+        ? perXcpSats(d)
+        : 0n;
   const fmtBtc = (sats: number) =>
     (sats / SATS).toFixed(8).replace(/0+$/, "").replace(/\.$/, "");
 
   const presets = d
     ? [1, 5, 10, 100].map((target) => {
-        const k = Math.max(1, Math.round((target * SATS) / d.give_quantity));
+        // Whole XCP to vends, exactly. Rounding a double here would have been
+        // fine at these sizes, but the raw form is the one the rest of the app
+        // uses and it cannot be wrong at any size.
+        const k = Math.max(
+          1,
+          Number((BigInt(target) * SATS_PER_UNIT) / big(d.give_quantity)),
+        );
         return { label: `${target}`, k, available: k <= capacity };
       })
     : [];
 
+  const blendedSatsPerXcp = approx(blendedRaw);
   const perXcpUsd = d && btcUsd ? (blendedSatsPerXcp / SATS) * btcUsd : null;
   // How far this route's blended rate sits above the cheapest dispenser in it.
   // Zero for a small order that the cheapest one fills alone, and it climbs as
@@ -540,7 +597,7 @@ function LoadCard({
                 className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                   !p.available
                     ? "cursor-not-allowed border-gray-100 text-gray-300"
-                    : n === p.k && (typedXcp > 0 || typedBtcSats > 0)
+                    : n === p.k && (typedXcpRaw > 0n || typedBtcSatsRaw > 0n)
                       ? "border-purple-400 bg-white text-purple-600"
                       : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
                 }`}
@@ -556,8 +613,8 @@ function LoadCard({
             <span>
               {xcpUsd && snapped > 0 && `≈ ${usdFmt(snapped * xcpUsd)}`}
               {lastEdited === "xcp" &&
-                typedXcp > 0 &&
-                Math.abs(snapped - typedXcp) > 1e-9 && (
+                typedXcpRaw > 0n &&
+                snappedRaw !== typedXcpRaw && (
                   <span className="text-amber-600">
                     {" "}
                     · adjusts to {commas(snapped)}
@@ -598,8 +655,8 @@ function LoadCard({
             <span>
               {btcUsd && btc > 0 && `≈ ${usdFmt(btc * btcUsd)}`}
               {lastEdited === "btc" &&
-                typedBtcSats > 0 &&
-                typedBtcSats !== btcSats && (
+                typedBtcSatsRaw > 0n &&
+                typedBtcSatsRaw !== big(btcSats) && (
                   <span className="text-amber-600"> · exact cost {fmtBtc(btcSats)}</span>
                 )}
             </span>
@@ -627,7 +684,7 @@ function LoadCard({
       <div className="px-2 pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600">
-            1 XCP = {Math.round(blendedSatsPerXcp).toLocaleString()} sats
+            1 XCP = {commasRaw(blendedRaw, 0)} sats
             {perXcpUsd && <span className="text-gray-400"> ({usdFmt(perXcpUsd)})</span>}
             {vsFloor !== null && vsFloor >= 1 && (
               <span className="font-medium text-amber-600">
@@ -759,7 +816,6 @@ function UnloadCard({
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
 
-  const marketSats = btcUsd && xcpUsd ? Math.round((xcpUsd / btcUsd) * SATS) : null;
   const [escrow, setEscrow] = useState("");
   const [price, setPrice] = useState(""); // sats per XCP
 
@@ -794,12 +850,24 @@ function UnloadCard({
   const floorSats = floorPrice(dispensers);
   const undercutSats = floorSats === null ? null : Math.max(1, floorSats - 1);
 
-  const priceSats = Math.round(parseFloat(price)) || (marketSats ?? 0);
+  // A price field in sats is a whole number of satoshi, so it parses as an
+  // integer rather than through the 8-decimal unit parser the amount fields
+  // use — `parseUnitsToRaw(v, 0)` is that same parser told this field has no
+  // decimals, which keeps one parser for every input in the app.
+  // Defaults to the undercut rather than the USD market rate. The USD rate was
+  // never a price anyone could sell at here — the book sits well above it — so
+  // an untouched field that meant "market" was proposing a price that would
+  // have jumped the whole queue by 30%. The floor is the neutral opening
+  // position: the cheapest place that actually vends.
+  const priceSats = approx(parseUnitsToRaw(price, 0) ?? 0n) || (undercutSats ?? 0);
   // Whole XCP only: these dispensers vend 1 XCP at a time, so a fractional
-  // remainder could never vend — it would just sit until close.
-  const typedEscrow = parseFloat(escrow) || 0;
-  const wholeEscrow = Math.floor(typedEscrow);
-  const escrowRaw = wholeEscrow * SATS;
+  // remainder could never vend — it would just sit until close. Truncated in
+  // raw units, so the escrow is exact and the fraction is dropped rather than
+  // rounded up into an amount the wallet does not hold.
+  const typedEscrowRaw = parseUnitsToRaw(escrow) ?? 0n;
+  const escrowRawBig = (typedEscrowRaw / SATS_PER_UNIT) * SATS_PER_UNIT;
+  const wholeEscrow = approx(typedEscrowRaw / SATS_PER_UNIT);
+  const escrowRaw = approx(escrowRawBig);
   const btcIfSold = priceSats > 0 ? (escrowRaw / SATS) * (priceSats / SATS) : 0;
   // Against the cheapest open dispenser, which is what decides whether this
   // ask vends at all — buyers fill cheapest-first, so position in the book is
@@ -947,7 +1015,7 @@ function UnloadCard({
               <span className="flex items-center gap-1">
                 <button
                   type="button"
-                  onClick={() => setPrice(String(Math.round(floorSats * 1.1)))}
+                  onClick={() => setPrice(String(percentOf(floorSats, 110)))}
                   title="Ten percent above the cheapest open dispenser"
                   className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
                 >
@@ -1012,7 +1080,7 @@ function UnloadCard({
           <AmountInput
             value={price}
             onChange={setPrice}
-            placeholder={marketSats ? String(marketSats) : "0"}
+            placeholder={undercutSats !== null ? String(undercutSats) : "0"}
             ariaLabel="Price in sats per XCP"
             className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
           />
@@ -1046,7 +1114,9 @@ function UnloadCard({
           <>
             <span>
               {xcpUsd && escrowRaw > 0 && `≈ ${usdFmt((escrowRaw / SATS) * xcpUsd)}`}
-              {typedEscrow > 0 && typedEscrow % 1 !== 0 && wholeEscrow >= 1 && (
+              {/* "Has a fraction" is now an exact question: the raw amount is
+                  not a whole number of XCP if truncating it changed it. */}
+              {typedEscrowRaw > 0n && escrowRawBig !== typedEscrowRaw && wholeEscrow >= 1 && (
                 <span className="text-amber-600">
                   {" "}
                   · adjusts to {wholeEscrow} (sells whole XCP)
@@ -1154,7 +1224,7 @@ function UnloadCard({
       open={dispensers}
       yourPriceSats={priceSats}
       yourEscrowXcp={escrowRaw / SATS}
-      active={escrowRaw > 0 || (parseFloat(price) || 0) > 0}
+      active={escrowRaw > 0 || (parseUnitsToRaw(price, 0) ?? 0n) > 0n}
       onPick={(sats) => setPrice(String(sats))}
     />
     </div>
@@ -1203,7 +1273,7 @@ function RouteBook({
               />
               <span className="relative z-10 flex items-center justify-between gap-2">
                 <span className="font-medium text-gray-900">
-                  {Math.round(r.price).toLocaleString()}{" "}
+                  {commasRaw(perXcpSats(r), 0)}{" "}
                   <span className="font-normal text-gray-400">sats</span>
                 </span>
                 <span className="flex items-center gap-2">
@@ -1213,7 +1283,7 @@ function RouteBook({
                         {commas(t * (r.give_quantity / SATS))} of{" "}
                       </span>
                     ) : null}
-                    {Math.round(r.give_remaining / SATS).toLocaleString()} XCP
+                    {commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP
                   </span>
                   <ExplorerLink txHash={r.tx_hash} />
                 </span>
@@ -1310,7 +1380,7 @@ function SellRow({
     <li className="relative">
       <button
         type="button"
-        onClick={() => onPick(Math.round(r.price))}
+        onClick={() => onPick(approx(perXcpSats(r)))}
         className="relative w-full overflow-hidden rounded-lg border border-transparent py-1.5 pl-2.5 pr-8 text-left text-xs transition-colors hover:border-amber-300 hover:bg-amber-50/50 active:scale-[0.99]"
       >
         <span
@@ -1320,10 +1390,10 @@ function SellRow({
         />
         <span className="relative z-10 flex items-center justify-between gap-2">
           <span className="font-medium text-gray-900">
-            {Math.round(r.price).toLocaleString()}{" "}
+            {commasRaw(perXcpSats(r), 0)}{" "}
             <span className="font-normal text-gray-400">sats</span>
           </span>
-          <span className="text-gray-500">{Math.round(r.give_remaining / SATS).toLocaleString()} XCP</span>
+          <span className="text-gray-500">{commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP</span>
         </span>
       </button>
       <span className="absolute inset-y-0 right-2 flex items-center">

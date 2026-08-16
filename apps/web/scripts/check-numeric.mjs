@@ -311,18 +311,13 @@ const EXEMPT = new Map([
       "core's own chunk size and DEFAULT_MULTISIG_DUST_SIZE, never from an " +
       "asset quantity",
   ],
-  [
-    "app/dispense/_components/bridge.tsx",
-    "XCP dispenser units and Bitcoin sat amounts, bounded by XCP's 2.6M supply — " +
-      "whole XCP only on the sell side, so escrow_quantity is an exact integer " +
-      "and useCompose's quantityParam gate rejects it if it ever isn't. Now also " +
-      "covers dispenser PRICES (floorPrice, the undercut, the +10% nudge): those " +
-      "are sats per XCP, four figures in practice and bounded by the same supply " +
-      "on both sides of the division. The bound is what this exemption rests on, " +
-      "so it holds only while this file trades XCP and BTC — a launch token's " +
-      "1e16 hard cap would not survive any of it, and putting token quantities " +
-      "in here means splitting the file rather than widening this line",
-  ],
+  // app/dispense/_components/bridge.tsx used to be exempted here, on the
+  // argument that XCP's 2.6M supply keeps every quantity in it inside the safe
+  // range. That was true, and it was still the wrong shape: an exemption that
+  // rests on "the numbers in this file happen to be small" holds only until
+  // someone puts a bigger number in the file, and nothing would have said so.
+  // It now does the same raw-unit math as everywhere else and needs no
+  // exemption, which is a stronger guarantee than the argument it replaced.
   [
     "app/faq/_components/explainer.tsx",
     "a simulator in whole units derived from the XCP-69 constants (690 XCP, " +
