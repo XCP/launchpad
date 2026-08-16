@@ -265,16 +265,21 @@ describe("token quantities are never labelled XCP", () => {
   // as plausible because the number had a unit next to it.
   const SOFT_CAP_TOKENS = 6_900_000_000_000_000n; // 69M tokens = 690 XCP
 
-  it("says 690 XCP for the standard's soft cap, not 69,000,000", () => {
-    const m = newLaunch({
-      asset: "A",
-      startBlock: 10,
-      softCapRaw: SOFT_CAP_TOKENS,
-      hardCapRaw: raw(100_000_000n),
-      height: 0,
-    });
-    expect(m.text).toContain("690 XCP soft cap");
-    expect(m.text).not.toContain("69,000,000 XCP");
+  it("never prints a token count beside XCP", () => {
+    // 69,000,000 XCP would be more than the asset's entire supply. Every
+    // message that names XCP is checked, because the mistake is one
+    // substitution away and looks right.
+    const texts = [
+      mintClosed({
+        asset: "A",
+        graduated: true,
+        earnedRaw: SOFT_CAP_TOKENS,
+        mints: 1,
+        minters: 1,
+      }).text,
+      mintClosing("A", 5, SOFT_CAP_TOKENS, SOFT_CAP_TOKENS).text,
+    ];
+    for (const t of texts) expect(t).not.toContain("69,000,000 XCP");
   });
 
   it("reports a full raise as 690 XCP on close", () => {

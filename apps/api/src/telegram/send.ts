@@ -16,6 +16,13 @@ export interface SendResult {
    *  off by this rather than guessing. */
   retryAfter: number | null;
   error: string | null;
+  /** The id Telegram assigned, kept so a replay can be undone.
+   *
+   *  There is no API for "list what this bot has posted" — a bot cannot read
+   *  channel history — so an id not recorded at send time is an id that cannot
+   *  be deleted later except by hand. Iterating on the wording means posting
+   *  the backlog more than once, and each attempt has to be removable. */
+  messageId: number | null;
 }
 
 /**
@@ -65,21 +72,31 @@ async function call(
     const data = (await res.json()) as {
       ok?: boolean;
       description?: string;
+      result?: { message_id?: number };
       parameters?: { retry_after?: number };
     };
-    if (data.ok) return { ok: true, retryAfter: null, error: null };
+    if (data.ok) {
+      return {
+        ok: true,
+        retryAfter: null,
+        error: null,
+        messageId: data.result?.message_id ?? null,
+      };
+    }
     return {
       ok: false,
       // 429 carries its own wait. Honour it rather than inventing a backoff —
       // guessing short gets us limited again, guessing long stalls the feed.
       retryAfter: data.parameters?.retry_after ?? null,
       error: data.description ?? `HTTP ${res.status}`,
+      messageId: null,
     };
   } catch (e) {
     return {
       ok: false,
       retryAfter: null,
       error: e instanceof Error ? e.message : String(e),
+      messageId: null,
     };
   }
 }

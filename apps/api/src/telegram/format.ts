@@ -53,6 +53,20 @@ export const SELL_EMOJI = "🔴";
 /** The wordmark's own emoji, so a graduation reads as the site celebrating. */
 export const GRADUATE_EMOJI = "🎉";
 
+/**
+ * A launch being announced is the feed shouting, so it gets megaphones — and
+ * more than a pair, because this is the one message that should catch an eye
+ * scrolling past.
+ *
+ * The rocket is deliberately NOT here. It reads as "this is going up", which
+ * on an announcement is a claim nobody has earned yet — the launch has not
+ * even opened. It is saved for the graduation, where it is a statement of
+ * something that actually happened.
+ */
+export const ANNOUNCE_EMOJI = "📣";
+const ANNOUNCE_COUNT = 3;
+export const LAUNCHED_EMOJI = "🚀";
+
 /** Raw token units (8 decimals) to whole tokens. Amounts arrive as raw
  *  quantities everywhere in this repo; the bar is sized on whole tokens. */
 const wholeTokens = (raw: bigint) => raw / 100_000_000n;
@@ -106,7 +120,24 @@ export function blocksEta(blocks: number): string {
   return `~${Math.round(hours / 24)}d`;
 }
 
-const link = (asset: string) => `https://xcp.fun/${asset}`;
+const SITE = "https://xcp.fun";
+
+/**
+ * The ticker, bold and linked to its page.
+ *
+ * Linking the NAME rather than trailing a bare URL underneath: the name is
+ * already the thing a reader looks for, and a naked link on its own line is a
+ * second thing to skip past on every message in a feed that is mostly skimmed.
+ * It also buys back a line, which matters on a phone.
+ */
+const assetLink = (asset: string) =>
+  `<a href="${SITE}/${encodeURIComponent(asset)}"><b>${asset}</b></a>`;
+
+/** A minter, linked to their profile. Shortened because the full address is
+ *  35 characters of noise; linked because "who was that" is the obvious next
+ *  question and the site can answer it. */
+const addressLink = (addr: string) =>
+  `<a href="${SITE}/profile/${encodeURIComponent(addr)}">${short(addr)}</a>`;
 
 /**
  * The token's own artwork, which is what makes this a feed rather than a log.
@@ -148,13 +179,15 @@ export function newLaunch(f: LaunchFacts): Announcement {
     away > 0
       ? `Opens at block ${f.startBlock.toLocaleString("en-US")} (${blocksEta(away)})`
       : `Open now`;
+  // No soft cap or supply line. Every XCP-69 launch has the same ones — 690
+  // XCP and 100,000,000 tokens are in the standard, not in the launch — so
+  // repeating them on every announcement is a constant dressed as news, and it
+  // pushed the link down a line for nothing.
   return withPhoto(
     f.asset,
     [
-      `🚀 <b>${f.asset}</b> announced`,
+      `${ANNOUNCE_EMOJI.repeat(ANNOUNCE_COUNT)} ${assetLink(f.asset)} announced`,
       when,
-      `${xcpOfTokens(f.softCapRaw)} XCP soft cap · ${tokens(f.hardCapRaw)} supply`,
-      link(f.asset),
     ].join("\n"),
   );
 }
@@ -169,17 +202,19 @@ export interface MintFacts {
 }
 
 export function mint(f: MintFacts): Announcement {
-  const pct =
-    f.progress === null ? "" : ` · ${Math.min(100, Math.round(f.progress * 100))}% to soft cap`;
-  return withPhoto(
-    f.asset,
-    [
-      sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP),
-      `<b>${f.asset}</b> minted`,
-      `${tokens(f.earnedRaw)} tokens · ${xcp(f.paidRaw)} XCP${pct}`,
-      `${short(f.source)}`,
-    ].join("\n"),
-  );
+  // Progress on its own line. On the amounts line it pushed past the width a
+  // phone shows and wrapped anyway, so the break is happening either way —
+  // better to choose where it lands than to let Telegram choose.
+  const lines = [
+    sizeBar(MINT_EMOJI, f.earnedRaw, MINT_PAIR_CAP),
+    `${assetLink(f.asset)} minted`,
+    `${tokens(f.earnedRaw)} tokens · ${xcp(f.paidRaw)} XCP`,
+  ];
+  if (f.progress !== null) {
+    lines.push(`${Math.min(100, Math.round(f.progress * 100))}% to soft cap`);
+  }
+  lines.push(addressLink(f.source));
+  return withPhoto(f.asset, lines.join("\n"));
 }
 
 /** A run of mints on one launch, collapsed because the queue got long. The
@@ -195,17 +230,14 @@ export function mintDigest(
     asset,
     [
       sizeBar(MINT_EMOJI, earnedRaw, MINT_PAIR_CAP),
-      `<b>${asset}</b> · ${count} mints`,
+      `${assetLink(asset)} · ${count} mints`,
       `${tokens(earnedRaw)} tokens · ${xcp(paidRaw)} XCP`,
     ].join("\n"),
   );
 }
 
 export function mintOpen(asset: string): Announcement {
-  return withPhoto(
-    asset,
-    [`🔔 <b>${asset}</b> is OPEN`, `Minting has started`, link(asset)].join("\n"),
-  );
+  return withPhoto(asset, [`🔔 ${assetLink(asset)} is OPEN`, `Minting has started`].join("\n"));
 }
 
 export function mintClosing(
@@ -218,9 +250,8 @@ export function mintClosing(
   return withPhoto(
     asset,
     [
-      `⏳ <b>${asset}</b> closes in ${blocks} block${blocks === 1 ? "" : "s"} (${blocksEta(blocks)})`,
+      `⏳ ${assetLink(asset)} closes in ${blocks} block${blocks === 1 ? "" : "s"} (${blocksEta(blocks)})`,
       `${xcpOfTokens(earnedRaw)} / ${xcpOfTokens(softCapRaw)} XCP${pct}`,
-      link(asset),
     ].join("\n"),
   );
 }
@@ -259,9 +290,8 @@ export function nearingSoldOut(
   return withPhoto(
     asset,
     [
-      `🔥 <b>${asset}</b> is ${minted}% minted`,
+      `🔥 ${assetLink(asset)} is ${minted}% minted`,
       `${pending} · ${open}% still open`,
-      link(asset),
     ].join("\n"),
   );
 }
@@ -293,16 +323,15 @@ export function mintClosed(f: CloseFacts): Announcement {
     f.asset,
     f.graduated
       ? [
-          `${GRADUATE_EMOJI} <b>${f.asset}</b> GRADUATED ${GRADUATE_EMOJI}`,
-          `${xcpOfTokens(f.earnedRaw)} XCP raised · ${f.minters} minters · ${f.mints} mints`,
+          `${GRADUATE_EMOJI}${LAUNCHED_EMOJI} ${assetLink(f.asset)} GRADUATED ${LAUNCHED_EMOJI}${GRADUATE_EMOJI}`,
+          `${xcpOfTokens(f.earnedRaw)} XCP raised`,
+          `${f.minters} minters · ${f.mints} mints`,
           `Pool is live`,
-          link(f.asset),
         ].join("\n")
       : [
-          `💔 <b>${f.asset}</b> refunded`,
-          `${xcpOfTokens(f.earnedRaw)} XCP raised · ${f.minters} minters · soft cap not met`,
+          `💔 ${assetLink(f.asset)} refunded`,
+          `${xcpOfTokens(f.earnedRaw)} XCP raised · soft cap not met`,
           `Everyone is repaid`,
-          link(f.asset),
         ].join("\n"),
   );
 }
@@ -320,9 +349,8 @@ export function trade(f: TradeFacts): Announcement {
     f.asset,
     [
       sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
-      `<b>${f.asset}</b> ${f.buy ? "bought" : "sold"}`,
-      `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP · ${f.venue}`,
-      link(f.asset),
+      `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
+      `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
     ].join("\n"),
   );
 }

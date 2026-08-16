@@ -73,7 +73,35 @@ interface TradeRow {
   kind: string;
 }
 
-export async function buildBacklog(db: D1Database, height: number): Promise<BacklogItem[]> {
+/**
+ * Build the backlog, optionally only the part that has never been said.
+ *
+ * The same function serves the one-off replay and every tick after it, which
+ * is the point: "what should the channel have said by now" is one question,
+ * and the announced table is the only thing that distinguishes the first
+ * answer from the rest. A separate live path would be a second implementation
+ * of the same rules, free to drift from this one.
+ *
+ * `unannouncedOnly` pushes that filter into SQL rather than fetching
+ * everything and discarding most of it. Announced is keyed by exactly the
+ * strings built here, so each of these is a primary-key anti-join: work
+ * proportional to what is new, not to how much has ever happened.
+ */
+export async function buildBacklog(
+  db: D1Database,
+  height: number,
+  unannouncedOnly = false,
+): Promise<BacklogItem[]> {
+  const newLaunches = unannouncedOnly
+    ? `AND NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'launch:' || tx_hash)`
+    : "";
+  const newMints = unannouncedOnly
+    ? `AND NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'mint:' || m.tx_hash)`
+    : "";
+  const newTrades = unannouncedOnly
+    ? `WHERE NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'trade:' || event)`
+    : "";
+
   const [launches, mints, trades] = await Promise.all([
     q<LaunchRow>(
       db,
@@ -86,14 +114,20 @@ export async function buildBacklog(db: D1Database, height: number): Promise<Back
       `SELECT m.tx_hash, m.launch_tx, l.asset, m.block_index, m.source,
               m.earn_quantity, m.paid_quantity, l.soft_cap
          FROM launch_mints m
-         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1`,
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+        WHERE 1 = 1 ${newMints}`,
     ),
     q<TradeRow>(
       db,
       `SELECT event, asset, block_index, token_delta, xcp_delta, kind
-         FROM asset_events`,
+         FROM asset_events ${newTrades}`,
     ),
   ]);
+  // Launches are read whole regardless: the running progress on a replayed
+  // mint needs every earlier mint of that launch, and the open/closed keys are
+  // derived from a row's phase rather than from its own existence. The table
+  // is one row per launch, so this stays small by construction.
+  void newLaunches;
 
   const items: BacklogItem[] = [];
 
