@@ -194,7 +194,28 @@ export async function buildBacklog(
   const softCapOf = new Map(launches.map((l) => [l.tx_hash, BigInt(l.soft_cap)]));
   // Running total per launch, so each replayed mint shows the progress it
   // showed at the time rather than the launch's final number.
+  //
+  // Seeded with what the launch had earned BEFORE this batch, which is the
+  // whole point: on the live path `mints` holds only the mints not yet
+  // announced, so starting every launch at zero made the percentage the
+  // BATCH's contribution rather than the launch's progress. A launch with
+  // twenty prior mints announced its twenty-first as "0.4% to soft cap" — the
+  // size of that one mint — while /ASSET correctly showed the total.
+  //
+  // The seed is derived, not counted: `earned_quantity` is the launch's total
+  // across every mint, so subtracting this batch's mints leaves what stood
+  // before it. On a full replay the batch IS every mint, the subtraction
+  // yields zero, and the behaviour is exactly what it was. Clamped at zero in
+  // case the indexer has written mints it has not yet rolled into the total.
+  const batched = new Map<string, bigint>();
+  for (const m of mints) {
+    batched.set(m.launch_tx, (batched.get(m.launch_tx) ?? 0n) + BigInt(m.earn_quantity));
+  }
   const running = new Map<string, bigint>();
+  for (const l of launches) {
+    const before = BigInt(l.earned_quantity ?? "0") - (batched.get(l.tx_hash) ?? 0n);
+    if (before > 0n) running.set(l.tx_hash, before);
+  }
   for (const m of [...mints].sort((a, b) => a.block_index - b.block_index)) {
     const earned = BigInt(m.earn_quantity);
     const soFar = (running.get(m.launch_tx) ?? 0n) + earned;
