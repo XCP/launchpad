@@ -13,18 +13,75 @@ import {
   getLaunch,
   getLaunchesBySource,
   getMintsBySource,
+  isLaunchPhase,
   minterEarnings,
   listLaunches,
+  listLaunchPage,
   listMinters,
+  listSearchIndex,
   sumFees,
 } from "#api/queries/launches";
 import { J, router } from "#api/read/respond";
 
 export const launchesRoute = router();
 
+/** Page sizes are the caller's business, but not without a ceiling — `limit`
+ *  arrives in a query string and bounds how many rows one request can read. */
+const MAX_PAGE = 100;
+/** Deep enough for any real list, shallow enough that a crafted `offset`
+ *  cannot ask SQLite to walk an absurd number of rows to discard them. */
+const MAX_OFFSET = 100_000;
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
+
+/**
+ * The launch index, in two modes.
+ *
+ * With `phase`, it is ordinary offset/limit pagination over one phase:
+ * `{ result, total, limit, offset, sort }`, where `total` counts the phase and
+ * not the page. That is what the homepage sections use, and `total` is the
+ * point of it — the pager and the heading now read the same number from the
+ * same query, where before the heading counted the table via /v2/stats and the
+ * pager divided a fixed-size prefetch, so a section could truthfully say "30"
+ * above a list with no way to reach row 25.
+ *
+ * Without it, the old behaviour: the top `per_phase` of every phase in one
+ * response. Nothing on the site pages with that any more, but it is how the
+ * profile and portfolio views ask for "every launch, so I can price a holding"
+ * — a universe, not a list — and it is a published endpoint besides.
+ */
 launchesRoute.get("/v2/launches", async (c) => {
+  const phase = c.req.query("phase");
+  if (phase !== undefined) {
+    if (!isLaunchPhase(phase)) {
+      return c.json({ error: `unknown phase '${phase}'` }, 400);
+    }
+    const limit = clamp(Number(c.req.query("limit") ?? 24) || 24, 1, MAX_PAGE);
+    const offset = clamp(Number(c.req.query("offset") ?? 0) || 0, 0, MAX_OFFSET);
+    const sort = c.req.query("sort");
+    const { rows, total } = await listLaunchPage(c.env.DB, phase, sort, limit, offset);
+    return J(c, { result: rows, result_count: rows.length, total, limit, offset }, 60);
+  }
+
   const perPhase = Math.min(Number(c.req.query("per_phase") ?? 12) || 12, 50);
   const result = await listLaunches(c.env.DB, perPhase);
+  return J(c, { result, result_count: result.length }, 60);
+});
+
+/**
+ * The whole conforming set, in the columns search ranks on.
+ *
+ * Registered ahead of /v2/launches/:asset so the static segment wins — the
+ * same thing /v2/launches/by/:source already relies on.
+ *
+ * Search cannot be paged the way a list can: someone typing an exact ticker
+ * has said precisely what they want, and answering "no such launch" because it
+ * fell outside a window is a worse failure than a list being short. So this is
+ * the one read that is deliberately unbounded by design — bounded instead by
+ * the conforming set, which is the thing the site is actually about.
+ */
+launchesRoute.get("/v2/launches/index", async (c) => {
+  const result = await listSearchIndex(c.env.DB);
   return J(c, { result, result_count: result.length }, 60);
 });
 

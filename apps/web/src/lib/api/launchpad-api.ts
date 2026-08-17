@@ -322,6 +322,23 @@ export async function fetchEventsBySource(source: string): Promise<AssetEvent[] 
   }
 }
 
+function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
+  return {
+    fm: toFairminter(row),
+    phase: row.phase,
+    conforming: true as const,
+    xcpDepth: BigInt(Math.trunc(row.pool_xcp_sats) || 0),
+    poolXcpReserve: row.pool_xcp_reserve,
+    poolTokenReserve: row.pool_token_reserve,
+    announceBlock: row.announce_block,
+    minters: row.minters,
+  };
+}
+
+/** Every phase's top `perPhase` in one response — a universe to price a
+ *  holding against, not a list to read. The homepage pages with
+ *  {@link fetchLaunchPage} instead; this is what the profile and portfolio
+ *  views ask for when they need every launch they might hold. */
 export async function fetchIndexedLaunches(
   perPhase: number,
 ): Promise<IndexedLaunch[] | null> {
@@ -333,16 +350,105 @@ export async function fetchIndexedLaunches(
     if (!res.ok) return null;
     const data = (await res.json()) as { result?: ApiLaunchRow[] };
     if (!Array.isArray(data.result)) return null;
-    return data.result.map((row) => ({
-      fm: toFairminter(row),
-      phase: row.phase,
-      conforming: true as const,
-      xcpDepth: BigInt(Math.trunc(row.pool_xcp_sats) || 0),
-      poolXcpReserve: row.pool_xcp_reserve,
-      poolTokenReserve: row.pool_token_reserve,
-      announceBlock: row.announce_block,
-      minters: row.minters,
-    }));
+    return data.result.map(toIndexedLaunch);
+  } catch {
+    return null;
+  }
+}
+
+/** One page of one phase, and how many that phase holds in total. */
+export interface IndexedPage {
+  rows: IndexedLaunch[];
+  total: number;
+}
+
+/**
+ * Ordinary offset/limit paging over one phase.
+ *
+ * Called from the server for a section's first page and from the browser for
+ * every page after it, so it takes no Next-specific fetch options — the edge
+ * cache in front of the worker is what makes it cheap in both places, and a
+ * `next.revalidate` hint would be ignored in a browser anyway.
+ *
+ * `total` counts the phase, not the page. It travels with the rows because a
+ * pager that gets its length from somewhere else is a pager that can disagree
+ * with the list it sits under — which is exactly the bug this replaced, where
+ * the heading counted the table via /v2/stats and the pager divided a
+ * fixed-size prefetch that had already clipped the phase.
+ *
+ * Null on any failure, like every other reader here: the caller keeps whatever
+ * it was already showing rather than blanking a section over one bad request.
+ */
+export async function fetchLaunchPage(
+  phase: LaunchPhase,
+  /** Omit for the phase's default ordering. Left out rather than spelled out
+   *  so the default has exactly one definition — DEFAULT_SORT in
+   *  apps/api/src/queries/launches.ts — instead of a copy on this side that
+   *  could quietly disagree with it. */
+  sort: string | undefined,
+  limit: number,
+  offset: number,
+): Promise<IndexedPage | null> {
+  try {
+    const qs =
+      `phase=${phase}&limit=${limit}&offset=${offset}` +
+      (sort ? `&sort=${encodeURIComponent(sort)}` : "");
+    const res = await fetch(`${API_BASE}/v2/launches?${qs}`, {
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiLaunchRow[]; total?: number };
+    if (!Array.isArray(data.result)) return null;
+    // A response without `total` is not a page — it is an OLDER WORKER, which
+    // ignores `phase` entirely and answers the per_phase query instead: every
+    // phase mixed together, twelve rows, no count. Rendering that into a
+    // single phase's section would fill all three sections with the same
+    // twelve launches. Treating it as a failure sends the caller to its live
+    // Counterparty derivation, which is correct if slower, and means the two
+    // deploys can land in either order without a window of wrong pages.
+    if (typeof data.total !== "number") return null;
+    return { rows: data.result.map(toIndexedLaunch), total: data.total };
+  } catch {
+    return null;
+  }
+}
+
+/** The twelve columns /v2/launches/index returns, raw. Quantities stay
+ *  strings: this side owns the arithmetic (see toSearchRow), and a float
+ *  computed on the server would be a second implementation of it. */
+export interface SearchIndexEntry {
+  asset: string;
+  asset_longname: string | null;
+  source: string;
+  phase: string;
+  announce_block: number | null;
+  start_block: number;
+  minters: number;
+  earned_quantity: string | null;
+  soft_cap: string;
+  hard_cap: string;
+  pool_xcp_reserve: string | null;
+  pool_token_reserve: string | null;
+}
+
+/**
+ * Every conforming launch, for search.
+ *
+ * Unpaged on purpose. Search is a membership question — someone typing an
+ * exact ticker has said what they want — and answering "no such launch"
+ * because it fell outside a window is a worse failure than a short list.
+ *
+ * Fetched when the search dialog first opens rather than with the page, so a
+ * visit that never searches never pays for it.
+ */
+export async function fetchSearchIndex(): Promise<SearchIndexEntry[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/launches/index`, {
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: SearchIndexEntry[] };
+    return Array.isArray(data.result) ? data.result : null;
   } catch {
     return null;
   }

@@ -2,29 +2,13 @@
 
 import { useRouter } from "next/navigation";
 import { Dialog as D } from "radix-ui";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
+import { fetchSearchIndex } from "@/lib/api/launchpad-api";
+import { type SearchRow, toSearchRow } from "@/lib/launch-row";
 
-/** One launch, flattened to what search needs to rank, describe and rank it. */
-export interface SearchRow {
-  asset: string;
-  /** Only when it differs from the asset name — a subasset's longname. */
-  name: string | null;
-  phase: "scheduled" | "minting" | "graduated" | "refunded";
-  /** Who opened it. */
-  source: string;
-  /** Block it was announced in; its real age. */
-  announceBlock: number;
-  /** Distinct addresses that have minted — the number every phase has. */
-  minters: number;
-  /** XCP per whole token × supply. Zero unless graduated. */
-  marketCapXcp: number;
-  /** 0–1 toward the soft cap. Meaningful while minting. */
-  progress: number;
-  /** When minting opens. Meaningful while scheduled. */
-  startBlock: number;
-}
+export type { SearchRow };
 
 export type SearchPhase = "all" | "graduated" | "minting" | "scheduled";
 
@@ -100,21 +84,26 @@ function relevance(row: SearchRow, q: string): number {
  *
  * A dialog rather than a dropdown, because it is doing more than completing a
  * word: sorting and filtering need room, and a panel that owns the screen can
- * be driven entirely from the keyboard. Everything filters in memory over the
- * launches already sent to the page — instant, and it can never offer an asset
- * that isn't there.
+ * be driven entirely from the keyboard. Everything filters in memory, which is
+ * instant and can never offer an asset that isn't there.
  *
- * That in-memory choice has a ceiling. It is the right call while the whole
- * index fits in one payload and the wrong one once it doesn't; at that point
- * this component keeps its shape and the filtering moves behind a search
- * endpoint.
+ * What it filters is now the WHOLE conforming index, fetched the first time
+ * the dialog opens. It used to be whatever the homepage had already sent
+ * down, which quietly made search a search of the front page: once the
+ * sections became paged that was three pages, and typing the exact ticker of
+ * any launch outside them answered "nothing matches". Telling someone the
+ * thing they named does not exist is a worse failure than a short list, and it
+ * is the one failure a search box must not have.
+ *
+ * Fetched on open rather than with the page, so a visit that never searches
+ * never pays for it. The in-memory filtering still has a ceiling — it is the
+ * right call while the whole index fits in one payload — but the ceiling is
+ * now the size of the index rather than the size of a page.
  */
 export function LaunchSearch({
-  rows,
   height,
   xcpUsd,
 }: {
-  rows: SearchRow[];
   /** Chain tip, for turning a start block into "opens in". */
   height: number;
   xcpUsd: number | null;
@@ -123,6 +112,21 @@ export function LaunchSearch({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [phase, setPhase] = useState<SearchPhase>("all");
+  const [rows, setRows] = useState<SearchRow[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // Once. A second open re-uses what the first fetched; the index is a minute
+  // stale at worst, and re-fetching per open would spend a request to move a
+  // percentage.
+  const load = useCallback(() => {
+    if (rows !== null || loading) return;
+    setLoading(true);
+    fetchSearchIndex()
+      .then((res) => {
+        if (res) setRows(res.map(toSearchRow));
+      })
+      .finally(() => setLoading(false));
+  }, [rows, loading]);
 
   // Cmd/Ctrl-K from anywhere on the page, the convention for this control.
   useEffect(() => {
@@ -130,15 +134,16 @@ export function LaunchSearch({
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
         setOpen(true);
+        load();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [load]);
 
   const results = useMemo(() => {
     const q = query.trim().toUpperCase();
-    const pool = rows.filter((r) => (phase === "all" ? true : r.phase === phase));
+    const pool = (rows ?? []).filter((r) => (phase === "all" ? true : r.phase === phase));
     // Typing still ranks by how well the name answers it — an exact asset
     // beats a prefix beats a substring — and only then by the chosen sort.
     const matched = q ? pool.filter((r) => relevance(r, q) < 5) : pool;
@@ -160,7 +165,13 @@ export function LaunchSearch({
     }`;
 
   return (
-    <D.Root open={open} onOpenChange={setOpen}>
+    <D.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (next) load();
+      }}
+    >
       <D.Trigger asChild>
         <button
           type="button"
@@ -222,7 +233,13 @@ export function LaunchSearch({
           <ul className="min-h-0 flex-1 overflow-y-auto p-2">
             {results.length === 0 ? (
               <li className="px-3 py-8 text-center text-sm text-gray-500">
-                {query ? `Nothing matches “${query}”.` : "No launches in this phase yet."}
+                {/* "Nothing matches" is a claim about the index, so it must
+                    not be made before the index has arrived. */}
+                {rows === null
+                  ? "Loading launches…"
+                  : query
+                    ? `Nothing matches “${query}”.`
+                    : "No launches in this phase yet."}
               </li>
             ) : (
               results.map((r) => (
@@ -270,7 +287,7 @@ export function LaunchSearch({
 
           <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400">
             <span>
-              {results.length} of {rows.length}
+              {results.length} of {rows?.length ?? 0}
             </span>
             <span className="hidden sm:block">Enter opens the first result · Esc closes</span>
           </div>

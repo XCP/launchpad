@@ -2,36 +2,20 @@
 
 import Link from "next/link";
 import { DropdownMenu as DM } from "radix-ui";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { PREVIEW_ADDRESS } from "@/lib/constants";
 import { LABEL } from "@/components/ui/tokens";
 import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/format";
+import { fetchLaunchPage } from "@/lib/api/launchpad-api";
 import {
-  type Fairminter,
-  type LaunchPhase,
-  saleProgress,
-  XCP69_MIN_PARTICIPANTS,
-} from "@/lib/xcp69";
-
-/** One launch, with the derived numbers a section needs to sort and tabulate
- *  it. Computed on the server so every row arrives comparable. */
-export interface SectionRow {
-  fm: Fairminter;
-  phase: LaunchPhase;
-  conforming: boolean;
-  /** XCP per whole token × supply. Zero until a pool exists. */
-  marketCapXcp: number;
-  /** XCP per whole token. Zero until a pool exists. */
-  priceXcp: number;
-  /** Distinct addresses that have minted. */
-  minters: number;
-  /** Block it was announced in; 0 when unresolved. */
-  announceBlock: number;
-  /** 0–1 toward the soft cap. */
-  progress: number;
-}
+  type LaunchPage,
+  PER_PAGE,
+  type SectionRow,
+  toSectionRow,
+} from "@/lib/launch-row";
+import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xcp69";
 
 type View = "grid" | "table";
 
@@ -60,6 +44,16 @@ const announced = (r: SectionRow) =>
  * rather than one shared list where two thirds of the options are inert.
  * The first entry is the default, and matches the order apps/api already
  * returns the section in.
+ *
+ * Every `id` here is a key of SORT_SQL in apps/api/src/queries/launches.ts —
+ * that is the contract, and it is why these are terse strings rather than
+ * anything descriptive. The sort now happens in the database, because a
+ * section holds ONE PAGE: sorting what the browser has would order 24 of 30
+ * rows and call it the ranking. `by` has not been deleted along with the old
+ * client-side sort, because it is still what orders the section when the API
+ * is unreachable and the page falls back to deriving launches live — see the
+ * `paged` prop on Section. The two must agree, so a change to one of these
+ * comparators is a change to the SQL beside it.
  */
 const SORTS: Record<string, SortOption[]> = {
   graduated: [
@@ -68,6 +62,9 @@ const SORTS: Record<string, SortOption[]> = {
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
   minting: [
+    // First, so it is the default — and it must stay in step with
+    // DEFAULT_SORT.minting in apps/api/src/queries/launches.ts, which is what
+    // the server renders page one with.
     { id: "progress", label: "Progress", by: (a, b) => b.progress - a.progress },
     // The window is fixed by the standard at start_block + 1,000, so the
     // deadline is exact and closing order never contradicts opening order.
@@ -83,7 +80,11 @@ const SORTS: Record<string, SortOption[]> = {
   ],
   scheduled: [
     { id: "soonest", label: "Soonest", by: (a, b) => a.fm.start_block - b.fm.start_block },
-    { id: "newest", label: "Newest", by: (a, b) => b.fm.start_block - a.fm.start_block },
+    // Announced-age, the same as every other Newest on the page. This used to
+    // be start_block DESC, which for a scheduled launch is not "newest" at all
+    // — it is "opens last", the exact reverse of the option above it. Two
+    // controls that were really one axis in both directions.
+    { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
 };
 
@@ -94,22 +95,15 @@ const SORTS: Record<string, SortOption[]> = {
 const TABULAR = new Set(["graduated", "minting", "scheduled"]);
 
 /**
- * How many a section shows before paging, by phase.
+ * PER_PAGE is now the LIMIT on a query as well as the width of a slice, which
+ * is why it lives in lib/launch-row.ts beside the row shapes — the server
+ * renders page one with it and this fetches the rest with it.
  *
- * Not one number: these sections answer different questions. Graduated is a
- * shortlist of what did well, so eight is a look rather than a catalogue.
- * Minting is the one people are actually shopping, so it gets the most room.
- * Both 24 and 12 divide evenly by 2, 3 and 4 — the grid's column counts — so
- * no breakpoint ends on a ragged half-row.
+ * There used to be a second number: a table page held 25 where a grid page
+ * held 24. With paging server-side that would mean toggling the view silently
+ * re-fetched and reshuffled which launches you were looking at. The view is a
+ * way of drawing a page, not a different page.
  */
-const GRID_PER_PAGE: Record<string, number> = {
-  graduated: 8,
-  minting: 24,
-  scheduled: 12,
-};
-
-/** Rows are far cheaper than cards, so a table page holds more of them. */
-const TABLE_PER_PAGE = 25;
 
 /**
  * Graduated cards, fabricated from the launches that DO exist.
@@ -137,15 +131,31 @@ function sampleGraduated(rows: SectionRow[], height: number): SectionRow[] {
   }));
 }
 
+/** The first page of each section, as the server rendered it. */
+export interface InitialPages {
+  graduated: LaunchPage;
+  minting: LaunchPage;
+  scheduled: LaunchPage;
+}
+
 export function LaunchSections({
-  rows,
-  totals,
+  initial,
+  paged,
   height,
   xcpUsd,
 }: {
-  rows: SectionRow[];
-  /** Real totals per phase, which can exceed what was sent to the page. */
-  totals?: { graduated: number; minting: number; scheduled: number };
+  initial: InitialPages;
+  /**
+   * Whether more pages can be asked for.
+   *
+   * True in the normal case: each `LaunchPage` is page one of a phase and the
+   * rest are a request away. False when the API was unreachable and the page
+   * derived every launch live from Counterparty — then each `rows` already IS
+   * the whole phase, and the sections sort and slice it themselves. The
+   * distinction is not cosmetic: paging a set that is already complete would
+   * ask an API that just failed for rows it already has.
+   */
+  paged: boolean;
   height: number;
   xcpUsd: number | null;
 }) {
@@ -158,15 +168,15 @@ export function LaunchSections({
   // not a control every visitor gets offered.
   const { address } = useWallet();
   const canPreview = address === PREVIEW_ADDRESS;
-  const graduated = useMemo(
-    () =>
-      preview
-        ? sampleGraduated(rows, height)
-        : rows.filter((r) => r.phase === "graduated"),
-    [preview, rows, height],
-  );
-  const of = (phase: LaunchPhase) =>
-    phase === "graduated" ? graduated : rows.filter((r) => r.phase === phase);
+  // Seeded from whatever real launches the page has — minting first, since
+  // that is the section with rows in it — so the sample shows real art.
+  const graduated = useMemo<LaunchPage>(() => {
+    if (!preview) return initial.graduated;
+    const seeds = [...initial.minting.rows, ...initial.scheduled.rows];
+    const rows = sampleGraduated(seeds, height);
+    return { rows, total: rows.length };
+  }, [preview, initial, height]);
+
   return (
     <div className="space-y-10">
       {/* Graduated leads by position only. The holographic border on its cards
@@ -176,8 +186,10 @@ export function LaunchSections({
         phase="graduated"
         title="Graduated"
         empty=""
-        rows={of("graduated")}
-        total={preview ? graduated.length : totals?.graduated}
+        initial={graduated}
+        // Sample rows exist only in this component; there is no page two of
+        // something the database has never heard of.
+        paged={paged && !preview}
         height={height}
         xcpUsd={xcpUsd}
         view={view}
@@ -188,8 +200,8 @@ export function LaunchSections({
         phase="minting"
         title="Minting"
         empty="No live launches. Start one — it sells out or everyone gets refunded."
-        rows={of("minting")}
-        total={totals?.minting}
+        initial={initial.minting}
+        paged={paged}
         height={height}
         xcpUsd={xcpUsd}
         view={view}
@@ -200,8 +212,8 @@ export function LaunchSections({
         phase="scheduled"
         title="Scheduled"
         empty=""
-        rows={of("scheduled")}
-        total={totals?.scheduled}
+        initial={initial.scheduled}
+        paged={paged}
         height={height}
         xcpUsd={xcpUsd}
         view={view}
@@ -231,12 +243,28 @@ export function LaunchSections({
   );
 }
 
+/**
+ * One phase's section: a heading, its controls, and one page of launches.
+ *
+ * The page is a query, not a slice. Changing the sort or the page number asks
+ * the API for that page of that ordering and swaps in what comes back, so the
+ * count beside the heading, the rows below it and the pager under those are
+ * three views of one answer. They used to be three readings of different
+ * things — the count came from /v2/stats, the rows from a fixed prefetch, the
+ * pager from dividing that prefetch — which is how the section could print
+ * "Minting 30" above a list of 24 with no page two, and why a launch that had
+ * not been minted yet was unreachable from every control on the page.
+ *
+ * `paged` false keeps the old behaviour for the one case that still needs it:
+ * the API being down, where the page hands over every launch it derived live
+ * and this sorts and slices in memory.
+ */
 function Section({
   phase,
   title,
   empty,
-  rows,
-  total,
+  initial,
+  paged,
   height,
   xcpUsd,
   view,
@@ -245,30 +273,70 @@ function Section({
   phase: LaunchPhase;
   title: string;
   empty: string;
-  rows: SectionRow[];
-  total?: number;
+  initial: LaunchPage;
+  paged: boolean;
   height: number;
   xcpUsd: number | null;
   view: View;
   onView: (v: View) => void;
 }) {
   const options = SORTS[phase] ?? SORTS.scheduled!;
-  const [sortId, setSortId] = useState(options[0]!.id);
+  const defaultSort = options[0]!.id;
+  const [sortId, setSortId] = useState(defaultSort);
   const [page, setPage] = useState(0);
+  // The last page a request returned, tagged with what was asked for. Tagged
+  // rather than bare so everything below can be DERIVED from it — whether a
+  // request is outstanding, whether one failed — instead of tracked in
+  // parallel flags that have to be reset in step with it.
+  const [fetched, setFetched] = useState<{ key: string; page: LaunchPage } | null>(null);
+  const [failedKey, setFailedKey] = useState<string | null>(null);
 
-  const sorted = useMemo(() => {
+  const perPage = PER_PAGE[phase] ?? 12;
+
+  // Unpaged: the whole phase is already here, so ordering and slicing are
+  // this component's job. `null` in the paged case, which is what every read
+  // below branches on.
+  const local = useMemo(() => {
+    if (paged) return null;
     const by = (options.find((o) => o.id === sortId) ?? options[0]!).by;
-    return [...rows].sort(by);
-  }, [rows, options, sortId]);
+    return [...initial.rows].sort(by);
+  }, [paged, initial.rows, options, sortId]);
 
-  const perPage = view === "table" ? TABLE_PER_PAGE : (GRID_PER_PAGE[phase] ?? 12);
-  const pages = Math.max(1, Math.ceil(sorted.length / perPage));
+  // Page one of the default ordering is what the document was rendered with,
+  // so it is never a request: asking for it would be a round trip to arrive
+  // back where we started, and it would blank the section on the way.
+  const atDefault = sortId === defaultSort && page === 0;
+  const key = `${sortId}:${page}`;
+  const shownPage = atDefault ? initial : (fetched?.page ?? initial);
+
+  const total = local ? local.length : shownPage.total;
+  const pages = Math.max(1, Math.ceil(total / perPage));
   // A control change can leave the cursor past the end; clamp on read rather
   // than resetting in an effect, which would flash the old page first.
   const current = Math.min(page, pages - 1);
-  const shown = sorted.slice(current * perPage, current * perPage + perPage);
+  const pending = Boolean(paged) && !atDefault && fetched?.key !== key;
+  const failed = failedKey === key;
 
-  if (rows.length === 0 && !empty) return null;
+  useEffect(() => {
+    if (!paged || atDefault) return;
+    // A late reply from an abandoned request must never overwrite a newer
+    // one — click through three pages quickly and the slowest wins otherwise.
+    let live = true;
+    fetchLaunchPage(phase, sortId, perPage, current * perPage).then((res) => {
+      if (!live) return;
+      if (res) setFetched({ key, page: { rows: res.rows.map(toSectionRow), total: res.total } });
+      else setFailedKey(key);
+    });
+    return () => {
+      live = false;
+    };
+  }, [paged, atDefault, phase, sortId, current, perPage, key]);
+
+  const shown = local
+    ? local.slice(current * perPage, current * perPage + perPage)
+    : shownPage.rows;
+
+  if (total === 0 && !empty) return null;
 
   const canTabulate = TABULAR.has(phase);
 
@@ -277,14 +345,14 @@ function Section({
       <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 className="flex items-baseline gap-2 text-xl font-bold">
           {title}
-          {total !== undefined && total > 0 && (
+          {total > 0 && (
             <span className="text-sm font-medium text-gray-400 tabular-nums">
               {commas(total)}
             </span>
           )}
         </h2>
 
-        {rows.length > 0 && (
+        {total > 0 && (
           <div className="flex shrink-0 items-center gap-2">
             <SortMenu
               label={`Sort ${title}`}
@@ -304,10 +372,10 @@ function Section({
                     type="button"
                     aria-pressed={view === v}
                     aria-label={v === "grid" ? "Grid view" : "Table view"}
-                    onClick={() => {
-                      onView(v);
-                      setPage(0);
-                    }}
+                    // No page reset: a page is the same launches either way
+                    // now that the two views share one page size, so toggling
+                    // keeps your place instead of throwing you back to the top.
+                    onClick={() => onView(v)}
                     className={`rounded-full p-1.5 transition-colors ${
                       view === v ? "bg-gray-900 text-white" : "text-gray-400 hover:bg-gray-100 hover:text-gray-700"
                     }`}
@@ -320,24 +388,45 @@ function Section({
           </div>
         )}
       </div>
-      {rows.length === 0 ? (
+      {total === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
           {empty}
         </p>
-      ) : view === "table" && canTabulate ? (
-        <LaunchTable
-          rows={shown}
-          phase={phase}
-          offset={current * perPage}
-          height={height}
-          xcpUsd={xcpUsd}
-        />
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-          {shown.map((r) => (
-            <Card key={r.fm.tx_hash} row={r} height={height} xcpUsd={xcpUsd} />
-          ))}
+        // A fetch in flight dims the page it is replacing rather than clearing
+        // it. Blanking would collapse the section's height and jump the page
+        // under the cursor that just clicked, and the rows being replaced are
+        // the best thing to show while their replacements are in the air.
+        <div
+          aria-busy={pending}
+          className={pending ? "opacity-50 transition-opacity" : undefined}
+        >
+          {view === "table" && canTabulate ? (
+            <LaunchTable
+              rows={shown}
+              phase={phase}
+              offset={current * perPage}
+              height={height}
+              xcpUsd={xcpUsd}
+            />
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
+              {shown.map((r) => (
+                <Card key={r.fm.tx_hash} row={r} height={height} xcpUsd={xcpUsd} />
+              ))}
+            </div>
+          )}
         </div>
+      )}
+
+      {/* Said plainly, because the alternative is the pager claiming to be on
+          a page whose rows never arrived — the same class of quiet lie this
+          whole change was about. */}
+      {failed && (
+        <p role="status" className="mt-3 text-center text-xs text-gray-500">
+          Couldn&apos;t load page {current + 1}. Showing the last page that
+          loaded.
+        </p>
       )}
 
       {pages > 1 && <Pager page={current} pages={pages} onGo={setPage} />}

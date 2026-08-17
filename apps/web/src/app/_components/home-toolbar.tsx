@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { LaunchSearch, type SearchRow } from "@/app/_components/launch-search";
+import { LaunchSearch } from "@/app/_components/launch-search";
 
 /**
  * The homepage's own toolbar: find a launch, or start one.
@@ -11,17 +11,15 @@ import { LaunchSearch, type SearchRow } from "@/app/_components/launch-search";
  * the section links on every page that wasn't asking for it at all.
  */
 export function HomeToolbar({
-  rows,
   height,
   xcpUsd,
 }: {
-  rows: SearchRow[];
   height: number;
   xcpUsd: number | null;
 }) {
   return (
     <div className="flex items-center gap-3">
-      <LaunchSearch rows={rows} height={height} xcpUsd={xcpUsd} />
+      <LaunchSearch height={height} xcpUsd={xcpUsd} />
       <Link
         href="/create"
         className="shrink-0 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"

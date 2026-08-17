@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { HomeToolbar } from "@/app/_components/home-toolbar";
-import { LaunchSections, type SectionRow } from "@/app/_components/launch-sections";
-import type { SearchRow } from "@/app/_components/launch-search";
-import { fetchIndexedLaunches, fetchLaunchStats } from "@/lib/api/launchpad-api";
+import { type InitialPages, LaunchSections } from "@/app/_components/launch-sections";
+import { type LaunchPage, PER_PAGE, toSectionRow } from "@/lib/launch-row";
+import { fetchLaunchPage } from "@/lib/api/launchpad-api";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
@@ -10,14 +10,11 @@ import {
   fetchPool,
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
-import {
-  fromSats,
-} from "@/lib/format";
-import { big, ratio } from "@/lib/numeric";
+import { big } from "@/lib/numeric";
 import {
   isXcp69,
+  type LaunchPhase,
   launchPhase,
-  saleProgress,
   windowIsExact,
   xcp69Params,
   XCP69_MIN_PARTICIPANTS,
@@ -26,150 +23,145 @@ import {
 export const revalidate = 60;
 
 /**
- * Rows fetched per phase — and the window every section pages through.
+ * The three sections, each fetched as page one of its own phase.
  *
- * One number rather than three, chosen so each section's page size divides it
- * exactly: graduated pages by 8 (three pages), minting by 24 (one), scheduled
- * by 12 (two). Nothing is fetched that no page can reach, and no section ends
- * on a stub page.
+ * There is no window any more, and that is the point. This page used to ask
+ * for a fixed number of rows per phase and hand the whole lot to the browser
+ * to sort, slice and page in memory — which meant the sections were not
+ * paging a list, they were paging a prefetch. Anything ranked past the cut
+ * was not merely on a later page, it was absent: the sort menus reorder what
+ * the browser holds, so a launch outside the window could not be reached by
+ * any control on the page. With minting ranked by progress toward the soft
+ * cap, the rows that fell outside were precisely the ones that had never been
+ * minted — the launches most in need of being seen.
  *
- * It is deliberately a window and not the whole table. The front page shows a
- * ranked slice, says so in each heading ("8 of 47"), and search reaches the
- * rest — so this bounds the payload and the D1 read no matter how many
- * launches exist. Keep it a common multiple of the page sizes in
- * launch-sections.tsx if either changes.
+ * Now each section asks for `PER_PAGE[phase]` rows at an offset and gets the
+ * phase's true length back with them, so the heading, the rows and the pager
+ * are three readings of one answer instead of three different sources. It
+ * also drops a request: the counts used to come from /v2/stats, which counted
+ * the table while the pager divided the prefetch — the two numbers that
+ * disagreed.
  */
-const SECTION_WINDOW = 24;
+const SECTIONS = ["graduated", "minting", "scheduled"] as const;
 
 export default async function HomePage() {
-  const [blockHeight, xcpUsd, stats] = await Promise.all([
+  const [blockHeight, xcpUsd, ...first] = await Promise.all([
     fetchBlockHeight(),
     fetchXcpUsd(),
-    fetchLaunchStats(),
+    // No `sort`: the API's own default for each phase, so the ordering has one
+    // definition rather than a copy here that could drift from it.
+    ...SECTIONS.map((phase) => fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0)),
   ]);
 
-  // launchpad-api mirrors exactly this query — a launches table read instead
-  // of a fan-out over every fairminter on the chain. A miss or a timeout
-  // falls through to the same derivation this page always did, so the site
-  // works with the API down, empty, or simply not caught up yet.
-  const indexed = await fetchIndexedLaunches(SECTION_WINDOW);
+  // All three or none. A partial answer would render one section paged and
+  // another from a live derivation, which is two different orderings of the
+  // same site on one screen.
+  const indexed = first.every((p) => p !== null)
+    ? (first as NonNullable<(typeof first)[number]>[])
+    : null;
 
-  const phased =
-    indexed ??
-    (await (async () => {
-      const fairminters = await fetchAllFairminters();
+  /**
+   * The live derivation, unchanged, for when the API cannot answer.
+   *
+   * It returns EVERY conforming launch rather than a page, because it has to:
+   * there is no query to ask for page two of a fan-out over the whole chain.
+   * That is what `paged={false}` tells the sections — sort and slice this
+   * yourselves, and don't ask for more.
+   */
+  const deriveLive = async () => {
+    const fairminters = await fetchAllFairminters();
 
-      // Parameters only here — the timing clauses need each launch's
-      // creation event, which is fetched below for exactly these rows.
-      // Filtering on the full predicate would reject every launch that has
-      // already opened, since its row no longer reports the block it was
-      // announced in.
-      const listed = fairminters.filter((fm) => xcp69Params(fm));
+    // Parameters only here — the timing clauses need each launch's creation
+    // event, which is fetched below for exactly these rows. Filtering on the
+    // full predicate would reject every launch that has already opened, since
+    // its row no longer reports the block it was announced in.
+    const listed = fairminters.filter((fm) => xcp69Params(fm));
 
-      // Newest first; the pool row is the graduated-vs-refunded oracle, only
-      // worth a lookup for closed pool fairminters.
-      listed.sort((a, b) => b.block_index - a.block_index);
-      return (
-        await Promise.all(
-          listed.map(async (fm) => {
-            const closed = fm.status === "closed";
-            const [pool, original] = await Promise.all([
-              closed && big(fm.pool_quantity) > 0n
-                ? fetchPool(fm.asset)
-                : Promise.resolve(null),
-              // A row past "pending" has had its block_index rewritten to
-              // the opening block, so creation facts come from the event —
-              // but only for rows whose parameters could conform at all.
-              // Every launch on the chain is listed here; asking about all
-              // of them is hundreds of subrequests for an answer six of
-              // them can use.
-              fm.status !== "pending" && xcp69Params(fm)
-                ? fetchOriginalRecord(fm.tx_hash)
-                : { deadline: null, announceBlock: null },
-            ]);
-            const conforming =
-              isXcp69(fm, original.announceBlock) &&
-              (!closed || windowIsExact(fm, original.deadline));
-            // Same fixed supply everywhere, so XCP depth IS the value
-            // ranking: exact sort key, near-equal pools must not swap
-            // places between renders.
-            const xcpDepth = big(
-              pool ? (pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b) : 0,
-            );
-            return {
-              fm,
-              phase: launchPhase(fm, pool !== null),
-              conforming,
-              xcpDepth,
-              poolXcpReserve: pool
-                ? String(pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b)
-                : null,
-              poolTokenReserve: pool
-                ? String(pool.asset_a === fm.asset ? pool.reserve_a : pool.reserve_b)
-                : null,
-              announceBlock: original.announceBlock,
-              // Only apps/api counts distinct minters; the live path is the
-              // fallback and reports none rather than guessing.
-              minters: 0,
-            };
-          }),
-        )
-      ).filter((p) => p.conforming);
-    })());
+    // Newest first; the pool row is the graduated-vs-refunded oracle, only
+    // worth a lookup for closed pool fairminters.
+    listed.sort((a, b) => b.block_index - a.block_index);
+    return (
+      await Promise.all(
+        listed.map(async (fm) => {
+          const closed = fm.status === "closed";
+          const [pool, original] = await Promise.all([
+            closed && big(fm.pool_quantity) > 0n
+              ? fetchPool(fm.asset)
+              : Promise.resolve(null),
+            // A row past "pending" has had its block_index rewritten to the
+            // opening block, so creation facts come from the event — but only
+            // for rows whose parameters could conform at all. Every launch on
+            // the chain is listed here; asking about all of them is hundreds
+            // of subrequests for an answer six of them can use.
+            fm.status !== "pending" && xcp69Params(fm)
+              ? fetchOriginalRecord(fm.tx_hash)
+              : { deadline: null, announceBlock: null },
+          ]);
+          const conforming =
+            isXcp69(fm, original.announceBlock) &&
+            (!closed || windowIsExact(fm, original.deadline));
+          return {
+            fm,
+            phase: launchPhase(fm, pool !== null),
+            conforming,
+            poolXcpReserve: pool
+              ? String(pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b)
+              : null,
+            poolTokenReserve: pool
+              ? String(pool.asset_a === fm.asset ? pool.reserve_a : pool.reserve_b)
+              : null,
+            announceBlock: original.announceBlock,
+            // Only apps/api counts distinct minters; the live path is the
+            // fallback and reports none rather than guessing.
+            minters: 0,
+          };
+        }),
+      )
+    ).filter((p) => p.conforming);
+  };
 
-  // Rows carry the derived numbers so the client never re-derives them and
-  // the ordering can never disagree with what a card prints.
-  const rows: SectionRow[] = phased
-    .filter((p) => p.fm.asset)
-    .map((p) => {
-      const xcpReserve = big(p.poolXcpReserve ?? 0);
-      const tokenReserve = big(p.poolTokenReserve ?? 0);
-      // Price is the pool's own ratio; supply is fixed by the standard, so
-      // market cap is that price across the whole hard cap.
-      const priceXcp = tokenReserve > 0n ? ratio(xcpReserve, tokenReserve) : 0;
-      return {
-        fm: p.fm,
-        phase: p.phase,
-        conforming: p.conforming,
-        priceXcp,
-        marketCapXcp: priceXcp * fromSats(p.fm.hard_cap),
-        minters: p.minters ?? 0,
-        announceBlock: p.announceBlock ?? 0,
-        progress: saleProgress(p.fm),
-      };
-    });
+  let initial: InitialPages;
+  let paged: boolean;
+  let count: number;
 
-  const searchRows: SearchRow[] = rows.map((r) => ({
-    asset: r.fm.asset,
-    // Only when it says something the asset name doesn't.
-    name:
-      r.fm.asset_longname && r.fm.asset_longname !== r.fm.asset
-        ? r.fm.asset_longname
-        : null,
-    phase: r.phase as SearchRow["phase"],
-    source: r.fm.source,
-    announceBlock: r.announceBlock,
-    minters: r.minters,
-    marketCapXcp: r.marketCapXcp,
-    progress: r.progress,
-    startBlock: r.fm.start_block,
-  }));
+  if (indexed) {
+    const [graduated, minting, scheduled] = indexed.map<LaunchPage>((p) => ({
+      rows: p.rows.map(toSectionRow),
+      total: p.total,
+    })) as [LaunchPage, LaunchPage, LaunchPage];
+    initial = { graduated, minting, scheduled };
+    paged = true;
+    count = graduated.total + minting.total + scheduled.total;
+  } else {
+    // Rows carry the derived numbers so the client never re-derives them and
+    // the ordering can never disagree with what a card prints.
+    const rows = (await deriveLive())
+      .filter((p) => p.fm.asset)
+      .map(toSectionRow);
+    const of = (phase: LaunchPhase): LaunchPage => {
+      const held = rows.filter((r) => r.phase === phase);
+      // `total` is the length of what we hold, because here that IS the whole
+      // phase. In the paged case it is the database's count and can exceed
+      // the page — the two agree on what the number means, not on where it
+      // comes from.
+      return { rows: held, total: held.length };
+    };
+    initial = { graduated: of("graduated"), minting: of("minting"), scheduled: of("scheduled") };
+    paged = false;
+    count = rows.length;
+  }
 
   return (
     <div className="space-y-10">
-      <HomeToolbar rows={searchRows} height={blockHeight} xcpUsd={xcpUsd} />
+      {/* Search fetches its own index when it first opens — it has to see
+          every conforming launch, and this page only holds three pages. */}
+      <HomeToolbar height={blockHeight} xcpUsd={xcpUsd} />
 
-      {rows.length === 0 && <FirstLaunchHero />}
+      {count === 0 && <FirstLaunchHero />}
 
       <LaunchSections
-        rows={rows}
-        totals={
-          stats ? {
-            graduated: stats.counts.graduated,
-            minting: stats.counts.minting,
-            scheduled: stats.counts.scheduled,
-          } : undefined
-        }
+        initial={initial}
+        paged={paged}
         height={blockHeight}
         xcpUsd={xcpUsd}
       />

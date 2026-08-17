@@ -100,6 +100,180 @@ export async function listLaunches(
   return perPhaseRows.flatMap((r) => r.results);
 }
 
+/** Is this string one of the four phases? The paged route takes the phase from
+ *  a query string, and everything downstream — the index seek, the count —
+ *  assumes it is real. */
+export function isLaunchPhase(s: string): s is LaunchPhase {
+  return (PHASE_ORDER as readonly string[]).includes(s);
+}
+
+/**
+ * The orderings a section can ask for, as SQL.
+ *
+ * A whitelist, and the ONLY place a sort id becomes SQL. The id arrives in a
+ * query string and is interpolated into an ORDER BY — which cannot be a bound
+ * parameter — so the mapping has to be a closed table rather than anything
+ * derived from the input. An unknown id falls back to the phase's default; it
+ * is never passed through.
+ *
+ * These mirror the sort menus in launch-sections.tsx one for one, because the
+ * browser can no longer sort what it was sent: it holds one page, so ordering
+ * has to happen where the whole phase is. Each entry says which index serves
+ * it, since that is the difference between a seek and a sort:
+ *
+ *  - progress / mcap → idx_launches_rank. `rank_key` IS the phase's own
+ *    measure (migration 0009): progress toward the soft cap while minting,
+ *    price — and therefore market cap, the supply being fixed — once
+ *    graduated. Index-served, no sort at all.
+ *  - closing / minters / newest / soonest → no index. SQLite reads the phase
+ *    off idx_launches_rank's `phase=?` seek and sorts it, so the rows read are
+ *    bounded by the size of ONE PHASE rather than by the table. That is the
+ *    property that matters for D1 billing, and it is why these are acceptable
+ *    unindexed at this size. When a phase gets big enough for that sort to
+ *    show up in the row counts, each of these becomes a partial index on
+ *    (phase, <key>, tx_index DESC) WHERE conforming = 1 — the same shape as
+ *    0009 — and nothing else has to change.
+ *
+ * `newest` restates launch-sections.tsx's `announced()` deliberately: the
+ * announcement block is the honest age, but it is 0 or NULL for a launch whose
+ * announcement was never resolved, and 0 sorts the newest launch last under
+ * DESC. start_block stands in for exactly those rows.
+ */
+const SORT_SQL = {
+  progress: "rank_key DESC",
+  mcap: "rank_key DESC",
+  closing: "current_deadline_block ASC",
+  minters: "minters DESC",
+  newest: "(CASE WHEN announce_block > 0 THEN announce_block ELSE start_block END) DESC",
+  soonest: "start_block ASC",
+} as const;
+
+export type LaunchSort = keyof typeof SORT_SQL;
+
+/** The sort a phase falls back to — the same one listLaunches has always
+ *  returned that phase in, so an omitted or unrecognised `sort` gives the
+ *  ordering this API already had. */
+const DEFAULT_SORT: Record<LaunchPhase, LaunchSort> = {
+  graduated: "mcap",
+  // Progress, per migration 0009 — the launches closest to actually happening.
+  //
+  // Briefly changed to recency, on the theory that a new launch buried at the
+  // bottom can never attract the 69 minters it needs. The premise was already
+  // false by then: paging this endpoint is what made every open fairminter
+  // reachable, and `sort=newest` puts the newest first for anyone who asks.
+  // Recency as the DEFAULT is a different thing — issuing a fairminter is
+  // cheap, so it makes the front page a function of who created something most
+  // recently, which is both gameable and permanently churning.
+  minting: "progress",
+  scheduled: "soonest",
+  refunded: "newest",
+};
+
+export interface LaunchPage {
+  rows: LaunchRow[];
+  /** Conforming launches in this phase — the whole of it, not this page. The
+   *  pager needs the size of the list it is paging, and it is the one number a
+   *  LIMITed query cannot tell you about itself. */
+  total: number;
+}
+
+/**
+ * One page of one phase, plus how many there are in total.
+ *
+ * This is what replaced handing the browser a fixed-size prefetch and letting
+ * it slice: the count and the page now come from one query against one table,
+ * so the pager can no longer disagree with the heading above it.
+ *
+ * Both statements go in a single `batch` — the count is a second statement,
+ * not a second round trip. It reads the phase off idx_launches_listed as a
+ * covering index, the same way countByPhase does.
+ *
+ * OFFSET makes SQLite walk and discard the rows it skips, so a deep page costs
+ * what every page before it cost. That is the accepted trade for numbered
+ * pages — they are addressable and a cursor is not — and it stays cheap while
+ * a phase is hundreds of rows. Past that the fix is keyset pagination on
+ * (rank_key, tx_index), which the index already supports.
+ */
+export async function listLaunchPage(
+  db: D1Database,
+  phase: LaunchPhase,
+  sort: string | undefined,
+  limit: number,
+  offset: number,
+): Promise<LaunchPage> {
+  // The lookup is the validation: anything not a key of the table lands on the
+  // phase's default, so no caller-supplied string ever reaches the SQL.
+  const key: LaunchSort =
+    sort && sort in SORT_SQL ? (sort as LaunchSort) : DEFAULT_SORT[phase];
+  // tx_index breaks every tie, so two launches that compare equal cannot swap
+  // places between two renders — which across pages is worse than untidy: a
+  // row can appear twice, or not at all.
+  const order = `${SORT_SQL[key]}, tx_index DESC`;
+
+  const [page, count] = await db.batch<LaunchRow & { n: number }>([
+    db
+      .prepare(
+        `SELECT ${COLUMNS} FROM launches
+          WHERE conforming = 1 AND phase = ?1
+          ORDER BY ${order}
+          LIMIT ?2 OFFSET ?3`,
+      )
+      .bind(phase, limit, offset),
+    db
+      .prepare(`SELECT COUNT(*) AS n FROM launches WHERE conforming = 1 AND phase = ?1`)
+      .bind(phase),
+  ]);
+
+  return {
+    rows: page.results as LaunchRow[],
+    total: (count.results[0] as { n: number } | undefined)?.n ?? 0,
+  };
+}
+
+export interface SearchIndexRow {
+  asset: string;
+  asset_longname: string | null;
+  source: string;
+  phase: string;
+  announce_block: number | null;
+  start_block: number;
+  minters: number;
+  earned_quantity: string | null;
+  soft_cap: string;
+  hard_cap: string;
+  pool_xcp_reserve: string | null;
+  pool_token_reserve: string | null;
+}
+
+/**
+ * Every conforming launch, in the twelve columns search actually ranks on.
+ *
+ * Search has to see the whole index or it is lying: a launch it cannot find by
+ * its exact ticker is worse than one missing from a list, because the user has
+ * told you precisely what they want and been told it does not exist. So this
+ * is deliberately unpaged — it is a membership set, not a list to read.
+ *
+ * Twelve columns rather than the thirty-seven `COLUMNS` selects, because the
+ * whole set travels at once and most of a launch row is detail no search
+ * result shows. The quantities come back RAW, not pre-divided into a price or
+ * a percentage: this repo does its standard math in integer satoshi and the
+ * client already owns those helpers, so sending a float would be a second
+ * implementation of arithmetic that has to agree with the first.
+ *
+ * It stays affordable because it is fetched when the search dialog first
+ * opens, not on page load — most visits never pay for it — and because the
+ * edge cache collapses it to about one read per colo per minute.
+ */
+export function listSearchIndex(db: D1Database): Promise<SearchIndexRow[]> {
+  return q<SearchIndexRow>(
+    db,
+    `SELECT asset, asset_longname, source, phase, announce_block, start_block,
+            minters, earned_quantity, soft_cap, hard_cap,
+            pool_xcp_reserve, pool_token_reserve
+       FROM launches WHERE conforming = 1`,
+  );
+}
+
 /** Every conforming launch's ticker — the membership test /v2/mempool needs
  *  to decide which unconfirmed mints this site has an opinion about. A single
  *  column off the partial index, not the full rows the client used to download
