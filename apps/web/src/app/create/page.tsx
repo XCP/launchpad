@@ -8,6 +8,7 @@ import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { GearPopover } from "@/components/ui/popover";
 import { trackTx } from "@/lib/analytics";
+import { fileIsAnimatedWebp } from "@/lib/animated-webp";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fromSats, commas, usd } from "@/lib/format";
@@ -208,6 +209,7 @@ export default function CreatePage() {
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<NameCheck>("idle");
   const [image, setImage] = useState<File | null>(null);
+  const [animatedWebp, setAnimatedWebp] = useState(false);
   const [description, setDescription] = useState("");
   const [xProfile, setXProfile] = useState("");
   const [telegram, setTelegram] = useState("");
@@ -559,7 +561,11 @@ export default function CreatePage() {
                 id="token-image"
                 type="file"
                 accept="image/png,image/jpeg,image/webp,image/gif"
-                onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+                onChange={async (e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  setImage(file);
+                  setAnimatedWebp(file ? await fileIsAnimatedWebp(file) : false);
+                }}
                 className="absolute inset-0 cursor-pointer opacity-0"
                 aria-label="Upload token image"
               />
@@ -591,6 +597,14 @@ export default function CreatePage() {
                 </div>
               )}
             </div>
+            {animatedWebp && (
+              <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-800">
+                This WEBP is animated. It will move on the site, but the announce
+                channel can only post a still frame of it — Telegram has no way to
+                play an animated WEBP. Upload the same art as a GIF and it moves
+                there too.
+              </p>
+            )}
             {isTaproot && (
               <label className="mt-3 flex items-start gap-2 text-sm text-gray-700">
                 <input

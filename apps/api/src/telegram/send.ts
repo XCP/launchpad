@@ -26,13 +26,56 @@ export interface SendResult {
 }
 
 /**
+ * Whether this artwork can be sent as something that moves.
+ *
+ * sendPhoto re-encodes whatever it is given into one still frame, so a GIF
+ * announced that way arrives as its own first frame and the art stops moving.
+ * sendAnimation is the method that keeps it: it takes a GIF (or silent H.264)
+ * by URL, converts it to MP4 itself, and clients loop it. Both carry a caption
+ * with the same parse_mode, so the choice is invisible to everything above.
+ *
+ * Animated WEBP has no method at all — sendAnimation takes GIF and MP4 only,
+ * sendDocument renders a file card with no caption, and animated WEBP is not
+ * one of the sticker formats (static .webp, Lottie .tgs, VP9 .webm). It gets
+ * sendPhoto and a still frame, which is why the upload form warns about it.
+ */
+export const playsAsAnimation = (contentType: string | null) =>
+  contentType?.split(";")[0].trim().toLowerCase() === "image/gif";
+
+/**
+ * What kind of image the artwork URL is serving, or null if it cannot be
+ * asked. /full/<ASSET> streams the R2 original with its stored content type,
+ * so a HEAD is enough and never pulls the bytes.
+ *
+ * Failure is not an error here: null means "send it as a photo", which is
+ * exactly what this module did before it could tell the difference. A probe
+ * that times out must not cost an announcement.
+ */
+async function contentTypeOf(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(url, {
+      method: "HEAD",
+      redirect: "follow",
+      signal: AbortSignal.timeout(5_000),
+    });
+    return res.ok ? res.headers.get("content-type") : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Send one announcement.
  *
- * A photo message when the launch has artwork, a plain message otherwise —
- * and a photo that fails to fetch falls back to text rather than being lost.
- * Telegram will refuse a URL it cannot download (a launch with no image
- * answers 404 at /full/<ASSET>), and losing the whole announcement over a
- * missing picture would be the wrong trade.
+ * A photo or animation message when the launch has artwork, a plain message
+ * otherwise — and an image that fails to fetch falls back to text rather than
+ * being lost. Telegram will refuse a URL it cannot download (a launch with no
+ * image answers 404 at /full/<ASSET>), and losing the whole announcement over
+ * a missing picture would be the wrong trade.
+ *
+ * The animation attempt falls back to sendPhoto before it falls back to text:
+ * the probe can be wrong (a redirect to the CDN, a missing content type) and a
+ * still frame is a much smaller loss than a caption on its own.
  */
 export async function send(
   token: string,
@@ -40,6 +83,15 @@ export async function send(
   a: Announcement,
 ): Promise<SendResult> {
   if (a.photo) {
+    if (playsAsAnimation(await contentTypeOf(a.photo))) {
+      const anim = await call(token, "sendAnimation", {
+        chat_id: chatId,
+        animation: a.photo,
+        caption: a.text,
+        parse_mode: "HTML",
+      });
+      if (anim.ok || anim.retryAfter !== null) return anim;
+    }
     const photo = await call(token, "sendPhoto", {
       chat_id: chatId,
       photo: a.photo,

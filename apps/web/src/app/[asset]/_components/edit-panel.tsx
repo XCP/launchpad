@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import useSWR from "swr";
+import { fileIsAnimatedWebp } from "@/lib/animated-webp";
 import { fetchJson } from "@/lib/client";
 import { useSession } from "@/providers/session-context";
 import { isValidTelegram, isValidX } from "@/lib/social";
@@ -38,6 +39,7 @@ export function EditPanel({ asset }: { asset: string }) {
   const [x, setX] = useState("");
   const [telegram, setTelegram] = useState("");
   const [image, setImage] = useState<File | null>(null);
+  const [animatedWebp, setAnimatedWebp] = useState(false);
   const [state, setState] = useState<
     | { status: "idle" | "signing" | "saving" | "saved" }
     | { status: "error"; error: string }
@@ -211,9 +213,19 @@ export function EditPanel({ asset }: { asset: string }) {
             id="edit-image"
             type="file"
             accept="image/png,image/jpeg,image/webp,image/gif"
-            onChange={(e) => setImage(e.target.files?.[0] ?? null)}
+            onChange={async (e) => {
+              const file = e.target.files?.[0] ?? null;
+              setImage(file);
+              setAnimatedWebp(file ? await fileIsAnimatedWebp(file) : false);
+            }}
             className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium"
           />
+          {animatedWebp && (
+            <p className="mt-2 text-xs text-amber-700">
+              Animated WEBP shows as a still frame in the announce channel — Telegram
+              cannot play one. A GIF moves there too.
+            </p>
+          )}
         </div>
         {state.status === "error" && (
           <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
