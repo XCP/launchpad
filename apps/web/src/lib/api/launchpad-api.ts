@@ -172,6 +172,17 @@ export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
   try {
     const res = await fetch(`${API_BASE}/v2/mempool`, {
       signal: AbortSignal.timeout(6_000),
+      // A polled endpoint must never be answered by the browser's own cache:
+      // the poll IS the freshness, and a cached reply makes it a timer that
+      // reports the same answer forever. Not theoretical here — Cloudflare
+      // rewrites `max-age` on anything it serves from its cache to the zone's
+      // Browser Cache TTL, so this route asks for 30 seconds and the browser
+      // is told four hours.
+      //
+      // The edge cache is what protects D1, and it is untouched by this: the
+      // request still stops at the colo, it just stops being answered from
+      // memory in the tab.
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
@@ -395,6 +406,9 @@ export async function fetchLaunchPage(
       (sort ? `&sort=${encodeURIComponent(sort)}` : "");
     const res = await fetch(`${API_BASE}/v2/launches?${qs}`, {
       signal: AbortSignal.timeout(6_000),
+      // See fetchMempoolSnapshot: this is the other polled route, and the
+      // section refresh is only a refresh if the browser actually asks.
+      cache: "no-store",
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { result?: ApiLaunchRow[]; total?: number };
