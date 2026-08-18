@@ -65,9 +65,15 @@ export function TokenImage({
   className?: string;
   large?: boolean;
 }) {
+  // `w` asks /i/ for a resized copy. Without it the route hands back the
+  // stored original, which is whatever the launch uploaded -- the homepage
+  // renders 56 of these at 280x280 and was pulling 34.3MB of originals to do
+  // it, single files up to 1.99MB. Widths are 2x the rendered box so retina
+  // still gets a sharp image. The CDN fallbacks are already sized variants and
+  // need no parameter.
   const sources = large
-    ? [`/i/${asset}?fb=full`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
-    : [`/i/${asset}?fb=icon`, `${CDN_BASE}/img/icon/${asset}`];
+    ? [`/i/${asset}?fb=full&w=560`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
+    : [`/i/${asset}?fb=icon&w=96`, `${CDN_BASE}/img/icon/${asset}`];
 
   // Reset the fallback chain when the identity this component is showing
   // changes — TokenImage instances can be reused across a different asset

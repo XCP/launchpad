@@ -1,4 +1,4 @@
-import { getMetadataBucket } from "@/lib/metadata";
+import { METADATA_ORIGIN, getMetadataBucket } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
 
 /**
@@ -12,12 +12,46 @@ import { CDN_BASE } from "@/lib/constants";
  *
  * `fb` names the CDN size to fall back to: "full" for hero-sized art,
  * anything else (or nothing) gets the icon.
+ *
+ * `w` optionally asks for a resized copy. Without it this route returns the
+ * stored original byte-for-byte, which is what on-chain metadata points at and
+ * must never change. With it, the bytes are the same picture at a sane size:
+ * the homepage renders 56 of these at 280x280 and was pulling 34.3MB of
+ * full-resolution originals to do it -- single images up to 1.99MB, one of
+ * them 1280x1223 to fill a 280px box.
+ *
+ * Resizing goes through the same fetch `cf.image` path /icon/<ASSET> already
+ * uses, rather than the Images binding (this Worker has none). The inner fetch
+ * deliberately omits `w`, so it takes the original branch below and cannot
+ * recurse; if the object is missing it follows the 302 and resizes the CDN
+ * copy instead, which is the right answer either way. Zone features do not run
+ * on workers.dev, so a failed transform falls through to the original rather
+ * than erroring.
  */
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ asset: string }> },
 ) {
   const { asset } = await params;
+  const requested = new URL(request.url).searchParams.get("w");
+  const width = requested && /^\d{1,4}$/.test(requested) ? Number(requested) : 0;
+
+  if (width >= 16 && width <= 2048) {
+    const source = `${METADATA_ORIGIN}/i/${encodeURIComponent(asset.toUpperCase())}`;
+    const res = await fetch(source, {
+      cf: { image: { format: "auto", fit: "contain", width }, cacheEverything: true },
+    } as RequestInit);
+    if (res.ok && (res.headers.get("content-type") ?? "").startsWith("image/")) {
+      return new Response(res.body, {
+        headers: {
+          "content-type": res.headers.get("content-type") ?? "image/png",
+          "cache-control": "public, max-age=31536000, immutable",
+          "access-control-allow-origin": "*",
+        },
+      });
+    }
+  }
+
   const bucket = await getMetadataBucket();
   const object = await bucket.get(`i/${asset.toUpperCase()}`);
   if (!object) {
