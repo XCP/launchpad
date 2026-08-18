@@ -40,7 +40,18 @@ const edgeCache: MiddlewareHandler<{ Bindings: Env }> = async (c, next) => {
 
   const cache = caches.default;
   const hit = await cache.match(c.req.raw);
-  if (hit) return hit;
+  // Copied, not returned as-is. A Response handed back by the Cache API has
+  // IMMUTABLE headers, and this middleware is not the outermost one — anything
+  // wrapping it gets that response as `c.res` and may reasonably try to add a
+  // header to it. Timing-Allow-Origin in src/index.ts does exactly that, which
+  // meant every cache hit threw `Can't modify immutable headers` and was
+  // served as a 500: the entry was fine, the handler never ran, and the site
+  // saw a working first request followed by a dead one for the whole TTL.
+  //
+  // Rebuilding costs nothing — the body is passed through as a stream, not
+  // read — and it fixes the whole class rather than that one header, so the
+  // next middleware to touch a response does not have to know any of this.
+  if (hit) return new Response(hit.body, hit);
 
   await next();
 
