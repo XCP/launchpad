@@ -23,8 +23,9 @@ export interface SectionRow {
   marketCapXcp: number;
   /** XCP per whole token. Zero until a pool exists. */
   priceXcp: number;
-  /** Distinct addresses that have minted. */
-  minters: number;
+  /** Distinct addresses that have minted; null when nothing could count
+   *  them. Not zero — zero is the answer for a launch nobody has minted. */
+  minters: number | null;
   /** Block it was announced in; 0 when unresolved. */
   announceBlock: number;
   /** 0–1 toward the soft cap. */
@@ -47,7 +48,7 @@ export interface RowSource {
   poolXcpReserve: string | null;
   poolTokenReserve: string | null;
   announceBlock: number | null;
-  minters: number;
+  minters: number | null;
 }
 
 /**
@@ -66,7 +67,9 @@ export function toSectionRow(p: RowSource): SectionRow {
     conforming: p.conforming,
     priceXcp,
     marketCapXcp: priceXcp * fromSats(p.fm.hard_cap),
-    minters: p.minters ?? 0,
+    // Passed through, null and all. Coalescing to 0 here is exactly the bug
+    // this used to have: an unknown count printed as a confident zero.
+    minters: p.minters,
     announceBlock: p.announceBlock ?? 0,
     progress: saleProgress(p.fm),
   };

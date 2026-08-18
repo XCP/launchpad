@@ -6,6 +6,7 @@ import { fetchLaunchPage } from "@/lib/api/launchpad-api";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
+  fetchMinterCount,
   fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
@@ -84,7 +85,7 @@ export default async function HomePage() {
       await Promise.all(
         listed.map(async (fm) => {
           const closed = fm.status === "closed";
-          const [pool, original] = await Promise.all([
+          const [pool, original, minters] = await Promise.all([
             closed && big(fm.pool_quantity) > 0n
               ? fetchPool(fm.asset)
               : Promise.resolve(null),
@@ -96,6 +97,20 @@ export default async function HomePage() {
             fm.status !== "pending" && xcp69Params(fm)
               ? fetchOriginalRecord(fm.tx_hash)
               : { deadline: null, announceBlock: null },
+            // Distinct minters, which this path used to report as a flat 0 —
+            // and 0 is a CLAIM, not a blank. Every card on the page said "0 of
+            // 69 minters" beside its own progress bar reading 43%, so the
+            // homepage contradicted itself on every card whenever the API
+            // blinked, which is worse than the outage it was covering for.
+            //
+            // Nobody has minted on a launch that has earned nothing, so that
+            // case is 0 by inspection rather than by request. The rest cost
+            // one read each, issued alongside the creation-event fetch these
+            // same rows already make rather than after it — no extra round
+            // trip, and only on the path that runs when the API is down.
+            big(fm.earned_quantity ?? 0) > 0n
+              ? fetchMinterCount(fm.tx_hash)
+              : 0,
           ]);
           const conforming =
             isXcp69(fm, original.announceBlock) &&
@@ -111,9 +126,9 @@ export default async function HomePage() {
               ? String(pool.asset_a === fm.asset ? pool.reserve_a : pool.reserve_b)
               : null,
             announceBlock: original.announceBlock,
-            // Only apps/api counts distinct minters; the live path is the
-            // fallback and reports none rather than guessing.
-            minters: 0,
+            // Null when the count could not be read at all — the card prints
+            // that as an em dash instead of inventing a number for it.
+            minters,
           };
         }),
       )

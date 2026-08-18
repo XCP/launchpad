@@ -234,15 +234,37 @@ export interface Fairmint {
   status: string;
 }
 
-export async function fetchFairmints(
+/**
+ * Every mint on one fairminter, paginated to exhaustion.
+ *
+ * One page was not the history. A launch needs 69 distinct addresses to close
+ * and nothing obliges any of them to mint their whole allowance at once, so a
+ * busy launch can run past a single page — at which point the mint list, the
+ * holder table and the minter count all quietly describe a prefix.
+ */
+export async function fetchFairmints(fairminterTxHash: string): Promise<Fairmint[]> {
+  return pageAll<Fairmint>(`/fairminters/${fairminterTxHash}/fairmints?verbose=true`);
+}
+
+/**
+ * Distinct addresses that have minted, counted the way apps/api's indexer
+ * counts them (`new Set(sources).size`). This is what the homepage falls back
+ * to when that indexer can't be reached, so the two have to agree on the
+ * number rather than on the idea of one.
+ *
+ * Null on failure, meaning NOT COUNTED — which is not the fact zero states. A
+ * card reading "0 of 69 minters" beside its own progress bar at 43% is
+ * contradicted by the rest of the card.
+ */
+export async function fetchMinterCount(
   fairminterTxHash: string,
-  limit = 1000,
-): Promise<Fairmint[]> {
-  const data = await get<Paginated<Fairmint>>(
-    `/fairminters/${fairminterTxHash}/fairmints?limit=${limit}&verbose=true`,
-    30,
-  );
-  return data.result;
+): Promise<number | null> {
+  try {
+    const mints = await fetchFairmints(fairminterTxHash);
+    return new Set(mints.map((m) => m.source)).size;
+  } catch {
+    return null;
+  }
 }
 
 export interface Pool {

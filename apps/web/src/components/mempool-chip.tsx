@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMempool } from "@/hooks/use-mempool";
+import { PendingDot } from "@/components/pending-dot";
 import { FOCUS } from "@/components/ui/tokens";
 
 /**
@@ -51,10 +52,7 @@ export function MempoolChip({ className = "" }: { className?: string }) {
       href="/mempool"
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:border-amber-300 ${FOCUS} ${className}`}
     >
-      <span className="relative flex size-1.5 shrink-0">
-        <span className="absolute inline-flex size-full animate-ping rounded-full bg-amber-400 opacity-75" />
-        <span className="relative inline-flex size-1.5 rounded-full bg-amber-500" />
-      </span>
+      <PendingDot />
       {/* Same count grammar as the tabs on /mempool — "Mints (3)" — so the
           chip and the page it opens read as one system. */}
       <span>Mempool</span>

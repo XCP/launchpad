@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { DropdownMenu as DM } from "radix-ui";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
+import { PendingDot } from "@/components/pending-dot";
+import { useMempool } from "@/hooks/use-mempool";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { PREVIEW_ADDRESS } from "@/lib/constants";
 import { LABEL } from "@/components/ui/tokens";
 import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/format";
+import type { MempoolMint } from "@/lib/api/counterparty";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
 import {
   type LaunchPage,
@@ -18,6 +22,43 @@ import {
 import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xcp69";
 
 type View = "grid" | "table";
+
+/**
+ * How often a section re-asks for the page it is showing.
+ *
+ * Not tuned to how fast the chain moves — tuned to how fast this site can
+ * possibly know. The indexer's cron is every five minutes and /v2/launches is
+ * edge-cached for sixty seconds, so asking any faster returns the same bytes
+ * out of the same colo cache. Behind that cache this is roughly one origin
+ * read per colo per minute however many tabs are open, which is what makes
+ * polling affordable at all.
+ */
+const INDEX_REFRESH_MS = 60_000;
+
+/**
+ * The rate the header's mempool chip already polls at, restated so the two
+ * agree deliberately rather than by coincidence.
+ *
+ * useMempool keys every caller to ONE SWR entry, so a section joining this
+ * costs no second request — the unconfirmed mints a card counts are the ones
+ * the chip in the header is already holding.
+ */
+const MEMPOOL_REFRESH_MS = 30_000;
+
+/**
+ * Unconfirmed mints, counted per asset.
+ *
+ * The mempool feed carries fairminters and fairmints and nothing else — no
+ * pool trades — so this can only be non-zero for a launch still taking mints.
+ * Every phase is looked up anyway rather than gated on `minting`: a launch
+ * that fills its soft cap with mints still queued behind it is exactly when
+ * the count is worth seeing, and that launch has already graduated by then.
+ */
+function pendingByAsset(mints: MempoolMint[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const m of mints) counts.set(m.asset, (counts.get(m.asset) ?? 0) + 1);
+  return counts;
+}
 
 interface SortOption {
   id: string;
@@ -40,6 +81,21 @@ const announced = (r: SectionRow) =>
   r.announceBlock > 0 ? r.announceBlock : r.fm.start_block;
 
 /**
+ * Minter count as a rank.
+ *
+ * Null means the count was not available, not that nobody minted, so it sorts
+ * BELOW a genuine zero rather than tying with it. In practice a section is
+ * either all-counted or all-unknown — the fallback derivation is all-or-none —
+ * so this decides ties in the second case and nothing in the first.
+ */
+const minterRank = (r: SectionRow) => r.minters ?? -1;
+
+/** The count as a cell or a card reads it: an em dash for "not counted",
+ *  which is the same convention the market-cap and deadline columns already
+ *  use for a figure that isn't there. */
+const minterText = (n: number | null) => (n === null ? "—" : commas(n));
+
+/**
  * Each phase is judged by its own measure, so each gets its own sort menu
  * rather than one shared list where two thirds of the options are inert.
  * The first entry is the default, and matches the order apps/api already
@@ -58,7 +114,7 @@ const announced = (r: SectionRow) =>
 const SORTS: Record<string, SortOption[]> = {
   graduated: [
     { id: "mcap", label: "Market cap", by: (a, b) => b.marketCapXcp - a.marketCapXcp },
-    { id: "minters", label: "Minters", by: (a, b) => b.minters - a.minters },
+    { id: "minters", label: "Minters", by: (a, b) => minterRank(b) - minterRank(a) },
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
   minting: [
@@ -75,7 +131,7 @@ const SORTS: Record<string, SortOption[]> = {
       label: "Closing soonest",
       by: (a, b) => a.fm.soft_cap_deadline_block - b.fm.soft_cap_deadline_block,
     },
-    { id: "minters", label: "Minters", by: (a, b) => b.minters - a.minters },
+    { id: "minters", label: "Minters", by: (a, b) => minterRank(b) - minterRank(a) },
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
   scheduled: [
@@ -164,6 +220,10 @@ export function LaunchSections({
   // can't tabulate simply ignore it.
   const [view, setView] = useState<View>("grid");
   const [preview, setPreview] = useState(false);
+  // One lookup for the whole page, built from the poll the header chip is
+  // already running. Sections read it; none of them fetches it.
+  const { mints } = useMempool(MEMPOOL_REFRESH_MS);
+  const pendingMints = useMemo(() => pendingByAsset(mints), [mints]);
   // Same gate as the asset and profile previews: a review tool for the owner,
   // not a control every visitor gets offered.
   const { address } = useWallet();
@@ -190,6 +250,7 @@ export function LaunchSections({
         // Sample rows exist only in this component; there is no page two of
         // something the database has never heard of.
         paged={paged && !preview}
+        pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
         view={view}
@@ -202,6 +263,7 @@ export function LaunchSections({
         empty="No live launches. Start one — it sells out or everyone gets refunded."
         initial={initial.minting}
         paged={paged}
+        pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
         view={view}
@@ -214,6 +276,7 @@ export function LaunchSections({
         empty=""
         initial={initial.scheduled}
         paged={paged}
+        pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
         view={view}
@@ -265,6 +328,7 @@ function Section({
   empty,
   initial,
   paged,
+  pendingMints,
   height,
   xcpUsd,
   view,
@@ -275,6 +339,8 @@ function Section({
   empty: string;
   initial: LaunchPage;
   paged: boolean;
+  /** Unconfirmed mints per asset, from the page-level poll. */
+  pendingMints: Map<string, number>;
   height: number;
   xcpUsd: number | null;
   view: View;
@@ -284,13 +350,6 @@ function Section({
   const defaultSort = options[0]!.id;
   const [sortId, setSortId] = useState(defaultSort);
   const [page, setPage] = useState(0);
-  // The last page a request returned, tagged with what was asked for. Tagged
-  // rather than bare so everything below can be DERIVED from it — whether a
-  // request is outstanding, whether one failed — instead of tracked in
-  // parallel flags that have to be reset in step with it.
-  const [fetched, setFetched] = useState<{ key: string; page: LaunchPage } | null>(null);
-  const [failedKey, setFailedKey] = useState<string | null>(null);
-
   const perPage = PER_PAGE[phase] ?? 12;
 
   // Unpaged: the whole phase is already here, so ordering and slicing are
@@ -302,39 +361,118 @@ function Section({
     return [...initial.rows].sort(by);
   }, [paged, initial.rows, options, sortId]);
 
-  // Page one of the default ordering is what the document was rendered with,
-  // so it is never a request: asking for it would be a round trip to arrive
-  // back where we started, and it would blank the section on the way.
   const atDefault = sortId === defaultSort && page === 0;
-  const key = `${sortId}:${page}`;
-  const shownPage = atDefault ? initial : (fetched?.page ?? initial);
 
-  const total = local ? local.length : shownPage.total;
+  /**
+   * How long the phase was, as of the last answer that arrived.
+   *
+   * State rather than something read off the response below, because it is an
+   * INPUT to that request: the cursor has to be clamped against a length
+   * before the offset can be worked out, and a hook's result does not exist
+   * before the hook. The version this replaced derived the same bound from
+   * its own `fetched` state for the same reason.
+   *
+   * Polling is what makes it matter. A phase can shrink WHILE someone sits on
+   * its last page — a launch graduates and Minting is a page shorter than it
+   * was — and clamping only what is drawn would leave the section asking for
+   * an offset that no longer exists, forever, since nothing else would move
+   * the cursor back.
+   */
+  const [knownTotal, setKnownTotal] = useState(initial.total);
+
+  const total = local ? local.length : knownTotal;
   const pages = Math.max(1, Math.ceil(total / perPage));
-  // A control change can leave the cursor past the end; clamp on read rather
-  // than resetting in an effect, which would flash the old page first.
+  // Clamped on read, never in an effect: an effect would render the stale
+  // cursor once before correcting it, and would ask for that page on the way.
   const current = Math.min(page, pages - 1);
-  const pending = Boolean(paged) && !atDefault && fetched?.key !== key;
-  const failed = failedKey === key;
 
-  useEffect(() => {
-    if (!paged || atDefault) return;
-    // A late reply from an abandoned request must never overwrite a newer
-    // one — click through three pages quickly and the slowest wins otherwise.
-    let live = true;
-    fetchLaunchPage(phase, sortId, perPage, current * perPage).then((res) => {
-      if (!live) return;
-      if (res) setFetched({ key, page: { rows: res.rows.map(toSectionRow), total: res.total } });
-      else setFailedKey(key);
-    });
-    return () => {
-      live = false;
-    };
-  }, [paged, atDefault, phase, sortId, current, perPage, key]);
+  /**
+   * The page this section is showing, kept current rather than fetched once.
+   *
+   * SWR rather than the fetch-into-state this replaced, for three properties
+   * that were each hand-rolled here and one that was not here at all: a reply
+   * for an abandoned page cannot land on top of a newer one, the last good
+   * page stays on screen while the next is in the air, a failure retries
+   * itself instead of latching a flag — and `refreshInterval` is what means
+   * the section no longer needs a reload to notice that the chain moved.
+   */
+  const { data, error, isLoading } = useSWR<LaunchPage>(
+    paged ? ["launch-page", phase, sortId, current, perPage] : null,
+    async () => {
+      const res = await fetchLaunchPage(phase, sortId, perPage, current * perPage);
+      // Thrown, not returned as null: an error leaves SWR holding the last
+      // page that loaded, which is what belongs on screen, and it schedules
+      // its own retry. Returning null would CACHE the failure as the answer.
+      if (!res) throw new Error(`no ${phase} page ${current}`);
+      return { rows: res.rows.map(toSectionRow), total: res.total };
+    },
+    {
+      // Page one of the default ordering is what the document was rendered
+      // with, so it is never re-asked on arrival — that would be a round trip
+      // to land back where we started. `revalidateOnMount` suppresses only
+      // the mount: a sort or page change is a new key and still fetches, and
+      // the interval below still runs.
+      fallbackData: atDefault ? initial : undefined,
+      revalidateOnMount: false,
+      refreshInterval: INDEX_REFRESH_MS,
+      keepPreviousData: true,
+      revalidateOnFocus: true,
+      // Every page carries the length of the phase it came from, so each
+      // answer re-bounds the next cursor. Unchanged on a quiet refresh, which
+      // React bails out of rather than re-rendering.
+      onSuccess: (p) => setKnownTotal(p.total),
+    },
+  );
+
+  // Dim only while a page we do NOT have yet is in the air. A background
+  // refresh of the page already on screen must never dim it — that would be
+  // the whole section flickering once a minute to report that nothing had
+  // changed.
+  const pending = isLoading;
+  const failed = Boolean(error);
 
   const shown = local
     ? local.slice(current * perPage, current * perPage + perPage)
-    : shownPage.rows;
+    : (data ?? initial).rows;
+
+  /**
+   * The front slot: the minting launch with the most mints queued behind it
+   * right now.
+   *
+   * Freshness IS the mempool here, not a stored timestamp — which is what
+   * makes this free, and also what makes it expire without anyone deciding
+   * when. The block lands, the queue empties, and the slot is simply not
+   * there on the next poll. Nothing carries a "fresh until" to get wrong.
+   *
+   * Ranked by queue depth and not by recency because the feed cannot answer
+   * recency: fetchMempoolFairmints maps /mempool/events/NEW_FAIRMINT straight
+   * through, with no per-mint timestamp and no documented ordering. "Busiest
+   * right now" is a question this data does answer.
+   *
+   * Grid only, and Minting only. The table is the ledger view and keeps the
+   * order it was sorted by — a row that jumped the queue there would carry
+   * nothing on it to explain why it had.
+   */
+  const { rows: ordered, fresh } = useMemo(() => {
+    if (phase !== "minting" || view !== "grid") {
+      return { rows: shown, fresh: null as string | null };
+    }
+    let best: SectionRow | null = null;
+    let bestN = 0;
+    for (const r of shown) {
+      const n = pendingMints.get(r.fm.asset) ?? 0;
+      if (n > bestN) {
+        best = r;
+        bestN = n;
+      }
+    }
+    if (!best) return { rows: shown, fresh: null as string | null };
+    const pinned = best;
+    return {
+      rows: [pinned, ...shown.filter((r) => r !== pinned)],
+      fresh: pinned.fm.asset as string | null,
+    };
+  }, [shown, phase, view, pendingMints]);
 
   if (total === 0 && !empty) return null;
 
@@ -411,8 +549,15 @@ function Section({
             />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {shown.map((r) => (
-                <Card key={r.fm.tx_hash} row={r} height={height} xcpUsd={xcpUsd} />
+              {ordered.map((r) => (
+                <Card
+                  key={r.fm.tx_hash}
+                  row={r}
+                  height={height}
+                  xcpUsd={xcpUsd}
+                  pending={pendingMints.get(r.fm.asset) ?? 0}
+                  fresh={r.fm.asset === fresh}
+                />
               ))}
             </div>
           )}
@@ -659,7 +804,7 @@ function LaunchTable({
                     </Cell>
                     <Cell>{priceLabel(r.priceXcp)}</Cell>
                     <Cell>{age(r.announceBlock, height)}</Cell>
-                    <Cell>{commas(r.minters)}</Cell>
+                    <Cell>{minterText(r.minters)}</Cell>
                   </>
                 ) : scheduled ? (
                   <>
@@ -671,7 +816,7 @@ function LaunchTable({
                   <>
                     <Cell>{(r.progress * 100).toFixed(1)}%</Cell>
                     <Cell>{compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
-                    <Cell>{commas(r.minters)}</Cell>
+                    <Cell>{minterText(r.minters)}</Cell>
                     <Cell>{deadline > 0 ? blocksEta(deadline - height) : "—"}</Cell>
                   </>
                 )}
@@ -740,10 +885,16 @@ function Card({
   row,
   height,
   xcpUsd,
+  pending,
+  fresh,
 }: {
   row: SectionRow;
   height: number;
   xcpUsd: number | null;
+  /** Unconfirmed mints queued for this asset right now. */
+  pending: number;
+  /** This is the section's front slot — see the pin in Section. */
+  fresh: boolean;
 }) {
   const { fm, phase, conforming } = row;
   const deadline = fm.soft_cap_deadline_block || fm.end_block;
@@ -777,13 +928,23 @@ function Card({
   // people — so once the threshold is met "of 69" stops describing a goal and
   // starts reading like a cap that has been exceeded. Past it, the count
   // stands on its own.
+  //
+  // A null count is "not counted", and the one thing it must not become is 0:
+  // "of 69" turns an unknown into a claim that nobody has joined, which the
+  // progress bar directly above it can be busy disproving. The label stays so
+  // the dash is legible as a missing number rather than a missing line.
+  const minters = row.minters;
   const fact =
     phase === "minting"
-      ? row.minters >= XCP69_MIN_PARTICIPANTS
-        ? `${commas(row.minters)} minters`
-        : `${commas(row.minters)} of ${XCP69_MIN_PARTICIPANTS} minters`
+      ? minters === null
+        ? "— minters"
+        : minters >= XCP69_MIN_PARTICIPANTS
+          ? `${commas(minters)} minters`
+          : `${commas(minters)} of ${XCP69_MIN_PARTICIPANTS} minters`
       : phase === "graduated"
-        ? `${commas(row.minters)} minter${row.minters === 1 ? "" : "s"}`
+        ? minters === null
+          ? "— minters"
+          : `${commas(minters)} minter${minters === 1 ? "" : "s"}`
         : `Opens at Block ${fm.start_block.toLocaleString()}`;
 
   // Bottom-right, always a time — the one axis every phase shares, pointing
@@ -807,8 +968,16 @@ function Card({
       // true of every card on the page, since non-conforming launches are not
       // listed at all — so it distinguished nothing. Reserved for the finished,
       // it means something at a glance.
+      // The fresh treatment is a ring rather than a thicker border: a border
+      // that changes WIDTH changes the card's box, so one card growing a
+      // pixel would nudge every card in its grid row. A ring is painted
+      // outside the box and moves nothing.
       className={`group block overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-md ${
-        conforming && phase === "graduated" ? "holo-border" : "border border-gray-200"
+        conforming && phase === "graduated"
+          ? "holo-border"
+          : fresh
+            ? "border border-amber-400 ring-2 ring-amber-100"
+            : "border border-gray-200"
       }`}
     >
       <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
@@ -818,6 +987,36 @@ function Card({
           className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute left-2 top-2">{chip}</div>
+        {/* Top-right, opposite the phase chip, and carrying the COUNT rather
+            than a name for the state.
+
+            This card sits ahead of cards with more progress, against the sort
+            the reader chose, so the only question it raises is why — and the
+            count is the answer, because the count is what ranked it. Two
+            earlier attempts did not answer it. "Fresh Mint" named the state
+            and explained nothing. "Minting now" explained it by restating the
+            phase, under a heading that says Minting, on a card already
+            wearing a Minting chip: the same word three times, carrying no
+            information the third time.
+
+            Deliberately the header's mempool chip, down to the border and the
+            dot, because it is the same fact in a second place — amber-50 and
+            a ping, meaning "queued, not confirmed". A reader who has parsed
+            the one in the header does not have to parse this. It is also the
+            only light chip on a card, which is what makes it read over
+            artwork of any colour. */}
+        {fresh && (
+          <div className="absolute right-2 top-2">
+            <span
+              title={`${pending} unconfirmed mint${pending === 1 ? "" : "s"} in the mempool — the most of any launch here, which is why it is first`}
+              className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 backdrop-blur-sm"
+            >
+              <PendingDot />
+              <span className="tabular-nums">{pending}</span>
+              <span>pending</span>
+            </span>
+          </div>
+        )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent p-3 pt-10">
           <div className="flex items-baseline justify-between gap-2">
             <span className="truncate text-lg font-bold text-white">
@@ -848,9 +1047,33 @@ function Card({
         {/* The creator, on its own line. It does not help rank one launch
             against another — which is why it is not on the row above with the
             facts that do — but it is the only thing on the card that says who
-            is behind it, and an address in mono reads as an address. */}
-        <div className="truncate font-mono text-[10px] text-gray-400">
-          {shortAddress(fm.source)}
+            is behind it, and an address in mono reads as an address.
+
+            The pending count shares the line because it is the same kind of
+            fact: not a measure to rank the launch by, just something true
+            about it this second. Absent at zero, like the header chip it
+            borrows the dot from — a counter that reads 0 almost always is a
+            counter people stop reading.
+
+            Absent on the pinned card too, where the badge above is already
+            showing this exact number, larger. One card saying 3 twice invites
+            the reader to work out what the difference between the two is,
+            and there isn't one. */}
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate font-mono text-[10px] text-gray-400">
+            {shortAddress(fm.source)}
+          </span>
+          {pending > 0 && !fresh && (
+            <span
+              title={`${pending} unconfirmed mint${pending === 1 ? "" : "s"} in the mempool`}
+              className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-amber-700"
+            >
+              <PendingDot />
+              <span className="tabular-nums">
+                {pending} tx{pending === 1 ? "" : "s"}
+              </span>
+            </span>
+          )}
         </div>
       </div>
     </Link>
