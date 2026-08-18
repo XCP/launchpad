@@ -7,7 +7,7 @@ import { fromSats, tokenQty, usd } from "@/lib/format";
 import useSWR from "swr";
 import { buildPortfolioSeries, rateLookup, timeLookup, type DailyRate, type TimeAnchor } from "@/lib/portfolio-chart";
 import { PortfolioChart, WindowPicker, WINDOW_BLOCKS, type Window } from "@/app/profile/_components/portfolio-chart";
-import { usePortfolio, type Portfolio } from "@/app/profile/_lib/use-portfolio";
+import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
 
 type Denom = "usd" | "xcp";
 
@@ -52,8 +52,8 @@ function PnlOverWindow({ values, format }: { values: number[]; format: (v: numbe
   );
 }
 
-export function PositionsTab({ address, demo }: { address: string; demo?: Portfolio }) {
-  const { portfolio, isLoading } = usePortfolio(address, demo);
+export function PositionsTab({ address }: { address: string }) {
+  const { portfolio, isLoading } = usePortfolio(address);
   const [denom, setDenom] = useState<Denom>("usd");
   const [windowKey, setWindowKey] = useState<Window>("7D");
   // Daily XCP/USD, so a dollar chart prices each point at its own day's rate.

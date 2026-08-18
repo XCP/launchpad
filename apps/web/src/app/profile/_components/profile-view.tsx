@@ -7,18 +7,13 @@ import { ConnectButton } from "@/components/connect-button";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { shortAddress } from "@/lib/format";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { PREVIEW_ADDRESS } from "@/lib/constants";
 import { ActivityTab } from "@/app/profile/_components/activity-tab";
-import { demoActivity, demoPortfolio } from "@/app/profile/_lib/demo-data";
 import { HistoryTab } from "@/app/profile/_components/history-tab";
 import { LaunchesTab } from "@/app/profile/_components/launches-tab";
 import { PositionsTab } from "@/app/profile/_components/positions-tab";
 
 type Tab = "positions" | "history" | "activity" | "launches";
 
-/** Any height works for the preview: rows are placed relative to it, and the
- *  ages shown are derived from that distance. */
-const BLOCK_TIP = 962_000;
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "positions", label: "Positions" },
@@ -41,15 +36,9 @@ export function ProfileView({ viewing }: { viewing?: string }) {
   const { status, address: connectedAddress, proofStatus, disconnect } = useWallet();
   const [tab, setTab] = useState<Tab>("positions");
   const [copied, setCopied] = useState(false);
-  const [preview, setPreview] = useState(false);
 
   const address = viewing ?? connectedAddress;
   const isSelf = !viewing || viewing === connectedAddress;
-
-  // Same device as the asset pages' phase preview: nothing has graduated yet,
-  // so these tabs are all empty and their design can't otherwise be seen.
-  const portfolio = preview ? demoPortfolio() : undefined;
-  const activity = preview ? demoActivity(BLOCK_TIP) : undefined;
 
   if (!address || (!viewing && status !== "connected")) {
     return (
@@ -137,36 +126,12 @@ export function ProfileView({ viewing }: { viewing?: string }) {
           </div>
         </Tabs>
         <div className="p-4">
-          {tab === "positions" && <PositionsTab address={address} demo={portfolio} />}
-          {tab === "history" && <HistoryTab address={address} demo={portfolio} />}
-          {tab === "activity" && <ActivityTab address={address} demo={activity} />}
+          {tab === "positions" && <PositionsTab address={address} />}
+          {tab === "history" && <HistoryTab address={address} />}
+          {tab === "activity" && <ActivityTab address={address} />}
           {tab === "launches" && <LaunchesTab address={address} />}
         </div>
       </div>
-
-      {connectedAddress === PREVIEW_ADDRESS && (
-      <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-gray-200 bg-white/95 px-1.5 py-1 text-[11px] font-medium shadow-lg backdrop-blur">
-        <span className="px-1.5 text-gray-400">preview</span>
-        <button
-          type="button"
-          onClick={() => setPreview(false)}
-          className={`rounded-full px-2 py-1 ${
-            !preview ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
-          }`}
-        >
-          live
-        </button>
-        <button
-          type="button"
-          onClick={() => setPreview(true)}
-          className={`rounded-full px-2 py-1 ${
-            preview ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
-          }`}
-        >
-          sample data
-        </button>
-      </div>
-      )}
     </div>
   );
 }

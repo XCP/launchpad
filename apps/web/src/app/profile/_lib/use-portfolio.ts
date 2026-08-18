@@ -34,9 +34,9 @@ export interface Portfolio {
 
 /** Positions and closed positions come out of one pass over the ledger, so
  *  both tabs share a cache key and the work happens once. */
-export function usePortfolio(address: string, demo?: Portfolio) {
+export function usePortfolio(address: string) {
   const { data, isLoading } = useSWR(
-    demo ? null : ["portfolio", address],
+    ["portfolio", address],
     async () => {
       // Four small requests. This used to also paginate the address's whole
       // credit/debit ledger — ~14,000 rows across 17 requests — to pair XCP
@@ -136,5 +136,5 @@ export function usePortfolio(address: string, demo?: Portfolio) {
     { refreshInterval: 600_000, revalidateOnFocus: false },
   );
 
-  return { portfolio: demo ?? data, isLoading: demo ? false : isLoading };
+  return { portfolio: data, isLoading };
 }

@@ -29,7 +29,7 @@ import {
   windowIsExact,
   xcp69Params,
 } from "@/lib/xcp69";
-import { PhasePreview } from "@/app/[asset]/_components/phase-preview";
+import { LaunchView } from "@/app/[asset]/_components/launch-view";
 
 export const revalidate = 30;
 
@@ -259,7 +259,7 @@ export default async function LaunchPage({
   }
 
   return (
-    <PhasePreview
+    <LaunchView
       asset={asset}
       fm={fm}
       conforming={conforming}

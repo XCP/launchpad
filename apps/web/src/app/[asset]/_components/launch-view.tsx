@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[asset]/_components/launch-chrome";
 import { HostedDescription, HostedSocials, InscriptionChip, LaunchDescription, isOurMetadata } from "@/app/[asset]/_components/launch-metadata";
@@ -37,9 +39,8 @@ import { PressurePanel } from "@/app/[asset]/_components/pressure-panel";
 import { PriceChart, type DevTrade } from "@/app/[asset]/_components/price-chart";
 
 /**
- * The launch page's entire presentation, data in via props — shared by the
- * real /[asset] route and the phase-preview simulator so the two can never
- * drift. No fetching happens here.
+ * The launch page's entire presentation, data in via props. No fetching
+ * happens here.
  *
  * Shape: a terminal for one asset. Header answers "how's it doing?" at a
  * glance (price, multiple, change), a dense stat strip carries the numbers,

@@ -3,10 +3,10 @@
 import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
 import { compact, fromSats, usd } from "@/lib/format";
-import { usePortfolio, type Portfolio } from "@/app/profile/_lib/use-portfolio";
+import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
 
-export function HistoryTab({ address, demo }: { address: string; demo?: Portfolio }) {
-  const { portfolio, isLoading } = usePortfolio(address, demo);
+export function HistoryTab({ address }: { address: string }) {
+  const { portfolio, isLoading } = usePortfolio(address);
 
   if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Loading history…</p>;
 

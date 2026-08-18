@@ -5,7 +5,7 @@ import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchEventsBySource, fetchIndexedLaunches, fetchMintsBySource } from "@/lib/api/launchpad-api";
-import { computeActivity, type ActivityKind, type ActivityRow } from "@/lib/activity";
+import { computeActivity, type ActivityKind } from "@/lib/activity";
 import { compact, fromSats, tokenQty } from "@/lib/format";
 
 const LABEL: Record<ActivityKind, string> = {
@@ -33,15 +33,9 @@ function ago(blocks: number): string {
   return `~${Math.round(mins / (60 * 24))}d ago`;
 }
 
-export function ActivityTab({
-  address,
-  demo,
-}: {
-  address: string;
-  demo?: { rows: ActivityRow[]; height: number };
-}) {
-  const { data: fetched, isLoading: loading } = useSWR(
-    demo ? null : ["activity", address],
+export function ActivityTab({ address }: { address: string }) {
+  const { data, isLoading } = useSWR(
+    ["activity", address],
     async () => {
       const [launches, events, mints, height] = await Promise.all([
         fetchIndexedLaunches(50),
@@ -56,9 +50,6 @@ export function ActivityTab({
     },
     { refreshInterval: 600_000, revalidateOnFocus: false },
   );
-
-  const data = demo ?? fetched;
-  const isLoading = demo ? false : loading;
 
   if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Loading activity…</p>;
 

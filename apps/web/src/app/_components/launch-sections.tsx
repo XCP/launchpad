@@ -7,8 +7,6 @@ import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { PendingDot } from "@/components/pending-dot";
 import { useMempool } from "@/hooks/use-mempool";
-import { useWallet } from "@/lib/wallet/wallet-context";
-import { PREVIEW_ADDRESS } from "@/lib/constants";
 import { LABEL } from "@/components/ui/tokens";
 import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/format";
 import type { MempoolMint } from "@/lib/api/counterparty";
@@ -161,32 +159,6 @@ const TABULAR = new Set(["graduated", "minting", "scheduled"]);
  * way of drawing a page, not a different page.
  */
 
-/**
- * Graduated cards, fabricated from the launches that DO exist.
- *
- * Nothing has graduated yet, so the section that leads the page is the one
- * nobody can look at. Reusing real rows — real art, real names — means the
- * preview shows what the layout will actually do rather than what it does with
- * invented placeholder art, which is the part that usually lies.
- */
-function sampleGraduated(rows: SectionRow[], height: number): SectionRow[] {
-  const seeds = rows.slice(0, 4);
-  return seeds.map((r, i) => ({
-    ...r,
-    phase: "graduated" as LaunchPhase,
-    // A spread of magnitudes, so the column shows how the numbers line up
-    // rather than four of the same width — and DELIBERATELY out of step with
-    // each other. Ranked the same way on every axis, the sample made all three
-    // sorts return one order, which is indistinguishable from a sort that
-    // does nothing. Sample data has to be able to demonstrate the control.
-    marketCapXcp: [41000, 12400, 3900, 820][i] ?? 500,
-    priceXcp: [0.00041, 0.000124, 0.000039, 0.0000082][i] ?? 0.000005,
-    minters: [97, 412, 71, 288][i] ?? 69,
-    announceBlock: height - [8800, 430, 4100, 2600][i]!,
-    progress: 1,
-  }));
-}
-
 /** The first page of each section, as the server rendered it. */
 export interface InitialPages {
   graduated: LaunchPage;
@@ -219,24 +191,10 @@ export function LaunchSections({
   // the next still in cards reads as a bug, not a setting. Sections that
   // can't tabulate simply ignore it.
   const [view, setView] = useState<View>("grid");
-  const [preview, setPreview] = useState(false);
   // One lookup for the whole page, built from the poll the header chip is
   // already running. Sections read it; none of them fetches it.
   const { mints } = useMempool(MEMPOOL_REFRESH_MS);
   const pendingMints = useMemo(() => pendingByAsset(mints), [mints]);
-  // Same gate as the asset and profile previews: a review tool for the owner,
-  // not a control every visitor gets offered.
-  const { address } = useWallet();
-  const canPreview = address === PREVIEW_ADDRESS;
-  // Seeded from whatever real launches the page has — minting first, since
-  // that is the section with rows in it — so the sample shows real art.
-  const graduated = useMemo<LaunchPage>(() => {
-    if (!preview) return initial.graduated;
-    const seeds = [...initial.minting.rows, ...initial.scheduled.rows];
-    const rows = sampleGraduated(seeds, height);
-    // No crown on invented rows, and none wanted: the pin is a Minting slot.
-    return { rows, total: rows.length, king: null };
-  }, [preview, initial, height]);
 
   return (
     <div className="space-y-10">
@@ -247,10 +205,8 @@ export function LaunchSections({
         phase="graduated"
         title="Graduated"
         empty=""
-        initial={graduated}
-        // Sample rows exist only in this component; there is no page two of
-        // something the database has never heard of.
-        paged={paged && !preview}
+        initial={initial.graduated}
+        paged={paged}
         pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
@@ -284,25 +240,6 @@ export function LaunchSections({
         onView={setView}
       />
 
-      {canPreview && (
-        <div className="fixed bottom-4 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-full border border-gray-200 bg-white/95 px-1.5 py-1 text-[11px] font-medium shadow-lg backdrop-blur">
-          <span className="px-1.5 text-gray-400">graduated</span>
-          {(["live", "sample"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setPreview(mode === "sample")}
-              className={`rounded-full px-2 py-1 ${
-                preview === (mode === "sample")
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-500 hover:bg-gray-100"
-              }`}
-            >
-              {mode === "live" ? "live" : "sample data"}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -1083,7 +1020,14 @@ function Card({
         {phase === "minting" && (
           <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/25">
             <div
-              className="h-full bg-purple-500"
+              // Matches the ring, so the card reads as one object rather than
+              // a purple bar with an unrelated coloured edge. Purple is the
+              // site accent and stays the resting state — the two other
+              // colours only appear when the ring is already saying the same
+              // thing, and mean exactly what it means there.
+              className={`h-full ${
+                fresh ? "bg-green-500" : pending > 0 ? "bg-amber-400" : "bg-purple-500"
+              }`}
               style={{ width: `${Math.min(100, saleProgress(fm) * 100)}%` }}
             />
           </div>
