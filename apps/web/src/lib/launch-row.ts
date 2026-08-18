@@ -129,6 +129,10 @@ export function toSearchRow(e: SearchIndexEntry): SearchRow {
 export interface LaunchPage {
   rows: SectionRow[];
   total: number;
+  /** The launch reigning over this phase — most recently minted, out of
+   *  everything still minting. Null everywhere else, and null on the live
+   *  fallback, which has no way to ask the question. */
+  king: SectionRow | null;
 }
 
 /**

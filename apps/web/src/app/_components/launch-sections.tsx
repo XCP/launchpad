@@ -234,7 +234,8 @@ export function LaunchSections({
     if (!preview) return initial.graduated;
     const seeds = [...initial.minting.rows, ...initial.scheduled.rows];
     const rows = sampleGraduated(seeds, height);
-    return { rows, total: rows.length };
+    // No crown on invented rows, and none wanted: the pin is a Minting slot.
+    return { rows, total: rows.length, king: null };
   }, [preview, initial, height]);
 
   return (
@@ -404,7 +405,11 @@ function Section({
       // page that loaded, which is what belongs on screen, and it schedules
       // its own retry. Returning null would CACHE the failure as the answer.
       if (!res) throw new Error(`no ${phase} page ${current}`);
-      return { rows: res.rows.map(toSectionRow), total: res.total };
+      return {
+        rows: res.rows.map(toSectionRow),
+        total: res.total,
+        king: res.king ? toSectionRow(res.king) : null,
+      };
     },
     {
       // Page one of the default ordering is what the document was rendered
@@ -436,43 +441,50 @@ function Section({
     : (data ?? initial).rows;
 
   /**
+   * Who is reigning, according to the last answer that arrived.
+   *
+   * Null on the unpaged path deliberately. That path is the live Counterparty
+   * derivation, which cannot answer "who minted most recently" at all — so the
+   * section shows no pinned slot rather than a guess, and the crown reappears
+   * when the index does.
+   */
+  const king = local ? null : (data ?? initial).king;
+
+  /**
    * The front slot: the minting launch with the most mints queued behind it
-   * right now.
+   * right now: the launch that minted most recently, holding the slot until
+   * another one mints.
    *
-   * Freshness IS the mempool here, not a stored timestamp — which is what
-   * makes this free, and also what makes it expire without anyone deciding
-   * when. The block lands, the queue empties, and the slot is simply not
-   * there on the next poll. Nothing carries a "fresh until" to get wrong.
+   * A crown that passes, not a rank that is recomputed. It does not empty when
+   * the mempool drains — once anything has minted, somebody is reigning —
+   * which is the difference between this and a busiest-right-now leaderboard.
    *
-   * Ranked by queue depth and not by recency because the feed cannot answer
-   * recency: fetchMempoolFairmints maps /mempool/events/NEW_FAIRMINT straight
-   * through, with no per-mint timestamp and no documented ordering. "Busiest
-   * right now" is a question this data does answer.
+   * The holder comes from the worker (`king`), never from `shown`. The rows
+   * here are ONE PAGE of the phase, and the reigning launch is usually not
+   * among them: on the live database the crown sat on a launch that page one
+   * of the progress sort did not contain. Choosing from what this component
+   * happens to hold would crown the best of twelve and present it as the best
+   * of forty.
+   *
+   * Which is also why it is prepended rather than reordered. The holder is
+   * pulled to the front if the page already has it, and added to the front if
+   * it does not — so the slot is filled on every page, not just the one the
+   * holder happens to fall on.
    *
    * Grid only, and Minting only. The table is the ledger view and keeps the
    * order it was sorted by — a row that jumped the queue there would carry
    * nothing on it to explain why it had.
    */
   const { rows: ordered, fresh } = useMemo(() => {
-    if (phase !== "minting" || view !== "grid") {
+    if (phase !== "minting" || view !== "grid" || !king) {
       return { rows: shown, fresh: null as string | null };
     }
-    let best: SectionRow | null = null;
-    let bestN = 0;
-    for (const r of shown) {
-      const n = pendingMints.get(r.fm.asset) ?? 0;
-      if (n > bestN) {
-        best = r;
-        bestN = n;
-      }
-    }
-    if (!best) return { rows: shown, fresh: null as string | null };
-    const pinned = best;
-    return {
-      rows: [pinned, ...shown.filter((r) => r !== pinned)],
-      fresh: pinned.fm.asset as string | null,
-    };
-  }, [shown, phase, view, pendingMints]);
+    // Matched on tx_hash, not on the object: the crown arrives as its own row
+    // from its own statement, so it is never the same object as the copy on
+    // the page even when it is the same launch.
+    const rest = shown.filter((r) => r.fm.tx_hash !== king.fm.tx_hash);
+    return { rows: [king, ...rest], fresh: king.fm.asset as string | null };
+  }, [shown, phase, view, king]);
 
   if (total === 0 && !empty) return null;
 
@@ -987,33 +999,27 @@ function Card({
           className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute left-2 top-2">{chip}</div>
-        {/* Top-right, opposite the phase chip, and carrying the COUNT rather
-            than a name for the state.
+        {/* Top-right, opposite the phase chip, and saying what the slot IS.
 
-            This card sits ahead of cards with more progress, against the sort
-            the reader chose, so the only question it raises is why — and the
-            count is the answer, because the count is what ranked it. Two
-            earlier attempts did not answer it. "Fresh Mint" named the state
-            and explained nothing. "Minting now" explained it by restating the
-            phase, under a heading that says Minting, on a card already
-            wearing a Minting chip: the same word three times, carrying no
-            information the third time.
+            This is a crown, not a measure: the launch that minted most
+            recently holds the front position until another one mints. So the
+            badge names that and nothing else. It cannot carry a count, because
+            the holder keeps the slot after its mints confirm and the mempool
+            empties — a number here would read 0 most of the time.
 
-            Deliberately the header's mempool chip, down to the border and the
-            dot, because it is the same fact in a second place — amber-50 and
-            a ping, meaning "queued, not confirmed". A reader who has parsed
-            the one in the header does not have to parse this. It is also the
-            only light chip on a card, which is what makes it read over
-            artwork of any colour. */}
+            Solid amber, not the light amber of the mempool chip on the address
+            line below. Amber because this is activity rather than a phase, and
+            the three phase chips own dark, blue and green; solid rather than
+            light so it is not mistaken for the pending indicator, which is a
+            different fact about a different moment. Purple was tried and
+            vanished into the site's own accent. */}
         {fresh && (
           <div className="absolute right-2 top-2">
             <span
-              title={`${pending} unconfirmed mint${pending === 1 ? "" : "s"} in the mempool — the most of any launch here, which is why it is first`}
-              className="flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 backdrop-blur-sm"
+              title="Minted more recently than anything else still minting — which is why it is first"
+              className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-medium text-amber-950 backdrop-blur-sm"
             >
-              <PendingDot />
-              <span className="tabular-nums">{pending}</span>
-              <span>pending</span>
+              Last mint
             </span>
           </div>
         )}
@@ -1055,15 +1061,20 @@ function Card({
             borrows the dot from — a counter that reads 0 almost always is a
             counter people stop reading.
 
-            Absent on the pinned card too, where the badge above is already
-            showing this exact number, larger. One card saying 3 twice invites
-            the reader to work out what the difference between the two is,
-            and there isn't one. */}
+            On EVERY card that has one, the pinned card included. These read
+            across the grid rather than on one card: twenty mints in the
+            mempool and this line is where they went, visible in one scan of
+            the homepage. Suppressing it on the pinned card to avoid repeating
+            the badge put the hole in that scan exactly where the traffic was
+            heaviest — the busiest launch on the page became the one card not
+            reporting its share. The badge answers "why is this first"; this
+            answers "where is everything going", and they are not the same
+            question. */}
         <div className="flex items-center justify-between gap-2">
           <span className="truncate font-mono text-[10px] text-gray-400">
             {shortAddress(fm.source)}
           </span>
-          {pending > 0 && !fresh && (
+          {pending > 0 && (
             <span
               title={`${pending} unconfirmed mint${pending === 1 ? "" : "s"} in the mempool`}
               className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-amber-700"

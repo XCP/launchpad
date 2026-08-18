@@ -371,6 +371,16 @@ export async function fetchIndexedLaunches(
 export interface IndexedPage {
   rows: IndexedLaunch[];
   total: number;
+  /**
+   * The launch that minted most recently, out of everything still minting.
+   *
+   * Comes from the worker rather than being picked out of `rows`, because it
+   * is a fact about the phase and `rows` is one page of it — the reigning
+   * launch is usually NOT on the page being shown. Null on every phase but
+   * minting, null before anything has minted, and null from a worker too old
+   * to know the field.
+   */
+  king: IndexedLaunch | null;
 }
 
 /**
@@ -411,7 +421,11 @@ export async function fetchLaunchPage(
       cache: "no-store",
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { result?: ApiLaunchRow[]; total?: number };
+    const data = (await res.json()) as {
+      result?: ApiLaunchRow[];
+      total?: number;
+      king?: ApiLaunchRow | null;
+    };
     if (!Array.isArray(data.result)) return null;
     // A response without `total` is not a page — it is an OLDER WORKER, which
     // ignores `phase` entirely and answers the per_phase query instead: every
@@ -421,7 +435,13 @@ export async function fetchLaunchPage(
     // Counterparty derivation, which is correct if slower, and means the two
     // deploys can land in either order without a window of wrong pages.
     if (typeof data.total !== "number") return null;
-    return { rows: data.result.map(toIndexedLaunch), total: data.total };
+    return {
+      rows: data.result.map(toIndexedLaunch),
+      total: data.total,
+      // Absent rather than null on a worker that predates the crown, which is
+      // the same thing to every reader of this: no one is reigning.
+      king: data.king ? toIndexedLaunch(data.king) : null,
+    };
   } catch {
     return null;
   }

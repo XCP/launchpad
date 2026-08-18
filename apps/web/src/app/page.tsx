@@ -143,6 +143,7 @@ export default async function HomePage() {
     const [graduated, minting, scheduled] = indexed.map<LaunchPage>((p) => ({
       rows: p.rows.map(toSectionRow),
       total: p.total,
+      king: p.king ? toSectionRow(p.king) : null,
     })) as [LaunchPage, LaunchPage, LaunchPage];
     initial = { graduated, minting, scheduled };
     paged = true;
@@ -159,7 +160,12 @@ export default async function HomePage() {
       // phase. In the paged case it is the database's count and can exceed
       // the page — the two agree on what the number means, not on where it
       // comes from.
-      return { rows: held, total: held.length };
+      // No crown on this path. It is the live Counterparty derivation, and
+       // "which launch minted most recently" is a question only the index can
+       // answer -- the fairminters listing carries no per-mint ordering. A
+       // section simply shows no pinned slot until the index is reachable
+       // again, which is the honest answer rather than a guessed one.
+       return { rows: held, total: held.length, king: null };
     };
     initial = { graduated: of("graduated"), minting: of("minting"), scheduled: of("scheduled") };
     paged = false;
