@@ -7,6 +7,7 @@ import { TokenImage } from "@/components/token-image";
 import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
 import { fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { type SearchRow, toSearchRow } from "@/lib/launch-row";
+import { NO_MATCH, hiddenAsRefunded, relevance } from "@/lib/search-rank";
 
 export type { SearchRow };
 
@@ -58,25 +59,6 @@ function metric(row: SearchRow, phase: SearchPhase, height: number, xcpUsd: numb
   if (shown === "minting") return `${(row.progress * 100).toFixed(1)}%`;
   if (shown === "scheduled") return `opens ${blocksEta(row.startBlock - height)}`;
   return `${commas(row.minters)} minter${row.minters === 1 ? "" : "s"}`;
-}
-
-/**
- * How well a row answers the query, lower being better.
- *
- * An exact asset beats a prefix beats a substring — typing "STAR" should put
- * STAR above STARMONEY above MYSTARS, which plain substring matching gets
- * wrong in all three positions. Only used while something is typed; with an
- * empty box the chosen sort orders the list on its own.
- */
-function relevance(row: SearchRow, q: string): number {
-  const asset = row.asset;
-  const name = (row.name ?? "").toUpperCase();
-  if (asset === q) return 0;
-  if (asset.startsWith(q)) return 1;
-  if (name.startsWith(q)) return 2;
-  if (asset.includes(q)) return 3;
-  if (name.includes(q)) return 4;
-  return 5;
 }
 
 /**
@@ -141,16 +123,27 @@ export function LaunchSearch({
     return () => window.removeEventListener("keydown", onKey);
   }, [load]);
 
-  const results = useMemo(() => {
+  const { results, hiddenRefunded } = useMemo(() => {
     const q = query.trim().toUpperCase();
     const pool = (rows ?? []).filter((r) => (phase === "all" ? true : r.phase === phase));
     // Typing still ranks by how well the name answers it — an exact asset
     // beats a prefix beats a substring — and only then by the chosen sort.
-    const matched = q ? pool.filter((r) => relevance(r, q) < 5) : pool;
+    const matched = q ? pool.filter((r) => relevance(r, q) < NO_MATCH) : pool;
+    // A refunded launch is shown only to someone who named it. It is a dead
+    // asset — the mint failed and everyone was repaid — so as a candidate for
+    // a half-typed word it is pure noise, and there is a lot of it: every
+    // launch that misses the soft cap ends up here forever. With an empty box
+    // nothing is named, so browsing All is live and graduated launches only.
+    const dead = (r: SearchRow) => hiddenAsRefunded(r, q);
+    const shown = matched.filter((r) => !dead(r));
     const by = ORDER[phase];
-    return [...matched].sort(
-      (a, b) => (q ? relevance(a, q) - relevance(b, q) : 0) || by(a, b),
-    );
+    return {
+      results: shown.sort((a, b) => (q ? relevance(a, q) - relevance(b, q) : 0) || by(a, b)),
+      // Counted, not silently dropped. Saying "nothing matches" when the index
+      // does hold a match is the lie this box exists not to tell; the count is
+      // what lets the empty state stay honest about what it is holding back.
+      hiddenRefunded: matched.filter(dead).length,
+    };
   }, [rows, query, phase]);
 
   const go = (asset: string) => {
@@ -237,9 +230,13 @@ export function LaunchSearch({
                     not be made before the index has arrived. */}
                 {rows === null
                   ? "Loading launches…"
-                  : query
-                    ? `Nothing matches “${query}”.`
-                    : "No launches in this phase yet."}
+                  : query && hiddenRefunded > 0
+                    ? `Nothing open matches “${query}” — ${hiddenRefunded} refunded ${
+                        hiddenRefunded === 1 ? "launch" : "launches"
+                      } hidden. Type a full name to open one.`
+                    : query
+                      ? `Nothing matches “${query}”.`
+                      : "No launches in this phase yet."}
               </li>
             ) : (
               results.map((r) => (
@@ -288,6 +285,7 @@ export function LaunchSearch({
           <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400">
             <span>
               {results.length} of {rows?.length ?? 0}
+              {hiddenRefunded > 0 && ` · ${hiddenRefunded} refunded hidden`}
             </span>
             <span className="hidden sm:block">Enter opens the first result · Esc closes</span>
           </div>
