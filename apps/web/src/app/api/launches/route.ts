@@ -19,7 +19,13 @@ import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
-const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
+const MAX_IMAGE_MB = 4;
+const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+/** Written from the limit rather than beside it — the two error strings below
+ *  both used to spell the number out, which is two more places to miss when
+ *  the ceiling moves. The label in create/page.tsx is the one copy that can't
+ *  import this (server module), and it says so there. */
+const TOO_LARGE = `Image too large (max ${MAX_IMAGE_MB} MB)`;
 const MAX_DESCRIPTION_CHARS = 2000;
 
 const sha256Hex = async (bytes: ArrayBuffer) => {
@@ -76,7 +82,7 @@ export async function POST(request: Request) {
     );
   }
   if (image.size > MAX_IMAGE_BYTES) {
-    return NextResponse.json({ error: "Image too large (max 2 MB)" }, { status: 400 });
+    return NextResponse.json({ error: TOO_LARGE }, { status: 400 });
   }
 
   const bucket = await getMetadataBucket();
@@ -178,7 +184,7 @@ export async function PUT(request: Request) {
     );
   }
   if (newImage && newImage.size > MAX_IMAGE_BYTES) {
-    return NextResponse.json({ error: "Image too large (max 2 MB)" }, { status: 400 });
+    return NextResponse.json({ error: TOO_LARGE }, { status: 400 });
   }
 
   // Two ways to prove who is asking. A session cookie is the normal one: the

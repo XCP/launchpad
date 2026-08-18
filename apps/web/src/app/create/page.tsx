@@ -115,6 +115,13 @@ function ViewLaunchLink({ asset }: { asset: string }) {
  */
 const INSCRIBE_MAX_BYTES = 385 * 1024;
 
+/** The hosted (non-inscribed) ceiling, for the label under the file picker.
+ *  A copy of MAX_IMAGE_MB in app/api/launches/route.ts, which is a server
+ *  module this cannot import — so if that limit moves, move this too. It is
+ *  only ever a label: the route is what enforces it, and the route rejects
+ *  anything over regardless of what this says. */
+const HOSTED_MAX_MB = 4;
+
 /** A named-asset registration is a fixed protocol fee, paid in the same
  *  compose transaction — not a separate step. */
 const REGISTRATION_FEE_XCP = 0.5;
@@ -578,7 +585,7 @@ export default function CreatePage() {
                   </div>
                   <div className="mt-1 text-xs">
                     PNG, JPEG, WEBP or GIF ·{" "}
-                    {inscribe ? "max 385 KB (inscribing)" : "max 2 MB"} · square
+                    {inscribe ? "max 385 KB (inscribing)" : `max ${HOSTED_MAX_MB} MB`} · square
                     (1:1) recommended
                   </div>
                 </div>
