@@ -40,6 +40,9 @@ export interface LaunchRow {
   pool_xcp_sats: number;
   seen_at_block: number;
   updated_at: number;
+  /** Block of this launch's most recent mint; null if it has never minted.
+   *  See migration 0012 — derived from launch_mints, never counted. */
+  last_mint_block: number | null;
 }
 
 const COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
@@ -49,7 +52,8 @@ const COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
   burn_payment, lock_quantity, lock_description, lp_asset, description,
   conforming, conformance_version, status, phase, earned_quantity,
   paid_quantity, current_deadline_block, mints, minters, pool_xcp_reserve,
-  pool_token_reserve, pool_xcp_sats, seen_at_block, updated_at`;
+  pool_token_reserve, pool_xcp_sats, seen_at_block, updated_at,
+  last_mint_block`;
 
 /**
  * The phases, in the order the index page stacks them.
@@ -171,6 +175,18 @@ const DEFAULT_SORT: Record<LaunchPhase, LaunchSort> = {
 
 export interface LaunchPage {
   rows: LaunchRow[];
+  /**
+   * The launch that minted most recently, out of everything still minting.
+   *
+   * Answered here rather than picked out of `rows` by the caller, because the
+   * caller only ever holds one page. The reigning launch is a fact about the
+   * whole phase, and on any page but the first it is usually not among the
+   * rows the caller can see — a browser choosing from what it was sent would
+   * quietly crown the best of twelve and call it the best of forty.
+   *
+   * Null for every phase but minting, and null while nothing has minted.
+   */
+  king: LaunchRow | null;
   /** Conforming launches in this phase — the whole of it, not this page. The
    *  pager needs the size of the list it is paging, and it is the one number a
    *  LIMITed query cannot tell you about itself. */
@@ -210,7 +226,18 @@ export async function listLaunchPage(
   // row can appear twice, or not at all.
   const order = `${SORT_SQL[key]}, tx_index DESC`;
 
-  const [page, count] = await db.batch<LaunchRow & { n: number }>([
+  /**
+   * The reigning launch, asked for only where it can exist.
+   *
+   * A third statement in the same batch rather than a second round trip, and
+   * only for the minting phase — the other three would each pay for a query
+   * whose answer is always null. It reads with no index by design: this is a
+   * few dozen rows out of a table in the low hundreds, and migration 0012
+   * spells out why an index would cost more than the scan it saved.
+   */
+  const wantsKing = phase === "minting";
+
+  const statements = [
     db
       .prepare(
         `SELECT ${COLUMNS} FROM launches
@@ -222,11 +249,24 @@ export async function listLaunchPage(
     db
       .prepare(`SELECT COUNT(*) AS n FROM launches WHERE conforming = 1 AND phase = ?1`)
       .bind(phase),
-  ]);
+  ];
+  if (wantsKing) {
+    statements.push(
+      db.prepare(
+        `SELECT ${COLUMNS} FROM launches
+          WHERE conforming = 1 AND phase = 'minting' AND last_mint_block IS NOT NULL
+          ORDER BY last_mint_block DESC, tx_index DESC
+          LIMIT 1`,
+      ),
+    );
+  }
+
+  const [page, count, king] = await db.batch<LaunchRow & { n: number }>(statements);
 
   return {
     rows: page.results as LaunchRow[],
     total: (count.results[0] as { n: number } | undefined)?.n ?? 0,
+    king: wantsKing ? ((king?.results[0] as LaunchRow | undefined) ?? null) : null,
   };
 }
 

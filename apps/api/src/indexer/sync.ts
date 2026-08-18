@@ -215,6 +215,41 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
           (_, idx) => (results[idx]!.meta.rows_written ?? 0) > 0,
         );
         mintsIngested += newlyInserted.length;
+
+        /**
+         * The crown: this launch's most recent mint block.
+         *
+         * Costs nothing on a quiet tick. It is keyed off newlyInserted, which
+         * is already computed above and is empty on almost every tick — the
+         * common case runs no statement at all, not a statement that finds
+         * nothing to do.
+         *
+         * The max comes from the rows just inserted rather than from a fresh
+         * MAX() over launch_mints, so this adds no read either. That is sound
+         * because launch_mints is append-only and the guard below is `<`:
+         * the column only ever moves forward, so a batch that happens to land
+         * entirely at or below the stored value writes nothing.
+         *
+         * Delta-guarded and by primary key, so this touches exactly one row
+         * and only when the answer actually changed — D1 bills rows a
+         * statement touches, and a conflicting row still counts.
+         */
+        if (newlyInserted.length > 0) {
+          const newest = newlyInserted.reduce(
+            (max, m) => (m.block_index > max ? m.block_index : max),
+            -1,
+          );
+          await db
+            .prepare(
+              `UPDATE launches
+                  SET last_mint_block = ?1
+                WHERE tx_hash = ?2
+                  AND (last_mint_block IS NULL OR last_mint_block < ?1)`,
+            )
+            .bind(newest, fm.tx_hash)
+            .run();
+        }
+
         // Concurrent, not sequential: a burst of new mints in one tick used
         // to pay for every fee lookup back-to-back (up to a 10s timeout
         // each), which could run the whole job past the lock's 110s lease

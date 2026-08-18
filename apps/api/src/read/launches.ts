@@ -59,8 +59,12 @@ launchesRoute.get("/v2/launches", async (c) => {
     const limit = clamp(Number(c.req.query("limit") ?? 24) || 24, 1, MAX_PAGE);
     const offset = clamp(Number(c.req.query("offset") ?? 0) || 0, 0, MAX_OFFSET);
     const sort = c.req.query("sort");
-    const { rows, total } = await listLaunchPage(c.env.DB, phase, sort, limit, offset);
-    return J(c, { result: rows, result_count: rows.length, total, limit, offset }, 60);
+    const { rows, total, king } = await listLaunchPage(c.env.DB, phase, sort, limit, offset);
+    // `king` is the launch that minted most recently out of everything still
+    // minting — a fact about the phase, not about this page, which is why it
+    // travels beside `result` rather than inside it. Null for every phase but
+    // minting. An older client that does not know the field ignores it.
+    return J(c, { result: rows, result_count: rows.length, total, limit, offset, king }, 60);
   }
 
   const perPhase = Math.min(Number(c.req.query("per_phase") ?? 12) || 12, 50);
