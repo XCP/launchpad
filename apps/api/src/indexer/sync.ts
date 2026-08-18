@@ -194,14 +194,19 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
 
         const stmt = db.prepare(
           `INSERT OR IGNORE INTO launch_mints
-             (tx_hash, launch_tx, block_index, source, earn_quantity, paid_quantity)
-           VALUES (?1, ?2, ?3, ?4, ?5, ?6)`,
+             (tx_hash, launch_tx, block_index, tx_index, source, earn_quantity, paid_quantity)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)`,
         );
         const batch = candidates.map((m) =>
           stmt.bind(
             m.tx_hash,
             fm.tx_hash,
             m.block_index,
+            // Ordering for mints that share a block — see migration 0013.
+            // Coalesced because it is the one field here a pre-0013 row will
+            // not have, and a null would make the tiebreak unorderable rather
+            // than merely undecided.
+            m.tx_index ?? 0,
             m.source,
             String(m.earn_quantity),
             String(m.paid_quantity),
@@ -239,14 +244,43 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
             (max, m) => (m.block_index > max ? m.block_index : max),
             -1,
           );
+
+          // How many of this launch's mints are in that block, and the last of
+          // them — the two halves of the tiebreak (migration 0013).
+          //
+          // Read back rather than counted from `newlyInserted`, because a
+          // block can be ingested across two ticks: the high-water filter
+          // above is `>=` precisely so the boundary block is re-checked, so
+          // this batch is not necessarily all of it. Counting the batch would
+          // undercount a block that arrived in pieces, and the count decides
+          // who wears the crown.
+          //
+          // One indexed lookup on (launch_tx, block_index), reading only the
+          // mints in a single block, and only on a tick that ingested
+          // something — which is almost never.
+          const tie = await one<{ n: number; ti: number | null }>(
+            db,
+            `SELECT COUNT(*) AS n, MAX(tx_index) AS ti
+               FROM launch_mints
+              WHERE launch_tx = ?1 AND block_index = ?2`,
+            fm.tx_hash,
+            newest,
+          );
+
           await db
             .prepare(
+              // Distinctness on all three, so a tick that re-reads the same
+              // block writes nothing, and `<=` so this can only ever move the
+              // crown forward. D1 bills rows a statement touches.
               `UPDATE launches
-                  SET last_mint_block = ?1
-                WHERE tx_hash = ?2
-                  AND (last_mint_block IS NULL OR last_mint_block < ?1)`,
+                  SET last_mint_block = ?1, last_mint_count = ?2, last_mint_tx_index = ?3
+                WHERE tx_hash = ?4
+                  AND (last_mint_block IS NULL OR last_mint_block <= ?1)
+                  AND (last_mint_block IS NOT ?1
+                       OR last_mint_count IS NOT ?2
+                       OR last_mint_tx_index IS NOT ?3)`,
             )
-            .bind(newest, fm.tx_hash)
+            .bind(newest, tie?.n ?? newlyInserted.length, tie?.ti ?? 0, fm.tx_hash)
             .run();
         }
 

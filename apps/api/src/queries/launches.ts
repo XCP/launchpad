@@ -253,9 +253,21 @@ export async function listLaunchPage(
   if (wantsKing) {
     statements.push(
       db.prepare(
+        // Recency first, then the two tiebreaks that only apply WITHIN one
+        // block (migration 0013): how many of this launch's mints are in it,
+        // then the last of those mints by Counterparty's global tx_index.
+        //
+        // Count before index because ordering inside a block is miner
+        // ordering — five mints arriving is a stronger claim on the slot than
+        // one that happened to be sequenced last. The launch's own tx_index
+        // still ends the sort, so the result is total and cannot flicker
+        // between two renders.
         `SELECT ${COLUMNS} FROM launches
           WHERE conforming = 1 AND phase = 'minting' AND last_mint_block IS NOT NULL
-          ORDER BY last_mint_block DESC, tx_index DESC
+          ORDER BY last_mint_block DESC,
+                   COALESCE(last_mint_count, 0) DESC,
+                   COALESCE(last_mint_tx_index, 0) DESC,
+                   tx_index DESC
           LIMIT 1`,
       ),
     );

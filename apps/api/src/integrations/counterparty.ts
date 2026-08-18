@@ -177,6 +177,10 @@ export async function fetchAnnounceFacts(
 
 export interface CpFairmint {
   tx_hash: string;
+  /** Counterparty's global transaction counter, which is what orders two
+   *  mints that landed in the SAME block — block_index alone cannot. Read for
+   *  the crown's tiebreak; see migration 0013. */
+  tx_index: number;
   block_index: number;
   source: string;
   earn_quantity: number | string;
