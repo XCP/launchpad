@@ -44,3 +44,12 @@ bucket_name = "launchpad-metadata"
 [[r2_buckets]]
 binding = "NEXT_INC_CACHE_R2_BUCKET"
 bucket_name = "launchpad-inc-cache"
+# LIFECYCLE: objects expire after 30 days, set 2026-08-17 via
+#   wrangler r2 bucket lifecycle add <bucket> expire-stale-isr "" --expire-days 30
+# Recorded here because it is NOT in code and nothing else would reveal it.
+# OpenNext only ever WRITES to this bucket -- there is no eviction, so one
+# object accumulates per unique URL rendered, forever. xcpdex-inc-cache reached
+# 56,310 objects in its first day against a key space of 12,444 pairs and
+# 248,029 assets. Expiry is safe: a missing entry is a cache miss, so the next
+# request re-renders and re-caches it.
+
