@@ -39,7 +39,16 @@ export async function GET(
   if (width >= 16 && width <= 2048) {
     const source = `${METADATA_ORIGIN}/i/${encodeURIComponent(asset.toUpperCase())}`;
     const res = await fetch(source, {
-      cf: { image: { format: "auto", fit: "contain", width }, cacheEverything: true },
+      cf: {
+        // scale-down, not contain: contain enlarges a source smaller than the
+        // requested width, and re-encoding an upscale is strictly worse than
+        // sending the original. CAPTAINDAN is 226x226 and 30,106 bytes; asking
+        // contain for 560 returned 201,194 -- nearly 7x larger -- on the most
+        // requested asset on the site. scale-down never enlarges, so a small
+        // source passes through at its own size.
+        image: { format: "auto", fit: "scale-down", width },
+        cacheEverything: true,
+      },
     } as RequestInit);
     if (res.ok && (res.headers.get("content-type") ?? "").startsWith("image/")) {
       return new Response(res.body, {
