@@ -41,7 +41,27 @@ const app = new Hono<{ Bindings: Env }>();
  */
 app.use("*", async (c, next) => {
   await next();
-  c.res.headers.set("Timing-Allow-Origin", "*");
+
+  // A 101 is a WebSocket handshake that a Durable Object performed itself and
+  // handed back through stub.fetch(), and a Response that arrived from a
+  // subrequest carries immutable headers. Setting one throws, and the throw
+  // takes the upgrade with it -- /ws/presence and /ws/launches/:asset have
+  // both been answering 500 since this middleware was added, which is the site
+  // presence badge and every live launch room. Resource Timing does not
+  // describe websockets anyway, so there was never a header to add here.
+  if (c.res.status === 101) return;
+
+  // Any other response that did not originate in this Worker is immutable for
+  // the same reason. Rebuilding is cheap -- the body passes through as a
+  // stream -- and it means one measurement header can never again be the thing
+  // that decides whether a route works.
+  try {
+    c.res.headers.set("Timing-Allow-Origin", "*");
+  } catch {
+    const rebuilt = new Response(c.res.body, c.res);
+    rebuilt.headers.set("Timing-Allow-Origin", "*");
+    c.res = rebuilt;
+  }
 });
 
 app.get("/", (c) => c.text("launchpad-api ok"));
