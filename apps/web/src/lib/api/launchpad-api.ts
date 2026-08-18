@@ -60,6 +60,8 @@ interface ApiLaunchRow {
   pool_token_reserve: string | null;
   announce_block: number | null;
   minters: number;
+  /** Optional because a worker older than migration 0012 does not send it. */
+  last_mint_block?: number | null;
 }
 
 export interface IndexedLaunch {
@@ -77,6 +79,9 @@ export interface IndexedLaunch {
   /** Distinct addresses that have minted. The one participation number every
    *  phase has, which is what makes it the cross-phase column in search. */
   minters: number;
+  /** Block of this launch's most recent mint; null if it has never minted.
+   *  What the crown is ordered by, and what the badge counts back from. */
+  lastMintBlock: number | null;
 }
 
 function toFairminter(row: ApiLaunchRow): Fairminter {
@@ -343,6 +348,7 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
     poolTokenReserve: row.pool_token_reserve,
     announceBlock: row.announce_block,
     minters: row.minters,
+    lastMintBlock: row.last_mint_block ?? null,
   };
 }
 

@@ -972,6 +972,17 @@ function Card({
           : ""
         : blocksEta(fm.start_block - height);
 
+  /**
+   * How long the crown has been worn, as the badge says it.
+   *
+   * `age` reports "now" for the block currently being built, where "now ago"
+   * would be nonsense — so that case gets its own wording rather than a
+   * template that only reads correctly for the other values.
+   */
+  const since = fresh && row.lastMintBlock ? age(row.lastMintBlock, height) : null;
+  const mintedAgo =
+    since === null || since === "—" ? null : since === "now" ? "just now" : `${since} ago`;
+
   return (
     <Link
       href={`/${fm.asset}`}
@@ -980,16 +991,35 @@ function Card({
       // true of every card on the page, since non-conforming launches are not
       // listed at all — so it distinguished nothing. Reserved for the finished,
       // it means something at a glance.
-      // The fresh treatment is a ring rather than a thicker border: a border
-      // that changes WIDTH changes the card's box, so one card growing a
-      // pixel would nudge every card in its grid row. A ring is painted
-      // outside the box and moves nothing.
+      //
+      // Below it, two rings that mean two different things, in the order they
+      // take precedence:
+      //
+      //   green  — this launch is wearing the crown. Exactly one card, ever.
+      //   amber  — this launch has mints waiting in the mempool. Any number of
+      //            cards, and gone the moment they confirm.
+      //
+      // Amber for pending because amber is ALREADY what the mempool looks like
+      // here: the dot on the address line, and the chip in the header. A card
+      // with unconfirmed mints now says so at the distance the grid is read
+      // from, not just in the corner of one line. Green is left for the crown
+      // — free to use because graduated is marked by the holographic border
+      // and never by a green one, so the two cannot be confused.
+      //
+      // The crown wins when a card is both, which is common: the launch that
+      // minted most recently is often the one still being minted.
+      //
+      // Rings rather than thicker borders. A border that changes WIDTH changes
+      // the card's box, so one card growing a pixel would nudge every card in
+      // its grid row. A ring is painted outside the box and moves nothing.
       className={`group block overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-md ${
         conforming && phase === "graduated"
           ? "holo-border"
           : fresh
-            ? "border border-amber-400 ring-2 ring-amber-100"
-            : "border border-gray-200"
+            ? "border border-green-500 ring-2 ring-green-100"
+            : pending > 0
+              ? "border border-amber-400 ring-2 ring-amber-100"
+              : "border border-gray-200"
       }`}
     >
       <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
@@ -999,28 +1029,43 @@ function Card({
           className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         <div className="absolute left-2 top-2">{chip}</div>
-        {/* Top-right, opposite the phase chip, and saying what the slot IS.
+        {/* Top-right, opposite the phase chip: a crown, and how long it has
+            worn it.
 
-            This is a crown, not a measure: the launch that minted most
-            recently holds the front position until another one mints. So the
-            badge names that and nothing else. It cannot carry a count, because
-            the holder keeps the slot after its mints confirm and the mempool
-            empties — a number here would read 0 most of the time.
+            The crown does the work a word could not. Four wordings were tried
+            and each failed the same test — a reader seeing this card ahead of
+            cards with more progress wants to know WHY, and "Fresh Mint",
+            "Minting now" and "Last mint" all named the state instead. A crown
+            is read as "this one won" before any text is, which at minimum says
+            the position is deliberate rather than a bug.
 
-            Solid amber, not the light amber of the mempool chip on the address
-            line below. Amber because this is activity rather than a phase, and
-            the three phase chips own dark, blue and green; solid rather than
-            light so it is not mistaken for the pending indicator, which is a
-            different fact about a different moment. Purple was tried and
-            vanished into the site's own accent. */}
+            The time says what it won. It teaches the rule without stating it:
+            see 4m here and 39h on nothing else, and the ordering explains
+            itself. It also stays honest when the site is quiet, where a badge
+            claiming freshness would not — "3h ago" is the true answer and a
+            useful one.
+
+            "Minted" is deliberately absent. This card is under a heading that
+            says Minting, wearing a chip that says Minting; a third Minting
+            would be the redundancy that killed the second wording. */}
         {fresh && (
           <div className="absolute right-2 top-2">
-            <span
-              title="Minted more recently than anything else still minting — which is why it is first"
-              className="rounded-full bg-amber-400 px-2 py-0.5 text-xs font-medium text-amber-950 backdrop-blur-sm"
-            >
-              Last mint
-            </span>
+            {/* The Chip component itself, not a span dressed to look like one.
+                The first attempt hand-rolled the same padding and text size and
+                still sat wrong beside the phase chip, because it added `flex` —
+                which takes the badge out of inline layout and gives it a
+                different height and baseline from the thing it is supposed to
+                match. Sharing the component is what makes them the same size
+                rather than nearly. */}
+            <Chip tone="green">
+              <span
+                title={`Wearing the crown: minted more recently than anything else still minting${
+                  mintedAgo ? ` — ${mintedAgo}` : ""
+                }`}
+              >
+                <span aria-hidden>👑</span> {mintedAgo}
+              </span>
+            </Chip>
           </div>
         )}
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/35 to-transparent p-3 pt-10">

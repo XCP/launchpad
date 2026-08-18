@@ -30,6 +30,10 @@ export interface SectionRow {
   announceBlock: number;
   /** 0–1 toward the soft cap. */
   progress: number;
+  /** Block of its most recent mint; null if it has never minted, or if this
+   *  row came from a path that cannot answer it. Only the crowned row uses
+   *  it, to say how long ago that was. */
+  lastMintBlock: number | null;
 }
 
 /**
@@ -49,6 +53,8 @@ export interface RowSource {
   poolTokenReserve: string | null;
   announceBlock: number | null;
   minters: number | null;
+  /** Optional: the live-derivation path in page.tsx cannot answer it. */
+  lastMintBlock?: number | null;
 }
 
 /**
@@ -72,6 +78,8 @@ export function toSectionRow(p: RowSource): SectionRow {
     minters: p.minters,
     announceBlock: p.announceBlock ?? 0,
     progress: saleProgress(p.fm),
+    // Undefined on the live-derivation path, which has no index to ask.
+    lastMintBlock: p.lastMintBlock ?? null,
   };
 }
 
