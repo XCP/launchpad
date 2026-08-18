@@ -11,6 +11,11 @@ interface Paginated<T> {
 
 async function get<T>(path: string, revalidate = 60): Promise<T> {
   const res = await fetch(`${COUNTERPARTY_API_BASE}${path}`, {
+    // Counterparty is a third party we do not run, and this is the shared
+    // client behind every server-rendered read. Without a deadline a stalled
+    // node holds the Worker invocation open and delays the HTML for everyone
+    // on that route; the throw below is what callers already handle.
+    signal: AbortSignal.timeout(8_000),
     next: { revalidate },
   });
   if (!res.ok) throw new Error(`Counterparty API ${res.status}: ${path}`);

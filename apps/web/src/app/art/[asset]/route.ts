@@ -21,7 +21,11 @@ export async function GET(
   const asset = rawAsset.toUpperCase();
 
   try {
-    const cdn = await fetch(`${CDN_BASE}/img/full/${asset}`);
+    // Server-side proxy: a stalled CDN holds this Worker invocation open, and
+    // the catch that falls back to our own copy only runs on a settled failure.
+    const cdn = await fetch(`${CDN_BASE}/img/full/${asset}`, {
+      signal: AbortSignal.timeout(6_000),
+    });
     if (cdn.ok && cdn.headers.get("x-cdn-placeholder") !== "1") {
       return new Response(cdn.body, {
         headers: {

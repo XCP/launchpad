@@ -8,6 +8,9 @@ import { XCP_API_BASE } from "@/lib/constants";
 export async function fetchXcpUsd(): Promise<number | null> {
   try {
     const res = await fetch(`${XCP_API_BASE}/price`, {
+      // Decorative context, and a failure returns null -- but only a settled
+      // failure does. A stall would hold the server render open instead.
+      signal: AbortSignal.timeout(6_000),
       next: { revalidate: 600 },
     });
     if (!res.ok) return null;
@@ -22,6 +25,9 @@ export async function fetchXcpUsd(): Promise<number | null> {
 export async function fetchBtcUsd(): Promise<number | null> {
   try {
     const res = await fetch(`${XCP_API_BASE}/price`, {
+      // Decorative context, and a failure returns null -- but only a settled
+      // failure does. A stall would hold the server render open instead.
+      signal: AbortSignal.timeout(6_000),
       next: { revalidate: 600 },
     });
     if (!res.ok) return null;

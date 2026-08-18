@@ -26,6 +26,24 @@ export { SitePresence } from "#api/durable/site-presence";
 
 const app = new Hono<{ Bindings: Env }>();
 
+/**
+ * Let the browser report timing for our own responses.
+ *
+ * Resource Timing zeroes `requestStart` and `responseStart` for cross-origin
+ * responses unless the server opts in, and the site is served from a different
+ * host than the API answers from -- so every call measured in a real browser
+ * collapses to one opaque `duration`. That makes "queued behind the JS
+ * download" and "the worker was slow" indistinguishable, which are opposite
+ * problems with opposite fixes.
+ *
+ * Only timing is exposed, never headers or bodies, and these routes are public
+ * and unauthenticated.
+ */
+app.use("*", async (c, next) => {
+  await next();
+  c.res.headers.set("Timing-Allow-Origin", "*");
+});
+
 app.get("/", (c) => c.text("launchpad-api ok"));
 app.get("/health", (c) => c.text("ok"));
 app.route("/", launchesRoute);

@@ -13,15 +13,21 @@ export async function GET(
 ) {
   const { asset } = await params;
   const source = `${METADATA_ORIGIN}/i/${asset.toUpperCase()}`;
+  // Deadlines on both: this is a server-side proxy, so a stalled upstream
+  // holds the Worker invocation open, and the untransformed retry below is
+  // unreachable if the first request never settles -- which is exactly the
+  // case the retry exists for.
   const init = {
     cf: {
       image: { format: "auto", fit: "cover", width: 48, height: 48 },
       cacheEverything: true,
     },
+    signal: AbortSignal.timeout(6_000),
   } as RequestInit;
-  let res = await fetch(source, init);
+  let res = await fetch(source, init).catch(() => new Response(null, { status: 504 }));
   if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) {
-    res = await fetch(source);
+    res = await fetch(source, { signal: AbortSignal.timeout(6_000) })
+      .catch(() => new Response(null, { status: 504 }));
   }
   if (!res.ok) return new Response("Not found", { status: 404 });
   return new Response(res.body, {

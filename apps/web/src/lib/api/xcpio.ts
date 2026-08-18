@@ -9,6 +9,9 @@ const XCPIO_API = "https://api.xcp.io/v2";
 export async function fetchHolderCount(asset: string): Promise<number | null> {
   try {
     const res = await fetch(`${XCPIO_API}/assets/${encodeURIComponent(asset)}`, {
+      // Decorative, and the catch below returns null -- but a stall never
+      // reaches a catch, it just holds the render open.
+      signal: AbortSignal.timeout(6_000),
       next: { revalidate: 300 },
     });
     if (!res.ok) return null;

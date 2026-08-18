@@ -18,6 +18,19 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* The document never names the origins its data comes from, so the
+            browser cannot open a socket to them until React has hydrated and a
+            hook fires -- each one then pays a cold DNS + TCP + TLS handshake
+            before its first byte. Only origins reached from the root layout
+            belong here; a preconnect a page does not use holds a socket open
+            for ten seconds for nothing. cdn.xcp.io is the art fallback behind
+            every TokenImage, and Counterparty backs the wallet's balance
+            reads. */}
+        <link rel="preconnect" href="https://api.xcp.fun" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.counterparty.io:4000" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://cdn.xcp.io" />
+      </head>
       <body className="min-h-dvh bg-gray-50 text-gray-900 antialiased">
         <SwrProvider>
         <WalletProvider>
