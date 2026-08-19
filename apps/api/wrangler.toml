@@ -43,7 +43,13 @@ TELEGRAM_CHAT_ID = "-1004326432550"
 # tighter, much cheaper cycle. 5 minutes is still well inside "notice a new
 # launch soon after it's created," at less than half the call volume.
 [triggers]
-crons = ["*/5 * * * *"]
+# Two cadences, and the second one is cheap on purpose. */5 is the indexer.
+# * is a one-minute sweep that only wakes launch rooms whose launches have
+# mints in the mempool — usually none, so usually it costs one worker
+# invocation and nothing else. It exists because rooms no longer hold an alarm
+# while idle (see LaunchRoom.alarm), so something has to tell a hibernating
+# room that its launch got busy again.
+crons = ["*/5 * * * *", "* * * * *"]
 
 [[d1_databases]]
 binding = "DB"

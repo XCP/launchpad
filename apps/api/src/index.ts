@@ -6,7 +6,7 @@ import { mintClosed } from "#api/telegram/format";
 import { announceLive, claimKeys } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
-import { fetchBlockHeight } from "#api/integrations/counterparty";
+import { fetchBlockHeight, fetchMempoolFairmints } from "#api/integrations/counterparty";
 
 export { Announcer } from "#api/durable/announcer";
 
@@ -211,7 +211,40 @@ app.get("/ws/presence", (c) => {
 
 export default {
   fetch: app.fetch,
-  async scheduled(_event, env, ctx) {
+  async scheduled(event, env, ctx) {
+    /**
+     * The one-minute sweep: wake the rooms that have something to say.
+     *
+     * Launch rooms stop scheduling their own alarm once a launch's mempool
+     * queue empties, because a pending alarm blocks hibernation and bills a
+     * full day of duration for a room that is doing nothing. That trade needs
+     * exactly one thing in return — a way for a sleeping room to find out its
+     * launch got busy again while its viewers were sitting there.
+     *
+     * One mempool read for the whole site, then a nudge to the handful of
+     * rooms that appear in it. Nothing pending means one fetch and no DO
+     * requests at all, which is the normal case. A room nobody is watching
+     * answers 204 and goes straight back to sleep without polling.
+     */
+    if (event.cron === "* * * * *") {
+      ctx.waitUntil(
+        runScheduledJob("wake_rooms", async () => {
+          const pending = await fetchMempoolFairmints();
+          const assets = [...new Set(pending.map((m) => m.asset))];
+          await Promise.all(
+            assets.map(async (asset) => {
+              const stub = env.LAUNCH_ROOM.get(env.LAUNCH_ROOM.idFromName(asset));
+              // Absolute URL because a DO stub requires one; the host is
+              // never resolved, only the query is read.
+              await stub.fetch(`https://launch-room/${asset}?nudge=1`);
+            }),
+          );
+          return { rooms_nudged: assets.length };
+        }).then(() => undefined),
+      );
+      return;
+    }
+
     ctx.waitUntil(
       withLock(env.DB, 110, async () => {
         await runScheduledJob("sync_launches", () => syncLaunches(env.DB));

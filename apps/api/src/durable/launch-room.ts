@@ -22,6 +22,23 @@ const MEMPOOL_BASE = "https://api.counterparty.io:4000/v2";
  *  every broadcast frame; the aggregate count/quantity below stay exact
  *  regardless of the cap. */
 const MAX_PENDING_ROWS = 25;
+/**
+ * How many consecutive polls may return an IDENTICAL state before the room
+ * gives up the fast cadence and sleeps.
+ *
+ * The awake condition is "this launch has mints in flight", which is normally
+ * a burst lasting a block. But a mint can sit unconfirmed for hours if it is
+ * underpaying fees, and without this a single stuck transaction would hold a
+ * room awake — and therefore billed — indefinitely, which is exactly the
+ * shape of bill this whole change exists to prevent.
+ *
+ * Twenty ticks is five minutes of genuinely nothing changing. Any change at
+ * all resets it, so a launch actually being minted never hits it: the pending
+ * count moves every time somebody arrives. When it does trip, the minute cron
+ * is still nudging the room, so the queue is watched at 60s instead of 15s
+ * rather than not at all.
+ */
+const MAX_IDENTICAL_TICKS = 20;
 
 interface PendingMint {
   tx_hash: string;
@@ -99,12 +116,19 @@ export class LaunchRoom extends DurableObject<Env> {
    */
   private last: RoomState | null = null;
   private lastEncoded: string | null = null;
+  /** Consecutive polls that returned exactly what the one before it did. */
+  private identicalTicks = 0;
 
   async fetch(request: Request): Promise<Response> {
+    const url = new URL(request.url);
+    // Not a viewer — the cron, telling a hibernating room that its launch has
+    // activity again. Checked before the upgrade guard because a nudge is
+    // deliberately a plain request.
+    if (url.searchParams.get("nudge") === "1") return this.nudge();
+
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
     }
-    const url = new URL(request.url);
     const txHash = url.searchParams.get("fm");
     if (!txHash) return new Response("missing fm", { status: 400 });
     // The room is keyed by asset (idFromName), but polling the market needs
@@ -147,11 +171,24 @@ export class LaunchRoom extends DurableObject<Env> {
     return new Response(null, { status: 101, webSocket: client });
   }
 
-  // Viewers never need to send anything, and nothing needs telling when one
-  // leaves — the alarm loop just checks getWebSockets().length itself on its
-  // next tick and stops rescheduling once nobody's left. A stray keepalive
-  // frame or an ungraceful disconnect can't take the room down either way.
-  async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {}
+  /**
+   * A viewer asking the room to look again.
+   *
+   * Viewers still never NEED to send anything, and nothing needs telling when
+   * one leaves — the alarm checks getWebSockets().length itself and stops
+   * rescheduling once nobody is left. But a room now sleeps whenever its
+   * launch has no mints in flight, and waking one costs a message rather than
+   * an alarm: this is the same shape SitePresence has always had, which
+   * answers ~52,000 requests a day inside ~136 seconds of billed duration.
+   *
+   * Anything at all wakes it, because there is nothing else a viewer could
+   * mean by sending a frame. Rate-limited by ensurePolling, which is a no-op
+   * when an alarm is already pending, so a hundred viewers asking at once
+   * still produce one poll.
+   */
+  async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {
+    await this.ensurePolling();
+  }
 
   /**
    * Keep the latest state for replay, writing only when it changed.
@@ -159,15 +196,20 @@ export class LaunchRoom extends DurableObject<Env> {
    * A tick that finds nothing new — which is most of them, since these values
    * only move when someone mints or a block lands — costs no write at all.
    */
-  private async remember(state: RoomState) {
+  private async remember(state: RoomState): Promise<boolean> {
     const encoded = JSON.stringify(state);
-    if (encoded === this.lastEncoded) return;
+    if (encoded === this.lastEncoded) return false;
     this.lastEncoded = encoded;
     this.last = state;
     await this.ctx.storage.put("last", state);
+    return true;
   }
 
   private async ensurePolling() {
+    // Whoever is asking has a reason to think something changed, so the
+    // stuck-queue counter starts over rather than leaving a freshly woken
+    // room one tick away from going back to sleep.
+    this.identicalTicks = 0;
     const existing = await this.ctx.storage.getAlarm();
     if (existing === null) await this.ctx.storage.setAlarm(Date.now());
   }
@@ -179,20 +221,71 @@ export class LaunchRoom extends DurableObject<Env> {
     if (sockets.length === 0) return;
 
     const txHash = await this.ctx.storage.get<string>("txHash");
+    let state: RoomState | null = null;
     if (txHash) {
       try {
-        const state = await this.poll(txHash);
+        state = await this.poll(txHash);
         if (state) {
           this.broadcast({ type: "state", ...state });
-          await this.remember(state);
+          const moved = await this.remember(state);
+          this.identicalTicks = moved ? 0 : this.identicalTicks + 1;
         }
       } catch {
-        // Transient Counterparty hiccup — just try again next tick rather
-        // than tearing down the room over it.
+        // Transient Counterparty hiccup — the room stays awake for one more
+        // tick rather than tearing down over it, which is why this leaves
+        // `state` null and falls into the keep-polling branch below.
+        await this.ctx.storage.setAlarm(Date.now() + POLL_MS);
+        return;
       }
     }
 
-    await this.ctx.storage.setAlarm(Date.now() + POLL_MS);
+    /**
+     * Reschedule ONLY while something is actually in flight.
+     *
+     * This is the difference between a room that costs nothing and a room
+     * that costs a full day of billed duration every day. A pending alarm
+     * makes a Durable Object ineligible for hibernation, and Cloudflare bills
+     * duration for an object that is "idle in memory but unable to hibernate"
+     * — so an unconditional 15s alarm bills all 86,400 seconds of every day
+     * whether anyone is minting or not. Their own guidance is the one line
+     * this used to ignore: "Only schedule alarms when there is work to do."
+     *
+     * Measured before this: alarm invocations reported wallTime of exactly
+     * POLL_MS, 15,000ms, against 1ms of CPU. The room was not working. It was
+     * being charged rent for staying awake.
+     *
+     * Unconfirmed mints are the definition of work. While the mempool holds
+     * any for this launch, the page needs the fast cadence and the room earns
+     * its keep. The moment it drains, this schedules nothing at all — no
+     * alarm, so the room hibernates and bills nothing while its viewers sit
+     * there. Compare SitePresence, which has never had an alarm and answers
+     * ~52,000 requests a day inside ~136 seconds of billed duration.
+     *
+     * Nothing is missed by sleeping. The poll that observes the queue empty
+     * has ALREADY read the post-confirmation fairminter in the same pass, so
+     * viewers get the confirmed numbers in the same frame that sends the room
+     * to sleep. What restarts it is a new viewer connecting, or the minute
+     * cron nudging rooms whose launches have mempool activity again.
+     */
+    if (state && state.pending_count > 0 && this.identicalTicks < MAX_IDENTICAL_TICKS) {
+      await this.ctx.storage.setAlarm(Date.now() + POLL_MS);
+    }
+  }
+
+  /**
+   * Wake up, look once, and decide whether to keep looking.
+   *
+   * The cron calls this for launches that have mints in the mempool, which is
+   * what lets a sleeping room notice activity that started while it was
+   * hibernating. Rooms nobody is watching answer immediately and go straight
+   * back to sleep without polling anything.
+   */
+  private async nudge(): Promise<Response> {
+    if (this.ctx.getWebSockets().length === 0) {
+      return new Response(null, { status: 204 });
+    }
+    await this.ensurePolling();
+    return new Response(null, { status: 202 });
   }
 
   /** Two small GETs, however many viewers are attached: the confirmed
