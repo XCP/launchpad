@@ -8,6 +8,7 @@ import {
   commas,
   commasRaw,
   compact,
+  fixedRaw,
   price as formatPrice,
   shortAddress,
   tokenQty,
@@ -545,9 +546,9 @@ export function ActivityTabs({
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
                     <th className="px-4 py-2">Side</th>
+                    <th className="px-3 py-2 text-right">Price</th>
                     <th className="px-3 py-2 text-right">Amount</th>
                     <th className="px-3 py-2 text-right">XCP</th>
-                    <th className="px-3 py-2 text-right">Price</th>
                     <th className="px-3 py-2">Address</th>
                     <th className="px-4 py-2 text-right">Venue / block</th>
                   </tr>
@@ -560,14 +561,14 @@ export function ActivityTabs({
                         <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}>
                           {t.buy ? "↗ Buy" : "↘ Sell"}
                         </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
+                          {formatPrice(ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8))}
+                        </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
                           {compact(tokens)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
-                          {commasRaw(t.xcpRaw)}
-                        </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
-                          {formatPrice(ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8))}
+                          {fixedRaw(t.xcpRaw)}
                         </td>
                         <td className="px-3 py-2">
                           <Link href={`/profile/${t.addr}`} className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline">

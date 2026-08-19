@@ -61,6 +61,14 @@ export function commasRaw(raw: RawLike | null | undefined, decimals = 8): string
   });
 }
 
+/** Grouped raw quantity padded to its full precision for aligned tables. */
+export function fixedRaw(raw: RawLike | null | undefined, decimals = 8): string {
+  return formatExact(rawToDecimalString(raw, decimals), {
+    minimumFractionDigits: Math.max(decimals, 0),
+    maximumFractionDigits: Math.max(decimals, 0),
+  });
+}
+
 /** Sub-cent-safe price formatting with significant digits. */
 export function price(n: number): string {
   if (n === 0) return "0";
