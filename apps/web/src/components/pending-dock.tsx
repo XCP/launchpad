@@ -35,6 +35,10 @@ const MAX_ROWS = 6;
  */
 const MAX_POLLS_PER_TICK = 8;
 
+/** Enough parallelism that one slow lookup cannot stall the whole dock,
+ * without bursting every outstanding request at Counterparty at once. */
+const POLL_CONCURRENCY = 4;
+
 /**
  * The pending dock: bottom-right pill that survives navigation, tracking
  * every broadcast action to its real outcome in block terms. Blocks are the
@@ -75,41 +79,47 @@ export function PendingDock() {
         .filter((i) => !i.resolved)
         .sort((a, b) => a.addedAt - b.addedAt)
         .slice(0, MAX_POLLS_PER_TICK);
-      for (const item of due) {
-        if (stop) break;
-        try {
-          if (item.kind === "order") {
-            const res = await fetch(
-              `${COUNTERPARTY_API_BASE}/orders/${item.txid}`,
-              { signal: AbortSignal.timeout(10_000) },
-            );
-            if (!res.ok) continue;
-            // Lossless: the partial-fill test below compares two 64-bit
-            // quantities, and a fill smaller than the gap between doubles at
-            // their magnitude would read as no fill at all.
-            const o = parseJsonLossless<{
-              result?: {
-                status?: string;
-                give_remaining?: Raw;
-                give_quantity?: Raw;
-              } | null;
-            }>(await res.text()).result;
-            if (!o) continue;
-            if (o.status === "filled") updatePending(item.txid, { resolved: "filled" });
-            else if (o.status === "expired")
-              updatePending(item.txid, { resolved: "expired · refunded" });
-            else if (o.status === "cancelled")
-              updatePending(item.txid, { resolved: "cancelled" });
-            else if (big(o.give_remaining) < big(o.give_quantity))
-              updatePending(item.txid, { resolved: "partially filled · resting" });
-          } else {
+      for (let i = 0; i < due.length && !stop; i += POLL_CONCURRENCY) {
+        await Promise.all(due.slice(i, i + POLL_CONCURRENCY).map(async (item) => {
+          if (stop) return;
+          try {
+            if (item.kind === "order") {
+              const res = await fetch(
+                `${COUNTERPARTY_API_BASE}/orders/${item.txid}`,
+                { signal: AbortSignal.timeout(10_000), cache: "no-store" },
+              );
+              if (!res.ok) return;
+              // Lossless: the partial-fill test below compares two 64-bit
+              // quantities, and a fill smaller than the gap between doubles at
+              // their magnitude would read as no fill at all.
+              const o = parseJsonLossless<{
+                result?: {
+                  status?: string;
+                  give_remaining?: Raw;
+                  give_quantity?: Raw;
+                } | null;
+              }>(await res.text()).result;
+              if (!o) return;
+              if (o.status === "filled") updatePending(item.txid, { resolved: "filled" });
+              else if (o.status === "expired")
+                updatePending(item.txid, { resolved: "expired · refunded" });
+              else if (o.status === "cancelled")
+                updatePending(item.txid, { resolved: "cancelled" });
+              else if (big(o.give_remaining) < big(o.give_quantity))
+                updatePending(item.txid, { resolved: "partially filled · resting" });
+            } else {
             // Three-state oracle: 404 = unknown, block_hash "mempool" =
             // pending, real block = confirmed. Only authoritative 404s
             // count as misses (network errors never do), only after a 60s
             // propagation grace, and only 3 CONSECUTIVE misses mark a drop.
             const res = await fetch(
               `${COUNTERPARTY_API_BASE}/transactions/${item.txid}`,
-              { signal: AbortSignal.timeout(10_000) },
+              {
+                signal: AbortSignal.timeout(10_000),
+                // A polling request must reach the source. Reusing a cached
+                // mempool response makes the timer repeat the same stale fact.
+                cache: "no-store",
+              },
             );
             if (res.status === 404) {
               if (Date.now() - item.addedAt > 60_000) {
@@ -121,13 +131,13 @@ export function PendingDock() {
                   });
                 else updatePending(item.txid, { misses });
               }
-              continue;
+              return;
             }
-            if (!res.ok) continue;
+            if (!res.ok) return;
             const t = (await res.json()).result;
             if (!t?.block_index || t.block_hash === "mempool") {
               if (item.misses) updatePending(item.txid, { misses: 0 });
-              continue;
+              return;
             }
             if (t?.block_index)
               updatePending(item.txid, {
@@ -144,9 +154,10 @@ export function PendingDock() {
                         : "confirmed",
               });
           }
-        } catch {
-          // transient — next poll retries
-        }
+          } catch {
+            // transient — next poll retries
+            }
+        }));
       }
     };
     poll();

@@ -20,6 +20,7 @@ function authed(supplied: string | undefined, expected: string | undefined): boo
 }
 import { runScheduledJob } from "#api/scheduler/job";
 import { withLock } from "#api/scheduler/lock";
+import { claimFastSync, recordMempoolSnapshot } from "#api/scheduler/mempool-transition";
 
 export { LaunchRoom } from "#api/durable/launch-room";
 export { SitePresence } from "#api/durable/site-presence";
@@ -239,7 +240,35 @@ export default {
               await stub.fetch(`https://launch-room/${asset}?nudge=1`);
             }),
           );
-          return { rooms_nudged: assets.length };
+          const transition = await recordMempoolSnapshot(
+            env.DB,
+            pending.map((m) => m.txHash),
+          );
+
+          // A transaction leaving the mempool is normally a confirmation.
+          // Reuse the proven, delta-guarded reconciliation immediately rather
+          // than building a second partial indexer. The ordinary five-minute
+          // run remains the repair pass if this signal or this lock is missed.
+          const fastSyncClaimed =
+            transition.disappeared > 0 && (await claimFastSync(env.DB));
+          let fastSyncRan = false;
+          if (fastSyncClaimed) {
+            fastSyncRan = await withLock(env.DB, 110, async () => {
+              await runScheduledJob("sync_after_mempool", () => syncLaunches(env.DB));
+              await runScheduledJob("announce_after_mempool", async () => {
+                const height = await fetchBlockHeight();
+                return announceLive(env, height);
+              });
+            });
+          }
+
+          return {
+            rooms_nudged: assets.length,
+            pending_mints: transition.pending,
+            disappeared: transition.disappeared,
+            fast_sync_claimed: fastSyncClaimed,
+            fast_sync_ran: fastSyncRan,
+          };
         }).then(() => undefined),
       );
       return;
