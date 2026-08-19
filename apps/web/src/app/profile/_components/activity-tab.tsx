@@ -3,9 +3,9 @@
 import Link from "next/link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
-import { fetchBlockHeight } from "@/lib/api/counterparty";
+import { fetchAssetBalance, fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchEventsBySource, fetchIndexedLaunches, fetchMintsBySource } from "@/lib/api/launchpad-api";
-import { computeActivity, type ActivityKind } from "@/lib/activity";
+import { computeActivity, reconcileActivity, type ActivityKind } from "@/lib/activity";
 import { compact, fromSats, tokenQty } from "@/lib/format";
 
 const LABEL: Record<ActivityKind, string> = {
@@ -14,6 +14,8 @@ const LABEL: Record<ActivityKind, string> = {
   refund: "Refunded",
   buy: "Bought",
   sell: "Sold",
+  movement_in: "Other in",
+  movement_out: "Other out",
 };
 
 const TONE: Record<ActivityKind, string> = {
@@ -22,6 +24,8 @@ const TONE: Record<ActivityKind, string> = {
   refund: "bg-gray-100 text-gray-600",
   buy: "bg-green-100 text-green-700",
   sell: "bg-red-100 text-red-700",
+  movement_in: "bg-blue-100 text-blue-700",
+  movement_out: "bg-gray-100 text-gray-600",
 };
 
 /** Blocks land about every ten minutes, so distance from the tip is a decent
@@ -46,7 +50,14 @@ export function ActivityTab({ address }: { address: string }) {
       // Every conforming launch, not just graduated ones: a mint that is still
       // open is activity, and so is a refund from one that failed.
       const universe = new Map((launches ?? []).map((l) => [l.fm.asset, l.fm.divisible]));
-      return { rows: computeActivity(events ?? [], mints ?? [], universe), height };
+      const focused = computeActivity(events ?? [], mints ?? [], universe);
+      const assets = [...new Set(focused.map((row) => row.asset))];
+      const balances = new Map(
+        await Promise.all(
+          assets.map(async (asset) => [asset, await fetchAssetBalance(address, asset)] as const),
+        ),
+      );
+      return { rows: reconcileActivity(focused, balances), height };
     },
     { refreshInterval: 600_000, revalidateOnFocus: false },
   );
@@ -118,7 +129,11 @@ export function ActivityTab({ address }: { address: string }) {
                     )}
                   </span>
                   <span className="text-right text-xs text-gray-400">
-                    {data?.height ? ago(data.height - r.block) : `block ${r.block}`}
+                    {r.block === null
+                      ? "other"
+                      : data?.height
+                        ? ago(data.height - r.block)
+                        : `block ${r.block}`}
                   </span>
                 </li>
               );
@@ -127,7 +142,9 @@ export function ActivityTab({ address }: { address: string }) {
         </div>
       </div>
       <p className="text-xs text-gray-400">
-        Mints, refunds, and pool or order-book fills on XCP-69 launches. An open
+        Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other”
+        reconciles those events to the live balance and can represent a send,
+        receive, burn, or liquidity movement. An open
         mint shows what you&apos;ve committed — that XCP is escrowed by
         consensus and comes back automatically if the launch misses its soft
         cap.

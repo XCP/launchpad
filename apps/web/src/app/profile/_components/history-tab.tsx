@@ -21,12 +21,15 @@ export function HistoryTab({ address }: { address: string }) {
     );
   }
 
-  const total = closed.reduce((sum, c) => sum + c.realizedXcpSats, 0n);
+  const incomplete = closed.some((c) => c.realizedXcpSats === null);
+  const total = closed.reduce((sum, c) => sum + (c.realizedXcpSats ?? 0n), 0n);
 
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-wider text-gray-500">Realized</p>
+        <p className="text-xs uppercase tracking-wider text-gray-500">
+          {incomplete ? "Known realized" : "Realized"}
+        </p>
         <Realized sats={total} xcpUsd={xcpUsd} large />
         <p className="text-sm text-gray-500">
           Across {closed.length} fully exited {closed.length === 1 ? "position" : "positions"}
@@ -45,6 +48,8 @@ export function HistoryTab({ address }: { address: string }) {
       </ul>
       <p className="text-xs text-gray-400">
         Positions you fully exited, with the profit or loss actually taken.
+        A dash means the focused mint-and-trade history does not explain the
+        live zero balance, so no P&amp;L is claimed.
         Basis is average-cost, so a partial sale realizes its share and leaves
         the rest with the tokens still held.
       </p>
@@ -57,10 +62,11 @@ function Realized({
   xcpUsd,
   large = false,
 }: {
-  sats: bigint;
+  sats: bigint | null;
   xcpUsd: number | null;
   large?: boolean;
 }) {
+  if (sats === null) return <span className="text-gray-400" title="Unexplained balance movement">—</span>;
   const up = sats >= 0n;
   // Magnitude in integer space; the sign is carried by the label.
   const xcp = fromSats((up ? sats : -sats).toString());
