@@ -3,6 +3,7 @@ import { isXcp69 } from "@launchpad/xcp69/xcp69";
 import {
   fetchMempoolFairminters,
   fetchMempoolFairmints,
+  fetchMempoolOrders,
 } from "#api/integrations/counterparty";
 import {
   listConformingAssets,
@@ -15,6 +16,7 @@ import {
   getMintsBySource,
   isLaunchPhase,
   minterEarnings,
+  refundsByBucket,
   listLaunches,
   listLaunchPage,
   listMinters,
@@ -106,11 +108,13 @@ const MEMPOOL_TTL = 15;
 launchesRoute.get("/v2/stats", async (c) => {
   const height = Number(c.req.query("height") ?? 0) || 0;
   const since = height > 0 ? Math.max(0, height - ACTIVITY_BUCKETS * BLOCKS_PER_DAY) : 0;
-  const [rows, totals, buckets] = await Promise.all([
+  const sinceBucket = Math.floor(since / BLOCKS_PER_DAY);
+  const [rows, totals, buckets, refundBuckets] = await Promise.all([
     countByPhase(c.env.DB),
     getMintTotals(c.env.DB),
     // Whole buckets, so the window is expressed in the unit the rollup stores.
-    listMintBuckets(c.env.DB, Math.floor(since / BLOCKS_PER_DAY)),
+    listMintBuckets(c.env.DB, sinceBucket),
+    refundsByBucket(c.env.DB, sinceBucket),
   ]);
   const counts: Record<string, number> = {
     scheduled: 0,
@@ -120,16 +124,21 @@ launchesRoute.get("/v2/stats", async (c) => {
   };
   for (const r of rows) counts[r.phase] = r.n;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
+  const activeXcp = rows.find((r) => r.phase === "minting")?.paid_xcp ?? 0;
+  const activity = totals
+    ? { ...totals, active_xcp: activeXcp }
+    : { mints: 0, minters: 0, paid_xcp: 0, active_xcp: activeXcp, fee_sats: 0 };
   return J(
     c,
     {
       result: {
         counts,
         total,
-        activity: totals ?? { mints: 0, minters: 0, paid_xcp: 0, fee_sats: 0 },
+        activity,
         // Bucket index is `block / 144`; the client turns it back into an
         // approximate day using the height it already has.
         daily: buckets,
+        refunds_daily: refundBuckets,
         blocks_per_bucket: BLOCKS_PER_DAY,
       },
     },
@@ -241,9 +250,10 @@ launchesRoute.get("/v2/launches/:asset/minters", async (c) => {
  * afford to be better than what it replaces.
  */
 launchesRoute.get("/v2/mempool", async (c) => {
-  const [rawFairminters, rawMints] = await Promise.all([
+  const [rawFairminters, rawMints, rawOrders] = await Promise.all([
     fetchMempoolFairminters(),
     fetchMempoolFairmints(),
+    fetchMempoolOrders(),
   ]);
 
   // No cast. CpFairminter is structurally a Fairminter, and the indexer calls
@@ -265,17 +275,24 @@ launchesRoute.get("/v2/mempool", async (c) => {
   // with no rows in it. The set is a membership test, so with nothing to test
   // there is nothing to fetch.
   let mints = rawMints;
-  if (rawMints.length > 0) {
+  let orders = rawOrders;
+  if (rawMints.length > 0 || rawOrders.length > 0) {
     const covered = new Set(await listConformingAssets(c.env.DB));
     for (const fm of fairminters) covered.add(fm.asset);
     mints = rawMints.filter((m) => covered.has(m.asset));
+    orders = rawOrders.filter(
+      (o) =>
+        ((o.giveAsset === "XCP" && covered.has(o.getAsset)) ||
+          (o.getAsset === "XCP" && covered.has(o.giveAsset))) &&
+        covered.has(o.asset),
+    );
   }
 
   return J(
     c,
     {
-      result: { fairminters, mints, fetched_at: Math.floor(Date.now() / 1000) },
-      result_count: fairminters.length + mints.length,
+      result: { fairminters, mints, orders, fetched_at: Math.floor(Date.now() / 1000) },
+      result_count: fairminters.length + mints.length + orders.length,
     },
     MEMPOOL_TTL,
   );

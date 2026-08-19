@@ -28,3 +28,14 @@ export interface MempoolMint {
   paidQuantity: Raw;
   divisible: boolean;
 }
+
+/** One unconfirmed XCP order involving an xcp.fun launch asset. */
+export interface MempoolOrder {
+  txHash: string;
+  source: string;
+  asset: string;
+  giveAsset: string;
+  getAsset: string;
+  giveQuantity: Raw;
+  getQuantity: Raw;
+}

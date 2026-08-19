@@ -3,7 +3,7 @@
  * poller reads through here; every read route answers from D1.
  */
 import { parseJsonLossless } from "@launchpad/xcp69/numeric";
-import type { MempoolMint } from "@launchpad/xcp69/mempool";
+import type { MempoolMint, MempoolOrder } from "@launchpad/xcp69/mempool";
 
 const BASE = "https://api.counterparty.io:4000/v2";
 
@@ -84,7 +84,19 @@ interface MempoolFairmintEvent {
   };
 }
 
-export type { MempoolMint } from "@launchpad/xcp69/mempool";
+interface MempoolOrderEvent {
+  tx_hash: string;
+  params: {
+    source: string;
+    give_asset: string;
+    get_asset: string;
+    give_quantity: number | string;
+    get_quantity: number | string;
+    status?: string;
+  };
+}
+
+export type { MempoolMint, MempoolOrder } from "@launchpad/xcp69/mempool";
 
 /** Unconfirmed launches. Empty on any failure: the mempool is a nice-to-have
  *  signal, and a Counterparty hiccup should leave the header chip absent, not
@@ -134,6 +146,30 @@ export async function fetchMempoolFairmints(): Promise<MempoolMint[]> {
         earnQuantity: e.params.earn_quantity!,
         paidQuantity: e.params.paid_quantity!,
         divisible: e.params.asset_info?.divisible ?? true,
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/** Unconfirmed order-book offers. Pair filtering belongs in /v2/mempool,
+ * where the conforming asset set is available. */
+export async function fetchMempoolOrders(): Promise<MempoolOrder[]> {
+  try {
+    const data = await get<{ result: MempoolOrderEvent[] }>(
+      `/mempool/events/OPEN_ORDER?limit=500`,
+    );
+    return data.result
+      .filter((e) => e.params.status === undefined || e.params.status === "open")
+      .map((e) => ({
+        txHash: e.tx_hash,
+        source: e.params.source,
+        // Resolved after the covered-set check in the route.
+        asset: e.params.give_asset === "XCP" ? e.params.get_asset : e.params.give_asset,
+        giveAsset: e.params.give_asset,
+        getAsset: e.params.get_asset,
+        giveQuantity: e.params.give_quantity,
+        getQuantity: e.params.get_quantity,
       }));
   } catch {
     return [];

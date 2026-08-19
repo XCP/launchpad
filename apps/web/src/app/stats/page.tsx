@@ -44,7 +44,7 @@ export default async function StatsPage() {
 
   const { counts, total, activity, daily, blocks_per_bucket } = stats;
   const settled = counts.graduated + counts.refunded;
-  const raisedXcp = fromSats(activity.paid_xcp);
+  const committedXcp = fromSats(activity.paid_xcp);
   const feeBtc = fromSats(activity.fee_sats);
 
   // Fill the window so quiet days read as quiet rather than as missing. The
@@ -57,6 +57,19 @@ export default async function StatsPage() {
   });
   const peak = series.reduce((m, d) => Math.max(m, d.n), 0);
   const windowTotal = series.reduce((sum, d) => sum + d.n, 0);
+  const refundsByBucket = new Map((stats.refunds_daily ?? []).map((d) => [d.bucket, d]));
+  const refundSeries = Array.from({ length: WINDOW_DAYS }, (_, i) => {
+    const bucket = newest - (WINDOW_DAYS - 1 - i);
+    const refund = refundsByBucket.get(bucket);
+    return {
+      bucket,
+      daysAgo: newest - bucket,
+      n: refund?.n ?? 0,
+      xcp: fromSats(refund?.xcp ?? 0),
+    };
+  });
+  const refundPeak = refundSeries.reduce((m, d) => Math.max(m, d.n), 0);
+  const refundTotal = refundSeries.reduce((sum, d) => sum + d.n, 0);
 
   return (
     <div className="mx-auto max-w-3xl space-y-8">
@@ -71,9 +84,9 @@ export default async function StatsPage() {
         <Stat label="Minted" value={commas(activity.mints)} hint="mint transactions" />
         <Stat label="Minters" value={commas(activity.minters)} hint="distinct addresses" />
         <Stat
-          label="Raised"
-          value={`${commas(raisedXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(raisedXcp * xcpUsd)}` : "escrowed by consensus"}
+          label="Ever committed"
+          value={`${commas(committedXcp)} XCP`}
+          hint={xcpUsd ? `≈ ${usd(committedXcp * xcpUsd)}` : "across all mint history"}
         />
         <Stat
           label="Bitcoin fees"
@@ -162,6 +175,35 @@ export default async function StatsPage() {
             How that works
           </Link>
         </p>
+
+        <div className="mt-5 border-t border-gray-100 pt-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-900">Refund activity</h3>
+            <span className="text-xs text-gray-400 tabular-nums">
+              {commas(refundTotal)} in the last {WINDOW_DAYS} days
+            </span>
+          </div>
+          {refundPeak === 0 ? (
+            <p className="mt-3 text-sm text-gray-500">No launches refunded in this window.</p>
+          ) : (
+            <>
+              <div className="mt-4 flex h-20 items-end gap-[3px]">
+                {refundSeries.map((d) => (
+                  <div
+                    key={d.bucket}
+                    title={`${d.n} refund${d.n === 1 ? "" : "s"} · ${commas(d.xcp)} XCP returned · about ${d.daysAgo === 0 ? "today" : `${d.daysAgo}d ago`}`}
+                    className="flex-1 rounded-t-sm bg-gray-300 transition-colors hover:bg-gray-500"
+                    style={{ height: `${Math.max(2, (d.n / refundPeak) * 100)}%` }}
+                  />
+                ))}
+              </div>
+              <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
+                <span>{WINDOW_DAYS}d ago</span>
+                <span>now</span>
+              </div>
+            </>
+          )}
+        </div>
       </section>
 
       <p className="text-xs text-gray-400 tabular-nums">

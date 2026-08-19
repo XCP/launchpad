@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
-import { fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
+import { fetchLaunchPage, fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { commas, price as priceFmt } from "@/lib/format";
+import { commas, fromSats, price as priceFmt } from "@/lib/format";
 import { ratio } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
 import { TokenImage } from "@/components/token-image";
@@ -34,9 +34,10 @@ const raiseXcp = XCP69_RAISE_SATS / 1e8;
  */
 export default async function RewardsPage() {
   const height = await fetchBlockHeight().catch(() => 0);
-  const [stats, earners, mintsPool, xcpUsd, btcUsd] = await Promise.all([
+  const [stats, earners, graduates, mintsPool, xcpUsd, btcUsd] = await Promise.all([
     fetchLaunchStats(height).catch(() => null),
     fetchMinterEarnings(25).catch(() => []),
+    fetchLaunchPage("graduated", "graduated", 3, 0).catch(() => null),
     // The MINTS/XCP pool is live on-chain; its reserve ratio IS the price.
     // The constant in lib/rewards is the seeded ratio, kept as the fallback
     // so an API hiccup never renders a reward worth zero.
@@ -45,6 +46,8 @@ export default async function RewardsPage() {
     fetchBtcUsd().catch(() => null),
   ]);
   const mintsSoFar = stats?.activity.mints ?? 0;
+  const activeXcp = fromSats(stats?.activity.active_xcp ?? 0);
+  const lifetimeXcp = fromSats(stats?.activity.paid_xcp ?? 0);
   const graduated = stats?.counts.graduated ?? 0;
   const remaining = Math.max(0, MINT_CAP - mintsSoFar);
 
@@ -82,7 +85,7 @@ export default async function RewardsPage() {
                 : "All three bounties have been claimed."}
         </p>
 
-        <Podium graduated={graduated} />
+        <Podium graduated={graduated} winners={graduates?.rows.map((r) => r.fm.asset) ?? []} />
 
         <p className="mt-4 text-xs leading-relaxed text-gray-500">
           Graduating means selling out: {commas(raiseXcp)} XCP raised from at
@@ -149,6 +152,23 @@ export default async function RewardsPage() {
             {commas(remaining)} still to claim
           </p>
         </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-3">
+          <Stat
+            label="Active escrow"
+            value={`${commas(activeXcp)} XCP`}
+            hint="in launches minting now"
+          />
+          <Stat
+            label="Ever committed"
+            value={`${commas(lifetimeXcp)} XCP`}
+            hint="all conforming mint payments"
+          />
+        </div>
+        <p className="mt-2 text-xs leading-relaxed text-gray-500">
+          Ever committed includes XCP later refunded and XCP from launches that
+          graduated. Active escrow is the amount currently held in open mints.
+        </p>
       </section>
 
       {/* ---------------- who has earned what ---------------- */}
@@ -204,7 +224,7 @@ export default async function RewardsPage() {
  * price list — which is the point while bounties are open: the whole thing
  * is an invitation to take the next step.
  */
-function Podium({ graduated }: { graduated: number }) {
+function Podium({ graduated, winners }: { graduated: number; winners: string[] }) {
   // Visual order, not rank order.
   const layout = [
     { i: 1, height: "h-20", accent: "from-gray-300 to-gray-200", ring: "ring-gray-300" },
@@ -217,6 +237,7 @@ function Podium({ graduated }: { graduated: number }) {
       {layout.map(({ i, height, accent, ring }) => {
         const b = BOUNTIES[i]!;
         const claimed = graduated > i;
+        const winner = winners[i];
         return (
           <div key={b.place} className="flex flex-col items-center">
             <div
@@ -233,9 +254,14 @@ function Podium({ graduated }: { graduated: number }) {
               className={`mt-2 flex w-full ${height} items-start justify-center rounded-t-xl bg-gradient-to-b ${accent} pt-2`}
             >
               {claimed ? (
-                <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-                  claimed
-                </span>
+                winner ? (
+                  <Link href={`/${winner}`} className="flex max-w-full items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-green-700">
+                    <TokenImage asset={winner} className="size-4 rounded-full object-cover" />
+                    <span className="truncate">{winner}</span>
+                  </Link>
+                ) : (
+                  <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-green-700">claimed</span>
+                )
               ) : (
                 <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-gray-600">
                   open

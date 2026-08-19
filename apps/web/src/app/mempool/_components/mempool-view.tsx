@@ -16,10 +16,10 @@ const REFRESH_MS = 10_000;
  *  a second fetch inside this window is refused rather than queued. */
 const MANUAL_REFRESH_DEBOUNCE_MS = 10_000;
 
-type Tab = "mints" | "fairminters";
+type Tab = "mints" | "orders" | "fairminters";
 
 export function MempoolView() {
-  const { fairminters, mints, isLoading, refresh } = useMempool(REFRESH_MS);
+  const { fairminters, mints, orders, isLoading, refresh } = useMempool(REFRESH_MS);
 
   const groups = groupMintsByAddress(mints);
 
@@ -30,7 +30,13 @@ export function MempoolView() {
   const [chosenTab, setChosenTab] = useState<Tab | null>(null);
   const tab =
     chosenTab ??
-    (mints.length === 0 && fairminters.length > 0 ? "fairminters" : "mints");
+    (mints.length === 0
+      ? orders.length > 0
+        ? "orders"
+        : fairminters.length > 0
+          ? "fairminters"
+          : "mints"
+      : "mints");
 
   return (
     <Tabs value={tab} onValueChange={(v) => setChosenTab(v as Tab)}>
@@ -43,6 +49,9 @@ export function MempoolView() {
         <SegmentedList className="w-fit">
           <SegmentedTrigger value="mints" grow={false}>
             Mints {mints.length > 0 && `(${mints.length})`}
+          </SegmentedTrigger>
+          <SegmentedTrigger value="orders" grow={false}>
+            Orders {orders.length > 0 && `(${orders.length})`}
           </SegmentedTrigger>
           <SegmentedTrigger value="fairminters" grow={false}>
             Fairminters {fairminters.length > 0 && `(${fairminters.length})`}
@@ -100,6 +109,45 @@ export function MempoolView() {
                     </td>
                     <td className="p-3 text-right font-medium tabular-nums">
                       {commas(fromSats(g.xcpRaw))}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </TabsContent>
+
+      <TabsContent value="orders" className="mt-4">
+        {isLoading ? (
+          <Empty>Reading the mempool…</Empty>
+        ) : orders.length === 0 ? (
+          <Empty>No orders queued — every order so far has confirmed.</Empty>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+            <table className="w-full min-w-[28rem] text-sm">
+              <thead>
+                <tr className="border-b border-gray-100 text-left">
+                  <Th>Address</Th>
+                  <Th>Asset</Th>
+                  <Th>Side</Th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {orders.map((o) => (
+                  <tr key={o.txHash}>
+                    <td className="whitespace-nowrap p-3">
+                      <Link href={`/profile/${o.source}`} className="font-mono text-xs text-gray-600 hover:text-purple-700">
+                        {shortAddress(o.source)}
+                      </Link>
+                    </td>
+                    <td className="p-3">
+                      <Link href={`/${o.asset}`} className="font-medium text-gray-800 hover:text-purple-700">
+                        {o.asset}
+                      </Link>
+                    </td>
+                    <td className={`p-3 font-medium ${o.getAsset === o.asset ? "text-green-700" : "text-red-600"}`}>
+                      {o.getAsset === o.asset ? "Buy" : "Sell"}
                     </td>
                   </tr>
                 ))}

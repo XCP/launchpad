@@ -23,6 +23,7 @@ import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
 import { AddressHoverCard } from "@/components/address-hover-card";
+import { useMempool } from "@/hooks/use-mempool";
 
 const PER_PAGE = 25;
 
@@ -90,6 +91,7 @@ export function ActivityTabs({
   poolTokensRaw?: Raw;
 }) {
   const { address } = useWallet();
+  const { orders: mempoolOrders } = useMempool(30_000);
   const compose = useCompose();
   const [tab, setTab] = useState<
     "minters" | "mempool" | "trades" | "holders" | "orders"
@@ -239,6 +241,7 @@ export function ActivityTabs({
     quantity: p.quantity,
   }));
   const pendingTotal = sumRaw(pending.map((p) => p.quantity));
+  const pendingOrders = mempoolOrders.filter((o) => o.asset === asset);
 
   // One row per address: what they hold of this sale, what they paid, and
   // how many times they came back. Exact sums — a whale near the per-address
@@ -283,13 +286,13 @@ export function ActivityTabs({
   const tabs: (typeof tab)[] = minting
     ? ["minters", "mempool"]
     : address
-      ? ["trades", "orders", "holders"]
-      : ["trades", "holders"];
+      ? ["trades", "orders", "holders", "mempool"]
+      : ["trades", "holders", "mempool"];
   const tabLabel = (t: typeof tab) =>
     t === "minters"
       ? `Holders (${minters.length})`
       : t === "mempool"
-        ? `Mempool${roomState ? ` (${pending.length})` : ""}`
+        ? `Mempool${minting ? (roomState ? ` (${pending.length})` : "") : pendingOrders.length > 0 ? ` (${pendingOrders.length})` : ""}`
         : t === "trades"
           ? `Trades${trades ? ` (${trades.length})` : ""}`
           : t === "holders"
@@ -300,7 +303,9 @@ export function ActivityTabs({
     tab === "minters"
       ? minters.length
       : tab === "mempool"
-        ? pending.length
+        ? minting
+          ? pending.length
+          : pendingOrders.length
         : tab === "trades"
           ? (trades?.length ?? 0)
           : tab === "holders"
@@ -441,7 +446,7 @@ export function ActivityTabs({
           </>
         ))}
 
-      {tab === "mempool" &&
+      {tab === "mempool" && minting &&
         (!roomState ? (
           <p className="p-6 text-center text-sm text-gray-400">
             Loading mempool…
@@ -488,6 +493,37 @@ export function ActivityTabs({
                     >
                       {compact(tokenQty(p.quantity, divisible))}{" "}
                       <span className="text-gray-400">pending</span>
+                    </a>
+                  </li>
+                );
+              })}
+            </ul>
+            {pager}
+          </>
+        ))}
+
+      {tab === "mempool" && !minting &&
+        (pendingOrders.length === 0 ? (
+          <p className="p-6 text-center text-sm text-gray-500">
+            No orders for {asset} are waiting in the mempool.
+          </p>
+        ) : (
+          <>
+            <p className="border-b border-gray-100 bg-amber-50/50 px-4 py-2 text-xs text-amber-800">
+              Unconfirmed and provisional — these orders join the book only after confirmation.
+            </p>
+            <ul className="divide-y divide-gray-100">
+              {pendingOrders.slice(from, from + PER_PAGE).map((o, i) => {
+                const buy = o.getAsset === asset;
+                return (
+                  <li key={o.txHash} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
+                    <Link href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline">
+                      <span className="w-8 shrink-0 text-right text-xs text-gray-400 tabular-nums">{from + i + 1}</span>
+                      <Identicon address={o.source} />
+                      <span className="truncate">{shortAddress(o.source)}</span>
+                    </Link>
+                    <a href={`https://xcp.io/tx/${o.txHash}`} target="_blank" rel="noreferrer" className={`shrink-0 font-medium hover:underline ${buy ? "text-green-700" : "text-red-600"}`}>
+                      {buy ? "Buy" : "Sell"} pending
                     </a>
                   </li>
                 );

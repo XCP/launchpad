@@ -8,6 +8,7 @@
  */
 import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
 import type { MempoolMint } from "@/lib/api/counterparty";
+import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 
 /**
  * The custom domain, for the same reason next.config.ts 308s every
@@ -156,6 +157,7 @@ export async function fetchLaunchFees(asset: string): Promise<FeeSummary | null>
 export interface MempoolSnapshot {
   fairminters: Fairminter[];
   mints: MempoolMint[];
+  orders: MempoolOrder[];
   /** Server-side fetch time, seconds. The client turns it into "updated Ns
    *  ago", and it comes from the response rather than from arrival so every
    *  tab sharing one cached answer agrees on its age. */
@@ -194,6 +196,7 @@ export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
       result?: {
         fairminters?: Fairminter[];
         mints?: MempoolMint[];
+        orders?: MempoolOrder[];
         fetched_at?: number;
       };
     };
@@ -201,6 +204,7 @@ export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
     return {
       fairminters: data.result.fairminters ?? [],
       mints: data.result.mints ?? [],
+      orders: data.result.orders ?? [],
       // Seconds on the wire, milliseconds here — the unit changes at this
       // boundary and nowhere else, so callers can treat it like any other
       // Date.now() value. Falls back to arrival time if the field is absent,
@@ -570,11 +574,15 @@ export interface LaunchStats {
     minters: number;
     /** XCP satoshi paid into every conforming launch, ever. */
     paid_xcp: number;
+    /** XCP satoshi currently committed to launches still minting. */
+    active_xcp: number;
     /** Bitcoin satoshi spent on mint transaction fees. */
     fee_sats: number;
   };
   /** Mints per ~144-block bucket; `bucket` is `block_index / 144`. */
   daily: { bucket: number; n: number; minters: number }[];
+  /** Refunded launch closures per ~144-block bucket. */
+  refunds_daily: { bucket: number; n: number; xcp: number }[];
   blocks_per_bucket: number;
 }
 

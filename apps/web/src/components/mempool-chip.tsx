@@ -22,8 +22,8 @@ const REFRESH_MS = 30_000;
  * number, not two that happen to agree.
  */
 export function useMempoolCount() {
-  const { fairminters, mints } = useMempool(REFRESH_MS);
-  return fairminters.length + mints.length;
+  const { fairminters, mints, orders } = useMempool(REFRESH_MS);
+  return fairminters.length + mints.length + orders.length;
 }
 
 /**

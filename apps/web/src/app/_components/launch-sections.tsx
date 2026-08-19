@@ -10,6 +10,7 @@ import { useMempool } from "@/hooks/use-mempool";
 import { LABEL } from "@/components/ui/tokens";
 import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/format";
 import type { MempoolMint } from "@/lib/api/counterparty";
+import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
 import {
   type LaunchPage,
@@ -52,9 +53,10 @@ const MEMPOOL_REFRESH_MS = 30_000;
  * that fills its soft cap with mints still queued behind it is exactly when
  * the count is worth seeing, and that launch has already graduated by then.
  */
-function pendingByAsset(mints: MempoolMint[]): Map<string, number> {
+function pendingByAsset(mints: MempoolMint[], orders: MempoolOrder[]): Map<string, number> {
   const counts = new Map<string, number>();
   for (const m of mints) counts.set(m.asset, (counts.get(m.asset) ?? 0) + 1);
+  for (const o of orders) counts.set(o.asset, (counts.get(o.asset) ?? 0) + 1);
   return counts;
 }
 
@@ -193,8 +195,8 @@ export function LaunchSections({
   const [view, setView] = useState<View>("grid");
   // One lookup for the whole page, built from the poll the header chip is
   // already running. Sections read it; none of them fetches it.
-  const { mints } = useMempool(MEMPOOL_REFRESH_MS);
-  const pendingMints = useMemo(() => pendingByAsset(mints), [mints]);
+  const { mints, orders } = useMempool(MEMPOOL_REFRESH_MS);
+  const pendingMints = useMemo(() => pendingByAsset(mints, orders), [mints, orders]);
 
   return (
     <div className="space-y-10">
@@ -1117,7 +1119,7 @@ function Card({
           </span>
           {pending > 0 && (
             <span
-              title={`${pending} unconfirmed mint${pending === 1 ? "" : "s"} in the mempool`}
+              title={`${pending} unconfirmed transaction${pending === 1 ? "" : "s"} in the mempool`}
               className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-amber-700"
             >
               <PendingDot />

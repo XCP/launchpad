@@ -150,6 +150,9 @@ const SORT_SQL = {
   minters: "minters DESC",
   newest: "(CASE WHEN announce_block > 0 THEN announce_block ELSE start_block END) DESC",
   soonest: "start_block ASC",
+  // A graduated launch's final mint is the transaction that sold it out.
+  // Oldest first identifies bounty places; market-cap order cannot.
+  graduated: "last_mint_block ASC, COALESCE(last_mint_tx_index, 0) ASC",
 } as const;
 
 export type LaunchSort = keyof typeof SORT_SQL;
@@ -341,15 +344,23 @@ export async function listConformingAssets(db: D1Database): Promise<string[]> {
 export interface PhaseCount {
   phase: string;
   n: number;
+  /** Raw XCP satoshi currently recorded on launches in this phase. */
+  paid_xcp: number;
 }
 
-/** How many conforming launches sit in each phase. One grouped read — the
+/** How many conforming launches sit in each phase, and their current XCP. One grouped read — the
  *  homepage shows a slice per section and needs to say how big the whole is,
- *  and /stats is the same question asked directly. */
+ *  and /stats is the same question asked directly. Summing the launch rows
+ *  also gives us active escrow without rescanning the append-only mint table. */
 export function countByPhase(db: D1Database): Promise<PhaseCount[]> {
   return q<PhaseCount>(
     db,
-    `SELECT phase, COUNT(*) AS n FROM launches WHERE conforming = 1 GROUP BY phase`,
+    `SELECT phase,
+            COUNT(*) AS n,
+            CAST(COALESCE(SUM(CAST(paid_quantity AS INTEGER)), 0) AS INTEGER) AS paid_xcp
+       FROM launches
+      WHERE conforming = 1
+      GROUP BY phase`,
   );
 }
 
@@ -537,6 +548,32 @@ export interface MintBucket {
   bucket: number;
   n: number;
   minters: number;
+}
+
+export interface RefundBucket {
+  bucket: number;
+  n: number;
+  xcp: number;
+}
+
+/** Refund closures by Bitcoin-day bucket. A refunded fairminter closes at its
+ * current deadline, so that block is the event time rather than its announce
+ * or start block. The phase set is small and this only runs on a stats-cache
+ * miss. */
+export function refundsByBucket(db: D1Database, sinceBucket: number): Promise<RefundBucket[]> {
+  return q<RefundBucket>(
+    db,
+    `SELECT current_deadline_block / 144 AS bucket,
+            COUNT(*) AS n,
+            CAST(COALESCE(SUM(CAST(paid_quantity AS INTEGER)), 0) AS INTEGER) AS xcp
+       FROM launches
+      WHERE conforming = 1
+        AND phase = 'refunded'
+        AND current_deadline_block / 144 >= ?1
+      GROUP BY bucket
+      ORDER BY bucket`,
+    sinceBucket,
+  );
 }
 
 /**
