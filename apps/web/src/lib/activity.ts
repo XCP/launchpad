@@ -20,11 +20,15 @@ export type ActivityKind =
   | "mint_pending"
   | "refund"
   | "buy"
-  | "sell";
+  | "sell"
+  | "movement_in"
+  | "movement_out";
 
 export interface ActivityRow {
   key: string;
-  block: number;
+  /** Null for a balance-reconciliation row whose underlying operation is
+   *  deliberately outside this focused activity feed. */
+  block: number | null;
   kind: ActivityKind;
   asset: string;
   /** Signed: tokens in is positive. */
@@ -65,5 +69,41 @@ export function computeActivity(
     });
   }
 
-  return rows.sort((a, b) => b.block - a.block);
+  return rows.sort((a, b) => (b.block ?? -1) - (a.block ?? -1));
+}
+
+/**
+ * Explain the gap between the focused mint/trade feed and the authoritative
+ * live balance without pretending to know whether it was a send, burn, or LP
+ * operation. One aggregate row per affected asset keeps this a launchpad
+ * activity view rather than a second transaction explorer.
+ */
+export function reconcileActivity(
+  rows: ActivityRow[],
+  balances: Map<string, string>,
+): ActivityRow[] {
+  const known = new Map<string, bigint>();
+  for (const row of rows) {
+    // An open mint shows what will be earned if the launch succeeds, but the
+    // quantity is not a spendable balance yet and therefore cannot explain a
+    // live-balance difference.
+    if (row.kind === "mint_pending") continue;
+    known.set(row.asset, (known.get(row.asset) ?? 0n) + row.tokenDelta);
+  }
+
+  const reconciled = [...rows];
+  for (const [asset, liveRaw] of balances) {
+    const residual = big(liveRaw) - (known.get(asset) ?? 0n);
+    if (residual === 0n) continue;
+    reconciled.push({
+      key: `movement-${asset}`,
+      block: null,
+      kind: residual > 0n ? "movement_in" : "movement_out",
+      asset,
+      tokenDelta: residual,
+      xcpDelta: 0n,
+      divisible: rows.find((row) => row.asset === asset)?.divisible ?? true,
+    });
+  }
+  return reconciled;
 }

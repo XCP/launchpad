@@ -52,7 +52,9 @@ export interface Position {
 
 export interface ClosedPosition {
   asset: string;
-  realizedXcpSats: bigint;
+  /** Null when the focused event history does not explain the live zero. */
+  realizedXcpSats: bigint | null;
+  withheld?: string;
 }
 
 interface Book {
@@ -128,7 +130,16 @@ export function computePositions(
 
     if (live <= 0n) {
       // Fully exited — only interesting if they ever held it.
-      if (b?.everHeld) closed.push({ asset: u.asset, realizedXcpSats: b.realized });
+      if (b?.everHeld)
+        closed.push(
+          b.qty === live
+            ? { asset: u.asset, realizedXcpSats: b.realized }
+            : {
+                asset: u.asset,
+                realizedXcpSats: null,
+                withheld: "activity does not reconcile with the live balance",
+              },
+        );
       continue;
     }
 
