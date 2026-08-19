@@ -11,6 +11,7 @@ import {
   fetchPool,
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
+import { fetchHolderCount } from "@/lib/api/xcpio";
 import { big } from "@/lib/numeric";
 import {
   isXcp69,
@@ -145,6 +146,15 @@ export default async function HomePage() {
       total: p.total,
       king: p.king ? toSectionRow(p.king) : null,
     })) as [LaunchPage, LaunchPage, LaunchPage];
+    // Only the eight graduated rows actually rendered ask Explorer for a
+    // holder count. Next caches each asset for five minutes, so this is one
+    // shared refresh per asset rather than a balance scan per visitor.
+    graduated.rows = await Promise.all(
+      graduated.rows.map(async (row) => ({
+        ...row,
+        holders: await fetchHolderCount(row.fm.asset),
+      })),
+    );
     initial = { graduated, minting, scheduled };
     paged = true;
     count = graduated.total + minting.total + scheduled.total;
@@ -209,7 +219,6 @@ function FirstLaunchHero() {
     </div>
   );
 }
-
 
 
 

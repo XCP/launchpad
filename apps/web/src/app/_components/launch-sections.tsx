@@ -12,6 +12,7 @@ import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/f
 import type { MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
+import { fetchHolderCount } from "@/lib/api/xcpio";
 import {
   type LaunchPage,
   PER_PAGE,
@@ -94,6 +95,7 @@ const minterRank = (r: SectionRow) => r.minters ?? -1;
  *  which is the same convention the market-cap and deadline columns already
  *  use for a figure that isn't there. */
 const minterText = (n: number | null) => (n === null ? "—" : commas(n));
+const holderText = (n: number | null) => (n === null ? "—" : commas(n));
 
 /**
  * Each phase is judged by its own measure, so each gets its own sort menu
@@ -379,6 +381,28 @@ function Section({
     ? local.slice(current * perPage, current * perPage + perPage)
     : (data ?? initial).rows;
 
+  // The launch index knows who minted; ownership can change afterward. Ask
+  // Explorer only for the graduated page on screen, and retain that answer
+  // for five minutes. Page one arrives prefilled by the server, so the common
+  // path makes no browser-side burst at all.
+  const holderAssets =
+    phase === "graduated" && shown.some((row) => row.holders === null)
+      ? shown.map((row) => row.fm.asset)
+      : [];
+  const { data: liveHolders } = useSWR<Record<string, number | null>>(
+    holderAssets.length > 0 ? ["graduated-holders", ...holderAssets] : null,
+    async () =>
+      Object.fromEntries(
+        await Promise.all(
+          holderAssets.map(async (asset) => [asset, await fetchHolderCount(asset)] as const),
+        ),
+      ),
+    { dedupingInterval: 300_000, refreshInterval: 300_000, revalidateOnFocus: false },
+  );
+  const displayed = liveHolders
+    ? shown.map((row) => ({ ...row, holders: liveHolders[row.fm.asset] ?? row.holders }))
+    : shown;
+
   /**
    * Who is reigning, according to the last answer that arrived.
    *
@@ -416,7 +440,7 @@ function Section({
    */
   const { rows: ordered, fresh } = useMemo(() => {
     if (phase !== "minting" || view !== "grid") {
-      return { rows: shown, fresh: null as string | null };
+      return { rows: displayed, fresh: null as string | null };
     }
 
     /**
@@ -439,7 +463,7 @@ function Section({
      * asset minting hard while sitting on page three is simply not promoted
      * — no request is made to go and fetch it, which is what keeps this free.
      */
-    const candidates = king ? [king, ...shown] : shown;
+    const candidates = king ? [king, ...displayed] : displayed;
     let live: SectionRow | null = null;
     let liveN = 0;
     for (const r of candidates) {
@@ -451,13 +475,13 @@ function Section({
     }
 
     const holder = live ?? king;
-    if (!holder) return { rows: shown, fresh: null as string | null };
+    if (!holder) return { rows: displayed, fresh: null as string | null };
     // Matched on tx_hash, not on the object: the crown arrives as its own row
     // from its own statement, so it is never the same object as the copy on
     // the page even when it is the same launch.
-    const rest = shown.filter((r) => r.fm.tx_hash !== holder.fm.tx_hash);
+    const rest = displayed.filter((r) => r.fm.tx_hash !== holder.fm.tx_hash);
     return { rows: [holder, ...rest], fresh: holder.fm.asset as string | null };
-  }, [shown, phase, view, king, pendingMints]);
+  }, [displayed, phase, view, king, pendingMints]);
 
   if (total === 0 && !empty) return null;
 
@@ -526,7 +550,7 @@ function Section({
         >
           {view === "table" && canTabulate ? (
             <LaunchTable
-              rows={shown}
+              rows={displayed}
               phase={phase}
               offset={current * perPage}
               height={height}
@@ -733,7 +757,7 @@ function LaunchTable({
   // lines up the only three facts it actually has rather than padding the row
   // with columns of zero.
   const head = graduated
-    ? ["Market cap", "Price", "Age", "Minters"]
+    ? ["Market cap", "Price", "Age", "Holders"]
     : scheduled
       ? ["Opens", "Closes", "Announced"]
       : ["Progress", "Raised", "Minters", "Closes"];
@@ -789,7 +813,7 @@ function LaunchTable({
                     </Cell>
                     <Cell>{priceLabel(r.priceXcp)}</Cell>
                     <Cell>{age(r.announceBlock, height)}</Cell>
-                    <Cell>{minterText(r.minters)}</Cell>
+                    <Cell>{holderText(r.holders)}</Cell>
                   </>
                 ) : scheduled ? (
                   <>
@@ -927,9 +951,9 @@ function Card({
           ? `${commas(minters)} minters`
           : `${commas(minters)} of ${XCP69_MIN_PARTICIPANTS} minters`
       : phase === "graduated"
-        ? minters === null
-          ? "— minters"
-          : `${commas(minters)} minter${minters === 1 ? "" : "s"}`
+        ? row.holders === null
+          ? "— holders"
+          : `${commas(row.holders)} holder${row.holders === 1 ? "" : "s"}`
         : `Opens at Block ${fm.start_block.toLocaleString()}`;
 
   // Bottom-right, always a time — the one axis every phase shares, pointing

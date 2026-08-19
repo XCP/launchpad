@@ -26,6 +26,9 @@ export interface SectionRow {
   /** Distinct addresses that have minted; null when nothing could count
    *  them. Not zero — zero is the answer for a launch nobody has minted. */
   minters: number | null;
+  /** Current positive-balance holders. Only graduated rows request this live
+   *  Explorer figure; null means it has not been read yet. */
+  holders: number | null;
   /** Block it was announced in; 0 when unresolved. */
   announceBlock: number;
   /** 0–1 toward the soft cap. */
@@ -55,6 +58,8 @@ export interface RowSource {
   minters: number | null;
   /** Optional: the live-derivation path in page.tsx cannot answer it. */
   lastMintBlock?: number | null;
+  /** Optional because the launch index tracks minters, not current owners. */
+  holders?: number | null;
 }
 
 /**
@@ -76,6 +81,7 @@ export function toSectionRow(p: RowSource): SectionRow {
     // Passed through, null and all. Coalescing to 0 here is exactly the bug
     // this used to have: an unknown count printed as a confident zero.
     minters: p.minters,
+    holders: p.holders ?? null,
     announceBlock: p.announceBlock ?? 0,
     progress: saleProgress(p.fm),
     // Undefined on the live-derivation path, which has no index to ask.
