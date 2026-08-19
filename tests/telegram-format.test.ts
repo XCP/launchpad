@@ -111,6 +111,18 @@ describe("messages", () => {
     expect(sell.text).toContain("sold");
   });
 
+  it("puts per-token XCP price and approximate USD total on a new line", () => {
+    const m = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      venue: "pool",
+      xcpUsd: 2.5,
+    });
+    expect(m.text.split("\n").at(-1)).toBe("0.00004000 XCP price · ≈$50.00 total");
+  });
+
   it("says graduated and refunded differently", () => {
     const facts = { asset: "A", earnedRaw: raw(690n), mints: 142, minters: 69 };
     expect(mintClosed({ ...facts, graduated: true }).text).toContain("GRADUATED");
@@ -252,6 +264,19 @@ describe("the mint bar's cap is the standard's own ceiling", () => {
   });
 });
 
+describe("the trade bar's visual ceiling", () => {
+  it("allows twice the previous maximum", () => {
+    const m = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(10_000_000n),
+      xcpRaw: raw(1n),
+      venue: "pool",
+    });
+    expect(m.text.match(new RegExp(BUY_EMOJI, "gu"))).toHaveLength(60);
+  });
+});
+
 describe("nearing sold out", () => {
   it("leads with how much is minted and names the pending share", () => {
     const m = nearingSoldOut("A", 90.4, 4.2);
@@ -260,10 +285,10 @@ describe("nearing sold out", () => {
     expect(m.text).toContain("6% still open"); // 100 − 90 − 4, from the shown figures
   });
 
-  it("says so plainly when nothing is pending", () => {
-    // "0% is in the mempool" reads as a measurement failure rather than as
-    // an empty mempool.
-    expect(nearingSoldOut("A", 92, 0).text).toContain("nothing pending yet");
+  it("omits mempool copy when nothing is pending", () => {
+    const text = nearingSoldOut("A", 92, 0).text;
+    expect(text).toContain("8% still open");
+    expect(text).not.toContain("pending");
   });
 
   it("floors the minted share rather than rounding it up", () => {

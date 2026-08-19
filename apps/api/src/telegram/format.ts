@@ -39,9 +39,9 @@ const MINT_PAIR_CAP = Number(
 );
 
 /** Trades have no protocol ceiling — supply is 100M, so a whale could produce
- *  a bar of any length. 30 emoji is a visual limit, not a meaningful one, and
- *  it lines up a 1.5M-token trade with a max mint plus half again. */
-const TRADE_PAIR_CAP = 15;
+ *  a bar of any length. 60 emoji is a visual limit, not a meaningful one, and
+ *  gives unusually large trades twice the room they previously had. */
+const TRADE_PAIR_CAP = 30;
 
 /** Mints are purple squares and trades are the market's own green and red
  *  circles. Two different shapes, not two shades of the same one: at a glance
@@ -289,13 +289,13 @@ export function nearingSoldOut(
   const minted = Math.floor(mintedPct);
   const pendingShown = pendingPct >= 1 ? Math.round(pendingPct) : 0;
   const open = Math.max(0, 100 - minted - pendingShown);
-  const pending =
-    pendingShown > 0 ? `${pendingShown}% more is in the mempool` : `nothing pending yet`;
   return withPhoto(
     asset,
     [
       `🔥 ${assetLink(asset)} is ${minted}% minted`,
-      `${pending} · ${open}% still open`,
+      pendingShown > 0
+        ? `${pendingShown}% more is in the mempool · ${open}% still open`
+        : `${open}% still open`,
     ].join("\n"),
   );
 }
@@ -354,15 +354,30 @@ export interface TradeFacts {
   tokenRaw: bigint;
   xcpRaw: bigint;
   venue: "pool" | "book";
+  /** Current decorative conversion, never part of the on-chain trade math. */
+  xcpUsd?: number | null;
 }
 
 export function trade(f: TradeFacts): Announcement {
+  const priceRaw = f.tokenRaw > 0n ? (f.xcpRaw * 100_000_000n) / f.tokenRaw : 0n;
+  const price = formatExact(rawToDecimalString(priceRaw, 8), {
+    minimumFractionDigits: 8,
+    maximumFractionDigits: 8,
+  });
+  const usdTotal =
+    f.xcpUsd && f.xcpUsd > 0
+      ? ` · ≈$${((Number(f.xcpRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })} total`
+      : "";
   return withPhoto(
     f.asset,
     [
       sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
       `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
+      `${price} XCP price${usdTotal}`,
     ].join("\n"),
   );
 }

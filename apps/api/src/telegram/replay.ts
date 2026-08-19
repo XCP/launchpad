@@ -16,6 +16,7 @@
  *    rule as the live feed rather than being a different, noisier thing.
  */
 import { q } from "#api/db";
+import { fetchXcpUsd } from "#api/integrations/price";
 import {
   MIN_TOKENS,
   mint,
@@ -137,6 +138,11 @@ export async function buildBacklog(
   void newLaunches;
 
   const items: BacklogItem[] = [];
+  // One cached quote for the whole batch, and no request at all on the usual
+  // tick where there are no new trades to announce.
+  const xcpUsd = trades.some((t) => wholeTokens(abs(BigInt(t.token_delta))) >= MIN_TOKENS)
+    ? await fetchXcpUsd()
+    : null;
 
   for (const l of launches) {
     // announce_block is the launch's real age; start_block is a stand-in only
@@ -250,6 +256,7 @@ export async function buildBacklog(
         buy: t.kind === "buy",
         tokenRaw: tokens,
         xcpRaw: abs(BigInt(t.xcp_delta)),
+        xcpUsd,
         // asset_events does not record which venue filled it, and guessing
         // would be worse than omitting it. Pool is the common case here.
         venue: "pool",
