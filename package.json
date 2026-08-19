@@ -12,8 +12,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run test && npm run check --workspace apps/web && npm run check --workspace apps/api",
+    "smoke": "node scripts/smoke.mjs",
     "deploy:web": "npm run deploy --workspace apps/web",
-    "deploy:api": "npm run deploy --workspace apps/api",
+    "deploy:api": "npm run deploy --workspace apps/api && npm run smoke",
     "migrate:api:local": "npm run migrate:local --workspace apps/api",
     "migrate:api:remote": "npm run migrate:remote --workspace apps/api"
   },
