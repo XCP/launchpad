@@ -27,6 +27,7 @@ import {
   trade,
   xcp,
 } from "#api/telegram/format";
+import { eventTxHash } from "#api/telegram/replay";
 
 /** Raw units for n whole tokens (8 decimals, as everything here is stored). */
 const raw = (n: bigint) => n * 100_000_000n;
@@ -119,8 +120,12 @@ describe("messages", () => {
       xcpRaw: raw(20n),
       venue: "pool",
       xcpUsd: 2.5,
+      txHash: "ab".repeat(32),
     });
-    expect(m.text.split("\n").at(-1)).toBe("0.00004000 XCP price · ≈$50.00 total");
+    expect(m.text).toContain("0.00004000 XCP price · ≈$50.00 total");
+    expect(m.text).toContain("Market cap: 4,000 XCP · ≈$10,000.00");
+    expect(m.text).toContain(`https://xcp.io/tx/${"ab".repeat(32)}`);
+    expect(m.text.split("\n").at(-1)).toContain(">Trade</a>");
   });
 
   it("says graduated and refunded differently", () => {
@@ -185,6 +190,16 @@ describe("messages", () => {
   it("opens with the asset and a link", () => {
     expect(mintOpen("A").text).toContain("OPEN");
     expect(mintOpen("A").text).toContain("https://xcp.fun/A");
+  });
+});
+
+describe("trade transaction links", () => {
+  it("uses a pool tx hash directly and the completing half of an order match", () => {
+    const tx0 = "12".repeat(32);
+    const tx1 = "34".repeat(32);
+    expect(eventTxHash(tx0)).toBe(tx0);
+    expect(eventTxHash(`${tx0}_${tx1}`)).toBe(tx1);
+    expect(eventTxHash("not-a-transaction")).toBeNull();
   });
 });
 

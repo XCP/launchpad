@@ -11,7 +11,7 @@
  * consistent, so every bar in here counts the same unit.
  */
 import { formatExact, rawToDecimalString, big } from "@launchpad/xcp69/numeric";
-import { XCP69 } from "@launchpad/xcp69/xcp69";
+import { XCP69, XCP69_EXACT } from "@launchpad/xcp69/xcp69";
 
 /**
  * One XCP mints 100,000 tokens at the standard's fixed price, so 100k tokens
@@ -356,10 +356,15 @@ export interface TradeFacts {
   venue: "pool" | "book";
   /** Current decorative conversion, never part of the on-chain trade math. */
   xcpUsd?: number | null;
+  /** Causal Bitcoin transaction, when the indexed match exposes one. */
+  txHash?: string | null;
 }
 
 export function trade(f: TradeFacts): Announcement {
   const priceRaw = f.tokenRaw > 0n ? (f.xcpRaw * 100_000_000n) / f.tokenRaw : 0n;
+  // Every graduated XCP-69 asset has exactly 100M issued tokens. Multiplying
+  // the execution price by that fixed supply makes this market cap, not FDV.
+  const marketCapRaw = f.tokenRaw > 0n ? (f.xcpRaw * XCP69_EXACT.HARD_CAP) / f.tokenRaw : 0n;
   const price = formatExact(rawToDecimalString(priceRaw, 8), {
     minimumFractionDigits: 8,
     maximumFractionDigits: 8,
@@ -371,6 +376,17 @@ export function trade(f: TradeFacts): Announcement {
           maximumFractionDigits: 2,
         })} total`
       : "";
+  const marketCapUsd =
+    f.xcpUsd && f.xcpUsd > 0
+      ? ` · ≈$${((Number(marketCapRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        })}`
+      : "";
+  const tx =
+    f.txHash && /^[0-9a-f]{64}$/i.test(f.txHash)
+      ? `<a href="https://xcp.io/tx/${f.txHash}">TX</a> · `
+      : "";
   return withPhoto(
     f.asset,
     [
@@ -378,6 +394,8 @@ export function trade(f: TradeFacts): Announcement {
       `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
       `${price} XCP price${usdTotal}`,
+      `Market cap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
+      `${tx}<a href="${SITE}/${encodeURIComponent(f.asset)}">Trade</a>`,
     ].join("\n"),
   );
 }

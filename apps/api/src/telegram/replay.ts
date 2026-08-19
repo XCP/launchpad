@@ -257,6 +257,7 @@ export async function buildBacklog(
         tokenRaw: tokens,
         xcpRaw: abs(BigInt(t.xcp_delta)),
         xcpUsd,
+        txHash: eventTxHash(t.event),
         // asset_events does not record which venue filled it, and guessing
         // would be worse than omitting it. Pool is the common case here.
         venue: "pool",
@@ -269,6 +270,14 @@ export async function buildBacklog(
 
 const abs = (v: bigint) => (v < 0n ? -v : v);
 const wholeTokens = (raw: bigint) => raw / 100_000_000n;
+
+/** Pool events are transaction hashes. Order matches are tx0_tx1; tx1 is the
+ * fill that completed the match and therefore the useful explorer target. */
+export function eventTxHash(event: string): string | null {
+  if (/^[0-9a-f]{64}$/i.test(event)) return event;
+  const match = event.match(/^[0-9a-f]{64}_([0-9a-f]{64})$/i);
+  return match?.[1] ?? null;
+}
 
 /** A close has no block of its own on the row, so it sorts at the last thing
  *  that happened to THAT launch — its final mint, or its start block if it
