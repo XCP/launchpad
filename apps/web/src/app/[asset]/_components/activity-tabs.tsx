@@ -540,51 +540,52 @@ export function ActivityTabs({
           <p className="p-6 text-center text-sm text-gray-500">No trades yet.</p>
         ) : (
           <>
-            <ul className="divide-y divide-gray-100">
-              {trades.slice(from, from + PER_PAGE).map((t) => {
-                const tokens = tokenQty(t.tokenRaw, divisible);
-                return (
-                  <li
-                    key={t.key}
-                    className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span
-                        className={`font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}
-                      >
-                        {t.buy ? "↗ Buy" : "↘ Sell"}
-                      </span>
-                      <span className="text-gray-900">{compact(tokens)}</span>
-                      <Link
-                        href={`/profile/${t.addr}`}
-                        className="hidden min-w-0 items-center gap-1.5 truncate font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline sm:flex"
-                      >
-                        <Identicon address={t.addr} />
-                        {shortAddress(t.addr)}
-                      </Link>
-                    </span>
-                    <span className="text-right text-gray-900">
-                      {commasRaw(t.xcpRaw)} XCP{" "}
-                      <span className="text-gray-400">
-                        (
-                        {formatPrice(
-                          ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8),
-                        )}{" "}
-                        ea · {t.via})
-                      </span>
-                    </span>
-                    <a
-                      href={`https://xcp.io/tx/${t.txHash}`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="hidden text-xs text-gray-500 hover:text-purple-700 hover:underline md:block"
-                    >
-                      block {t.block}
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[43rem] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-4 py-2">Side</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2 text-right">XCP</th>
+                    <th className="px-3 py-2 text-right">Price</th>
+                    <th className="px-3 py-2">Address</th>
+                    <th className="px-4 py-2 text-right">Venue / block</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {trades.slice(from, from + PER_PAGE).map((t) => {
+                    const tokens = tokenQty(t.tokenRaw, divisible);
+                    return (
+                      <tr key={t.key}>
+                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}>
+                          {t.buy ? "↗ Buy" : "↘ Sell"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                          {compact(tokens)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                          {commasRaw(t.xcpRaw)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
+                          {formatPrice(ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8))}
+                        </td>
+                        <td className="px-3 py-2">
+                          <Link href={`/profile/${t.addr}`} className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline">
+                            <Identicon address={t.addr} />
+                            {shortAddress(t.addr)}
+                          </Link>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
+                          <a href={`https://xcp.io/tx/${t.txHash}`} target="_blank" rel="noreferrer" className="hover:text-purple-700 hover:underline">
+                            {t.via} · {commas(t.block)}
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
             {pager}
           </>
         ))}
