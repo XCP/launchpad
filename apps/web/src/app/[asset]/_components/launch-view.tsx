@@ -23,6 +23,7 @@ import {
   usd,
 } from "@/lib/format";
 import { big, rawEquals } from "@/lib/numeric";
+import { priceChangePercent } from "@/lib/market";
 import {
   type Fairminter,
   XCP69_EXACT,
@@ -106,15 +107,15 @@ export function LaunchView({
     .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
     .map(([source]) => source);
 
-  // "How's it doing" numbers (graduated): spot from the pool, change over
-  // the available history, multiple vs the fixed mint price.
+  // "How's it doing" numbers (graduated): spot from the pool and change from
+  // what this launch actually charged minters. The first candle is the first
+  // completed trade, already above or below the pool's opening state, so using
+  // it as an unlabeled baseline understates the launch return.
   const spot = poolTokens > 0 ? poolXcp / poolTokens : 0;
-  // Daily buckets carry the whole history; the hourly series is a recent
-  // window and would put "since launch" at whenever the last day began.
   const history = candles["1d"];
-  const first = history[0];
-  const firstPrice = first?.open ?? 0;
-  const change = firstPrice > 0 && spot > 0 ? (spot / firstPrice - 1) * 100 : null;
+  const quantityByPrice = fromSats(fm.quantity_by_price);
+  const mintPrice = quantityByPrice > 0 ? fromSats(fm.price) / quantityByPrice : 0;
+  const change = priceChangePercent(spot, mintPrice);
   // The highest price the pool ever printed, and where spot sits against it.
   // Free — the same history the chart already renders.
   // The high wick, not the close: a peak a candle traded at and gave back is
@@ -652,7 +653,7 @@ export function LaunchView({
                         className={change >= 0 ? "text-green-600" : "text-red-600"}
                       >
                         {change >= 0 ? "+" : ""}
-                        {change.toFixed(1)}%
+                        {change.toFixed(1)}% since mint
                       </span>
                     )}
                   </>
