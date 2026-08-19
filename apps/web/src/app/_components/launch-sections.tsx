@@ -757,7 +757,7 @@ function LaunchTable({
   // lines up the only three facts it actually has rather than padding the row
   // with columns of zero.
   const head = graduated
-    ? ["Market cap", "Price", "Age", "Holders"]
+    ? ["Market cap", "Price", "Graduated", "Holders"]
     : scheduled
       ? ["Opens", "Closes", "Announced"]
       : ["Progress", "Raised", "Minters", "Closes"];
@@ -812,7 +812,7 @@ function LaunchTable({
                         : "—"}
                     </Cell>
                     <Cell>{priceLabel(r.priceXcp)}</Cell>
-                    <Cell>{age(r.announceBlock, height)}</Cell>
+                    <Cell>{age(r.lastMintBlock ?? r.announceBlock, height)}</Cell>
                     <Cell>{holderText(r.holders)}</Cell>
                   </>
                 ) : scheduled ? (
@@ -960,8 +960,8 @@ function Card({
   // backwards for the finished and forwards for the rest.
   const when =
     phase === "graduated"
-      ? row.announceBlock > 0
-        ? `${age(row.announceBlock, height)} ago`
+      ? (row.lastMintBlock ?? row.announceBlock) > 0
+        ? `${age(row.lastMintBlock ?? row.announceBlock, height)} ago`
         : ""
       : phase === "minting"
         ? deadline > 0
