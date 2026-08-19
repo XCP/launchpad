@@ -413,15 +413,49 @@ function Section({
    * nothing on it to explain why it had.
    */
   const { rows: ordered, fresh } = useMemo(() => {
-    if (phase !== "minting" || view !== "grid" || !king) {
+    if (phase !== "minting" || view !== "grid") {
       return { rows: shown, fresh: null as string | null };
     }
+
+    /**
+     * An unconfirmed mint outranks every confirmed one, because it is newer
+     * than all of them by definition.
+     *
+     * The worker's crown is the last mint to CONFIRM, and confirming takes a
+     * block. So a launch being minted this second loses the slot to one that
+     * was minted ten minutes ago — the site knows about the newer activity
+     * (it is already drawing amber rings for it) and was declining to act on
+     * it. This is the same poll, read one step further.
+     *
+     * Most queued wins, not first seen. Arrival order would mean diffing one
+     * mempool snapshot against the previous one, which only a tab that was
+     * already open can do — two people would then see different kings. Depth
+     * is stateless, so everyone polling the same mempool agrees.
+     *
+     * Only rows this section can actually draw are eligible: the page it is
+     * showing, plus the worker's crown, which is usually not among them. An
+     * asset minting hard while sitting on page three is simply not promoted
+     * — no request is made to go and fetch it, which is what keeps this free.
+     */
+    const candidates = king ? [king, ...shown] : shown;
+    let live: SectionRow | null = null;
+    let liveN = 0;
+    for (const r of candidates) {
+      const n = pendingMints.get(r.fm.asset) ?? 0;
+      if (n > liveN) {
+        live = r;
+        liveN = n;
+      }
+    }
+
+    const holder = live ?? king;
+    if (!holder) return { rows: shown, fresh: null as string | null };
     // Matched on tx_hash, not on the object: the crown arrives as its own row
     // from its own statement, so it is never the same object as the copy on
     // the page even when it is the same launch.
-    const rest = shown.filter((r) => r.fm.tx_hash !== king.fm.tx_hash);
-    return { rows: [king, ...rest], fresh: king.fm.asset as string | null };
-  }, [shown, phase, view, king]);
+    const rest = shown.filter((r) => r.fm.tx_hash !== holder.fm.tx_hash);
+    return { rows: [holder, ...rest], fresh: holder.fm.asset as string | null };
+  }, [shown, phase, view, king, pendingMints]);
 
   if (total === 0 && !empty) return null;
 
@@ -916,9 +950,27 @@ function Card({
    * would be nonsense — so that case gets its own wording rather than a
    * template that only reads correctly for the other values.
    */
+  /**
+   * How long the crown has been worn, as the badge says it.
+   *
+   * Unconfirmed mints make it "just now" whatever the chain says, because
+   * that is what is true: this card holds the slot for a mint happening right
+   * now, and lastMintBlock describes the previous one that CONFIRMED. Dating
+   * the badge from that would have a launch being minted this second wearing
+   * a crown that says 20m ago.
+   *
+   * `age` also reports "now" for the block currently being built, where "now
+   * ago" would be nonsense — so both cases land on the same wording.
+   */
   const since = fresh && row.lastMintBlock ? age(row.lastMintBlock, height) : null;
   const mintedAgo =
-    since === null || since === "—" ? null : since === "now" ? "just now" : `${since} ago`;
+    fresh && pending > 0
+      ? "just now"
+      : since === null || since === "—"
+        ? null
+        : since === "now"
+          ? "just now"
+          : `${since} ago`;
 
   return (
     <Link
