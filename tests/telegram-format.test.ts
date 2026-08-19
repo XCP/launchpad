@@ -121,10 +121,13 @@ describe("messages", () => {
       venue: "pool",
       xcpUsd: 2.5,
       txHash: "ab".repeat(32),
+      address: "1KacrYMuQW5eqLbrYUotQ1mdsVpxin6hC9",
     });
     expect(m.text).toContain("0.00004000 XCP price · ≈$50.00 total");
     expect(m.text).toContain("Market cap: 4,000 XCP · ≈$10,000.00");
     expect(m.text).toContain(`https://xcp.io/tx/${"ab".repeat(32)}`);
+    expect(m.text).toContain("1KacrY…6hC9");
+    expect(m.text).toContain("https://xcp.fun/profile/1KacrYMuQW5eqLbrYUotQ1mdsVpxin6hC9");
     expect(m.text.split("\n").at(-1)).toContain(">Trade</a>");
   });
 

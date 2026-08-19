@@ -358,6 +358,8 @@ export interface TradeFacts {
   xcpUsd?: number | null;
   /** Causal Bitcoin transaction, when the indexed match exposes one. */
   txHash?: string | null;
+  /** Trader whose indexed balance leg this alert represents. */
+  address?: string | null;
 }
 
 export function trade(f: TradeFacts): Announcement {
@@ -385,8 +387,11 @@ export function trade(f: TradeFacts): Announcement {
       : "";
   const tx =
     f.txHash && /^[0-9a-f]{64}$/i.test(f.txHash)
-      ? `<a href="https://xcp.io/tx/${f.txHash}">TX</a> · `
-      : "";
+      ? `<a href="https://xcp.io/tx/${f.txHash}">TX</a>`
+      : null;
+  const links = [f.address ? addressLink(f.address) : null, tx, `<a href="${SITE}/${encodeURIComponent(f.asset)}">Trade</a>`]
+    .filter((link): link is string => link !== null)
+    .join(" · ");
   return withPhoto(
     f.asset,
     [
@@ -395,7 +400,7 @@ export function trade(f: TradeFacts): Announcement {
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
       `${price} XCP price${usdTotal}`,
       `Market cap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
-      `${tx}<a href="${SITE}/${encodeURIComponent(f.asset)}">Trade</a>`,
+      links,
     ].join("\n"),
   );
 }

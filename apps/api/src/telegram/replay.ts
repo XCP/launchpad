@@ -74,6 +74,7 @@ interface MintRow {
 
 interface TradeRow {
   event: string;
+  address: string;
   asset: string;
   block_index: number;
   token_delta: string;
@@ -127,7 +128,7 @@ export async function buildBacklog(
     ),
     q<TradeRow>(
       db,
-      `SELECT event, asset, block_index, token_delta, xcp_delta, kind
+      `SELECT event, address, asset, block_index, token_delta, xcp_delta, kind
          FROM asset_events ${newTrades}`,
     ),
   ]);
@@ -258,6 +259,7 @@ export async function buildBacklog(
         xcpRaw: abs(BigInt(t.xcp_delta)),
         xcpUsd,
         txHash: eventTxHash(t.event),
+        address: t.address,
         // asset_events does not record which venue filled it, and guessing
         // would be worse than omitting it. Pool is the common case here.
         venue: "pool",
