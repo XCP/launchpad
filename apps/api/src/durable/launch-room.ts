@@ -87,6 +87,19 @@ interface MempoolEvent {
  * happens once per launch, not once per visitor.
  */
 export class LaunchRoom extends DurableObject<Env> {
+  /**
+   * The last state this room broadcast, kept so a socket does not have to
+   * wait out the poll cycle to see anything.
+   *
+   * In memory AND in storage. Memory is what makes the common case free, but
+   * a hibernating object can be evicted between alarms and lose it — and the
+   * viewer arriving right after that eviction is precisely the one this
+   * exists for. Storage survives; the write below is guarded so it only
+   * happens when the state actually moved.
+   */
+  private last: RoomState | null = null;
+  private lastEncoded: string | null = null;
+
   async fetch(request: Request): Promise<Response> {
     if (request.headers.get("Upgrade") !== "websocket") {
       return new Response("expected a websocket upgrade", { status: 426 });
@@ -111,6 +124,26 @@ export class LaunchRoom extends DurableObject<Env> {
     this.ctx.acceptWebSocket(server);
     await this.ensurePolling();
 
+    /**
+     * Answer immediately, rather than at the next tick.
+     *
+     * Nothing here used to send a frame on connect: state only ever reached a
+     * viewer from the alarm, so joining a room that was already polling meant
+     * waiting out the REST of somebody else's 15 second cycle before the page
+     * showed anything live. Measured against production, a socket opened in
+     * 286ms and then sat silent for 9 seconds.
+     *
+     * The room already knows the answer by then — it polled moments ago — so
+     * this is not a fresher fetch, just the answer it is already holding,
+     * handed over on arrival. A cold room has nothing to replay and does not
+     * need it: ensurePolling above set its alarm to fire immediately.
+     */
+    const known = this.last ?? (await this.ctx.storage.get<RoomState>("last")) ?? null;
+    if (known) {
+      this.last = known;
+      server.send(JSON.stringify({ type: "state", ...known } satisfies RoomMessage));
+    }
+
     return new Response(null, { status: 101, webSocket: client });
   }
 
@@ -119,6 +152,20 @@ export class LaunchRoom extends DurableObject<Env> {
   // next tick and stops rescheduling once nobody's left. A stray keepalive
   // frame or an ungraceful disconnect can't take the room down either way.
   async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {}
+
+  /**
+   * Keep the latest state for replay, writing only when it changed.
+   *
+   * A tick that finds nothing new — which is most of them, since these values
+   * only move when someone mints or a block lands — costs no write at all.
+   */
+  private async remember(state: RoomState) {
+    const encoded = JSON.stringify(state);
+    if (encoded === this.lastEncoded) return;
+    this.lastEncoded = encoded;
+    this.last = state;
+    await this.ctx.storage.put("last", state);
+  }
 
   private async ensurePolling() {
     const existing = await this.ctx.storage.getAlarm();
@@ -135,7 +182,10 @@ export class LaunchRoom extends DurableObject<Env> {
     if (txHash) {
       try {
         const state = await this.poll(txHash);
-        if (state) this.broadcast({ type: "state", ...state });
+        if (state) {
+          this.broadcast({ type: "state", ...state });
+          await this.remember(state);
+        }
       } catch {
         // Transient Counterparty hiccup — just try again next tick rather
         // than tearing down the room over it.
