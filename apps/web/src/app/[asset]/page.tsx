@@ -8,6 +8,7 @@ import {
   fetchOriginalRecord,
   fetchPool,
   fetchPriceSeries,
+  fetchHolderCount,
   fetchHolderConcentration,
   fetchPairActivity,
   type PairActivity,
@@ -21,7 +22,6 @@ import {
 } from "@/lib/api/launchpad-api";
 import { foldPointsToCandles, type ChartResolution } from "@/lib/candles";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { fetchHolderCount } from "@/lib/api/xcpio";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import {
   isXcp69,

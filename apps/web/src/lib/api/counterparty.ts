@@ -126,6 +126,35 @@ export interface HolderConcentration {
 }
 
 /**
+ * Live number of distinct positive-balance holders for an asset.
+ *
+ * This deliberately uses the same Counterparty balance endpoint as the
+ * Holders tab.  The explorer's denormalized `holder_count` can lag a newly
+ * graduated launch by several blocks, which made the page header claim one
+ * holder while the table already contained the full mint population.
+ * Address balances are coalesced by address; address-less UTXO balances use
+ * the UTXO itself as their ownership location.
+ */
+export async function fetchHolderCount(asset: string): Promise<number | null> {
+  try {
+    const rows = await pageAll<{
+      address: string | null;
+      utxo: string | null;
+      quantity: Raw;
+    }>(`/assets/${encodeURIComponent(asset)}/balances`);
+    const holders = new Set<string>();
+    for (const row of rows) {
+      if (big(row.quantity) <= 0n) continue;
+      if (row.address) holders.add(`address:${row.address}`);
+      else if (row.utxo) holders.add(`utxo:${row.utxo}`);
+    }
+    return holders.size;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * How concentrated the holder base is.
  *
  * Measured against TOTAL SUPPLY, not the sum of address balances, because the
