@@ -8,6 +8,7 @@ import useSWR from "swr";
 import { buildPortfolioSeries, rateLookup, timeLookup, type DailyRate, type TimeAnchor } from "@/lib/portfolio-chart";
 import { PortfolioChart, WindowPicker, WINDOW_BLOCKS, type Window } from "@/app/profile/_components/portfolio-chart";
 import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
+import { totalPnlXcpSats } from "@/lib/positions";
 
 type Denom = "usd" | "xcp";
 
@@ -24,8 +25,17 @@ function holding(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
 }
 
-function Pnl({ sats, format }: { sats: bigint | null; format: (s: bigint) => string }) {
-  if (sats === null) return <span className="text-gray-400">—</span>;
+function Pnl({
+  sats,
+  format,
+  unavailable,
+}: {
+  sats: bigint | null;
+  format: (s: bigint) => string;
+  unavailable?: string;
+}) {
+  if (sats === null)
+    return <span className="text-gray-400" title={unavailable}>—</span>;
   const up = sats >= 0n;
   // Magnitude taken in integer space, before any conversion to a double —
   // the sign is carried by the label, not by the arithmetic.
@@ -76,6 +86,8 @@ export function PositionsTab({ address }: { address: string }) {
   };
 
   const totalXcpSats = open.reduce((sum, p) => sum + p.valueXcpSats, 0n);
+  const chartComplete =
+    open.every((p) => !p.withheld) && (portfolio?.closed ?? []).every((p) => !p.withheld);
 
   const tip = portfolio?.tipBlock ?? 0;
   const series =
@@ -136,7 +148,7 @@ export function PositionsTab({ address }: { address: string }) {
 
       {/* A portfolio that has never been worth anything has nothing to chart;
           a flat line at zero with "+$0 this window" is noise, not information. */}
-      {chartValues.length >= 2 && chartValues.some((v) => v > 0) && (
+      {chartComplete && chartValues.length >= 2 && chartValues.some((v) => v > 0) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
             <PnlOverWindow values={chartValues} format={chartLabel} />
@@ -144,6 +156,12 @@ export function PositionsTab({ address }: { address: string }) {
           </div>
           <PortfolioChart values={chartValues} format={chartLabel} />
         </div>
+      )}
+      {!chartComplete && open.length > 0 && (
+        <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+          Value history is hidden because some balance movements cannot be dated reliably.
+          Current holdings and values still come from live balances.
+        </p>
       )}
 
       {open.length === 0 ? (
@@ -163,7 +181,7 @@ export function PositionsTab({ address }: { address: string }) {
               <span>Token</span>
               <span className="text-right">Holding</span>
               <span className="text-right">Value</span>
-              <span className="text-right">PnL</span>
+              <span className="text-right">Total PnL</span>
             </div>
             <ul className="divide-y divide-gray-100">
               {open.map((p) => {
@@ -184,7 +202,16 @@ export function PositionsTab({ address }: { address: string }) {
                       {money(p.valueXcpSats)}
                     </span>
                     <span className="text-right tabular-nums">
-                      <Pnl sats={p.unrealizedXcpSats} format={money} />
+                      <Pnl
+                        sats={totalPnlXcpSats(p)}
+                        format={money}
+                        unavailable={p.withheld}
+                      />
+                      {p.realizedXcpSats !== 0n && p.unrealizedXcpSats !== null && (
+                        <span className="mt-0.5 block text-[10px] text-gray-400">
+                          <Pnl sats={p.realizedXcpSats} format={money} /> realized
+                        </span>
+                      )}
                     </span>
                   </li>
                 );
@@ -195,9 +222,11 @@ export function PositionsTab({ address }: { address: string }) {
       )}
 
       <p className="text-xs text-gray-400">
-        PnL uses average-cost accounting over your on-chain history, with
-        transfers valued at the market price when they moved. It is withheld
-        when that history can&apos;t be reconciled with your live balance.
+        Total PnL combines profit or loss already realized by partial sales
+        with the unrealized result on tokens still held. It uses average-cost
+        accounting over your indexed mint-and-trade history. It is withheld
+        when transfers or incomplete activity mean that history can&apos;t be
+        reconciled with your live balance.
         Positions cover graduated XCP-69 launches — the ones with a locked pool
         quoting them against XCP.
       </p>

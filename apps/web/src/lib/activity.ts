@@ -59,7 +59,7 @@ export function computeActivity(
 
   for (const e of events) {
     rows.push({
-      key: `e-${e.asset}-${e.block}-${e.tokenDelta}`,
+      key: `e-${e.event}-${e.asset}`,
       block: e.block,
       kind: e.kind === "sell" ? "sell" : "buy",
       asset: e.asset,

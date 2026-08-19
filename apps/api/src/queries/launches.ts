@@ -409,6 +409,7 @@ export function getMintsBySource(
   db: D1Database,
   source: string,
   limit: number,
+  offset = 0,
 ): Promise<SourceMintRow[]> {
   return q<SourceMintRow>(
     db,
@@ -417,10 +418,11 @@ export function getMintsBySource(
      FROM launch_mints m
      JOIN launches l ON l.tx_hash = m.launch_tx
      WHERE m.source = ?1 AND l.conforming IS NOT 0
-     ORDER BY m.block_index DESC
-     LIMIT ?2`,
+     ORDER BY m.block_index DESC, m.tx_hash DESC
+     LIMIT ?2 OFFSET ?3`,
     source,
     limit,
+    offset,
   );
 }
 
@@ -440,16 +442,18 @@ export function getEventsBySource(
   db: D1Database,
   address: string,
   limit: number,
+  offset = 0,
 ): Promise<AssetEventRow[]> {
   return q<AssetEventRow>(
     db,
     `SELECT event, asset, block_index, token_delta, xcp_delta, kind
      FROM asset_events
      WHERE address = ?1
-     ORDER BY block_index DESC
-     LIMIT ?2`,
+     ORDER BY block_index DESC, event DESC, asset DESC
+     LIMIT ?2 OFFSET ?3`,
     address,
     limit,
+    offset,
   );
 }
 

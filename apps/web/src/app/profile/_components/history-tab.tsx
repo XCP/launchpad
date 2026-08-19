@@ -28,7 +28,7 @@ export function HistoryTab({ address }: { address: string }) {
     <div className="space-y-4">
       <div>
         <p className="text-xs uppercase tracking-wider text-gray-500">
-          {incomplete ? "Known realized" : "Realized"}
+          {incomplete ? "Known realized PnL" : "Realized PnL"}
         </p>
         <Realized sats={total} xcpUsd={xcpUsd} large />
         <p className="text-sm text-gray-500">

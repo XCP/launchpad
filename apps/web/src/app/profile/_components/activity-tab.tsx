@@ -4,7 +4,7 @@ import Link from "next/link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { fetchAssetBalance, fetchBlockHeight } from "@/lib/api/counterparty";
-import { fetchEventsBySource, fetchIndexedLaunches, fetchMintsBySource } from "@/lib/api/launchpad-api";
+import { fetchEventsBySource, fetchMintsBySource, fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { computeActivity, reconcileActivity, type ActivityKind } from "@/lib/activity";
 import { compact, fromSats, tokenQty } from "@/lib/format";
 
@@ -42,14 +42,14 @@ export function ActivityTab({ address }: { address: string }) {
     ["activity", address],
     async () => {
       const [launches, events, mints, height] = await Promise.all([
-        fetchIndexedLaunches(50),
+        fetchSearchIndex(),
         fetchEventsBySource(address),
         fetchMintsBySource(address),
         fetchBlockHeight(),
       ]);
       // Every conforming launch, not just graduated ones: a mint that is still
       // open is activity, and so is a refund from one that failed.
-      const universe = new Map((launches ?? []).map((l) => [l.fm.asset, l.fm.divisible]));
+      const universe = new Map((launches ?? []).map((l) => [l.asset, true]));
       const focused = computeActivity(events ?? [], mints ?? [], universe);
       const assets = [...new Set(focused.map((row) => row.asset))];
       const balances = new Map(

@@ -57,6 +57,13 @@ export interface ClosedPosition {
   withheld?: string;
 }
 
+/** Whole-position PnL, including profit already realized by partial sales. */
+export function totalPnlXcpSats(position: Position): bigint | null {
+  return position.unrealizedXcpSats === null
+    ? null
+    : position.realizedXcpSats + position.unrealizedXcpSats;
+}
+
 interface Book {
   qty: bigint;
   cost: bigint;

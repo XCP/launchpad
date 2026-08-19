@@ -187,16 +187,26 @@ launchesRoute.get("/v2/launches/:asset", async (c) => {
 launchesRoute.get("/v2/events/by/:source", async (c) => {
   const source = c.req.param("source");
   const limit = Math.min(Number(c.req.query("limit") ?? 500) || 500, 2000);
-  const result = await getEventsBySource(c.env.DB, source, limit);
-  return J(c, { result, result_count: result.length }, 15);
+  const offset = Math.min(Math.max(0, Number(c.req.query("offset") ?? 0) || 0), 100_000);
+  const result = await getEventsBySource(c.env.DB, source, limit, offset);
+  return J(c, {
+    result,
+    result_count: result.length,
+    next_offset: result.length === limit ? offset + limit : null,
+  }, 15);
 });
 
 // An address's own mints across every launch — the profile activity feed.
 launchesRoute.get("/v2/mints/by/:source", async (c) => {
   const source = c.req.param("source");
   const limit = Math.min(Number(c.req.query("limit") ?? 200) || 200, 1000);
-  const result = await getMintsBySource(c.env.DB, source, limit);
-  return J(c, { result, result_count: result.length }, 15);
+  const offset = Math.min(Math.max(0, Number(c.req.query("offset") ?? 0) || 0), 100_000);
+  const result = await getMintsBySource(c.env.DB, source, limit, offset);
+  return J(c, {
+    result,
+    result_count: result.length,
+    next_offset: result.length === limit ? offset + limit : null,
+  }, 15);
 });
 
 // OHLCV for a TOKEN/XCP pair, folded by the indexer from the same pool and

@@ -8,15 +8,11 @@ import {
   fetchPoolPriceHistory,
   type PoolSnapshot,
 } from "@/lib/api/counterparty";
-import { fetchEventsBySource, fetchIndexedLaunches, fetchMintsBySource } from "@/lib/api/launchpad-api";
+import { fetchEventsBySource, fetchMintsBySource, fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { fetchXcpUsd } from "@/lib/api/price";
 import { big } from "@/lib/numeric";
 import type { BalanceDelta, PriceSnapshot } from "@/lib/portfolio-chart";
 import { computePositions, type ClosedPosition, type PairedDelta, type Position, type PositionInput } from "@/lib/positions";
-
-/** Enough graduated launches to cover any wallet; the conforming universe is
- *  deliberately small and grows one launch at a time. */
-const UNIVERSE_LIMIT = 50;
 
 export interface Portfolio {
   open: Position[];
@@ -38,12 +34,12 @@ export function usePortfolio(address: string) {
   const { data, isLoading } = useSWR(
     ["portfolio", address],
     async () => {
-      // Four small requests. This used to also paginate the address's whole
+      // Five focused requests. This used to also paginate the address's whole
       // credit/debit ledger — ~14,000 rows across 17 requests — to pair XCP
       // legs with token legs. apps/api does that pairing now, so the same
       // answer costs one indexed read.
       const [launches, xcpUsd, mints, events, tipBlock] = await Promise.all([
-        fetchIndexedLaunches(UNIVERSE_LIMIT),
+        fetchSearchIndex(),
         fetchXcpUsd(),
         fetchMintsBySource(address),
         fetchEventsBySource(address),
@@ -52,14 +48,16 @@ export function usePortfolio(address: string) {
       const tipTime = await fetchBlockTime(tipBlock);
       // Only graduated launches have a pool, and only a pool gives a price.
       const graduated = (launches ?? []).filter(
-        (l) => l.phase === "graduated" && l.poolXcpReserve && l.poolTokenReserve,
+        (l) => l.phase === "graduated" && l.pool_xcp_reserve && l.pool_token_reserve,
       );
       const universe: PositionInput[] = graduated.map((l) => ({
-        asset: l.fm.asset,
-        poolXcpReserve: l.poolXcpReserve!,
-        poolTokenReserve: l.poolTokenReserve!,
+        asset: l.asset,
+        poolXcpReserve: l.pool_xcp_reserve!,
+        poolTokenReserve: l.pool_token_reserve!,
       }));
-      const divisible = new Map(graduated.map((l) => [l.fm.asset, l.fm.divisible]));
+      // Conformance requires divisible=true; the compact all-launch index can
+      // omit a column whose answer is constant for this universe.
+      const divisible = new Map(graduated.map((l) => [l.asset, true]));
 
       // Both ways a balance moves, both legs already paired. A mint only
       // yields tokens once its launch closes successfully: while it is still
@@ -103,12 +101,12 @@ export function usePortfolio(address: string) {
       const prices = new Map<string, PriceSnapshot[]>();
       await Promise.all(
         graduated
-          .filter((l) => held.has(l.fm.asset))
+          .filter((l) => held.has(l.asset))
           .map(async (l) => {
             const xcpIsA = (s: PoolSnapshot) => s.asset_a === "XCP";
-            const snaps = await fetchPoolPriceHistory(l.fm.asset);
+            const snaps = await fetchPoolPriceHistory(l.asset);
             prices.set(
-              l.fm.asset,
+              l.asset,
               snaps
                 .map((s) => ({
                   block: s.block_index,

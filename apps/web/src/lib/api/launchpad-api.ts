@@ -282,14 +282,21 @@ interface ApiMintRow {
  *  the on-chain ledger records a mint's XCP leg without naming the asset. */
 export async function fetchMintsBySource(source: string): Promise<MintRecord[] | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/mints/by/${encodeURIComponent(source)}`, {
-      signal: AbortSignal.timeout(3_000),
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { result?: ApiMintRow[] };
-    if (!Array.isArray(data.result)) return null;
-    return data.result.map((r) => ({
+    const rows: ApiMintRow[] = [];
+    let offset = 0;
+    do {
+      const res = await fetch(
+        `${API_BASE}/v2/mints/by/${encodeURIComponent(source)}?limit=1000&offset=${offset}`,
+        { signal: AbortSignal.timeout(3_000), cache: "no-store" },
+      );
+      if (!res.ok) return null;
+      const data = (await res.json()) as { result?: ApiMintRow[]; next_offset?: number | null };
+      if (!Array.isArray(data.result)) return null;
+      rows.push(...data.result);
+      if (data.next_offset === null || data.next_offset === undefined) break;
+      offset = data.next_offset;
+    } while (offset <= 100_000);
+    return rows.map((r) => ({
       txHash: r.tx_hash,
       asset: r.asset,
       phase: r.phase,
@@ -304,6 +311,7 @@ export async function fetchMintsBySource(source: string): Promise<MintRecord[] |
 }
 
 export interface AssetEvent {
+  event: string;
   asset: string;
   block: number;
   tokenDelta: string;
@@ -312,6 +320,7 @@ export interface AssetEvent {
 }
 
 interface ApiEventRow {
+  event: string;
   asset: string;
   block_index: number;
   token_delta: string;
@@ -323,14 +332,22 @@ interface ApiEventRow {
  *  answered by an index — the browser no longer walks the whole ledger. */
 export async function fetchEventsBySource(source: string): Promise<AssetEvent[] | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/events/by/${encodeURIComponent(source)}`, {
-      signal: AbortSignal.timeout(3_000),
-      cache: "no-store",
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { result?: ApiEventRow[] };
-    if (!Array.isArray(data.result)) return null;
-    return data.result.map((r) => ({
+    const rows: ApiEventRow[] = [];
+    let offset = 0;
+    do {
+      const res = await fetch(
+        `${API_BASE}/v2/events/by/${encodeURIComponent(source)}?limit=2000&offset=${offset}`,
+        { signal: AbortSignal.timeout(3_000), cache: "no-store" },
+      );
+      if (!res.ok) return null;
+      const data = (await res.json()) as { result?: ApiEventRow[]; next_offset?: number | null };
+      if (!Array.isArray(data.result)) return null;
+      rows.push(...data.result);
+      if (data.next_offset === null || data.next_offset === undefined) break;
+      offset = data.next_offset;
+    } while (offset <= 100_000);
+    return rows.map((r) => ({
+      event: r.event,
       asset: r.asset,
       block: r.block_index,
       tokenDelta: r.token_delta,
