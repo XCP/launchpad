@@ -373,14 +373,14 @@ export function trade(f: TradeFacts): Announcement {
   });
   const usdTotal =
     f.xcpUsd && f.xcpUsd > 0
-      ? ` · ≈$${((Number(f.xcpRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
+      ? ` · $${((Number(f.xcpRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
-        })} total`
+        })}`
       : "";
   const marketCapUsd =
     f.xcpUsd && f.xcpUsd > 0
-      ? ` · ≈$${((Number(marketCapRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
+      ? ` · $${((Number(marketCapRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`
@@ -398,8 +398,8 @@ export function trade(f: TradeFacts): Announcement {
       sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
       `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
-      `${price} XCP price${usdTotal}`,
-      `Market cap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
+      `${price} XCP/token${usdTotal}`,
+      `MCap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
       links,
     ].join("\n"),
   );
