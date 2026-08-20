@@ -1058,7 +1058,7 @@ function Card({
         {performanceLabel && (
           <div className="absolute right-2 top-2">
             <Chip tone={performance !== null && performance >= 0 ? "green" : "dark"}>
-              <span title="Percent change">Change {performanceLabel}</span>
+              <span title="Percent change">{performanceLabel}</span>
             </Chip>
           </div>
         )}
