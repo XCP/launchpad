@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import type { Fairmint } from "@/lib/api/counterparty";
 import {
@@ -19,6 +19,7 @@ import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchJson } from "@/lib/client";
+import { timeAgo } from "@/lib/chain-time";
 import { useLaunchRoom } from "@/app/[asset]/_components/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
@@ -37,6 +38,7 @@ interface HolderRow {
 interface TradeRow {
   key: string;
   block: number;
+  time: number;
   buy: boolean;
   tokenRaw: Raw;
   xcpRaw: Raw;
@@ -99,10 +101,19 @@ export function ActivityTabs({
     "minters" | "mempool" | "trades" | "holders" | "orders"
   >(minting ? "minters" : "trades");
   const [pageParam, setPage] = useState(1);
+  const [, setTimeTick] = useState(0);
   const setParams = (t: typeof tab, p: number) => {
     setTab(t);
     setPage(p);
   };
+
+  // Relative trade ages should keep moving even when the room has no new
+  // fills to trigger a render. Minute precision is all the label exposes.
+  useEffect(() => {
+    if (tab !== "trades") return;
+    const timer = window.setInterval(() => setTimeTick((tick) => tick + 1), 60_000);
+    return () => window.clearInterval(timer);
+  }, [tab]);
 
   // One subscription for the whole card: the mempool tape, the trade tape,
   // and the status the page watches for a transition all arrive on it.
@@ -147,6 +158,7 @@ export function ActivityTabs({
     roomState?.trades?.map((t) => ({
       key: t.key,
       block: t.block,
+      time: t.time,
       buy: t.buy,
       tokenRaw: t.token_quantity,
       xcpRaw: t.xcp_quantity,
@@ -180,6 +192,7 @@ export function ActivityTabs({
       return merged.map((trade) => ({
         key: trade.key,
         block: trade.block,
+        time: trade.time,
         buy: trade.buy,
         tokenRaw: trade.tokenQuantity,
         xcpRaw: trade.xcpQuantity,
@@ -520,7 +533,7 @@ export function ActivityTabs({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[43rem] text-sm">
+              <table className="w-full min-w-[41rem] text-sm">
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
                     <th className="px-4 py-2">Side</th>
@@ -528,12 +541,16 @@ export function ActivityTabs({
                     <th className="px-3 py-2 text-right">Amount</th>
                     <th className="px-3 py-2 text-right">XCP</th>
                     <th className="px-3 py-2">Address</th>
-                    <th className="px-4 py-2 text-right">Venue / block</th>
+                    <th className="px-4 py-2 text-right">Venue / time</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {trades.slice(from, from + PER_PAGE).map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
+                    const hasTime = t.time > 0;
+                    const exactTime = hasTime
+                      ? new Date(t.time * 1000).toUTCString()
+                      : null;
                     return (
                       <tr key={t.key}>
                         <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}>
@@ -555,8 +572,14 @@ export function ActivityTabs({
                           </Link>
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
-                          <a href={`https://xcp.io/tx/${t.txHash}`} target="_blank" rel="noreferrer" className="hover:text-purple-700 hover:underline">
-                            {t.via} · {commas(t.block)}
+                          <a
+                            href={`https://xcp.io/tx/${t.txHash}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={exactTime ? `${exactTime} · block ${commas(t.block)}` : `Block ${commas(t.block)}`}
+                            className="hover:text-purple-700 hover:underline"
+                          >
+                            {t.via} · {hasTime ? timeAgo(t.time) : "time unavailable"}
                           </a>
                         </td>
                       </tr>
