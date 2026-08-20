@@ -59,6 +59,7 @@ interface LaunchRow {
   earned_quantity: string | null;
   mints: number;
   minters: number;
+  last_mint_block: number | null;
 }
 
 interface MintRow {
@@ -108,83 +109,99 @@ interface TradeGroup {
  * answer from the rest. A separate live path would be a second implementation
  * of the same rules, free to drift from this one.
  *
- * `unannouncedOnly` pushes that filter into SQL rather than fetching
- * everything and discarding most of it. Announced is keyed by exactly the
- * strings built here, so each of these is a primary-key anti-join: work
- * proportional to what is new, not to how much has ever happened.
+ * `unannouncedOnly` reads the small `announcement_work` outbox populated in
+ * the same transactions as new chain facts. An anti-join still walks every
+ * historical mint to prove it was already said; the outbox contains only
+ * work that is waiting, so a quiet tick reads zero mint/trade rows however
+ * old the site becomes.
  */
 export async function buildBacklog(
   db: D1Database,
   height: number,
   unannouncedOnly = false,
 ): Promise<BacklogItem[]> {
-  const newLaunches = unannouncedOnly
-    ? `AND NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'launch:' || tx_hash)`
-    : "";
-  const newMints = unannouncedOnly
-    ? `AND NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'mint:' || m.tx_hash)`
-    : "";
-  const newTrades = unannouncedOnly
-    ? `WHERE primary_actor = 1 AND tx_hash IS NOT NULL
-         AND NOT EXISTS (
-           SELECT 1 FROM announced a
-            WHERE a.key = 'trade-tx:' || asset_events.tx_hash || ':' || asset_events.asset
-         )`
-    : "WHERE primary_actor = 1 AND tx_hash IS NOT NULL";
+  // Outbox first, then primary-key lookup into history. Writing the join as
+  // `w.key = 'mint:' || m.tx_hash` with mints first looks equivalent but lets
+  // SQLite scan every mint and probe the outbox for each one -- the exact
+  // historical-growth bug this path exists to remove.
+  const mintSource = unannouncedOnly
+    ? `announcement_work w
+         JOIN launch_mints m
+           ON w.key LIKE 'mint:%' AND m.tx_hash = substr(w.key, 6)`
+    : "launch_mints m";
+  const tradeSource = unannouncedOnly
+    ? `announcement_work w
+         JOIN asset_events e
+           ON w.key LIKE 'trade-tx:%'
+          AND e.tx_hash = substr(w.key, 10, 64)
+          AND e.asset = substr(w.key, 75)`
+    : "asset_events e";
 
-  const [launches, mints, trades] = await Promise.all([
+  const [launches, mints, trades, pendingRows] = await Promise.all([
     q<LaunchRow>(
       db,
       `SELECT tx_hash, asset, announce_block, start_block, phase, soft_cap,
-              hard_cap, earned_quantity, mints, minters
+              hard_cap, earned_quantity, mints, minters, last_mint_block
          FROM launches WHERE conforming = 1`,
     ),
     q<MintRow>(
       db,
       `SELECT m.tx_hash, m.launch_tx, l.asset, m.block_index, m.source,
               m.earn_quantity, m.paid_quantity, l.soft_cap
-         FROM launch_mints m
+         FROM ${mintSource}
          JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
-        WHERE 1 = 1 ${newMints}`,
+        WHERE 1 = 1`,
     ),
     q<TradeRow>(
       db,
-      `SELECT event, tx_hash, event_index, address, asset, block_index,
-              token_delta, xcp_delta, kind
-         FROM asset_events ${newTrades}`,
+      `SELECT e.event, e.tx_hash, e.event_index, e.address, e.asset, e.block_index,
+              e.token_delta, e.xcp_delta, e.kind
+         FROM ${tradeSource}
+        WHERE e.primary_actor = 1 AND e.tx_hash IS NOT NULL`,
     ),
+    unannouncedOnly
+      ? q<{ key: string }>(db, `SELECT key FROM announcement_work`)
+      : Promise.resolve([]),
   ]);
-  // Launches are read whole regardless: the running progress on a replayed
-  // mint needs every earlier mint of that launch, and the open/closed keys are
-  // derived from a row's phase rather than from its own existence. The table
-  // is one row per launch, so this stays small by construction.
-  void newLaunches;
+  // Launches stay whole: pending mint progress needs its cap, while lifecycle
+  // wording needs the current phase. One row per launch keeps this bounded;
+  // only append-only mint/trade histories need the outbox to avoid all-time
+  // scans.
+  const pending = unannouncedOnly ? new Set(pendingRows.map((r) => r.key)) : null;
 
   const items: BacklogItem[] = [];
   for (const l of launches) {
     // announce_block is the launch's real age; start_block is a stand-in only
     // when the announcement block was never recovered.
     const announced = l.announce_block ?? l.start_block;
-    items.push({
-      key: `launch:${l.tx_hash}`,
-      block: announced,
-      rank: RANK.launch,
-      mint: null,
-      a: newLaunch({
-        asset: l.asset,
-        startBlock: l.start_block,
-        softCapRaw: BigInt(l.soft_cap),
-        hardCapRaw: BigInt(l.hard_cap),
-        // As of the block it was announced in, not today — otherwise every
-        // historical launch reads "Open now".
-        height: announced,
-      }),
-    });
+    const launchKey = `launch:${l.tx_hash}`;
+    if (!pending || pending.has(launchKey)) {
+      items.push({
+        key: launchKey,
+        block: announced,
+        rank: RANK.launch,
+        mint: null,
+        a: newLaunch({
+          asset: l.asset,
+          startBlock: l.start_block,
+          softCapRaw: BigInt(l.soft_cap),
+          hardCapRaw: BigInt(l.hard_cap),
+          // As of the block it was announced in, not today — otherwise every
+          // historical launch reads "Open now".
+          height: announced,
+        }),
+      });
+    }
 
     // Only launches that actually reached their start block ever opened.
-    if (l.start_block <= height && l.phase !== "scheduled") {
+    const openKey = `open:${l.tx_hash}`;
+    if (
+      (!pending || pending.has(openKey)) &&
+      l.start_block <= height &&
+      l.phase !== "scheduled"
+    ) {
       items.push({
-        key: `open:${l.tx_hash}`,
+        key: openKey,
         block: l.start_block,
         rank: RANK.open,
         mint: null,
@@ -192,12 +209,16 @@ export async function buildBacklog(
       });
     }
 
-    if (l.phase === "graduated" || l.phase === "refunded") {
+    const closedKey = `closed:${l.tx_hash}`;
+    if (
+      (!pending || pending.has(closedKey)) &&
+      (l.phase === "graduated" || l.phase === "refunded")
+    ) {
       items.push({
         // Closes have no block of their own on the row, so they sort at the
         // last thing that happened to the launch: after its final mint.
-        key: `closed:${l.tx_hash}`,
-        block: lastBlockFor(mints, l.tx_hash, l.start_block),
+        key: closedKey,
+        block: lastBlockFor(mints, l.tx_hash, l.last_mint_block ?? l.start_block),
         rank: RANK.closed,
         mint: null,
         a: mintClosed({

@@ -38,27 +38,80 @@ const MAX_QUEUE = 500;
 
 export type { Queued } from "#api/telegram/digest";
 
+/** Every queued event carries the chain-derived identity D1 uses for the same
+ * fact. The queue is the cross-system idempotency boundary: accepting the same
+ * key twice returns the first acceptance instead of appending a second post. */
+export interface KeyedQueued extends Queued {
+  key: string;
+}
+
+export interface EnqueueResult {
+  /** Current queue length after the cap is applied. */
+  depth: number;
+  /** Keys appended by this call. */
+  newlyAccepted: string[];
+  /** Every supplied key now durably known, including retries of an earlier
+   * acceptance whose D1 acknowledgement failed. */
+  known: string[];
+}
+
+const ACCEPTED_PREFIX = "accepted:";
+const STORAGE_CHUNK = 100;
+type StoredQueued = Queued & { key?: string };
+
 export class Announcer extends DurableObject<Env> {
   /**
    * Take events. Never sends inline: the caller is a cron tick with a lock
    * and a deadline, and it should not be waiting on someone else's rate
    * limit.
    */
-  async enqueue(items: Queued[]): Promise<number> {
-    if (items.length === 0) return 0;
-    const queue = await this.read();
-    queue.push(...items);
-    // Drop from the FRONT when over the cap. In a feed, the newest events are
-    // the ones anyone is watching for; a backlog that discards them to
-    // preserve an hour-old mint has its priorities backwards.
-    const trimmed = queue.length > MAX_QUEUE ? queue.slice(queue.length - MAX_QUEUE) : queue;
-    await this.ctx.storage.put("queue", trimmed);
-    // Start draining if it is not already. An alarm that exists is a drain in
-    // progress; setting it again would only move it later.
-    if ((await this.ctx.storage.getAlarm()) === null) {
-      await this.ctx.storage.setAlarm(Date.now());
+  async enqueue(items: KeyedQueued[]): Promise<EnqueueResult> {
+    if (items.length === 0) {
+      return { depth: (await this.read()).length, newlyAccepted: [], known: [] };
     }
-    return trimmed.length;
+
+    // One key once even if a malformed caller repeats it inside one RPC. The
+    // Durable Object serializes calls, and the storage transaction makes the
+    // accepted marker and queue append one decision across transaction retries.
+    const unique = [...new Map(items.map((item) => [item.key, item])).values()];
+    return this.ctx.storage.transaction(async (txn) => {
+      const storageKeys = unique.map((item) => `${ACCEPTED_PREFIX}${item.key}`);
+      const accepted = new Set<string>();
+      for (let i = 0; i < storageKeys.length; i += STORAGE_CHUNK) {
+        const found = await txn.get<number>(storageKeys.slice(i, i + STORAGE_CHUNK));
+        for (const key of found.keys()) accepted.add(key);
+      }
+
+      const fresh = unique.filter(
+        (item) => !accepted.has(`${ACCEPTED_PREFIX}${item.key}`),
+      );
+      const queue = ((await txn.get<StoredQueued[]>("queue")) ?? []).concat(fresh);
+      // Drop from the FRONT when over the cap. In a feed, the newest events
+      // are the ones anyone is watching for; a backlog that discards them to
+      // preserve an hour-old mint has its priorities backwards.
+      const trimmed = queue.length > MAX_QUEUE ? queue.slice(queue.length - MAX_QUEUE) : queue;
+      await txn.put("queue", trimmed);
+
+      const now = Date.now();
+      for (let i = 0; i < fresh.length; i += STORAGE_CHUNK) {
+        const markers = Object.fromEntries(
+          fresh
+            .slice(i, i + STORAGE_CHUNK)
+            .map((item) => [`${ACCEPTED_PREFIX}${item.key}`, now]),
+        );
+        if (Object.keys(markers).length > 0) await txn.put(markers);
+      }
+
+      // Start draining if it is not already. An alarm that exists is a drain
+      // in progress; setting it again would only move it later.
+      if ((await txn.getAlarm()) === null) await txn.setAlarm(Date.now());
+
+      return {
+        depth: trimmed.length,
+        newlyAccepted: fresh.map((item) => item.key),
+        known: unique.map((item) => item.key),
+      };
+    });
   }
 
   async depth(): Promise<number> {
@@ -108,7 +161,7 @@ export class Announcer extends DurableObject<Env> {
     if (rest.length > 0) await this.ctx.storage.setAlarm(Date.now() + SEND_INTERVAL_MS);
   }
 
-  private async read(): Promise<Queued[]> {
-    return (await this.ctx.storage.get<Queued[]>("queue")) ?? [];
+  private async read(): Promise<StoredQueued[]> {
+    return (await this.ctx.storage.get<StoredQueued[]>("queue")) ?? [];
   }
 }

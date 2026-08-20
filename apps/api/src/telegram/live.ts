@@ -8,9 +8,10 @@
  * forever, and there is no way to notice.
  *
  * This asks a different question: what SHOULD the channel have said by now,
- * and what has it not said yet? The answer comes from D1's current state
- * minus the announced table, which means a missed tick is repaired by the next
- * one and a replay is just the first run of the same code.
+ * and what has it not said yet? Chain transactions populate a small D1 outbox;
+ * the queue accepts each stable event key once, and only then does D1 move the
+ * key to `announced`. A missed tick or a failure between those systems is
+ * repaired by the next one without repeating a post.
  */
 import { ratio } from "@launchpad/xcp69/numeric";
 import { q } from "#api/db";
@@ -56,51 +57,96 @@ async function isLive(db: D1Database): Promise<boolean> {
 }
 
 /**
- * Claim keys in one batch and return the ones this caller won.
- *
- * The claim IS the decision: `INSERT OR IGNORE` writes a row the first time
- * and nothing forever after, so "should this be announced" and "record that it
- * was" are a single atomic step rather than a check followed by a race.
- *
- * Chunked for the same reason every other batch in this worker is: a batch is
- * one implicit transaction and D1 bounds how much one can carry, so the limit
- * belongs on the batch rather than on how many events a block happens to
- * produce.
+ * A message ready for the Durable Object. `key` is a chain-derived identity,
+ * so the object can turn two callers or a retry into one queue entry.
  */
-const CLAIM_CHUNK = 100;
+export interface AnnouncementItem {
+  key: string;
+  a: Announcement;
+  mintOf: string | null;
+  earned: string;
+  paid: string;
+}
 
-export async function claimKeys<T extends { key: string }>(
+export interface QueueResult {
+  /** Candidates D1 still considered unsaid at the start of this attempt. */
+  accepted: number;
+  /** Entries appended on this RPC; lower than accepted when repairing an
+   * earlier queue acceptance whose D1 acknowledgement failed. */
+  newlyQueued: number;
+  /** Current Durable Object queue depth. */
+  depth: number;
+}
+
+const D1_CHUNK = 50;
+
+/** Remove keys D1 already acknowledged. This is an indexed point lookup, not
+ * the concurrency decision -- the Durable Object makes that decision. */
+async function onlyUnannounced<T extends { key: string }>(
   db: D1Database,
   items: T[],
 ): Promise<T[]> {
-  const now = Math.floor(Date.now() / 1000);
-  const stmt = db.prepare(`INSERT OR IGNORE INTO announced (key, at) VALUES (?1, ?2)`);
-  const claimed: T[] = [];
-  for (let i = 0; i < items.length; i += CLAIM_CHUNK) {
-    const chunk = items.slice(i, i + CLAIM_CHUNK);
-    const results = await db.batch(chunk.map((it) => stmt.bind(it.key, now)));
-    chunk.forEach((it, idx) => {
-      if ((results[idx]!.meta.rows_written ?? 0) > 0) claimed.push(it);
-    });
+  const unique = [...new Map(items.map((item) => [item.key, item])).values()];
+  const said = new Set<string>();
+  for (let i = 0; i < unique.length; i += D1_CHUNK) {
+    const chunk = unique.slice(i, i + D1_CHUNK);
+    const placeholders = chunk.map((_, index) => `?${index + 1}`).join(", ");
+    const rows = await q<{ key: string }>(
+      db,
+      `SELECT key FROM announced WHERE key IN (${placeholders})`,
+      ...chunk.map((item) => item.key),
+    );
+    for (const row of rows) said.add(row.key);
   }
-  return claimed;
+  return unique.filter((item) => !said.has(item.key));
+}
+
+/** Record durable queue acceptance and retire its pending outbox row in the
+ * same D1 batch. A failed batch leaves every key retryable; the queue's own
+ * accepted-key marker prevents that retry from appending a duplicate. */
+async function acknowledge(db: D1Database, keys: string[]): Promise<void> {
+  const now = Math.floor(Date.now() / 1000);
+  const insert = db.prepare(`INSERT OR IGNORE INTO announced (key, at) VALUES (?1, ?2)`);
+  const remove = db.prepare(`DELETE FROM announcement_work WHERE key = ?1`);
+  // Two statements per key, hence fifty rather than the queue's hundred-item
+  // chunk: each D1 batch stays at or below one hundred statements.
+  for (let i = 0; i < keys.length; i += D1_CHUNK) {
+    const chunk = keys.slice(i, i + D1_CHUNK);
+    await db.batch(
+      chunk.flatMap((key) => [insert.bind(key, now), remove.bind(key)]),
+    );
+  }
+}
+
+/** Enqueue first, acknowledge second. This order is safe because the Durable
+ * Object persists an accepted-key marker atomically with the queue append. */
+export async function queueAnnouncements(
+  env: Env,
+  items: AnnouncementItem[],
+): Promise<QueueResult> {
+  const unsaid = await onlyUnannounced(env.DB, items);
+  if (unsaid.length === 0) {
+    return { accepted: 0, newlyQueued: 0, depth: 0 };
+  }
+
+  const stub = env.ANNOUNCER.get(env.ANNOUNCER.idFromName("global"));
+  const result = await stub.enqueue(unsaid);
+  await acknowledge(env.DB, result.known);
+  return {
+    accepted: result.known.length,
+    newlyQueued: result.newlyAccepted.length,
+    depth: result.depth,
+  };
 }
 
 export async function announceLive(env: Env, height: number): Promise<LiveResult> {
   if (!(await isLive(env.DB))) return { announced: 0, queued: 0 };
 
-  interface Item {
-    key: string;
-    a: Announcement;
-    mintOf: string | null;
-    earned: string;
-    paid: string;
-  }
-  const items: Item[] = [];
+  const items: AnnouncementItem[] = [];
 
   // Everything with a chain fact behind it: launches, opens, mints, closes,
-  // trades. Filtered in SQL to what has never been announced, so this costs
-  // work proportional to what is new.
+  // trades. Mint/trade history comes from the pending-work outbox, so this
+  // costs work proportional to what is new rather than all-time history.
   for (const b of await buildBacklog(env.DB, height, true)) {
     items.push({
       key: b.key,
@@ -182,21 +228,6 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
 
   if (items.length === 0) return { announced: 0, queued: 0 };
 
-  // Claim, then queue what was claimed. The other order double-posts on a
-  // retry: queued-but-unclaimed is invisible to the next tick, which would
-  // queue it again.
-  //
-  // One batch, not one round trip per item. A block that lands forty mints
-  // would otherwise spend forty sequential trips to D1 inside a tick that
-  // holds a lock with a deadline — the same shape this repo already removed
-  // from the indexer's upserts. rows_written still comes back per statement,
-  // so which keys were actually claimed is unchanged.
-  const claimed = await claimKeys(env.DB, items);
-  if (claimed.length === 0) return { announced: 0, queued: 0 };
-
-  const stub = env.ANNOUNCER.get(env.ANNOUNCER.idFromName("global"));
-  const queued = await stub.enqueue(
-    claimed.map((c) => ({ a: c.a, mintOf: c.mintOf, earned: "0", paid: "0" })),
-  );
-  return { announced: claimed.length, queued };
+  const queued = await queueAnnouncements(env, items);
+  return { announced: queued.accepted, queued: queued.depth };
 }

@@ -3,7 +3,7 @@ import type { Env } from "#api/env";
 import { syncLaunches } from "#api/indexer/sync";
 import { launchesRoute } from "#api/read/launches";
 import { mintClosed } from "#api/telegram/format";
-import { announceLive, claimKeys } from "#api/telegram/live";
+import { announceLive, queueAnnouncements } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
 import { fetchBlockHeight, fetchMempoolFairmints } from "#api/integrations/counterparty";
@@ -85,11 +85,10 @@ app.route("/", launchesRoute);
  * claiming anything — which is how a couple of hundred messages get reviewed
  * before any of them are read by a person.
  *
- * A live run claims each key in `announced` as it enqueues, so the indexer
- * that takes over afterwards sees the past as already said and starts from
- * whatever happens next. Claiming and queueing in the same pass is what makes
- * running this twice harmless: the second run finds every key taken and
- * enqueues nothing.
+ * The Durable Object accepts each chain-derived key once, then D1 records that
+ * acceptance. Running this twice is harmless, including after a failure
+ * between those systems: the queue returns the first acceptance instead of
+ * appending a duplicate, and D1 repairs its acknowledgement.
  */
 app.post("/admin/replay", async (c) => {
   if (!authed(c.req.header("x-admin-token"), c.env.ADMIN_TOKEN)) {
@@ -106,16 +105,10 @@ app.post("/admin/replay", async (c) => {
     });
   }
 
-  // Claim first, enqueue what was actually claimed. The other order would
-  // double-post on a retry: enqueued but unclaimed is invisible to the next
-  // run, and it would queue them all again. Batched — a backlog is hundreds
-  // of keys, and hundreds of sequential round trips is a request that times
-  // out for no reason.
-  const claimed = await claimKeys(c.env.DB, backlog);
-
-  const stub = c.env.ANNOUNCER.get(c.env.ANNOUNCER.idFromName("global"));
-  const depth = await stub.enqueue(
-    claimed.map((item) => ({
+  const result = await queueAnnouncements(
+    c.env,
+    backlog.map((item) => ({
+      key: item.key,
       a: item.a,
       // Never collapsed. A replay is the feed it would have been, and it would
       // not have been a digest — these arrived days apart.
@@ -124,7 +117,12 @@ app.post("/admin/replay", async (c) => {
       paid: item.mint?.paid ?? "0",
     })),
   );
-  return c.json({ queued: claimed.length, skipped: backlog.length - claimed.length, depth });
+  return c.json({
+    queued: result.newlyQueued,
+    accepted: result.accepted,
+    skipped: backlog.length - result.accepted,
+    depth: result.depth,
+  });
 });
 
 /**
@@ -282,8 +280,9 @@ export default {
         // describe something D1 already believes — and a tick that dies
         // half-done leaves nothing announced that did not happen.
         //
-        // Inside the same lock, because two overlapping ticks both claiming
-        // keys is the one race the announced table cannot settle on its own.
+        // Inside the same lock so the index and feed normally advance as one
+        // ordered pass. The Durable Object's accepted-key markers still make
+        // an overlapping admin replay or retry harmless.
         await runScheduledJob("announce", async () => {
           const height = await fetchBlockHeight();
           return announceLive(env, height);
