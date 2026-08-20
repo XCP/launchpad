@@ -352,11 +352,12 @@ export default function DocsPage() {
         </p>
         <p className="text-sm text-gray-700">
           One integration trap worth knowing:{" "}
-          <code className="rounded bg-gray-100 px-1">pool_quantity</code> and{" "}
-          <code className="rounded bg-gray-100 px-1">max_mint_per_address</code>{" "}
-          have <strong>no <code className="rounded bg-gray-100 px-1">_normalized</code> siblings</strong>{" "}
-          in the API. Do all standard math in raw integer satoshi units
-          (×10⁸) and divide by 10⁸ only for display.
+          Counterparty Core 11.3+ returns{" "}
+          <code className="rounded bg-gray-100 px-1">pool_quantity_normalized</code> and{" "}
+          <code className="rounded bg-gray-100 px-1">max_mint_per_address_normalized</code>{" "}
+          under <code className="rounded bg-gray-100 px-1">verbose=true</code>. Use them for
+          display, but keep standard conformance math in raw integer satoshi units (×10⁸) so
+          comparisons remain exact and match non-verbose event and mempool data.
         </p>
       </section>
 

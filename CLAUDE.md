@@ -12,8 +12,10 @@ progress, wallet composes — that traffic is free and stays in the browser.
   equality on the standard's raw values, never ranges. Change it only when
   docs/xcp-69.md changes. `apps/api` must derive the same verdict from the
   same predicate, never a re-implementation.
-- All standard math is done in raw integer satoshi units. `pool_quantity` and
-  `max_mint_per_address` have no `_normalized` API fields — never assume one.
+- All standard math is done in raw integer satoshi units. Counterparty Core 11.3+
+  adds `_normalized` companions for `pool_quantity` and `max_mint_per_address`
+  under `verbose=true`, but conformance and indexing stay raw for exact integer
+  comparison and for event/mempool responses that are not verbose.
 - `earned_quantity` / `paid_quantity` / `commission` come back `null` for
   fairminters with no mints; guard before arithmetic (the old xcp.fun rendered
   NaN from this).

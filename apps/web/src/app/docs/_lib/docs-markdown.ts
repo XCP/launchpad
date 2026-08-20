@@ -86,9 +86,10 @@ asset-name registration fee, and the protocol's pooldeposit gas fee
   counterparty-core node).
 - **Messages:** launches are \`fairminter\` (ID 90) with \`pool_quantity\` and
   \`lp_asset\` set; mints are \`fairmint\` (ID 91) in whole-lot multiples.
-- **Raw units:** all standard math is raw integer satoshis (×10⁸);
-  \`pool_quantity\` and \`max_mint_per_address\` have NO \`_normalized\`
-  siblings in the API.
+- **Raw units:** all standard math is raw integer satoshis (×10⁸). Core 11.3+
+  also returns \`pool_quantity_normalized\` and
+  \`max_mint_per_address_normalized\` under \`verbose=true\`; those are for
+  display, while exact conformance and event/mempool ingestion stay raw.
 
 ### Composing a launch
 

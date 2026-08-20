@@ -57,8 +57,10 @@ XCP-69.
 | Description lock | locked at close | `lock_description: true` |
 | Payment | XCP payment (never burn) | `burn_payment: false` |
 
-Raw values are satoshi units (×10⁸). `pool_quantity` and `max_mint_per_address`
-have no `_normalized` form in the API — divide by 10⁸ for display.
+Raw values are satoshi units (×10⁸). Counterparty Core 11.3+ also returns
+`pool_quantity_normalized` and `max_mint_per_address_normalized` under
+`verbose=true`. Use those companions for display, while retaining raw values for
+exact conformance checks and non-verbose event or mempool responses.
 
 **House style vs. conformance.** Two fields are deliberately NOT part of the
 standard, so other platforms can launch strictly-conforming XCP-69 without

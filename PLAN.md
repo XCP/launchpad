@@ -59,9 +59,10 @@ def is_xcp69(fm):  # raw integer fields; do NOT use *_normalized here
 Notes: core has **no** standard marker — this predicate is the standard's enforcement.
 The commission clause is the one naive checks miss (protocol allows up to 99% skim per
 mint; it's a premine with extra steps). Measure the 1% cap against `soft_cap`, not
-`hard_cap` (hard cap includes the unmintable pool reserve). `pool_quantity` and
-`max_mint_per_address` have **no `_normalized` siblings** — divide by 1e8 manually for
-display only. Belt-and-braces: asset's first issuance must have
+`hard_cap` (hard cap includes the unmintable pool reserve). Counterparty Core 11.3+
+adds `_normalized` siblings for `pool_quantity` and `max_mint_per_address` under
+`verbose=true`; keep conformance math in raw integers and use normalized values only
+for display. Belt-and-braces: asset's first issuance must have
 `asset_events == "open_fairminter"`. Render `lock_quantity` as *intent* until close
 ("supply locks at launch"), since `locked` is only written by `close_fairminter()`.
 

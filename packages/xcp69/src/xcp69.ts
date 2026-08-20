@@ -2,8 +2,9 @@
  * XCP-69: the one launch standard this site surfaces. See docs/xcp-69.md.
  *
  * All quantities are raw integer satoshi units (×1e8) exactly as the
- * Counterparty API returns them. `pool_quantity` and `max_mint_per_address`
- * have no `_normalized` siblings in the API, so all standard math stays raw.
+ * Counterparty API returns them. Core 11.3+ also exposes normalized display
+ * companions under `verbose=true`, but standard math stays raw so conformance
+ * comparisons remain exact and event/mempool ingestion uses the same shape.
  */
 
 import { big, type Raw, ratio, rawEquals } from "./numeric";
