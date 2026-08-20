@@ -8,6 +8,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 
 const CHROME_STORE_URL =
   "https://chromewebstore.google.com/detail/xcp-wallet/nicpjdbehgcjbjfjkobcidnfmfpijohg";
+const PHONE_WIDTH = "(max-width: 639px)";
 
 /**
  * The connect click and its install-prompt modal, shared by every trigger
@@ -20,16 +21,17 @@ export function useConnectAction(): { status: ReturnType<typeof useWallet>["stat
   const { status, connect } = useWallet();
   const [installOpen, setInstallOpen] = useState(false);
   const [desktopOnlyOpen, setDesktopOnlyOpen] = useState(false);
-  // The wallet is a browser extension, so "not detected" on a phone is not a
-  // missing install — it is a thing that cannot be installed there. Sending
-  // someone to the Chrome Web Store from a phone is a dead end, so that case
-  // gets an explanation instead of a link.
+  // A coarse pointer alone does not mean "phone": iPads, touch laptops and
+  // desktop-class tablet setups all report one. Only intercept the genuinely
+  // phone-sized case; larger screens get the ordinary install link and let
+  // their browser/store make the capability decision itself.
   const coarse = useCoarsePointer();
-  const cannotInstall = status === "not_detected" && coarse;
   return {
     status,
     onClick: () =>
-      cannotInstall
+      status === "not_detected" &&
+      coarse &&
+      window.matchMedia(PHONE_WIDTH).matches
         ? setDesktopOnlyOpen(true)
         : status === "not_detected"
           ? setInstallOpen(true)
