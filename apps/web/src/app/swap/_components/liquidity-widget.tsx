@@ -32,6 +32,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchBalance, fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { useSwapSettings } from "@/app/swap/_components/swap-settings";
+import { defaultTradeAsset } from "@/lib/trade-selection";
 
 /** Pool tx size for the TX-fee estimate; true size known after compose. */
 const POOL_VBYTES = 250;
@@ -79,7 +80,7 @@ export function LiquidityWidget({
 }) {
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
-  const [asset, setAsset] = useState(assets[0] ?? "");
+  const [asset, setAsset] = useState(() => defaultTradeAsset(assets));
   const [tab, setTab] = useState<"add" | "remove">("add");
   // Bidirectional add: edit either leg and the other derives at the pool
   // ratio — consensus clamps every deposit to the current ratio, so you

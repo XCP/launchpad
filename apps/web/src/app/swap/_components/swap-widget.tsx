@@ -39,6 +39,7 @@ import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { useSwapSettings } from "@/app/swap/_components/swap-settings";
+import { defaultTradeAsset } from "@/lib/trade-selection";
 
 /** Typical composed order size (1–2 inputs, OP_RETURN, change) for the
  *  TX-fee estimate; the true size is known only after compose. */
@@ -70,7 +71,7 @@ export function SwapWidget({
 }) {
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
-  const [asset, setAsset] = useState(assets[0] ?? "");
+  const [asset, setAsset] = useState(() => defaultTradeAsset(assets));
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);

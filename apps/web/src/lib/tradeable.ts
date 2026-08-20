@@ -5,6 +5,7 @@ import {
 } from "@/lib/api/counterparty";
 import { big, compareRawDesc, type Raw } from "@/lib/numeric";
 import { isXcp69, windowIsExact, xcp69Params } from "@/lib/xcp69";
+import { orderTradeAssets } from "@/lib/trade-selection";
 
 /**
  * The house pools beside the graduates: PEPECASH (the classic) and MINTS
@@ -52,5 +53,5 @@ export async function fetchTradeableAssets(): Promise<string[]> {
       ),
     )
   ).filter((a): a is string => a !== null);
-  return [...graduates, ...specials];
+  return orderTradeAssets([...graduates, ...specials]);
 }

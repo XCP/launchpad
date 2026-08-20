@@ -6,7 +6,6 @@ import { TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { fetchBalance } from "@/lib/client";
 import { commasRaw } from "@/lib/format";
-import { compareRawDesc } from "@/lib/numeric";
 
 async function fetchBalances(
   address: string,
@@ -26,7 +25,8 @@ async function fetchBalances(
 
 /**
  * The token selector every swap UI ships: a modal (never a dropdown) with
- * search, 56px rows, balances right-aligned, sorted holdings-first.
+ * search, 56px rows, and balances right-aligned. Row order is supplied by
+ * the market list and never changes underneath an open pointer.
  * Radix Dialog supplies focus trap, Escape, and scroll lock; content
  * unmounts on close so the search resets.
  */
@@ -86,12 +86,9 @@ function ModalBody({
   );
 
   const q = query.trim().toUpperCase();
-  const filtered = assets.filter((a) => a.toUpperCase().includes(q));
-  // Holdings first. Not `b - a`: two balances that differ by less than the gap
-  // between doubles at their magnitude would subtract to zero and sort as tied.
-  const sorted = [...filtered].sort((a, b) =>
-    compareRawDesc(balances?.[a] ?? 0n, balances?.[b] ?? 0n),
-  );
+  // Stable on purpose. Balances arrive after the modal opens; using them as a
+  // sort key made every row jump just as someone was about to select it.
+  const shown = assets.filter((a) => a.toUpperCase().includes(q));
 
   return (
     <>
@@ -104,14 +101,14 @@ function ModalBody({
         spellCheck={false}
         className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-purple-400 focus:bg-white"
         onKeyDown={(e) => {
-          if (e.key === "Enter" && sorted.length === 1) onPick(sorted[0]);
+          if (e.key === "Enter" && shown.length === 1) onPick(shown[0]);
         }}
       />
       <div className="mt-2 max-h-[45vh] overflow-y-auto">
-        {sorted.length === 0 ? (
+        {shown.length === 0 ? (
           <p className="p-4 text-center text-sm text-gray-400">No matches</p>
         ) : (
-          sorted.map((a) => {
+          shown.map((a) => {
             const bal = balances?.[a];
             return (
               <button

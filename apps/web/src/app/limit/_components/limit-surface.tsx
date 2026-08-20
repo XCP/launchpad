@@ -9,6 +9,7 @@ import {
 import { TokenSelectModal } from "@/components/token-select-modal";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { defaultTradeAsset } from "@/lib/trade-selection";
 
 /** The limit page: Buy | Sell in the tab row (its gear beside them), the
  *  order form below. Same silhouette as /swap. */
@@ -21,7 +22,7 @@ export function LimitSurface({
 }) {
   const { address } = useWallet();
   const [side, setSide] = useState<"buy" | "sell">("buy");
-  const [asset, setAsset] = useState(assets[0] ?? "");
+  const [asset, setAsset] = useState(() => defaultTradeAsset(assets));
   const [selectorOpen, setSelectorOpen] = useState(false);
   return (
     <SwapSettingsProvider>
