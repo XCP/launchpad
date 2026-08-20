@@ -4,6 +4,7 @@
  */
 import { parseJsonLossless } from "@launchpad/xcp69/numeric";
 import type { MempoolMint, MempoolOrder } from "@launchpad/xcp69/mempool";
+import type { CounterpartyEvent } from "@launchpad/xcp69/trades";
 
 const BASE = "https://api.counterparty.io:4000/v2";
 
@@ -36,12 +37,16 @@ export interface CpFairminter {
   burn_payment: boolean;
   max_mint_per_tx: number | string;
   max_mint_per_address: number | string | null;
+  /** Core 11.3+ display companion; raw value above remains the indexed source of truth. */
+  max_mint_per_address_normalized?: string | null;
   premint_quantity: number | string;
   minted_asset_commission_int: number | string | null;
   lock_description: boolean;
   lock_quantity: boolean;
   divisible: boolean;
   pool_quantity: number | string | null;
+  /** Core 11.3+ display companion; intentionally not persisted for conformance math. */
+  pool_quantity_normalized?: string | null;
   lp_asset: string | null;
   status: string;
   earned_quantity: number | string | null;
@@ -261,9 +266,12 @@ export async function fetchPool(asset: string): Promise<CpPool | null> {
  *  one row, which is what makes this cheap: the XCP amount never has to be
  *  chased through a separate, chain-wide feed. */
 export interface CpMatch {
+  [key: string]: unknown;
   id?: string;
   tx_hash?: string;
+  tx_index?: number;
   tx1_hash?: string;
+  tx1_index?: number;
   block_index: number;
   /** Pool match: the trader. The pool itself is the counterparty. */
   source?: string;
@@ -273,6 +281,7 @@ export interface CpMatch {
   tx0_address?: string;
   forward_asset: string;
   forward_quantity: number | string;
+  backward_asset: string;
   backward_quantity: number | string;
   /** Real Unix seconds — the bucket a candle folds this fill into. */
   block_time?: number;
@@ -319,4 +328,14 @@ export function fetchOrderMatches(asset: string, sinceBlock: number): Promise<Cp
     `/orders/${encodeURIComponent(asset)}/XCP/matches?status=completed&verbose=true`,
     sinceBlock,
   );
+}
+
+/** Exact message order for the rare transaction that crosses more than one
+ * venue or price level. Match listings omit event_index, so callers only use
+ * this immutable transaction-local list when a transaction is ambiguous. */
+export async function fetchTransactionEvents(txHash: string): Promise<CounterpartyEvent[]> {
+  const data: { result: CounterpartyEvent[] } = await get(
+    `/transactions/${encodeURIComponent(txHash)}/events?limit=1000`,
+  );
+  return data.result ?? [];
 }

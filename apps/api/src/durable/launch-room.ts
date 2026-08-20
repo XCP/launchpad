@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import { compareRawDesc, sumRaw } from "@launchpad/xcp69/numeric";
+import { mergePairTrades } from "@launchpad/xcp69/trades";
 import type { Env } from "#api/env";
 import { fetchFairminter } from "#api/integrations/counterparty";
 
@@ -365,39 +366,21 @@ export class LaunchRoom extends DurableObject<Env> {
       grab(`/orders/${encoded}/XCP/matches?verbose=true&status=completed&limit=${MAX_TRADES}`),
     ]);
 
-    const shape = (
-      r: Record<string, unknown>,
-      venue: "pool" | "book",
-    ): RoomTrade | null => {
-      const forwardIsToken = r.forward_asset === asset;
-      const token = String(forwardIsToken ? r.forward_quantity : r.backward_quantity);
-      const xcp = String(forwardIsToken ? r.backward_quantity : r.forward_quantity);
-      const address = String(
-        (venue === "pool" ? r.source : r.tx1_address) ?? "",
-      );
-      const txHash = String(r.tx_hash ?? r.tx1_hash ?? r.id ?? "");
-      if (!txHash) return null;
-      return {
-        key: `${venue}-${txHash}-${asset}`,
-        block: Number(r.block_index) || 0,
-        time: Number(r.block_time) || 0,
-        buy: forwardIsToken,
-        token_quantity: token,
-        xcp_quantity: xcp,
-        address,
-        venue,
-        tx_hash: txHash,
-      };
-    };
-
-    return [
-      ...poolRows
-        .filter((r) => r.status === "valid")
-        .map((r) => shape(r, "pool")),
-      ...bookRows.map((r) => shape(r, "book")),
-    ]
-      .filter((t): t is RoomTrade => t !== null)
-      .sort((a, b) => b.block - a.block || b.time - a.time)
+    const trades = await mergePairTrades(asset, poolRows, bookRows, async (txHash) =>
+      grab(`/transactions/${encodeURIComponent(txHash)}/events?limit=1000`),
+    );
+    return trades
+      .map((trade) => ({
+        key: trade.key,
+        block: trade.block,
+        time: trade.time,
+        buy: trade.buy,
+        token_quantity: trade.tokenQuantity,
+        xcp_quantity: trade.xcpQuantity,
+        address: trade.address,
+        venue: trade.venue,
+        tx_hash: trade.txHash,
+      }))
       .slice(0, MAX_TRADES);
   }
 

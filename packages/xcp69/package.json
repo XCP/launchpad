@@ -7,6 +7,7 @@
     "./xcp69": "./src/xcp69.ts",
     "./numeric": "./src/numeric.ts",
     "./candles": "./src/candles.ts",
-    "./mempool": "./src/mempool.ts"
+    "./mempool": "./src/mempool.ts",
+    "./trades": "./src/trades.ts"
   }
 }

@@ -20,6 +20,7 @@ import {
   toSectionRow,
 } from "@/lib/launch-row";
 import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xcp69";
+import { ratio } from "@/lib/numeric";
 
 type View = "grid" | "table";
 
@@ -907,6 +908,18 @@ function Card({
 }) {
   const { fm, phase, conforming } = row;
   const deadline = fm.soft_cap_deadline_block || fm.end_block;
+  const launchPriceXcp = ratio(fm.price, fm.quantity_by_price);
+  const performance =
+    phase === "graduated" && row.priceXcp > 0 && launchPriceXcp > 0
+      ? ((row.priceXcp / launchPriceXcp) - 1) * 100
+      : null;
+  const performanceLabel =
+    performance !== null && Number.isFinite(performance)
+      ? `${performance > 0 ? "+" : ""}${performance.toLocaleString("en-US", {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 1,
+        })}%`
+      : null;
 
   const chip =
     phase === "graduated" ? (
@@ -1080,6 +1093,13 @@ function Card({
               >
                 <span aria-hidden>👑</span> {mintedAgo}
               </span>
+            </Chip>
+          </div>
+        )}
+        {performanceLabel && (
+          <div className="absolute right-2 top-2">
+            <Chip tone={performance !== null && performance >= 0 ? "green" : "dark"}>
+              <span title="Performance">{performanceLabel}</span>
             </Chip>
           </div>
         )}

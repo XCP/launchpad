@@ -360,13 +360,25 @@ export interface TradeFacts {
   txHash?: string | null;
   /** Trader whose indexed balance leg this alert represents. */
   address?: string | null;
+  /** One taker transaction can cross several pool/book price levels. */
+  fills?: number;
+  /** Final fill, used for post-trade market cap rather than average entry. */
+  marketTokenRaw?: bigint;
+  marketXcpRaw?: bigint;
 }
 
 export function trade(f: TradeFacts): Announcement {
   const priceRaw = f.tokenRaw > 0n ? (f.xcpRaw * 100_000_000n) / f.tokenRaw : 0n;
+  const marketTokenRaw = f.marketTokenRaw ?? f.tokenRaw;
+  const marketXcpRaw = f.marketXcpRaw ?? f.xcpRaw;
   // Every graduated XCP-69 asset has exactly 100M issued tokens. Multiplying
   // the execution price by that fixed supply makes this market cap, not FDV.
-  const marketCapRaw = f.tokenRaw > 0n ? (f.xcpRaw * XCP69_EXACT.HARD_CAP) / f.tokenRaw : 0n;
+  const marketCapRaw =
+    marketTokenRaw > 0n ? (marketXcpRaw * XCP69_EXACT.HARD_CAP) / marketTokenRaw : 0n;
+  const marketPriceRaw =
+    marketTokenRaw > 0n ? (marketXcpRaw * 100_000_000n) / marketTokenRaw : 0n;
+  const launchPriceRaw =
+    (XCP69_EXACT.PRICE * 100_000_000n) / XCP69_EXACT.QUANTITY_BY_PRICE;
   const price = formatExact(rawToDecimalString(priceRaw, 8), {
     minimumFractionDigits: 8,
     maximumFractionDigits: 8,
@@ -397,12 +409,26 @@ export function trade(f: TradeFacts): Announcement {
     [
       sizeBar(f.buy ? BUY_EMOJI : SELL_EMOJI, f.tokenRaw, TRADE_PAIR_CAP),
       `${assetLink(f.asset)} ${f.buy ? "bought" : "sold"}`,
-      `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP`,
-      `${price} XCP/token${usdTotal}`,
+      `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP${(f.fills ?? 1) > 1 ? ` filled · ${f.fills} fills` : ""}`,
+      `${(f.fills ?? 1) > 1 ? "Avg " : ""}${price} XCP/token${usdTotal}`,
       `MCap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
+      `Performance: ${performance(marketPriceRaw, launchPriceRaw)}`,
       links,
     ].join("\n"),
   );
+}
+
+function performance(priceRaw: bigint, launchPriceRaw: bigint): string {
+  if (launchPriceRaw <= 0n) return "—";
+  const delta = priceRaw - launchPriceRaw;
+  const magnitude = delta < 0n ? -delta : delta;
+  // Tenths of a percent, rounded rather than truncated. Kept in bigint so a
+  // large pool ratio never takes a precision detour through Number.
+  const tenths = (magnitude * 1_000n + launchPriceRaw / 2n) / launchPriceRaw;
+  const whole = tenths / 10n;
+  const decimal = tenths % 10n;
+  const sign = delta > 0n ? "+" : delta < 0n ? "−" : "";
+  return `${sign}${whole}.${decimal}%`;
 }
 
 function percent(part: bigint, whole: bigint): number {

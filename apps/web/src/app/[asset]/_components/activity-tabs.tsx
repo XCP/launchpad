@@ -25,6 +25,7 @@ import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
 import { AddressHoverCard } from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
+import { mergePairTrades } from "@launchpad/xcp69/trades";
 
 const PER_PAGE = 25;
 
@@ -159,56 +160,33 @@ export function ActivityTabs({
     async () => {
       const [pm, om] = await Promise.all([
         fetchJson(
-          `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/matches?limit=250`,
+          `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/matches?verbose=true&limit=250`,
         ).catch(() => ({ result: [] })),
         fetchJson(
-          `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP/matches?status=completed&limit=250`,
+          `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP/matches?verbose=true&status=completed&limit=250`,
         ).catch(() => ({ result: [] })),
       ]);
-      const poolRows: TradeRow[] = (pm.result ?? []).map(
-        (r: {
-          tx_hash: string;
-          block_index: number;
-          source: string;
-          forward_asset: string;
-          forward_quantity: Raw;
-          backward_quantity: Raw;
-        }) => ({
-          key: `p-${r.tx_hash}`,
-          block: r.block_index,
-          buy: r.forward_asset === asset,
-          tokenRaw:
-            r.forward_asset === asset ? r.forward_quantity : r.backward_quantity,
-          xcpRaw:
-            r.forward_asset === asset ? r.backward_quantity : r.forward_quantity,
-          addr: r.source,
-          via: "pool" as const,
-          txHash: r.tx_hash,
-        }),
+      const merged = await mergePairTrades(
+        asset,
+        pm.result ?? [],
+        om.result ?? [],
+        async (txHash) =>
+          (
+            await fetchJson(
+              `${COUNTERPARTY_API_BASE}/transactions/${txHash}/events?limit=1000`,
+            )
+          ).result ?? [],
       );
-      const bookRows: TradeRow[] = (om.result ?? []).map(
-        (r: {
-          id: string;
-          tx1_hash: string;
-          tx1_address: string;
-          block_index: number;
-          forward_asset: string;
-          forward_quantity: Raw;
-          backward_quantity: Raw;
-        }) => ({
-          key: `o-${r.id}`,
-          block: r.block_index,
-          buy: r.forward_asset === asset,
-          tokenRaw:
-            r.forward_asset === asset ? r.forward_quantity : r.backward_quantity,
-          xcpRaw:
-            r.forward_asset === asset ? r.backward_quantity : r.forward_quantity,
-          addr: r.tx1_address,
-          via: "book" as const,
-          txHash: r.tx1_hash,
-        }),
-      );
-      return [...poolRows, ...bookRows].sort((a, b) => b.block - a.block);
+      return merged.map((trade) => ({
+        key: trade.key,
+        block: trade.block,
+        buy: trade.buy,
+        tokenRaw: trade.tokenQuantity,
+        xcpRaw: trade.xcpQuantity,
+        addr: trade.address,
+        via: trade.venue,
+        txHash: trade.txHash,
+      }));
     },
     { refreshInterval: 30_000 },
   );

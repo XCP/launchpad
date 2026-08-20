@@ -74,12 +74,29 @@ interface MintRow {
 
 interface TradeRow {
   event: string;
+  tx_hash: string;
+  event_index: number | null;
   address: string;
   asset: string;
   block_index: number;
   token_delta: string;
   xcp_delta: string;
   kind: string;
+}
+
+interface TradeGroup {
+  txHash: string;
+  address: string;
+  asset: string;
+  block: number;
+  kind: string;
+  tokenRaw: bigint;
+  xcpRaw: bigint;
+  fills: number;
+  lastTokenRaw: bigint;
+  lastXcpRaw: bigint;
+  lastEventIndex: number;
+  venue: "pool" | "book";
 }
 
 /**
@@ -108,8 +125,12 @@ export async function buildBacklog(
     ? `AND NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'mint:' || m.tx_hash)`
     : "";
   const newTrades = unannouncedOnly
-    ? `WHERE NOT EXISTS (SELECT 1 FROM announced a WHERE a.key = 'trade:' || event)`
-    : "";
+    ? `WHERE primary_actor = 1 AND tx_hash IS NOT NULL
+         AND NOT EXISTS (
+           SELECT 1 FROM announced a
+            WHERE a.key = 'trade-tx:' || asset_events.tx_hash || ':' || asset_events.asset
+         )`
+    : "WHERE primary_actor = 1 AND tx_hash IS NOT NULL";
 
   const [launches, mints, trades] = await Promise.all([
     q<LaunchRow>(
@@ -128,7 +149,8 @@ export async function buildBacklog(
     ),
     q<TradeRow>(
       db,
-      `SELECT event, address, asset, block_index, token_delta, xcp_delta, kind
+      `SELECT event, tx_hash, event_index, address, asset, block_index,
+              token_delta, xcp_delta, kind
          FROM asset_events ${newTrades}`,
     ),
   ]);
@@ -139,12 +161,6 @@ export async function buildBacklog(
   void newLaunches;
 
   const items: BacklogItem[] = [];
-  // One cached quote for the whole batch, and no request at all on the usual
-  // tick where there are no new trades to announce.
-  const xcpUsd = trades.some((t) => wholeTokens(abs(BigInt(t.token_delta))) >= MIN_TOKENS)
-    ? await fetchXcpUsd()
-    : null;
-
   for (const l of launches) {
     // announce_block is the launch's real age; start_block is a stand-in only
     // when the announcement block was never recovered.
@@ -244,25 +260,68 @@ export async function buildBacklog(
     });
   }
 
+  const groupedTrades = new Map<string, TradeGroup>();
   for (const t of trades) {
-    const tokens = abs(BigInt(t.token_delta));
-    if (wholeTokens(tokens) < MIN_TOKENS) continue;
+    const tokenRaw = abs(BigInt(t.token_delta));
+    const xcpRaw = abs(BigInt(t.xcp_delta));
+    const key = `${t.tx_hash}:${t.asset}:${t.address}:${t.kind}`;
+    const eventIndex = t.event_index ?? 0;
+    const current = groupedTrades.get(key);
+    if (!current) {
+      groupedTrades.set(key, {
+        txHash: t.tx_hash,
+        address: t.address,
+        asset: t.asset,
+        block: t.block_index,
+        kind: t.kind,
+        tokenRaw,
+        xcpRaw,
+        fills: 1,
+        lastTokenRaw: tokenRaw,
+        lastXcpRaw: xcpRaw,
+        lastEventIndex: eventIndex,
+        venue: t.event.includes("_") ? "book" : "pool",
+      });
+      continue;
+    }
+    current.tokenRaw += tokenRaw;
+    current.xcpRaw += xcpRaw;
+    current.fills += 1;
+    if (eventIndex >= current.lastEventIndex) {
+      current.lastTokenRaw = tokenRaw;
+      current.lastXcpRaw = xcpRaw;
+      current.lastEventIndex = eventIndex;
+      current.venue = t.event.includes("_") ? "book" : "pool";
+    }
+  }
+
+  // One cached quote for the whole batch, and no request at all on the usual
+  // tick where there are no qualifying transaction totals to announce.
+  const xcpUsd = [...groupedTrades.values()].some(
+    (t) => wholeTokens(t.tokenRaw) >= MIN_TOKENS,
+  )
+    ? await fetchXcpUsd()
+    : null;
+
+  for (const t of groupedTrades.values()) {
+    if (wholeTokens(t.tokenRaw) < MIN_TOKENS) continue;
     items.push({
-      key: `trade:${t.event}`,
-      block: t.block_index,
+      key: `trade-tx:${t.txHash}:${t.asset}`,
+      block: t.block,
       rank: RANK.trade,
       mint: null,
       a: trade({
         asset: t.asset,
         buy: t.kind === "buy",
-        tokenRaw: tokens,
-        xcpRaw: abs(BigInt(t.xcp_delta)),
+        tokenRaw: t.tokenRaw,
+        xcpRaw: t.xcpRaw,
+        fills: t.fills,
+        marketTokenRaw: t.lastTokenRaw,
+        marketXcpRaw: t.lastXcpRaw,
         xcpUsd,
-        txHash: eventTxHash(t.event),
+        txHash: t.txHash,
         address: t.address,
-        // asset_events does not record which venue filled it, and guessing
-        // would be worse than omitting it. Pool is the common case here.
-        venue: "pool",
+        venue: t.venue,
       }),
     });
   }
@@ -273,10 +332,12 @@ export async function buildBacklog(
 const abs = (v: bigint) => (v < 0n ? -v : v);
 const wholeTokens = (raw: bigint) => raw / 100_000_000n;
 
-/** Pool events are transaction hashes. Order matches are tx0_tx1; tx1 is the
- * fill that completed the match and therefore the useful explorer target. */
+/** Pool events begin with their transaction hash (a later fill may add its
+ * event index). Order matches are tx0_tx1; tx1 completed the match. */
 export function eventTxHash(event: string): string | null {
   if (/^[0-9a-f]{64}$/i.test(event)) return event;
+  const pool = event.match(/^([0-9a-f]{64})#/i);
+  if (pool?.[1]) return pool[1];
   const match = event.match(/^[0-9a-f]{64}_([0-9a-f]{64})$/i);
   return match?.[1] ?? null;
 }

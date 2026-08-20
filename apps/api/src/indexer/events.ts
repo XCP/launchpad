@@ -5,10 +5,12 @@ import {
   foldCandles,
   bucketIds,
 } from "@launchpad/xcp69/candles";
+import { mergePairTrades, type PairTrade } from "@launchpad/xcp69/trades";
 import { q } from "#api/db";
 import {
   fetchOrderMatches,
   fetchPoolMatches,
+  fetchTransactionEvents,
   type CpMatch,
 } from "#api/integrations/counterparty";
 
@@ -44,6 +46,12 @@ interface EventRow {
   tokenDelta: bigint;
   xcpDelta: bigint;
   kind: "buy" | "sell";
+  /** Causal transaction, shared by every venue/level the taker crossed. */
+  txHash: string;
+  /** Exact Counterparty message order; zero only on legacy/fallback rows. */
+  eventIndex: number;
+  /** Telegram announces the taker, not a second alert for the resting maker. */
+  primaryActor: boolean;
 }
 
 /**
@@ -86,6 +94,9 @@ function receives(
   tokenQty: bigint,
   xcpQty: bigint,
   gainsToken: boolean,
+  txHash: string,
+  eventIndex: number,
+  primaryActor: boolean,
 ): EventRow {
   return {
     // The asset belongs in the key: one transaction can move more than one
@@ -99,6 +110,9 @@ function receives(
     tokenDelta: gainsToken ? tokenQty : -tokenQty,
     xcpDelta: gainsToken ? -xcpQty : xcpQty,
     kind: gainsToken ? "buy" : "sell",
+    txHash,
+    eventIndex,
+    primaryActor,
   };
 }
 
@@ -110,7 +124,18 @@ export function toPoolRows(asset: string, m: CpMatch): EventRow[] {
   const l = legs(asset, m);
   if (!l) return [];
   return [
-    receives(event, m.source, asset, m.block_index, l.tokenQty, l.xcpQty, l.forwardIsToken),
+    receives(
+      event,
+      m.source,
+      asset,
+      m.block_index,
+      l.tokenQty,
+      l.xcpQty,
+      l.forwardIsToken,
+      m.tx_hash ?? event,
+      0,
+      true,
+    ),
   ];
 }
 
@@ -126,18 +151,109 @@ export function toOrderRows(asset: string, m: CpMatch): EventRow[] {
   if (!event) return [];
   const l = legs(asset, m);
   if (!l) return [];
+  const txHash = m.tx1_hash ?? m.tx_hash ?? event;
   const rows: EventRow[] = [];
   if (m.tx1_address) {
     rows.push(
-      receives(event, m.tx1_address, asset, m.block_index, l.tokenQty, l.xcpQty, l.forwardIsToken),
+      receives(
+        event,
+        m.tx1_address,
+        asset,
+        m.block_index,
+        l.tokenQty,
+        l.xcpQty,
+        l.forwardIsToken,
+        txHash,
+        0,
+        true,
+      ),
     );
   }
   if (m.tx0_address && m.tx0_address !== m.tx1_address) {
     rows.push(
-      receives(event, m.tx0_address, asset, m.block_index, l.tokenQty, l.xcpQty, !l.forwardIsToken),
+      receives(
+        event,
+        m.tx0_address,
+        asset,
+        m.block_index,
+        l.tokenQty,
+        l.xcpQty,
+        !l.forwardIsToken,
+        txHash,
+        0,
+        false,
+      ),
     );
   }
   return rows;
+}
+
+export function toIndexedRows(asset: string, trades: PairTrade[]): EventRow[] {
+  // Preserve the legacy transaction-hash identity for the first pool match.
+  // That lets a boundary-block reread add only the previously-collapsed later
+  // fills instead of duplicating the first row already in production.
+  const firstPoolFill = new Map<string, PairTrade>();
+  for (const trade of trades) {
+    if (trade.venue !== "pool") continue;
+    const first = firstPoolFill.get(trade.txHash);
+    if (
+      !first ||
+      (trade.eventIndex > 0 &&
+        (first.eventIndex === 0 || trade.eventIndex < first.eventIndex)) ||
+      (trade.eventIndex === 0 &&
+        first.eventIndex === 0 &&
+        trade.sourceOrder < first.sourceOrder)
+    ) {
+      firstPoolFill.set(trade.txHash, trade);
+    }
+  }
+
+  return trades.flatMap((trade) => {
+    const tokenQty = rawInt(trade.tokenQuantity);
+    const xcpQty = rawInt(trade.xcpQuantity);
+    if (tokenQty === null || xcpQty === null || !trade.address) return [];
+    const event =
+      trade.venue === "book" && trade.matchId
+        ? trade.matchId
+        : firstPoolFill.get(trade.txHash) === trade
+          ? trade.txHash
+          : `${trade.txHash}#${trade.eventIndex || trade.key}`;
+    const rows = [
+      receives(
+        event,
+        trade.address,
+        asset,
+        trade.block,
+        tokenQty,
+        xcpQty,
+        trade.buy,
+        trade.txHash,
+        trade.eventIndex,
+        true,
+      ),
+    ];
+    if (
+      trade.venue === "book" &&
+      trade.counterpartyAddress &&
+      trade.counterpartyAddress !== trade.address
+    ) {
+      rows.push(
+        receives(
+          event,
+          trade.counterpartyAddress,
+          asset,
+          trade.block,
+          tokenQty,
+          xcpQty,
+          !trade.buy,
+          trade.txHash,
+          trade.eventIndex,
+          false,
+        ),
+      );
+    }
+    return rows;
+  });
 }
 
 /** D1 caps how much one batch can carry, and a first-run backfill can produce
@@ -205,10 +321,13 @@ export async function syncAssetEvents(
       fetchOrderMatches(target.asset, sinceBlock),
     ]);
 
-    const rows = [
-      ...poolMatches.flatMap((m) => toPoolRows(target.asset, m)),
-      ...orderMatches.flatMap((m) => toOrderRows(target.asset, m)),
-    ];
+    const mergedTrades = await mergePairTrades(
+      target.asset,
+      poolMatches,
+      orderMatches,
+      fetchTransactionEvents,
+    );
+    const rows = toIndexedRows(target.asset, mergedTrades);
 
     // Same fills, folded a second way. A pool match has one trader and a book
     // match has two, but as a PRICE each is exactly one fill — so candles come
@@ -235,8 +354,9 @@ export async function syncAssetEvents(
       const chunk = rows.slice(i, i + INSERT_CHUNK);
       const stmt = db.prepare(
         `INSERT OR IGNORE INTO asset_events
-           (id, event, address, asset, block_index, token_delta, xcp_delta, kind)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)`,
+           (id, event, address, asset, block_index, token_delta, xcp_delta, kind,
+            tx_hash, event_index, primary_actor)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`,
       );
       const results = await db.batch(
         chunk.map((r) =>
@@ -249,6 +369,9 @@ export async function syncAssetEvents(
             r.tokenDelta.toString(),
             r.xcpDelta.toString(),
             r.kind,
+            r.txHash,
+            r.eventIndex || null,
+            r.primaryActor ? 1 : 0,
           ),
         ),
       );

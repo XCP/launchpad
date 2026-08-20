@@ -201,6 +201,7 @@ describe("trade transaction links", () => {
     const tx0 = "12".repeat(32);
     const tx1 = "34".repeat(32);
     expect(eventTxHash(tx0)).toBe(tx0);
+    expect(eventTxHash(`${tx0}#20449811`)).toBe(tx0);
     expect(eventTxHash(`${tx0}_${tx1}`)).toBe(tx1);
     expect(eventTxHash("not-a-transaction")).toBeNull();
   });
@@ -292,6 +293,25 @@ describe("the trade bar's visual ceiling", () => {
       venue: "pool",
     });
     expect(m.text.match(new RegExp(BUY_EMOJI, "gu"))).toHaveLength(60);
+  });
+});
+
+describe("multi-fill trade messages", () => {
+  it("shows one filled total, an average price, and market cap at the final fill", () => {
+    const m = trade({
+      asset: "CAPTAINDAN",
+      buy: true,
+      tokenRaw: 299_119_856_059_935n,
+      xcpRaw: 12_097_813_359n,
+      fills: 3,
+      marketTokenRaw: 16_107_043_441_048n,
+      marketXcpRaw: 730_187_677n,
+      venue: "pool",
+    });
+    expect(m.text).toContain("2,991,199 tokens · 120.98 XCP filled · 3 fills");
+    expect(m.text).toContain("Avg 0.00004044 XCP/token");
+    expect(m.text).toContain("MCap: 4,533.34 XCP");
+    expect(m.text).toContain("Performance: +353.3%");
   });
 });
 
