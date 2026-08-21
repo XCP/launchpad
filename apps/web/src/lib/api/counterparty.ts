@@ -465,6 +465,9 @@ interface OrderMatch {
   /** The order that came in and matched — the aggressor, and the side whose
    *  direction a buy/sell figure means. */
   tx1_address: string;
+  /** The resting order the aggressor hit. A real trader with a real position
+   *  on the opposite side of the same fill. */
+  tx0_address?: string;
   /** What tx1 RECEIVES (messages/order.py sets this from tx1's get_asset). */
   forward_asset: string;
   forward_quantity: Raw;
@@ -654,6 +657,10 @@ export async function fetchPairActivity(
     soldTokens: boolean,
     xcpLeg: bigint,
     at: number,
+    // A book fill's resting side. Counted as a trader on the opposite
+    // direction — the maker whose sell the taker's buy crossed really did
+    // sell — but never into the trade/volume tallies, which count fills.
+    maker?: string,
   ) => {
     const targets: Tally[] = [windows.all];
     if (at >= monthCutoff) targets.push(windows["30d"]);
@@ -665,10 +672,12 @@ export async function fetchPairActivity(
         t.sells++;
         t.sellVol += xcpLeg;
         if (taker) t.sellers.add(taker);
+        if (maker) t.buyers.add(maker);
       } else {
         t.buys++;
         t.buyVol += xcpLeg;
         if (taker) t.buyers.add(taker);
+        if (maker) t.sellers.add(maker);
       }
     }
   };
@@ -717,6 +726,7 @@ export async function fetchPairActivity(
           sold,
           big(sold ? m.forward_quantity : m.backward_quantity),
           m.block_time,
+          m.tx0_address !== m.tx1_address ? m.tx0_address : undefined,
         );
       },
     ),
