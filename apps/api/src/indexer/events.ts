@@ -344,10 +344,21 @@ export async function syncAssetEvents(
 
     const sinceBlock = firstRun ? 0 : known;
 
-    const [poolMatches, orderMatches] = await Promise.all([
-      fetchPoolMatches(target.asset, sinceBlock),
-      fetchOrderMatches(target.asset, sinceBlock),
-    ]);
+    // Both feeds or neither. fetchMatches throws on a failed or truncated
+    // walk, and one venue's fills must never advance a cursor shared with a
+    // venue that didn't answer — that strands the silent venue's fills behind
+    // a watermark nothing will ever look under. Skipping writes nothing, so
+    // the next tick retries the whole window from the same place.
+    let poolMatches: CpMatch[];
+    let orderMatches: CpMatch[];
+    try {
+      [poolMatches, orderMatches] = await Promise.all([
+        fetchPoolMatches(target.asset, sinceBlock),
+        fetchOrderMatches(target.asset, sinceBlock),
+      ]);
+    } catch {
+      continue;
+    }
 
     const mergedTrades = await mergePairTrades(
       target.asset,
@@ -409,7 +420,16 @@ export async function syncAssetEvents(
     // Always advance the cursor, even when nothing was found. Without this an
     // asset that has never traded would look like a first run forever and
     // re-read both feeds on every single tick.
-    const seen = rows.reduce((max, r) => (r.block > max ? r.block : max), sinceBlock);
+    //
+    // The watermark comes from the MATCHES, not the converted rows: both
+    // feeds were fully read through this block (a failure skipped the asset
+    // above), so it is honest even when a malformed row was dropped — where
+    // a rows-based watermark would stall on that row and re-read the same
+    // window every tick forever.
+    const seen = [...poolMatches, ...orderMatches].reduce(
+      (max, m) => (m.block_index > max ? m.block_index : max),
+      sinceBlock,
+    );
     const next = Math.min(Math.max(seen, sinceBlock), height);
     if (next !== known) {
       await db

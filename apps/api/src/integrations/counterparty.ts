@@ -296,27 +296,38 @@ export interface CpMatch {
  * page and nothing else. `>=` rather than `>`: several fills can share the
  * boundary block, and the caller's INSERT OR IGNORE makes re-reading that one
  * block free.
+ *
+ * A mid-walk failure THROWS rather than returning what it had. This used to
+ * `break` — which handed the caller a partial list indistinguishable from a
+ * complete one, and the caller's high-water cursor then advanced past fills
+ * the failed feed never delivered. Those fills became permanently
+ * unreachable: the book probe only fires on strictly-newer matches, and the
+ * candle fold's lastBlock guard would drop them even after a manual cursor
+ * reset. An error must look like an error. The page cap exists only as a
+ * runaway bound — far above any real pair's history — and hitting it is the
+ * same lie a failed page was, so it throws too.
  */
+const MAX_MATCH_PAGES = 200;
+
 async function fetchMatches(path: string, sinceBlock: number): Promise<CpMatch[]> {
   const rows: CpMatch[] = [];
   let cursor: number | null = null;
-  for (let page = 0; page < 20; page++) {
+  for (let page = 0; page < MAX_MATCH_PAGES; page++) {
     const qs = cursor ? `&cursor=${cursor}` : "";
-    let data: { result: CpMatch[]; next_cursor: number | null };
-    try {
-      data = await get(`${path}${path.includes("?") ? "&" : "?"}limit=500${qs}`);
-    } catch {
-      break;
-    }
+    const data: { result: CpMatch[]; next_cursor: number | null } = await get(
+      `${path}${path.includes("?") ? "&" : "?"}limit=500${qs}`,
+    );
     rows.push(...data.result);
     // Descending order means the oldest row on this page bounds the page: once
     // it is at or below what we already have, nothing older can be new.
     const oldest = data.result[data.result.length - 1];
-    if (!oldest || oldest.block_index < sinceBlock) break;
+    if (!oldest || oldest.block_index < sinceBlock) {
+      return rows.filter((r) => r.block_index >= sinceBlock);
+    }
     cursor = data.next_cursor;
-    if (!cursor) break;
+    if (!cursor) return rows.filter((r) => r.block_index >= sinceBlock);
   }
-  return rows.filter((r) => r.block_index >= sinceBlock);
+  throw new Error(`match feed truncated after ${MAX_MATCH_PAGES} pages: ${path}`);
 }
 
 export function fetchPoolMatches(asset: string, sinceBlock: number): Promise<CpMatch[]> {
