@@ -36,6 +36,20 @@ const RANGES: {
   { id: "all", label: "All", seconds: Number.POSITIVE_INFINITY, resolution: "1d" },
 ];
 
+/**
+ * Smallest range that still covers the whole trading history: a pair that has
+ * traded for a day opens on 24H, a week on 7D, a month on 30D, and only
+ * older ones on All. Measured candle-to-candle rather than against the clock,
+ * because the visible window is anchored at the newest candle too — and a
+ * wall-clock read would render differently on server and client.
+ */
+function defaultRange(candles: Record<ChartResolution, ChartCandle[]>): ChartRange {
+  const source = candles["1d"].length > 0 ? candles["1d"] : candles["1h"];
+  if (source.length === 0) return "all";
+  const span = source[source.length - 1]!.time - source[0]!.time;
+  return RANGES.find((r) => span <= r.seconds)!.id;
+}
+
 export interface DevTrade {
   block: number;
   kind: "buy" | "sell";
@@ -90,7 +104,7 @@ export function PriceChart({
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Plotted | null>(null);
-  const [range, setRange] = useState<ChartRange>("all");
+  const [range, setRange] = useState<ChartRange>(() => defaultRange(candles));
   // Daily XCP/USD. Every candle carries a real bucket time, so each one is
   // priced at the rate of its OWN day — multiplying the whole series by
   // today's rate would draw a dollar curve that never happened.
