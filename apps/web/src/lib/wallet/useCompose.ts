@@ -55,10 +55,21 @@ function normalizeCoreError(raw: unknown): string {
  * catch-all. friendlyError still logs, so nothing stops being debuggable.
  */
 function composeError(e: unknown): string {
-  const friendly = friendlyError(e)
-  if (friendly !== GENERIC_ERROR) return friendly
-
   const raw = (e instanceof Error ? e.message : String(e)).trim()
+
+  // Preserve which balance is actually short. The shared wallet formatter's
+  // generic `insufficient` branch used to flatten all three of these into
+  // "Insufficient balance", sending users to refresh tokens when Core was
+  // really asking for XCP or BTC.
+  if (/rate limit|too many requests|(?:API error|HTTP)[: ]+429/i.test(raw)) {
+    return 'Counterparty API is busy — wait a moment and try again.'
+  }
+  if (/insufficient XCP balance to pay fee/i.test(raw)) {
+    return 'Not enough XCP to pay the Counterparty fee for this action.'
+  }
+  if (/insufficient funds for the target amount/i.test(raw)) {
+    return 'Not enough spendable BTC for the transaction and miner fee. Wait for pending change to confirm or add BTC.'
+  }
 
   // The one core error worth naming ourselves, because it is the first-timer
   // failure and its own words don't say what's missing. "no utxos found for
@@ -70,6 +81,13 @@ function composeError(e: unknown): string {
   if (NO_SPENDABLE_BTC_PATTERN.test(raw)) {
     return 'No spendable bitcoin at this address — every transaction needs BTC for the miner fee, on top of any XCP it spends.'
   }
+
+  // Core often names the asset and the required/available quantities in its
+  // insufficiency text. That detail is the diagnosis; do not erase it.
+  if (/insufficient/i.test(raw) && !/^insufficient balance$/i.test(raw)) return raw
+
+  const friendly = friendlyError(e)
+  if (friendly !== GENERIC_ERROR) return friendly
 
   return raw && raw !== '[object Object]' ? raw : friendly
 }
@@ -227,12 +245,24 @@ async function composeRequest(
 
   const url = `${COUNTERPARTY_API_BASE}/${path}/compose/${type}?${qp.toString()}`
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
-  const data = await res.json()
+  const body = await res.text()
+  let data: { error?: unknown; result?: { rawtransaction?: string } } = {}
+  try {
+    data = body ? JSON.parse(body) : {}
+  } catch {
+    if (!res.ok) throw new Error(`Counterparty API request failed: HTTP ${res.status}`)
+    throw new Error('Counterparty API returned an unreadable response')
+  }
+
+  if (res.status === 429) {
+    throw new Error('Counterparty API rate limit: HTTP 429')
+  }
 
   if (!res.ok || data.error) {
     throw new Error(normalizeCoreError(data.error) || `Compose failed: ${res.status}`)
   }
 
+  if (!data.result?.rawtransaction) throw new Error('Compose response did not include a transaction')
   return data.result.rawtransaction
 }
 
