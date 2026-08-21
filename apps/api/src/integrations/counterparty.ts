@@ -330,6 +330,28 @@ export function fetchOrderMatches(asset: string, sinceBlock: number): Promise<Cp
   );
 }
 
+/**
+ * The newest completed book match's block, or null when the pair has never
+ * traded on the book (or the probe failed — the caller treats both as "no
+ * news", and the next tick asks again).
+ *
+ * This is the cheap question behind the indexer's gate: a fill between two
+ * resting orders moves no pool reserve, so the reserve check alone left book
+ * fills unindexed until the next pool swap happened to force a pass. Same
+ * feed and same descending-order guarantee `fetchMatches` already relies on;
+ * one request, one row, no verbose.
+ */
+export async function fetchNewestOrderMatchBlock(asset: string): Promise<number | null> {
+  try {
+    const data: { result: CpMatch[] } = await get(
+      `/orders/${encodeURIComponent(asset)}/XCP/matches?status=completed&limit=1`,
+    );
+    return data.result?.[0]?.block_index ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Exact message order for the rare transaction that crosses more than one
  * venue or price level. Match listings omit event_index, so callers only use
  * this immutable transaction-local list when a transaction is ambiguous. */

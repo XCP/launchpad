@@ -412,10 +412,10 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
       );
     upserts.push(upsert);
 
-    // Trades are only possible once a pool exists, and the reserve moving is
-    // the proof that one happened. Comparing against the reserve already
-    // stored means a graduated launch nobody traded costs nothing here —
-    // no feed reads, no MAX() probe, no writes.
+    // Trades are only possible once a pool exists. The reserve moving proves
+    // one happened, but the converse doesn't hold — a book-only fill moves no
+    // reserve — so this flag is a fast-path hint, not the whole gate:
+    // syncAssetEvents probes the book feed for quiet-pool assets itself.
     if (phase === "graduated" && pendingVerdict !== false) {
       eventTargets.push({
         asset: fm.asset,

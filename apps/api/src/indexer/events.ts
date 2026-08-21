@@ -8,6 +8,7 @@ import {
 import { mergePairTrades, type PairTrade } from "@launchpad/xcp69/trades";
 import { q } from "#api/db";
 import {
+  fetchNewestOrderMatchBlock,
   fetchOrderMatches,
   fetchPoolMatches,
   fetchTransactionEvents,
@@ -28,12 +29,15 @@ import {
  * because D1 bills every row a statement touches and a conflicting row still
  * counts. Rows are immutable — no upsert, no sweep, no delete anywhere in
  * this file. A tick where nothing traded costs one cursor read TOTAL (not per
- * asset), no feed requests, and zero writes.
+ * asset), one one-row book probe per quiet asset (a Counterparty read, which
+ * is free — the discipline above is about D1 writes), and zero writes.
  */
 
 export interface GraduatedTarget {
   asset: string;
-  /** Skip the feeds entirely unless the pool moved since the last pass. */
+  /** The pool reserve moved since the last pass — sufficient proof of a
+   *  trade, but NOT necessary: a fill between two resting book orders moves
+   *  no reserve, so quiet-pool assets still get a one-row book probe below. */
   poolChanged: boolean;
 }
 
@@ -298,17 +302,41 @@ export async function syncAssetEvents(
   );
   const cursors = new Map(cursorRows.map((r) => [r.key, Number(r.value)]));
 
+  // The pool reserve is proof a trade happened, but not the only way one can:
+  // two resting book orders match without touching the pool at all. This gate
+  // used to trust the reserve alone, which froze a user's activity, positions,
+  // and candles at their last pool swap while their book fills kept landing —
+  // "the site says 308k, my wallet says more" — until an unrelated pool trade
+  // finally forced a pass. So every quiet-pool asset gets a one-row probe of
+  // its book feed, all probes in flight together. Strictly NEWER than the
+  // cursor: the boundary block was fully read when the cursor was set (blocks
+  // are atomic in the feed), and `>=` here would re-touch those rows every
+  // tick forever, which D1 bills even when OR IGNORE writes nothing. A probe
+  // that fails reads as "no news" — the next tick simply asks again, and a
+  // pool move still forces the pass regardless.
+  const bookChanged = new Set<string>();
+  await Promise.all(
+    targets
+      .filter((t) => !t.poolChanged && cursors.has(cursorKey(t.asset)))
+      .map(async (t) => {
+        const newest = await fetchNewestOrderMatchBlock(t.asset);
+        if (newest !== null && newest > cursors.get(cursorKey(t.asset))!) {
+          bookChanged.add(t.asset);
+        }
+      }),
+  );
+
   let inserted = 0;
   let firstRuns = 0;
 
   for (const target of targets) {
     const known = cursors.get(cursorKey(target.asset));
     const firstRun = known === undefined;
-    // An asset already caught up only gets looked at when its pool moved,
-    // which is the only way a trade can have happened. First run is the
+    // An asset already caught up only gets looked at when one of its venues
+    // moved — the pool reserve, or the book probe above. First run is the
     // exception: a launch that graduated before this existed has a perfectly
     // unchanged reserve and would otherwise never be indexed at all.
-    if (!firstRun && !target.poolChanged) continue;
+    if (!firstRun && !target.poolChanged && !bookChanged.has(target.asset)) continue;
     if (firstRun) {
       if (firstRuns >= FIRST_RUNS_PER_TICK) continue; // next tick takes it
       firstRuns += 1;
