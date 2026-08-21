@@ -118,6 +118,22 @@ async function acknowledge(db: D1Database, keys: string[]): Promise<void> {
   }
 }
 
+/** Retire outbox rows whose keys are already in `announced`. These exist
+ * because the phase-transition trigger re-inserts `open:`/`closed:` keys on
+ * every later transition, and a later fill re-inserts an already-announced
+ * `trade-tx:` key. `acknowledge` can never reach them — it only sees keys
+ * that pass the unannounced filter — so without this sweep they sit in
+ * announcement_work forever, re-read and re-rendered on every tick: the
+ * unbounded-history cost this outbox exists to prevent. Most keys here have
+ * no outbox row at all (the live-only closing/near items); deleting a missing
+ * key is an index seek that touches nothing. */
+async function retireAlreadySaid(db: D1Database, keys: string[]): Promise<void> {
+  const remove = db.prepare(`DELETE FROM announcement_work WHERE key = ?1`);
+  for (let i = 0; i < keys.length; i += D1_CHUNK) {
+    await db.batch(keys.slice(i, i + D1_CHUNK).map((key) => remove.bind(key)));
+  }
+}
+
 /** Enqueue first, acknowledge second. This order is safe because the Durable
  * Object persists an accepted-key marker atomically with the queue append. */
 export async function queueAnnouncements(
@@ -125,6 +141,11 @@ export async function queueAnnouncements(
   items: AnnouncementItem[],
 ): Promise<QueueResult> {
   const unsaid = await onlyUnannounced(env.DB, items);
+  const unsaidKeys = new Set(unsaid.map((item) => item.key));
+  const alreadySaid = [...new Set(items.map((item) => item.key))].filter(
+    (key) => !unsaidKeys.has(key),
+  );
+  if (alreadySaid.length > 0) await retireAlreadySaid(env.DB, alreadySaid);
   if (unsaid.length === 0) {
     return { accepted: 0, newlyQueued: 0, depth: 0 };
   }
