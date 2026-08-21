@@ -183,12 +183,23 @@ export class LaunchRoom extends DurableObject<Env> {
    * answers ~52,000 requests a day inside ~136 seconds of billed duration.
    *
    * Anything at all wakes it, because there is nothing else a viewer could
-   * mean by sending a frame. Rate-limited by ensurePolling, which is a no-op
-   * when an alarm is already pending, so a hundred viewers asking at once
-   * still produce one poll.
+   * mean by sending a frame. A hundred viewers asking at once still produce
+   * one poll: a pending alarm makes this a no-op.
+   *
+   * Deliberately NOT ensurePolling: that resets the stuck-queue counter, and
+   * the client pings on a clock. A stuck unconfirmed mint would then hold a
+   * watched room at the fast cadence forever — the exact bill the counter
+   * exists to cap. A ping only matters to a SLEEPING room, where it buys one
+   * fresh poll cycle; for a graduated launch that cycle reads the tape,
+   * broadcasts it, and puts the room straight back to sleep, which is what
+   * keeps the trade tape moving without the room ever holding an idle alarm.
    */
   async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {
-    await this.ensurePolling();
+    const existing = await this.ctx.storage.getAlarm();
+    if (existing === null) {
+      this.identicalTicks = 0;
+      await this.ctx.storage.setAlarm(Date.now());
+    }
   }
 
   /**

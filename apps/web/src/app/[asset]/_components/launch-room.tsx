@@ -81,6 +81,16 @@ export function useLaunchRoom(): RoomContextValue {
 
 const WS_BASE = "wss://launchpad-api.me-bbe.workers.dev";
 const MAX_BACKOFF_MS = 30_000;
+/**
+ * How often a viewer nudges the room. A graduated launch's room holds no
+ * alarm — an idle alarm bills every second of every day — so with silent
+ * clients its trade tape only ever updated on connect, and then froze until
+ * a reload. A ping wakes a sleeping room for exactly one poll-and-broadcast,
+ * shared by every viewer, and the room goes straight back to sleep; a room
+ * already polling ignores it. Slower than the room's own 24s trade cache so
+ * each ping can actually show something new.
+ */
+const PING_MS = 30_000;
 
 /**
  * One shared WebSocket per page, to the launch's Durable Object room —
@@ -114,6 +124,18 @@ export function LaunchRoomProvider({
     let socket: WebSocket | null = null;
     let stopped = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let pingTimer: ReturnType<typeof setInterval> | null = null;
+
+    // A hidden tab stops nudging — its viewer isn't looking, so the room
+    // owes it nothing — and one nudge on return catches the tab up at once.
+    const ping = () => {
+      if (document.visibilityState !== "visible") return;
+      if (socket?.readyState === WebSocket.OPEN) socket.send("p");
+    };
+    const onVisible = () => {
+      if (document.visibilityState === "visible") ping();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     const connect = () => {
       if (stopped) return;
@@ -124,6 +146,7 @@ export function LaunchRoomProvider({
       ws.onopen = () => {
         attemptRef.current = 0;
         setConnected(true);
+        pingTimer = setInterval(ping, PING_MS);
       };
       ws.onmessage = (event) => {
         try {
@@ -135,6 +158,8 @@ export function LaunchRoomProvider({
       };
       ws.onclose = () => {
         setConnected(false);
+        if (pingTimer) clearInterval(pingTimer);
+        pingTimer = null;
         if (stopped) return;
         const attempt = attemptRef.current + 1;
         attemptRef.current = attempt;
@@ -147,7 +172,9 @@ export function LaunchRoomProvider({
     connect();
     return () => {
       stopped = true;
+      document.removeEventListener("visibilitychange", onVisible);
       if (retryTimer) clearTimeout(retryTimer);
+      if (pingTimer) clearInterval(pingTimer);
       socket?.close();
     };
   }, [asset, fairminterTxHash, enabled]);
