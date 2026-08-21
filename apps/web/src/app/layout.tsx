@@ -6,10 +6,12 @@ import { SiteHeader } from "@/components/site-header";
 import { SitePresenceBadge } from "@/components/site-presence";
 import { SessionProvider } from "@/providers/session-context";
 import { SwrProvider } from "@/providers/swr-provider";
+import { METADATA_ORIGIN } from "@/lib/metadata";
 import { WalletProvider } from "@/lib/wallet/wallet-context";
 import "@/app/globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(METADATA_ORIGIN),
   title: "xcp.fun — XCP-69 Launchpad",
   description:
     "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.",
