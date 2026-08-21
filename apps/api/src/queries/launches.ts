@@ -365,9 +365,16 @@ export function countByPhase(db: D1Database): Promise<PhaseCount[]> {
 }
 
 export function getLaunch(db: D1Database, asset: string): Promise<LaunchRow | null> {
+  // A ticker can be re-launched (migration 0016), so this pick is a policy,
+  // not a lookup: the conforming record is the one this site has an opinion
+  // about, and between two the newer fairminter is the live story. A pending
+  // verdict (NULL) ranks below a settled conforming row, so a relaunch takes
+  // the page over only once it has actually passed the predicate.
   return one<LaunchRow>(
     db,
-    `SELECT ${COLUMNS} FROM launches WHERE asset = ?1`,
+    `SELECT ${COLUMNS} FROM launches WHERE asset = ?1
+      ORDER BY (conforming IS 1) DESC, tx_index DESC
+      LIMIT 1`,
     asset,
   );
 }
