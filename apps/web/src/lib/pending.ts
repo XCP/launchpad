@@ -16,6 +16,11 @@ import { sumRaw } from "@/lib/numeric";
 
 export type PendingKind = "order" | "dispense" | "mint" | "pool" | "launch";
 
+export interface PendingSpend {
+  asset: string;
+  raw: string;
+}
+
 export interface PendingItem {
   txid: string;
   kind: PendingKind;
@@ -35,6 +40,9 @@ export interface PendingItem {
    *  can be larger than JSON.parse would hand back intact on the way out. */
   giveAsset?: string;
   giveRaw?: string;
+  /** All assets this action debits. Pool deposits spend two assets; keeping
+   *  this as a list avoids pretending one side is the whole transaction. */
+  spends?: PendingSpend[];
   /** Consecutive authoritative 404s — 3 marks the tx dropped. */
   misses?: number;
 }
@@ -123,18 +131,28 @@ export function dismissPending(txid: string) {
  * for phantom subtractions, even if every mempool check fails.
  */
 const SUBTRACT_MS = 60 * 60 * 1000;
-export function pendingSpentRaw(asset: string, address?: string | null): bigint {
+export function pendingSpentRaw(
+  asset: string,
+  address?: string | null,
+  excludeTxids: ReadonlySet<string> = new Set(),
+): bigint {
   const now = Date.now();
   return sumRaw(
     readPending()
       .filter(
         (i) =>
           !i.resolved &&
-          i.giveAsset === asset &&
+          !excludeTxids.has(i.txid) &&
           (!i.address || !address || i.address === address) &&
           now - i.addedAt < SUBTRACT_MS,
       )
-      .map((i) => i.giveRaw ?? 0),
+      .flatMap((i) =>
+        i.spends?.length
+          ? i.spends.filter((spend) => spend.asset === asset).map((spend) => spend.raw)
+          : i.giveAsset === asset
+            ? [i.giveRaw ?? 0]
+            : [],
+      ),
   );
 }
 

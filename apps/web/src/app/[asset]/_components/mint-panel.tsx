@@ -10,11 +10,12 @@ import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
-import { fetchBalance, fetchJson } from "@/lib/client";
+import { fetchJson } from "@/lib/client";
 import { commas, commasRaw, satsPerVb, usd as usdFmt } from "@/lib/format";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
+import { useSpendableBalance } from "@/hooks/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -70,10 +71,10 @@ export function MintPanel({
   const costXcp = lots * XCP_PER_LOT;
   const costRaw = lots * XCP69.PRICE;
 
-  const { data: xcpBalance } = useSWR(
-    address ? [address, "XCP", "mint-xcp-balance"] : null,
-    ([addr]) => fetchBalance(addr, "XCP"),
-    { refreshInterval: 30_000 },
+  const { balance: xcpBalance, balanceError } = useSpendableBalance(
+    address,
+    "XCP",
+    "mint",
   );
   const insufficient =
     xcpBalance !== undefined && costRaw > 0 && costRaw > approx(xcpBalance);
@@ -99,13 +100,24 @@ export function MintPanel({
         kind: "mint",
         label: `Mint ${mintTokens.toLocaleString()} ${asset}`,
         address: address ?? undefined,
+        spends: [{ asset: "XCP", raw: costRaw.toString() }],
       });
       // The XCP escrowed, valued at the rate the panel just quoted.
       trackTx(compose.txid, "mint", xcpUsd ? costXcp * xcpUsd : null);
     }
-  }, [compose.status, compose.txid, mintTokens, asset, address, costXcp, xcpUsd]);
+  }, [
+    compose.status,
+    compose.txid,
+    mintTokens,
+    asset,
+    address,
+    costRaw,
+    costXcp,
+    xcpUsd,
+  ]);
 
-  const ready = lots > 0 && !busy && !insufficient;
+  const ready =
+    xcpBalance !== undefined && lots > 0 && !busy && !insufficient;
   const buttonLabel = busy
     ? compose.status === "composing"
       ? "Composing…"
@@ -114,6 +126,10 @@ export function MintPanel({
         : "Broadcasting…"
     : lots === 0
       ? "Enter an amount"
+      : xcpBalance === undefined
+        ? balanceError
+          ? "Balance unavailable"
+          : "Checking balance…"
       : insufficient
         ? "Insufficient XCP balance"
         : `Mint ${commas(mintTokens)} ${asset}`;

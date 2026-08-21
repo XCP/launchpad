@@ -22,10 +22,11 @@ import {
 } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
+import { useSpendableBalance } from "@/hooks/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { fetchBalance, fetchJson } from "@/lib/client";
+import { fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { LIMIT_EXPIRATIONS, useSwapSettings } from "@/app/swap/_components/swap-settings";
 
@@ -144,29 +145,18 @@ export function TradePanel({
       null,
     );
 
-  const { data: tokenBalance } = useSWR(
-    address && asset ? [address, asset, "limit-token-balance"] : null,
-    ([addr, a]) => fetchBalance(addr, a),
-    { refreshInterval: 30_000 },
+  const { balance: tokenBalance, balanceError: tokenBalanceError } = useSpendableBalance(
+    address,
+    asset,
+    "limit-token",
   );
-  const { data: xcpBalance } = useSWR(
-    address ? [address, "XCP", "limit-xcp-balance"] : null,
-    ([addr]) => fetchBalance(addr, "XCP"),
-    { refreshInterval: 30_000 },
+  const { balance: xcpBalance, balanceError: xcpBalanceError } = useSpendableBalance(
+    address,
+    "XCP",
+    "limit-xcp",
   );
 
   const busy = isBusy(compose.status);
-
-  useEffect(() => {
-    if (compose.status === "confirmed") {
-      registerPending({
-        txid: compose.txid,
-        kind: "order",
-        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — limit order`,
-        address: address ?? undefined,
-      });
-    }
-  }, [compose.status, compose.txid, side, asset, address]);
 
   const limitPriceNum = parseFloat(limitPrice) || 0;
   // Exact integers end to end: price at 8 places is itself an integer, so
@@ -187,6 +177,28 @@ export function TradePanel({
       : (limitAmountExact * priceExact) / SATS_PER_UNIT;
   const limitAmountRaw = approx(limitAmountExact);
   const limitTotalRaw = approx(limitTotalExact);
+  const giveAsset = side === "buy" ? "XCP" : asset;
+  const giveRaw = side === "buy" ? limitTotalExact : limitAmountExact;
+
+  useEffect(() => {
+    if (compose.status === "confirmed") {
+      registerPending({
+        txid: compose.txid,
+        kind: "order",
+        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — limit order`,
+        address: address ?? undefined,
+        spends: [{ asset: giveAsset, raw: giveRaw.toString() }],
+      });
+    }
+  }, [
+    compose.status,
+    compose.txid,
+    side,
+    asset,
+    address,
+    giveAsset,
+    giveRaw,
+  ]);
   // The give side must be covered: XCP (Total) for a buy, tokens for a sell.
   const insufficientToken =
     side === "sell" &&
@@ -199,6 +211,9 @@ export function TradePanel({
     limitTotalRaw > 0 &&
     limitTotalRaw > xcpBalance;
   const insufficient = insufficientToken || insufficientXcp;
+  const spendBalance = side === "buy" ? xcpBalance : tokenBalance;
+  const spendBalanceError =
+    side === "buy" ? xcpBalanceError : tokenBalanceError;
 
   // A limit order is a stated intent, not a fill — but placing one is the
   // conversion this surface exists for, and its XCP total is what the user
@@ -216,6 +231,7 @@ export function TradePanel({
     limitPriceNum > 0 &&
     limitAmountRaw > 0 &&
     limitTotalRaw > 0 &&
+    spendBalance !== undefined &&
     !busy &&
     !insufficient;
   // Fill forecast vs the pool. The pool's 50 bps fee is charged in-curve,
@@ -312,9 +328,13 @@ export function TradePanel({
         : "Broadcasting…"
     : limitPriceNum === 0
       ? "Enter a price"
-      : limitAmountRaw === 0
-        ? "Enter an amount"
-        : insufficient
+    : limitAmountRaw === 0
+      ? "Enter an amount"
+      : spendBalance === undefined
+        ? spendBalanceError
+          ? "Balance unavailable"
+          : "Checking balance…"
+      : insufficient
           ? `Insufficient ${side === "buy" ? "XCP" : asset} balance`
           : `Place limit ${side}`;
 

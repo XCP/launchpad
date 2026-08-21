@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { AssetChip } from "@/components/asset-chip";
@@ -13,11 +13,10 @@ import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
-import { fetchBalance, fetchJson } from "@/lib/client";
+import { fetchJson } from "@/lib/client";
 import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
 import {
   approx,
-  maxRaw,
   parseUnitsToRaw,
   percentOf,
   type Raw,
@@ -27,13 +26,8 @@ import {
 } from "@/lib/numeric";
 import { useDebounced } from "@/hooks/use-debounced";
 import { trackTx } from "@/lib/analytics";
-import {
-  pendingSpentRaw,
-  readPending,
-  readPendingServer,
-  registerPending,
-  subscribePending,
-} from "@/lib/pending";
+import { registerPending } from "@/lib/pending";
+import { useSpendableBalance } from "@/hooks/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -131,26 +125,15 @@ export function SwapWidget({
     },
   );
 
-  // Mempool-aware balance: subtract what unresolved pending actions spend.
-  // The pending list is part of the balance key, so any resolution
-  // triggers an immediate refetch — no unsynchronized-poller wobble.
-  const pendingItems = useSyncExternalStore(
-    subscribePending,
-    readPending,
-    readPendingServer,
+  const {
+    balance: effBalance,
+    pendingOutgoing,
+    balanceError,
+  } = useSpendableBalance(
+    address,
+    giveAsset,
+    "swap",
   );
-  const resolvedCount = pendingItems.filter((i) => i.resolved).length;
-  const { data: balance } = useSWR(
-    address && giveAsset
-      ? [address, giveAsset, "swap-balance", resolvedCount]
-      : null,
-    ([addr, a]) => fetchBalance(addr, a),
-    { refreshInterval: 30_000 },
-  );
-  const effBalance =
-    balance !== undefined
-      ? maxRaw(0n, balance - pendingSpentRaw(giveAsset, address))
-      : undefined;
 
   // What the market holds of the buy asset — the pool reserve (the book
   // varies too fast to sum honestly client-side).
@@ -219,7 +202,12 @@ export function SwapWidget({
     address,
   ]);
 
-  const ready = amountRaw > 0 && approx(outRaw) > 0 && !busy && !insufficient;
+  const ready =
+    effBalance !== undefined &&
+    amountRaw > 0 &&
+    approx(outRaw) > 0 &&
+    !busy &&
+    !insufficient;
 
   // USD on BOTH sides, derived through the XCP leg of the trade.
   const xcpLeg = side === "buy" ? amountHuman : out;
@@ -342,10 +330,10 @@ export function SwapWidget({
       onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
     >
       Balance: {commasRaw(effBalance)}
-      {balance !== undefined && balance > effBalance && (
+      {pendingOutgoing > 0n && (
         <span className="text-gray-400">
           {" "}
-          · {commasRaw(balance - effBalance)} pending
+          · {commasRaw(pendingOutgoing)} pending
         </span>
       )}
     </button>
@@ -361,10 +349,10 @@ export function SwapWidget({
         onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
       >
         Balance: {commasRaw(effBalance)}
-        {balance !== undefined && balance > effBalance && (
+        {pendingOutgoing > 0n && (
           <span className="text-gray-400">
             {" "}
-            · {commasRaw(balance - effBalance)} pending
+            · {commasRaw(pendingOutgoing)} pending
           </span>
         )}
       </button>
@@ -397,6 +385,10 @@ export function SwapWidget({
         : "Broadcasting…"
     : amountRaw === 0
       ? "Enter an amount"
+      : effBalance === undefined
+        ? balanceError
+          ? "Balance unavailable"
+          : "Checking balance…"
       : insufficient
         ? `Insufficient ${giveAsset} balance`
         : approx(outRaw) === 0

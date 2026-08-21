@@ -1,6 +1,11 @@
 "use client";
 
-import { parseJsonLossless, type Raw, sumRaw } from "@/lib/numeric";
+import {
+  parseJsonLossless,
+  type Raw,
+  sumRaw,
+  toBigInt,
+} from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 /**
@@ -28,7 +33,7 @@ export async function fetchBalance(
   asset: string,
 ): Promise<bigint> {
   const data = await fetchJson(
-    `${COUNTERPARTY_API_BASE}/addresses/${address}/balances/${asset}`,
+    `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/balances/${encodeURIComponent(asset)}?type=address`,
   );
   const rows: { quantity: Raw; utxo?: string | null }[] = Array.isArray(
     data.result,
@@ -38,4 +43,67 @@ export async function fetchBalance(
       ? [data.result]
       : [];
   return sumRaw(rows.filter((r) => !r.utxo).map((r) => r.quantity));
+}
+
+export interface PendingAssetDebit {
+  quantity: bigint;
+  txids: Set<string>;
+}
+
+interface MempoolLedgerEvent {
+  tx_hash?: string;
+  event?: string;
+  params?: {
+    address?: string;
+    asset?: string;
+    quantity?: Raw;
+  };
+}
+
+/**
+ * Counterparty debits already parsed from the node's mempool, grouped by
+ * asset. The endpoint's address match is a superset, so every event is
+ * filtered against its own exact address before it can affect a balance.
+ */
+export async function fetchPendingDebits(
+  address: string,
+): Promise<Map<string, PendingAssetDebit>> {
+  const query = new URLSearchParams({
+    addresses: address,
+    event_name: "DEBIT",
+    verbose: "true",
+    limit: "100",
+  });
+  const data = await fetchJson(
+    `${COUNTERPARTY_API_BASE}/addresses/mempool?${query.toString()}`,
+  );
+  const events: MempoolLedgerEvent[] = Array.isArray(data.result)
+    ? data.result
+    : [];
+  const byAsset = new Map<string, PendingAssetDebit>();
+
+  for (const event of events) {
+    const params = event.params;
+    if (
+      event.event !== "DEBIT" ||
+      !event.tx_hash ||
+      params?.address !== address ||
+      !params.asset
+    ) {
+      continue;
+    }
+    const quantity = toBigInt(params.quantity);
+    if (quantity === null) {
+      throw new Error("Counterparty returned an unreadable pending debit");
+    }
+    const current = byAsset.get(params.asset) ?? {
+      quantity: 0n,
+      txids: new Set<string>(),
+    };
+    current.quantity += quantity;
+    current.txids.add(event.tx_hash);
+    byAsset.set(params.asset, current);
+  }
+
+  return byAsset;
 }

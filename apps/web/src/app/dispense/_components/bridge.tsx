@@ -23,6 +23,7 @@ import {
   SATS_PER_UNIT,
 } from "@/lib/numeric";
 import { isBusy } from "@/hooks/use-busy";
+import { useSpendableBalance } from "@/hooks/use-spendable-balance";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { GearPopover } from "@/components/ui/popover";
@@ -822,10 +823,10 @@ function UnloadCard({
   const [escrow, setEscrow] = useState("");
   const [price, setPrice] = useState(""); // sats per XCP
 
-  const { data: balance } = useSWR(
-    address ? [address, "XCP", "unload-balance"] : null,
-    ([addr]) => fetchBalance(addr, "XCP"),
-    { refreshInterval: 30_000 },
+  const { balance, balanceError } = useSpendableBalance(
+    address,
+    "XCP",
+    "unload-dispenser",
   );
 
   // No status filter: a CLOSING dispenser (status 11) still vends for ~5
@@ -884,7 +885,13 @@ function UnloadCard({
     balance !== undefined && escrowRaw > 0 && escrowRaw > balance;
 
   const busy = isBusy(compose.status);
-  const ready = escrowRaw >= SATS && priceSats > 0 && !busy && !existing && !insufficient;
+  const ready =
+    balance !== undefined &&
+    escrowRaw >= SATS &&
+    priceSats > 0 &&
+    !busy &&
+    !existing &&
+    !insufficient;
 
   // Inventory priced at-or-under yours — what must sell before your first
   // vend (ties go to earlier tx_index, so equal prices count as ahead).
@@ -989,6 +996,10 @@ function UnloadCard({
       : "Working…"
     : escrowRaw === 0
       ? "Enter an amount"
+      : balance === undefined
+        ? balanceError
+          ? "Balance unavailable"
+          : "Checking balance…"
       : insufficient
         ? "Insufficient XCP balance"
         : escrowRaw < SATS

@@ -26,10 +26,11 @@ import {
 import { useDebounced } from "@/hooks/use-debounced";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
+import { useSpendableBalance } from "@/hooks/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { fetchBalance, fetchJson } from "@/lib/client";
+import { fetchJson } from "@/lib/client";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { useSwapSettings } from "@/app/swap/_components/swap-settings";
 import { defaultTradeAsset } from "@/lib/trade-selection";
@@ -143,15 +144,15 @@ export function LiquidityWidget({
   const depTokenNum = approx(depTokenRaw);
   const depXcpNum = approx(depXcpRaw);
 
-  const { data: tokenBalance } = useSWR(
-    address && asset ? [address, asset, "lq-token-balance"] : null,
-    ([addr, a]) => fetchBalance(addr, a),
-    { refreshInterval: 30_000 },
+  const { balance: tokenBalance, balanceError: tokenBalanceError } = useSpendableBalance(
+    address,
+    asset,
+    "liquidity-token",
   );
-  const { data: xcpBalance } = useSWR(
-    address ? [address, "XCP", "lq-xcp-balance"] : null,
-    ([addr]) => fetchBalance(addr, "XCP"),
-    { refreshInterval: 30_000 },
+  const { balance: xcpBalance, balanceError: xcpBalanceError } = useSpendableBalance(
+    address,
+    "XCP",
+    "liquidity-xcp",
   );
 
   // Congestion-priced XCP gas for pool ops — usually 0, but never hardcode.
@@ -165,12 +166,10 @@ export function LiquidityWidget({
     { refreshInterval: 60_000 },
   );
 
-  const { data: lpBalance } = useSWR(
-    address && pool?.lp_asset
-      ? [address, pool.lp_asset, "lq-lp-balance"]
-      : null,
-    ([addr, lp]) => fetchBalance(addr, lp),
-    { refreshInterval: 30_000 },
+  const { balance: lpBalance, balanceError: lpBalanceError } = useSpendableBalance(
+    address,
+    pool?.lp_asset ?? null,
+    "liquidity-lp",
   );
 
   // LP supply + reserves in one request (a withdraw quote for 1 LP unit) —
@@ -235,9 +234,32 @@ export function LiquidityWidget({
         kind: "pool",
         label: `${tab === "add" ? "Add" : "Remove"} ${asset}/XCP liquidity`,
         address: address ?? undefined,
+        spends:
+          tab === "add"
+            ? [
+                { asset, raw: big(depTokenRaw).toString() },
+                {
+                  asset: "XCP",
+                  raw: (big(depXcpRaw) + big(gasFee ?? 0)).toString(),
+                },
+              ]
+            : pool?.lp_asset
+              ? [{ asset: pool.lp_asset, raw: lpToRemove.toString() }]
+              : undefined,
       });
     }
-  }, [compose.status, compose.txid, tab, asset, address]);
+  }, [
+    compose.status,
+    compose.txid,
+    tab,
+    asset,
+    address,
+    depTokenRaw,
+    depXcpRaw,
+    gasFee,
+    pool?.lp_asset,
+    lpToRemove,
+  ]);
 
   const needTokenRaw = editSide === "token" ? amountRaw : depTokenNum;
   const insufficientToken =
@@ -255,11 +277,17 @@ export function LiquidityWidget({
     amountRaw > 0 &&
     depTokenNum > 0 &&
     depXcpNum > 0 &&
+    tokenBalance !== undefined &&
+    xcpBalance !== undefined &&
     !busy &&
     !insufficientToken &&
     !insufficientXcp &&
     !depositQuote?.first_deposit;
-  const removeReady = tab === "remove" && lpToRemove > 0n && !busy;
+  const removeReady =
+    tab === "remove" &&
+    lpBalance !== undefined &&
+    lpToRemove > 0n &&
+    !busy;
 
   const submitAdd = () => {
     if (!addReady || !depositQuote) return;
@@ -293,6 +321,10 @@ export function LiquidityWidget({
       : "Working…"
     : amountRaw === 0
       ? "Enter an amount"
+      : tokenBalance === undefined || xcpBalance === undefined
+        ? tokenBalanceError || xcpBalanceError
+          ? "Balance unavailable"
+          : "Checking balance…"
       : insufficientToken
         ? `Insufficient ${asset} balance`
         : insufficientXcp
@@ -671,7 +703,11 @@ export function LiquidityWidget({
                   ? "Confirm in wallet…"
                   : "Working…"
                 : lpToRemove === 0n
-                  ? (lpBalance ?? 0) === 0
+                  ? lpBalance === undefined
+                    ? lpBalanceError
+                      ? "Balance unavailable"
+                      : "Checking balance…"
+                    : lpBalance === 0n
                     ? "No LP in this pool"
                     : "Choose an amount"
                   : "Remove liquidity"}
