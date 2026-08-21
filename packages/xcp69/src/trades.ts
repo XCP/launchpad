@@ -71,9 +71,9 @@ function shape(
 
   const matchId = text(row.id);
   return {
-    // Replaced below after enrichment. The ordinal makes the fallback unique
-    // even when one pool transaction creates two otherwise identical fills.
-    key: `${venue}-${txHash}-${matchId || `${forwardQuantity}-${backwardQuantity}`}-${ordinal}`,
+    // Assigned in mergePairTrades once all rows are in hand — a fill's key
+    // must not depend on where this fetch's window happened to start.
+    key: "",
     block: finiteNumber(row.block_index),
     time: finiteNumber(row.block_time),
     txIndex: finiteNumber(venue === "pool" ? row.tx_index : row.tx1_index),
@@ -136,6 +136,21 @@ export async function mergePairTrades(
       .map((row, i) => shape(token, row, "pool", i)),
     ...bookRows.map((row, i) => shape(token, row, "book", poolRows.length + i)),
   ].filter((row): row is WorkingTrade => row !== null);
+
+  // Fallback keys, used verbatim as database identity when event enrichment
+  // is unavailable. The discriminator is the fill's position among ITS OWN
+  // transaction's fills on the same venue — stable however the fetch window
+  // is cut, because a tx's fills always ride the feed in the same relative
+  // order. The global array ordinal used before shifted whenever the boundary
+  // block was re-read under a different window, so the same fill re-entered
+  // under a fresh key and was inserted twice.
+  const withinTx = new Map<string, number>();
+  for (const row of rows) {
+    const slot = `${row.venue}-${row.txHash}`;
+    const nth = withinTx.get(slot) ?? 0;
+    withinTx.set(slot, nth + 1);
+    row.key = `${slot}-${row.matchId || `${row.forwardQuantity}-${row.backwardQuantity}`}-${nth}`;
+  }
 
   const byTransaction = new Map<string, WorkingTrade[]>();
   for (const row of rows) {
