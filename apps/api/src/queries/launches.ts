@@ -219,6 +219,7 @@ export async function listLaunchPage(
   sort: string | undefined,
   limit: number,
   offset: number,
+  unmintedBy?: string,
 ): Promise<LaunchPage> {
   // The lookup is the validation: anything not a key of the table lands on the
   // phase's default, so no caller-supplied string ever reaches the SQL.
@@ -228,6 +229,36 @@ export async function listLaunchPage(
   // places between two renders — which across pages is worse than untidy: a
   // row can appear twice, or not at all.
   const order = `${SORT_SQL[key]}, tx_index DESC`;
+
+  /**
+   * A wallet filter belongs inside the query, not after LIMIT. Filtering the
+   * returned twelve rows in the browser would make short pages, wrong totals,
+   * and eventually empty pages even while unminted launches still existed.
+   *
+   * idx_launch_mints_minter is (launch_tx, source), exactly the two equality
+   * terms in this anti-join. Each candidate launch is therefore one indexed
+   * existence lookup; it does not scan the append-only mint table. The source
+   * is always bound, and each statement uses the placeholder number matching
+   * its own existing binds.
+   */
+  const notMintedPage = unmintedBy
+    ? ` AND NOT EXISTS (
+          SELECT 1 FROM launch_mints m
+           WHERE m.launch_tx = launches.tx_hash AND m.source = ?4
+        )`
+    : "";
+  const notMintedCount = unmintedBy
+    ? ` AND NOT EXISTS (
+          SELECT 1 FROM launch_mints m
+           WHERE m.launch_tx = launches.tx_hash AND m.source = ?2
+        )`
+    : "";
+  const notMintedKing = unmintedBy
+    ? ` AND NOT EXISTS (
+          SELECT 1 FROM launch_mints m
+           WHERE m.launch_tx = launches.tx_hash AND m.source = ?1
+        )`
+    : "";
 
   /**
    * The reigning launch, asked for only where it can exist.
@@ -244,18 +275,19 @@ export async function listLaunchPage(
     db
       .prepare(
         `SELECT ${COLUMNS} FROM launches
-          WHERE conforming = 1 AND phase = ?1
+          WHERE conforming = 1 AND phase = ?1${notMintedPage}
           ORDER BY ${order}
           LIMIT ?2 OFFSET ?3`,
       )
-      .bind(phase, limit, offset),
+      .bind(phase, limit, offset, ...(unmintedBy ? [unmintedBy] : [])),
     db
-      .prepare(`SELECT COUNT(*) AS n FROM launches WHERE conforming = 1 AND phase = ?1`)
-      .bind(phase),
+      .prepare(
+        `SELECT COUNT(*) AS n FROM launches WHERE conforming = 1 AND phase = ?1${notMintedCount}`,
+      )
+      .bind(phase, ...(unmintedBy ? [unmintedBy] : [])),
   ];
   if (wantsKing) {
-    statements.push(
-      db.prepare(
+    const kingStatement = db.prepare(
         // Recency first, then the two tiebreaks that only apply WITHIN one
         // block (migration 0013): how many of this launch's mints are in it,
         // then the last of those mints by Counterparty's global tx_index.
@@ -266,14 +298,17 @@ export async function listLaunchPage(
         // still ends the sort, so the result is total and cannot flicker
         // between two renders.
         `SELECT ${COLUMNS} FROM launches
-          WHERE conforming = 1 AND phase = 'minting' AND last_mint_block IS NOT NULL
+          WHERE conforming = 1 AND phase = 'minting' AND last_mint_block IS NOT NULL${notMintedKing}
           ORDER BY last_mint_block DESC,
                    COALESCE(last_mint_count, 0) DESC,
                    COALESCE(last_mint_tx_index, 0) DESC,
                    tx_index DESC
           LIMIT 1`,
-      ),
-    );
+      );
+    // D1 statements with no placeholders should be batched directly. Calling
+    // bind() with zero arguments is unnecessary and is not consistently
+    // accepted by local Miniflare and the production D1 implementation.
+    statements.push(unmintedBy ? kingStatement.bind(unmintedBy) : kingStatement);
   }
 
   const [page, count, king] = await db.batch<LaunchRow & { n: number }>(statements);

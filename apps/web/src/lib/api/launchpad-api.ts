@@ -436,11 +436,15 @@ export async function fetchLaunchPage(
   sort: string | undefined,
   limit: number,
   offset: number,
+  /** When present, exclude launches this address has already minted. The
+   *  worker applies it before LIMIT so totals and paging remain truthful. */
+  unmintedBy?: string,
 ): Promise<IndexedPage | null> {
   try {
     const qs =
       `phase=${phase}&limit=${limit}&offset=${offset}` +
-      (sort ? `&sort=${encodeURIComponent(sort)}` : "");
+      (sort ? `&sort=${encodeURIComponent(sort)}` : "") +
+      (unmintedBy ? `&unminted_by=${encodeURIComponent(unmintedBy)}` : "");
     const res = await fetch(`${API_BASE}/v2/launches?${qs}`, {
       signal: AbortSignal.timeout(6_000),
       // See fetchMempoolSnapshot: this is the other polled route, and the

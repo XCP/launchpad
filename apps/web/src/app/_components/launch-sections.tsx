@@ -21,6 +21,7 @@ import {
 } from "@/lib/launch-row";
 import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xcp69";
 import { ratio } from "@/lib/numeric";
+import { useWallet } from "@/lib/wallet/wallet-context";
 
 type View = "grid" | "table";
 
@@ -196,6 +197,12 @@ export function LaunchSections({
   // the next still in cards reads as a bug, not a setting. Sections that
   // can't tabulate simply ignore it.
   const [view, setView] = useState<View>("grid");
+  const { address, status: walletStatus } = useWallet();
+  // The wallet itself is desktop-only (the header hides it below `sm`), and
+  // this control follows the same boundary. Keep the data guard here too: CSS
+  // decides visibility, but a disconnected phone must not start personalised
+  // API reads merely because the hidden component still exists in the DOM.
+  const walletAddress = walletStatus === "connected" && address ? address : null;
   // One lookup for the whole page, built from the poll the header chip is
   // already running. Sections read it; none of them fetches it.
   const { mints, orders } = useMempool(MEMPOOL_REFRESH_MS);
@@ -217,6 +224,7 @@ export function LaunchSections({
         xcpUsd={xcpUsd}
         view={view}
         onView={setView}
+        walletAddress={null}
       />
 
       <Section
@@ -230,6 +238,11 @@ export function LaunchSections({
         xcpUsd={xcpUsd}
         view={view}
         onView={setView}
+        // Only a live launch is an opportunity someone can still act on.
+        // Scheduled launches cannot have mints, and graduated launches cannot
+        // be minted again, so offering the filter there would be inert/history
+        // filtering rather than the requested "what haven't I minted yet?".
+        walletAddress={paged ? walletAddress : null}
       />
 
       <Section
@@ -243,6 +256,7 @@ export function LaunchSections({
         xcpUsd={xcpUsd}
         view={view}
         onView={setView}
+        walletAddress={null}
       />
 
     </div>
@@ -276,6 +290,7 @@ function Section({
   xcpUsd,
   view,
   onView,
+  walletAddress,
 }: {
   phase: LaunchPhase;
   title: string;
@@ -288,11 +303,19 @@ function Section({
   xcpUsd: number | null;
   view: View;
   onView: (v: View) => void;
+  /** Connected wallet eligible for the live-launch filter. Null hides it. */
+  walletAddress: string | null;
 }) {
   const options = SORTS[phase] ?? SORTS.scheduled!;
   const defaultSort = options[0]!.id;
   const [sortId, setSortId] = useState(defaultSort);
   const [page, setPage] = useState(0);
+  // Store the address that enabled the filter rather than a bare boolean. If
+  // the user switches wallets, the new wallet does not inherit the old one's
+  // checked preference or personalised query.
+  const [hideMintedBy, setHideMintedBy] = useState<string | null>(null);
+  const hideMinted = walletAddress !== null && hideMintedBy === walletAddress;
+  const unmintedBy = hideMinted ? walletAddress : undefined;
   const perPage = PER_PAGE[phase] ?? 12;
 
   // Unpaged: the whole phase is already here, so ordering and slicing are
@@ -304,7 +327,7 @@ function Section({
     return [...initial.rows].sort(by);
   }, [paged, initial.rows, options, sortId]);
 
-  const atDefault = sortId === defaultSort && page === 0;
+  const atDefault = sortId === defaultSort && page === 0 && !unmintedBy;
 
   /**
    * How long the phase was, as of the last answer that arrived.
@@ -340,9 +363,15 @@ function Section({
    * the section no longer needs a reload to notice that the chain moved.
    */
   const { data, error, isLoading } = useSWR<LaunchPage>(
-    paged ? ["launch-page", phase, sortId, current, perPage] : null,
+    paged ? ["launch-page", phase, sortId, current, perPage, unmintedBy ?? null] : null,
     async () => {
-      const res = await fetchLaunchPage(phase, sortId, perPage, current * perPage);
+      const res = await fetchLaunchPage(
+        phase,
+        sortId,
+        perPage,
+        current * perPage,
+        unmintedBy,
+      );
       // Thrown, not returned as null: an error leaves SWR holding the last
       // page that loaded, which is what belongs on screen, and it schedules
       // its own retry. Returning null would CACHE the failure as the answer.
@@ -487,6 +516,10 @@ function Section({
   if (total === 0 && !empty) return null;
 
   const canTabulate = TABULAR.has(phase);
+  // Keep the controls visible when this filter itself produces the empty
+  // state. Otherwise a wallet that has minted every live launch would check
+  // the box and immediately lose the only way to uncheck it.
+  const showControls = total > 0 || hideMinted;
 
   return (
     <section>
@@ -500,7 +533,7 @@ function Section({
           )}
         </h2>
 
-        {total > 0 && (
+        {showControls && (
           <div className="flex shrink-0 items-center gap-2">
             <SortMenu
               label={`Sort ${title}`}
@@ -511,6 +544,26 @@ function Section({
                 setPage(0);
               }}
             />
+
+            {walletAddress && phase === "minting" && (
+              <label className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 sm:flex">
+                <input
+                  type="checkbox"
+                  checked={hideMinted}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    setHideMintedBy(checked ? walletAddress : null);
+                    setPage(0);
+                    // The unfiltered total is already known from the initial
+                    // server render. Restore it immediately on uncheck rather
+                    // than leaving the filtered count beside unfiltered rows.
+                    if (!checked) setKnownTotal(initial.total);
+                  }}
+                  className="size-3.5 accent-purple-600"
+                />
+                <span>Hide minted</span>
+              </label>
+            )}
 
             {canTabulate && (
               <div className="flex items-center rounded-full border border-gray-200 bg-white p-0.5">
@@ -538,7 +591,7 @@ function Section({
       </div>
       {total === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
-          {empty}
+          {hideMinted ? "You’ve already minted every live launch." : empty}
         </p>
       ) : (
         // A fetch in flight dims the page it is replacing rather than clearing

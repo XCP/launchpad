@@ -61,7 +61,21 @@ launchesRoute.get("/v2/launches", async (c) => {
     const limit = clamp(Number(c.req.query("limit") ?? 24) || 24, 1, MAX_PAGE);
     const offset = clamp(Number(c.req.query("offset") ?? 0) || 0, 0, MAX_OFFSET);
     const sort = c.req.query("sort");
-    const { rows, total, king } = await listLaunchPage(c.env.DB, phase, sort, limit, offset);
+    const unmintedBy = c.req.query("unminted_by")?.trim() || undefined;
+    // A real wallet address is alphanumeric and comfortably below 90 chars.
+    // Reject arbitrary cache-busting strings before they reach D1: this route
+    // is edge-cached by URL, so binding alone protects SQL but not resources.
+    if (unmintedBy && !/^[A-Za-z0-9]{26,90}$/.test(unmintedBy)) {
+      return c.json({ error: "invalid unminted_by address" }, 400);
+    }
+    const { rows, total, king } = await listLaunchPage(
+      c.env.DB,
+      phase,
+      sort,
+      limit,
+      offset,
+      unmintedBy,
+    );
     // `king` is the launch that minted most recently out of everything still
     // minting — a fact about the phase, not about this page, which is why it
     // travels beside `result` rather than inside it. Null for every phase but
