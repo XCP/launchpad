@@ -45,6 +45,7 @@ export default async function StatsPage() {
   const { counts, total, activity, daily, blocks_per_bucket } = stats;
   const settled = counts.graduated + counts.refunded;
   const committedXcp = fromSats(activity.paid_xcp);
+  const activeXcp = fromSats(activity.active_xcp);
   const feeBtc = fromSats(activity.fee_sats);
 
   // Fill the window so quiet days read as quiet rather than as missing. The
@@ -80,9 +81,18 @@ export default async function StatsPage() {
         </p>
       </div>
 
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat label="Minted" value={commas(activity.mints)} hint="mint transactions" />
         <Stat label="Minters" value={commas(activity.minters)} hint="distinct addresses" />
+        <Stat
+          label="Active escrow"
+          value={`${commas(activeXcp)} XCP`}
+          hint={
+            xcpUsd
+              ? `≈ ${usd(activeXcp * xcpUsd)} baking in open mints`
+              : "baking in open mints"
+          }
+        />
         <Stat
           label="Ever committed"
           value={`${commas(committedXcp)} XCP`}

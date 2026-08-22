@@ -11,7 +11,7 @@ export async function generateMetadata({
   const { address } = await params;
   return {
     title: `${shortAddress(address)} — xcp.fun`,
-    description: `Positions, history, and launches for ${address} on xcp.fun.`,
+    description: `Positions, open mints, history, and launches for ${address} on xcp.fun.`,
   };
 }
 

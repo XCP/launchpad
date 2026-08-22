@@ -3,7 +3,7 @@ import Link from "next/link";
 import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
 import { fetchLaunchPage, fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { commas, fromSats, price as priceFmt } from "@/lib/format";
+import { commas, price as priceFmt } from "@/lib/format";
 import { ratio } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
 import { TokenImage } from "@/components/token-image";
@@ -46,8 +46,6 @@ export default async function RewardsPage() {
     fetchBtcUsd().catch(() => null),
   ]);
   const mintsSoFar = stats?.activity.mints ?? 0;
-  const activeXcp = fromSats(stats?.activity.active_xcp ?? 0);
-  const lifetimeXcp = fromSats(stats?.activity.paid_xcp ?? 0);
   const graduated = stats?.counts.graduated ?? 0;
   const remaining = Math.max(0, MINT_CAP - mintsSoFar);
 
@@ -152,23 +150,6 @@ export default async function RewardsPage() {
             {commas(remaining)} still to claim
           </p>
         </div>
-
-        <div className="mt-3 grid grid-cols-2 gap-3">
-          <Stat
-            label="Active escrow"
-            value={`${commas(activeXcp)} XCP`}
-            hint="in launches minting now"
-          />
-          <Stat
-            label="Ever committed"
-            value={`${commas(lifetimeXcp)} XCP`}
-            hint="all conforming mint payments"
-          />
-        </div>
-        <p className="mt-2 text-xs leading-relaxed text-gray-500">
-          Ever committed includes XCP later refunded and XCP from launches that
-          graduated. Active escrow is the amount currently held in open mints.
-        </p>
       </section>
 
       {/* ---------------- who has earned what ---------------- */}

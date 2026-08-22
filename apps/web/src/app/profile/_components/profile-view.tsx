@@ -10,15 +10,16 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 import { ActivityTab } from "@/app/profile/_components/activity-tab";
 import { HistoryTab } from "@/app/profile/_components/history-tab";
 import { LaunchesTab } from "@/app/profile/_components/launches-tab";
+import { MintingTab } from "@/app/profile/_components/minting-tab";
 import { PositionsTab } from "@/app/profile/_components/positions-tab";
 
-type Tab = "positions" | "history" | "activity" | "launches";
-
+type Tab = "positions" | "history" | "activity" | "minting" | "launches";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "positions", label: "Positions" },
   { id: "history", label: "Closed" },
   { id: "activity", label: "Activity" },
+  { id: "minting", label: "Minting" },
   { id: "launches", label: "Launches" },
 ];
 
@@ -116,7 +117,10 @@ export function ProfileView({ viewing }: { viewing?: string }) {
       <div className="rounded-2xl border border-gray-200 bg-white">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <div className="border-b border-gray-200 p-2">
-            <SegmentedList variant="card">
+            <SegmentedList
+              variant="card"
+              className="!flex-nowrap overflow-x-auto text-xs sm:text-sm [&_[role=tab]]:!px-2"
+            >
               {TABS.map((t) => (
                 <SegmentedTrigger key={t.id} value={t.id} variant="card" grow={false}>
                   {t.label}
@@ -129,6 +133,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
           {tab === "positions" && <PositionsTab address={address} />}
           {tab === "history" && <HistoryTab address={address} />}
           {tab === "activity" && <ActivityTab address={address} />}
+          {tab === "minting" && <MintingTab address={address} />}
           {tab === "launches" && <LaunchesTab address={address} />}
         </div>
       </div>
