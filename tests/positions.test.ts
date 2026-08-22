@@ -37,4 +37,49 @@ describe("position accounting", () => {
     expect(totalPnlXcpSats(open[0]!)).toBeNull();
     expect(open[0]!.withheld).toContain("doesn't reconcile");
   });
+
+  it("marks an incoming transfer at arrival value without losing known trade basis", () => {
+    const deltas: PairedDelta[] = [
+      { asset: "A", block: 1, tokenDelta: 100n, xcpDelta: -100n },
+      {
+        asset: "A",
+        block: 2,
+        tokenDelta: 10n,
+        xcpDelta: 0n,
+        external: true,
+      },
+    ];
+    const { open } = computePositions(
+      deltas,
+      universe,
+      new Map([["A", 110n]]),
+      (_asset, _block, quantity) => quantity * 2n,
+    );
+    expect(open[0]).toMatchObject({
+      costXcpSats: 120n,
+      valueXcpSats: 220n,
+      unrealizedXcpSats: 100n,
+      realizedXcpSats: 0n,
+    });
+    expect(open[0]!.withheld).toBeUndefined();
+  });
+
+  it("carries basis out on an external transfer without realizing a loss", () => {
+    const deltas: PairedDelta[] = [
+      { asset: "A", block: 1, tokenDelta: 100n, xcpDelta: -100n },
+      {
+        asset: "A",
+        block: 2,
+        tokenDelta: -25n,
+        xcpDelta: 0n,
+        external: true,
+      },
+    ];
+    const { open } = computePositions(deltas, universe, new Map([["A", 75n]]));
+    expect(open[0]).toMatchObject({
+      costXcpSats: 75n,
+      realizedXcpSats: 0n,
+      unrealizedXcpSats: 75n,
+    });
+  });
 });

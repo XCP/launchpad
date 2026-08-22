@@ -54,25 +54,47 @@ export async function refreshRollup(db: D1Database): Promise<RollupResult> {
     activityTotals(db),
     mintsByBucket(db),
   ]);
-  const totals = totalsRows[0] ?? { mints: 0, minters: 0, paid_xcp: 0, fee_sats: 0 };
+  const totals = totalsRows[0] ?? {
+    mints: 0,
+    minters: 0,
+    paid_xcp: 0,
+    fee_sats: 0,
+    fee_samples: 0,
+    median_fee_sats: 0,
+  };
   const now = Math.floor(Date.now() / 1000);
 
   const totalsRes = await db
     .prepare(
-      `INSERT INTO mint_totals (id, mints, minters, paid_xcp, fee_sats, updated_at)
-       VALUES (1, ?1, ?2, ?3, ?4, ?5)
+      `INSERT INTO mint_totals (
+         id, mints, minters, paid_xcp, fee_sats, fee_samples,
+         median_fee_sats, updated_at
+       )
+       VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7)
        ON CONFLICT(id) DO UPDATE SET
          mints = excluded.mints,
          minters = excluded.minters,
          paid_xcp = excluded.paid_xcp,
          fee_sats = excluded.fee_sats,
+         fee_samples = excluded.fee_samples,
+         median_fee_sats = excluded.median_fee_sats,
          updated_at = excluded.updated_at
        WHERE mint_totals.mints IS NOT excluded.mints
           OR mint_totals.minters IS NOT excluded.minters
           OR mint_totals.paid_xcp IS NOT excluded.paid_xcp
-          OR mint_totals.fee_sats IS NOT excluded.fee_sats`,
+          OR mint_totals.fee_sats IS NOT excluded.fee_sats
+          OR mint_totals.fee_samples IS NOT excluded.fee_samples
+          OR mint_totals.median_fee_sats IS NOT excluded.median_fee_sats`,
     )
-    .bind(totals.mints, totals.minters, totals.paid_xcp, totals.fee_sats, now)
+    .bind(
+      totals.mints,
+      totals.minters,
+      totals.paid_xcp,
+      totals.fee_sats,
+      totals.fee_samples,
+      totals.median_fee_sats,
+      now,
+    )
     .run();
 
   const bucketsWritten = await writeBuckets(db, buckets);

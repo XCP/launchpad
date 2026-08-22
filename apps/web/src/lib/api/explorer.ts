@@ -3,9 +3,11 @@ import { XCP_API_BASE } from "@/lib/constants";
 interface ExplorerLedgerRow {
   direction: "in" | "out";
   block_index: number;
+  tx_hash: string;
   asset: string;
   /** Raw quantity, preserved as text by the explorer index. */
   quantity: string;
+  calling_function?: string | null;
 }
 
 interface LedgerPage {
@@ -16,8 +18,10 @@ interface LedgerPage {
 export interface DatedBalanceMovement {
   asset: string;
   block: number;
+  txHash: string;
   quantity: string;
   direction: 1 | -1;
+  callingFunction: string | null;
 }
 
 export interface LedgerWindow {
@@ -63,8 +67,10 @@ export async function fetchAddressLedgerSince(
       movements.push({
         asset: row.asset,
         block: row.block_index,
+        txHash: row.tx_hash,
         quantity: row.quantity,
         direction: row.direction === "in" ? 1 : -1,
+        callingFunction: row.calling_function ?? null,
       });
     }
     nextOffset = page.next_offset ?? null;

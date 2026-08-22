@@ -21,9 +21,9 @@ export const POOL_XCP = 1_000;
 /** XCP per MINTS, implied by the pool ratio rather than quoted separately. */
 export const MINTS_PRICE_XCP = POOL_XCP / POOL_MINTS;
 
-/** A mint transaction's Bitcoin fee, measured across every mint on the site
- *  so far — used to state what share of a minter's cost is covered. */
-export const TYPICAL_MINT_FEE_SATS = 273;
+/** Used only if the measured fee rollup is unavailable during a deploy or API
+ *  outage. The rewards page normally uses the live observed median. */
+export const FALLBACK_MINT_FEE_SATS = 273;
 export const SATS_PER_XCP = 2_446;
 
 export const BOUNTIES = [

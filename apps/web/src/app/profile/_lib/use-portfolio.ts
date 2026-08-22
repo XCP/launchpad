@@ -40,6 +40,12 @@ export interface Portfolio {
 /** The largest chart window offered by the UI. */
 const HISTORY_BLOCKS = 4_320;
 
+/** Token credits that enter from outside this portfolio without an XCP leg.
+ * They are priced at arrival so gifts and distributions do not masquerade as
+ * trading profit. Market fills and fairmint settlement are already paired by
+ * the focused index and must not be duplicated here. */
+const EXTERNAL_INFLOW_REASONS = new Set(["send", "mpma send", "dividend"]);
+
 /** Positions and closed positions come out of one pass over the ledger, so
  *  both tabs share a cache key and the work happens once. */
 export function usePortfolio(address: string) {
@@ -101,12 +107,18 @@ export function usePortfolio(address: string) {
         }),
       );
 
-      const positions = computePositions(paired, universe, balances);
-      const incomplete = [
-        ...positions.open.filter((position) => position.withheld).map((position) => position.asset),
-        ...positions.closed.filter((position) => position.withheld).map((position) => position.asset),
+      let positions = computePositions(paired, universe, balances);
+      const issuesFor = (result: typeof positions) => [
+        ...new Set([
+          ...result.open
+            .filter((position) => position.withheld)
+            .map((position) => position.asset),
+          ...result.closed
+            .filter((position) => position.withheld)
+            .map((position) => position.asset),
+        ]),
       ];
-      const historyIssues = [...new Set(incomplete)];
+      let historyIssues = issuesFor(positions);
 
       // Fast and cheap for most wallets: mint + market deltas already reconcile
       // exactly. Only a mismatch pays for the bounded ledger fallback, which
@@ -119,6 +131,7 @@ export function usePortfolio(address: string) {
         block: d.block,
         tokenDelta: d.tokenDelta,
       }));
+      let externalFlows: PairedDelta[] = [];
       if (!historyComplete && positions.open.length > 0 && tipBlock > 0) {
         try {
           const fromBlock = Math.max(0, tipBlock - HISTORY_BLOCKS);
@@ -133,6 +146,28 @@ export function usePortfolio(address: string) {
                 tokenDelta: BigInt(entry.quantity) * BigInt(entry.direction),
               }));
             deltas = anchorBalanceWindow(movements, balances, fromBlock);
+            // A send or distribution is an external portfolio flow, not a
+            // trade. It is absent from the focused mint/trade index by design.
+            // Incoming tokens enter at their arrival value so a gift is not
+            // reported as trading profit. Other actions (liquidity, dispenser,
+            // attach/detach) stay withheld until their economic legs can be
+            // paired honestly.
+            externalFlows = ledger.movements
+              .filter(
+                (entry) =>
+                  universeAssets.has(entry.asset) &&
+                  entry.direction === 1 &&
+                  entry.callingFunction !== null &&
+                  EXTERNAL_INFLOW_REASONS.has(entry.callingFunction),
+              )
+              .map((entry) => ({
+                asset: entry.asset,
+                block: entry.block,
+                tokenDelta:
+                  BigInt(entry.quantity) * BigInt(entry.direction),
+                xcpDelta: 0n,
+                external: true,
+              }));
             historyComplete = true;
           }
         } catch {
@@ -164,6 +199,26 @@ export function usePortfolio(address: string) {
             );
           }),
       );
+
+      if (externalFlows.length > 0) {
+        positions = computePositions(
+          [...paired, ...externalFlows],
+          universe,
+          balances,
+          (asset, block, quantity) => {
+            const snapshots = prices.get(asset) ?? [];
+            let snapshot: PriceSnapshot | null = null;
+            for (const candidate of snapshots) {
+              if (candidate.block > block) break;
+              snapshot = candidate;
+            }
+            return snapshot && snapshot.tokenReserve > 0n
+              ? (quantity * snapshot.xcpReserve) / snapshot.tokenReserve
+              : null;
+          },
+        );
+        historyIssues = issuesFor(positions);
+      }
 
       return {
         ...positions,

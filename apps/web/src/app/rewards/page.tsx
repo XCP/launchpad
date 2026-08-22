@@ -15,11 +15,11 @@ import { TokenImage } from "@/components/token-image";
 import { XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
 import {
   BOUNTIES,
+  FALLBACK_MINT_FEE_SATS,
   MINT_CAP,
   MINTS_PER_MINT,
   MINTS_PRICE_XCP,
   SATS_PER_XCP,
-  TYPICAL_MINT_FEE_SATS,
 } from "@/lib/rewards";
 import { EarnersTable } from "@/app/rewards/_components/earners-table";
 
@@ -73,7 +73,10 @@ export default async function RewardsPage() {
   // measured constant stands in only when a feed is down.
   const satsPerXcp =
     btcUsd && xcpUsd && xcpUsd > 0 ? (xcpUsd / btcUsd) * 1e8 : SATS_PER_XCP;
-  const feeXcp = TYPICAL_MINT_FEE_SATS / satsPerXcp;
+  const feeSamples = stats?.activity.fee_samples ?? 0;
+  const measuredFee = stats?.activity.median_fee_sats ?? 0;
+  const typicalMintFeeSats = measuredFee > 0 ? measuredFee : FALLBACK_MINT_FEE_SATS;
+  const feeXcp = typicalMintFeeSats / satsPerXcp;
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
@@ -132,13 +135,13 @@ export default async function RewardsPage() {
           />
           <Stat
             label="Your fee"
-            value={`~${TYPICAL_MINT_FEE_SATS} sats`}
-            hint={`~${feeXcp.toFixed(2)} XCP, typical`}
+            value={`~${commas(typicalMintFeeSats)} sats`}
+            hint={`~${feeXcp.toFixed(2)} XCP · ${measuredFee > 0 ? `${commas(feeSamples)}-mint median` : "estimate"}`}
           />
           <Stat
             label="Covered"
             value={`${Math.round((rewardXcp / feeXcp) * 100)}%`}
-            hint="of what a mint costs you"
+            hint="of the typical mint fee"
           />
         </div>
 

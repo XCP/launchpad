@@ -33,7 +33,11 @@ import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { useSwapSettings } from "@/app/swap/_components/swap-settings";
-import { defaultTradeAsset } from "@/lib/trade-selection";
+import {
+  defaultTradeAsset,
+  selectTradeAsset,
+  type TradePairLeg,
+} from "@/lib/trade-selection";
 
 /** Typical composed order size (1–2 inputs, OP_RETURN, change) for the
  *  TX-fee estimate; the true size is known only after compose. */
@@ -65,10 +69,10 @@ export function SwapWidget({
 }) {
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
-  const [asset, setAsset] = useState(() => defaultTradeAsset(assets));
-  const [side, setSide] = useState<"buy" | "sell">("buy");
+  const [giveAsset, setGiveAsset] = useState("XCP");
+  const [getAsset, setGetAsset] = useState(() => defaultTradeAsset(assets));
   const [amount, setAmount] = useState("");
-  const [selectorOpen, setSelectorOpen] = useState(false);
+  const [selectorLeg, setSelectorLeg] = useState<TradePairLeg | null>(null);
   const [rateInverted, setRateInverted] = useState(false);
   const [flips, setFlips] = useState(0);
   const [priceMoved, setPriceMoved] = useState(false);
@@ -99,8 +103,14 @@ export function SwapWidget({
   );
   const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
 
-  const giveAsset = side === "buy" ? "XCP" : asset;
-  const getAsset = side === "buy" ? asset : "XCP";
+  const action =
+    giveAsset === "XCP" ? "buy" : getAsset === "XCP" ? "sell" : "swap";
+  const actionLabel =
+    action === "buy" ? "Buy" : action === "sell" ? "Sell" : "Swap";
+  const selectableAssets = [
+    "XCP",
+    ...assets.filter((asset) => asset !== "XCP"),
+  ];
   // Parse the typed digits exactly (a full XCP-69 bag is 10^16 raw, past
   // double precision); the double beside it feeds UI-only paths.
   const amountExact = parseUnitsToRaw(amount) ?? 0n;
@@ -108,11 +118,12 @@ export function SwapWidget({
   const debouncedRaw = useDebounced(amountRaw, 250);
 
   const quoteUrl =
-    asset && debouncedRaw > 0
-      ? `${COUNTERPARTY_API_BASE}/pools/${giveAsset}/${getAsset}/quote?quantity=${debouncedRaw}`
+    giveAsset && getAsset && giveAsset !== getAsset && debouncedRaw > 0
+      ? `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(giveAsset)}/${encodeURIComponent(getAsset)}/quote?quantity=${debouncedRaw}`
       : null;
   const {
     data: quote,
+    error: quoteError,
     isValidating,
     mutate: mutateQuote,
   } = useSWR<Quote>(
@@ -120,7 +131,6 @@ export function SwapWidget({
     (url: string) => fetchJson(url).then((d) => d.result),
     {
       refreshInterval: QUOTE_REFRESH_MS,
-      keepPreviousData: true,
       onSuccess: () => setLastQuoteAt(Date.now()),
     },
   );
@@ -137,26 +147,41 @@ export function SwapWidget({
 
   // What the market holds of the buy asset — the pool reserve (the book
   // varies too fast to sum honestly client-side).
-  const { data: poolInfo } = useSWR<{
+  const { data: poolInfo, error: poolError } = useSWR<{
     asset_a: string;
+    asset_b: string;
     reserve_a: Raw;
     reserve_b: Raw;
   } | null>(
-    asset ? [asset, "swap-pool-reserves"] : null,
+    giveAsset && getAsset && giveAsset !== getAsset
+      ? [giveAsset, getAsset, "swap-pool-reserves"]
+      : null,
     () =>
-      fetchJson(`${COUNTERPARTY_API_BASE}/pools/${asset}/XCP`)
+      fetchJson(
+        `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(giveAsset)}/${encodeURIComponent(getAsset)}`,
+      )
         .then((d) => d.result ?? null)
-        .catch(() => null),
+        .catch((error: unknown) => {
+          // Counterparty uses 404 for a pair with no pool. That is a normal
+          // market state: the quote endpoint may still find resting orders.
+          if (error instanceof Error && error.message === "HTTP 404") {
+            return null;
+          }
+          throw error;
+        }),
     { refreshInterval: 60_000 },
   );
-  const availableRaw = poolInfo
-    ? getAsset === "XCP"
-      ? poolInfo.asset_a === "XCP"
-        ? poolInfo.reserve_a
-        : poolInfo.reserve_b
-      : poolInfo.asset_a === "XCP"
+  const poolHasLiquidity = Boolean(
+    poolInfo &&
+      approx(poolInfo.reserve_a) > 0 &&
+      approx(poolInfo.reserve_b) > 0,
+  );
+  const availableRaw = poolInfo && poolHasLiquidity
+    ? poolInfo.asset_a === getAsset
+      ? poolInfo.reserve_a
+      : poolInfo.asset_b === getAsset
         ? poolInfo.reserve_b
-        : poolInfo.reserve_a
+        : null
     : null;
 
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
@@ -183,10 +208,16 @@ export function SwapWidget({
 
   useEffect(() => {
     if (compose.status === "confirmed") {
+      const label =
+        action === "buy"
+          ? `Buy ${getAsset} — market order`
+          : action === "sell"
+            ? `Sell ${giveAsset} — market order`
+            : `Swap ${giveAsset} for ${getAsset} — market order`;
       registerPending({
         txid: compose.txid,
         kind: "order",
-        label: `${side === "buy" ? "Buy" : "Sell"} ${asset} — market order`,
+        label,
         address: address ?? undefined,
         giveAsset,
         giveRaw: amountExact.toString(),
@@ -195,9 +226,9 @@ export function SwapWidget({
   }, [
     compose.status,
     compose.txid,
-    side,
-    asset,
+    action,
     giveAsset,
+    getAsset,
     amountExact,
     address,
   ]);
@@ -207,27 +238,25 @@ export function SwapWidget({
     amountRaw > 0 &&
     approx(outRaw) > 0 &&
     !busy &&
-    !insufficient;
+    !insufficient &&
+    !staleQuote;
 
   // USD on BOTH sides, derived through the XCP leg of the trade.
-  const xcpLeg = side === "buy" ? amountHuman : out;
-  const tradeUsd = xcpUsd && xcpLeg > 0 ? xcpLeg * xcpUsd : null;
-  const giveUsd =
-    giveAsset === "XCP"
-      ? xcpUsd && amountHuman > 0
-        ? amountHuman * xcpUsd
-        : null
-      : tradeUsd;
-  const getUsd = getAsset === "XCP" ? tradeUsd : out > 0 ? tradeUsd : null;
+  const xcpLeg =
+    giveAsset === "XCP" ? amountHuman : getAsset === "XCP" ? out : null;
+  const tradeUsd =
+    xcpUsd !== null && xcpLeg !== null ? xcpLeg * xcpUsd : null;
+  const giveUsd = tradeUsd;
+  const getUsd = tradeUsd;
 
   // Reported here rather than alongside registerPending above, because the
   // trade's USD value isn't computed until this point. trackTx dedupes on the
   // txid, so this effect re-running as the rate refreshes costs nothing.
   useEffect(() => {
     if (compose.status === "confirmed") {
-      trackTx(compose.txid, side === "buy" ? "buy" : "sell", tradeUsd);
+      trackTx(compose.txid, action, tradeUsd);
     }
-  }, [compose.status, compose.txid, side, tradeUsd]);
+  }, [compose.status, compose.txid, action, tradeUsd]);
 
   // Rate line: 1 <base> = <rate> <quote asset>, tap to invert.
   const rate = out > 0 && amountHuman > 0 ? out / amountHuman : null;
@@ -237,16 +266,23 @@ export function SwapWidget({
         ? `1 ${getAsset} = ${formatPrice(1 / rate)} ${giveAsset}`
         : `1 ${giveAsset} = ${formatPrice(rate)} ${getAsset}`
       : null;
-  const rateBaseUsd =
+  const giveUnitUsd =
     rate !== null && xcpUsd
-      ? rateInverted
-        ? getAsset === "XCP"
-          ? xcpUsd
-          : (xcpLeg / (side === "buy" ? out : amountHuman)) * xcpUsd
-        : giveAsset === "XCP"
-          ? xcpUsd
-          : (xcpLeg / (side === "buy" ? out : amountHuman)) * xcpUsd
+      ? giveAsset === "XCP"
+        ? xcpUsd
+        : getAsset === "XCP"
+          ? rate * xcpUsd
+          : null
       : null;
+  const getUnitUsd =
+    rate !== null && xcpUsd
+      ? getAsset === "XCP"
+        ? xcpUsd
+        : giveAsset === "XCP"
+          ? (1 / rate) * xcpUsd
+          : null
+      : null;
+  const rateBaseUsd = rateInverted ? getUnitUsd : giveUnitUsd;
 
   const submit = async () => {
     if (!ready || !quote || !quoteUrl) return;
@@ -276,18 +312,35 @@ export function SwapWidget({
   const flip = () => {
     setFlips((f) => f + 1);
     if (out > 0) setAmount(fmtAmount(out));
-    setSide(side === "buy" ? "sell" : "buy");
+    setGiveAsset(getAsset);
+    setGetAsset(giveAsset);
+    setRateInverted(false);
     setPriceMoved(false);
   };
 
-  // Every ticker is a dropdown on the swap page — the XCP side included;
-  // both open the same pair selector. On a single-asset surface (the asset
-  // page) the chip is identity, not a control — no chevron, no modal.
-  const chipFor = (a: string) =>
+  const chooseAsset = (nextAsset: string) => {
+    if (!selectorLeg) return;
+    const nextPair = selectTradeAsset(
+      giveAsset,
+      getAsset,
+      selectorLeg,
+      nextAsset,
+    );
+    setGiveAsset(nextPair.giveAsset);
+    setGetAsset(nextPair.getAsset);
+    setAmount("");
+    setRateInverted(false);
+    setPriceMoved(false);
+  };
+
+  // Each ticker independently edits the leg that was clicked. If the user
+  // chooses the opposite leg's token, the pair flips instead of becoming an
+  // impossible same-token swap. Compact asset-page cards remain fixed.
+  const chipFor = (a: string, leg: TradePairLeg) =>
     compact ? (
       <AssetChip asset={a} />
     ) : (
-      <AssetChip asset={a} onClick={() => setSelectorOpen(true)} />
+      <AssetChip asset={a} onClick={() => setSelectorLeg(leg)} />
     );
 
   // Presets live in the label row in both layouts, always visible while
@@ -357,14 +410,22 @@ export function SwapWidget({
         : approx(outRaw) === 0
           ? staleQuote
             ? "Fetching quote…"
-            : availableRaw
+            : quoteError
+              ? !poolHasLiquidity
+                ? "No quote for this pair"
+                : "Quote unavailable"
+            : availableRaw !== null
               ? "Amount too small — rounds to 0"
-              : "Insufficient liquidity"
+              : "No quote for this pair"
           : slippage >= 20
-            ? `${side === "buy" ? "Buy" : "Sell"} anyway — ${slippage}% slippage`
+            ? `${actionLabel} anyway — ${slippage}% slippage`
             : impact >= 5
-              ? `${side === "buy" ? "Buy" : "Sell"} anyway`
-              : `${side === "buy" ? "Buy" : "Sell"} ${asset}`;
+              ? `${actionLabel} anyway`
+              : action === "buy"
+                ? `Buy ${getAsset}`
+                : action === "sell"
+                  ? `Sell ${giveAsset}`
+                  : `Swap ${giveAsset} for ${getAsset}`;
 
   // The live slippage figure in the buy-well corner; the gear that edits
   // it sits beside the mode tabs (the Uniswap placement). Auto is marked.
@@ -390,10 +451,12 @@ export function SwapWidget({
         layout={compact ? "stack" : "row"}
         label="Sell"
         topRight={presetRow || undefined}
-        chip={chipFor(giveAsset)}
+        chip={chipFor(giveAsset, "give")}
         footer={
           <>
-            <span>≈ {usdFmt(giveUsd ?? 0)}</span>
+            <span>
+              {giveUsd === null ? "USD unavailable" : `≈ ${usdFmt(giveUsd)}`}
+            </span>
             {balanceLabel}
           </>
         }
@@ -418,10 +481,12 @@ export function SwapWidget({
         layout={compact ? "stack" : "row"}
         label="Buy"
         topRight={availableLabel || undefined}
-        chip={chipFor(getAsset)}
+        chip={chipFor(getAsset, "get")}
         footer={
           <>
-            <span>≈ {usdFmt(getUsd ?? 0)}</span>
+            <span>
+              {getUsd === null ? "USD unavailable" : `≈ ${usdFmt(getUsd)}`}
+            </span>
             {slippageControl}
           </>
         }
@@ -525,6 +590,20 @@ export function SwapWidget({
       )}
 
       <div className="px-0.5 pb-0.5 pt-3">
+        {poolInfo !== undefined && !poolHasLiquidity && !poolError && (
+          <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            No active {giveAsset}/{getAsset} pool liquidity. A resting order
+            can still fill through the order book.
+          </p>
+        )}
+
+        {poolError && (
+          <p className="mb-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            Couldn&apos;t check the {giveAsset}/{getAsset} pool. Quotes may still
+            use the order book.
+          </p>
+        )}
+
         {priceMoved && (
           <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
             Quote moved — the numbers above are updated. Press again to swap
@@ -572,16 +651,13 @@ export function SwapWidget({
 
       {!compact && (
         <TokenSelectModal
-          open={selectorOpen}
-          onClose={() => setSelectorOpen(false)}
-          assets={assets}
-          selected={asset}
+          open={selectorLeg !== null}
+          onClose={() => setSelectorLeg(null)}
+          assets={selectableAssets}
+          selected={selectorLeg === "give" ? giveAsset : getAsset}
           address={address}
-          onSelect={(a) => {
-            setAsset(a);
-            setAmount("");
-            setPriceMoved(false);
-          }}
+          title={selectorLeg === "give" ? "Choose what to sell" : "Choose what to buy"}
+          onSelect={chooseAsset}
         />
       )}
     </div>

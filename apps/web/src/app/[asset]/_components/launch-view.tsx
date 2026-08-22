@@ -760,6 +760,7 @@ export function LaunchView({
         mints={mints}
         divisible={fm.divisible}
         issuerSource={fm.source}
+        poolXcpRaw={pool ? String(poolXcpRaw) : undefined}
         poolTokensRaw={pool ? String(poolTokensRaw) : undefined}
       />
       </LaunchRoomProvider>

@@ -17,6 +17,15 @@ export const revalidate = 60;
  *  returns; anything longer stops being "lately". */
 const WINDOW_DAYS = 28;
 
+/** Stats are aggregate estimates, so one decimal keeps partial XCP visible
+ * without implying transaction-level precision. Keep every XCP figure on
+ * this page on the same visual scale. */
+const formatXcp = (value: number) =>
+  value.toLocaleString("en-US", {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
+
 /**
  * The scoreboard, and the one place refunded launches are counted.
  *
@@ -82,31 +91,31 @@ export default async function StatsPage() {
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <Stat
+          label="Market cap"
+          value={xcpUsd ? usd(marketCapXcp * xcpUsd) : `${formatXcp(marketCapXcp)} XCP`}
+          hint={`${formatXcp(marketCapXcp)} XCP · graduated coins`}
+        />
+        <Stat
+          label="XCP in pools"
+          value={`${formatXcp(poolXcp)} XCP`}
+          hint={xcpUsd ? `≈ ${usd(poolXcp * xcpUsd)} in locked pools` : "in locked pools"}
+        />
+        <Stat
+          label="Ever escrowed"
+          value={`${formatXcp(committedXcp)} XCP`}
+          hint={xcpUsd ? `≈ ${usd(committedXcp * xcpUsd)}` : "across all mint history"}
+        />
         <Stat label="Mints" value={commas(activity.mints)} hint="mint transactions" />
         <Stat label="Minters" value={commas(activity.minters)} hint="distinct addresses" />
         <Stat
           label="Active escrow"
-          value={`${commas(activeXcp)} XCP`}
+          value={`${formatXcp(activeXcp)} XCP`}
           hint={
             xcpUsd
               ? `≈ ${usd(activeXcp * xcpUsd)} committed to open mints`
               : "committed to open mints"
           }
-        />
-        <Stat
-          label="Ever committed"
-          value={`${commas(committedXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(committedXcp * xcpUsd)}` : "across all mint history"}
-        />
-        <Stat
-          label="XCP in pools"
-          value={`${commas(poolXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(poolXcp * xcpUsd)} in locked pools` : "in locked pools"}
-        />
-        <Stat
-          label="Market cap"
-          value={xcpUsd ? usd(marketCapXcp * xcpUsd) : `${commas(marketCapXcp)} XCP`}
-          hint={`${commas(marketCapXcp)} XCP · graduated coins`}
         />
       </section>
 
@@ -206,7 +215,7 @@ export default async function StatsPage() {
                 {refundSeries.map((d) => (
                   <div
                     key={d.bucket}
-                    title={`${d.n} refund${d.n === 1 ? "" : "s"} · ${commas(d.xcp)} XCP returned · about ${d.daysAgo === 0 ? "today" : `${d.daysAgo}d ago`}`}
+                    title={`${d.n} refund${d.n === 1 ? "" : "s"} · ${formatXcp(d.xcp)} XCP returned · about ${d.daysAgo === 0 ? "today" : `${d.daysAgo}d ago`}`}
                     className="flex-1 rounded-t-sm bg-gray-300 transition-colors hover:bg-gray-500"
                     style={{ height: `${Math.max(2, (d.n / refundPeak) * 100)}%` }}
                   />

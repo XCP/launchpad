@@ -574,6 +574,10 @@ export interface ActivityTotals {
   paid_xcp: number;
   /** Bitcoin satoshi spent on mint transaction fees. */
   fee_sats: number;
+  /** Conforming mints whose Bitcoin fee has been indexed. */
+  fee_samples: number;
+  /** Median observed Bitcoin fee per conforming mint transaction. */
+  median_fee_sats: number;
 }
 
 /**
@@ -596,13 +600,29 @@ export interface ActivityTotals {
 export function activityTotals(db: D1Database): Promise<ActivityTotals[]> {
   return q<ActivityTotals>(
     db,
-    `SELECT
-       COUNT(*) AS mints,
-       COUNT(DISTINCT m.source) AS minters,
-       CAST(COALESCE(SUM(CAST(m.paid_quantity AS INTEGER)), 0) AS INTEGER) AS paid_xcp,
-       CAST(COALESCE(SUM(m.fee_sats), 0) AS INTEGER) AS fee_sats
-     FROM launch_mints m
-     JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1`,
+    `WITH eligible AS (
+       SELECT m.source, m.paid_quantity, m.fee_sats
+         FROM launch_mints m
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+     ),
+     ranked_fees AS (
+       SELECT fee_sats,
+              ROW_NUMBER() OVER (ORDER BY fee_sats) AS rn,
+              COUNT(*) OVER () AS n
+         FROM eligible
+        WHERE fee_sats IS NOT NULL
+     )
+     SELECT
+       (SELECT COUNT(*) FROM eligible) AS mints,
+       (SELECT COUNT(DISTINCT source) FROM eligible) AS minters,
+       CAST(COALESCE((SELECT SUM(CAST(paid_quantity AS INTEGER)) FROM eligible), 0) AS INTEGER) AS paid_xcp,
+       CAST(COALESCE((SELECT SUM(fee_sats) FROM eligible), 0) AS INTEGER) AS fee_sats,
+       (SELECT COUNT(*) FROM ranked_fees) AS fee_samples,
+       COALESCE((
+         SELECT CAST(AVG(fee_sats) AS INTEGER)
+           FROM ranked_fees
+          WHERE rn IN ((n + 1) / 2, (n + 2) / 2)
+       ), 0) AS median_fee_sats`,
   );
 }
 
@@ -673,7 +693,8 @@ export function mintsByBucket(db: D1Database): Promise<MintBucket[]> {
 export function getMintTotals(db: D1Database): Promise<ActivityTotals | null> {
   return one<ActivityTotals>(
     db,
-    `SELECT mints, minters, paid_xcp, fee_sats FROM mint_totals WHERE id = 1`,
+    `SELECT mints, minters, paid_xcp, fee_sats, fee_samples, median_fee_sats
+       FROM mint_totals WHERE id = 1`,
   );
 }
 

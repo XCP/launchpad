@@ -26,7 +26,10 @@ import { useLaunchRoom } from "@/app/[asset]/_components/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
-import { AddressHoverCard } from "@/components/address-hover-card";
+import {
+  AddressHoverCard,
+  LaunchpadAddressHoverCard,
+} from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
 import { mergePairTrades } from "@launchpad/xcp69/trades";
 import {
@@ -77,6 +80,7 @@ export function ActivityTabs({
   minting = false,
   issuerSource,
   blockHeight,
+  poolXcpRaw,
   poolTokensRaw,
 }: {
   asset: string;
@@ -88,6 +92,8 @@ export function ActivityTabs({
   issuerSource?: string;
   /** Needed only for the Minters tab, to judge address freshness. */
   blockHeight?: number;
+  /** XCP side of the pool, reused by the trader hover's reconciled PnL. */
+  poolXcpRaw?: Raw;
   /** Token side of the locked pool. Counterparty holds pool reserves in the
    *  pool itself, not at an address, so it never appears in /balances — which
    *  quietly makes the holder list look like it covers the whole supply when
@@ -190,6 +196,11 @@ export function ActivityTabs({
           { address: POOL_ROW, quantity: big(poolTokensRaw) },
         ].sort((a, b) => compareRawDesc(a.quantity, b.quantity))
       : holderHistory;
+  const holderBalance = new Map(
+    holderRows
+      .filter((row) => row.address !== POOL_ROW)
+      .map((row) => [row.address, row.quantity]),
+  );
   // Shares are of circulating PLUS the locked pool, which is what makes them
   // read as shares of supply rather than of whatever is left over.
   const holderTotal = sumRaw(holderRows.map((h) => h.quantity));
@@ -552,13 +563,17 @@ export function ActivityTabs({
                         </td>
                         <td className="px-3 py-2">
                           <span className="flex items-center gap-1.5 whitespace-nowrap">
-                            <Link
-                              href={`/profile/${t.addr}`}
+                            <LaunchpadAddressHoverCard
+                              source={t.addr}
+                              asset={asset}
+                              balanceRaw={holderBalance.get(t.addr)}
+                              poolXcpRaw={poolXcpRaw}
+                              poolTokenRaw={poolTokensRaw}
                               className="flex items-center gap-1.5 font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline"
                             >
                               <Identicon address={t.addr} />
                               {shortAddress(t.addr)}
-                            </Link>
+                            </LaunchpadAddressHoverCard>
                             {issuerSource === t.addr && (
                               <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
                                 dev
@@ -637,12 +652,12 @@ export function ActivityTabs({
                           {isUtxo ? (
                             `${h.address.slice(0, 17)}…`
                           ) : (
-                            <Link
-                              href={`/profile/${h.address}`}
+                            <AddressHoverCard
+                              source={h.address}
                               className="hover:text-purple-700 hover:underline"
                             >
                               {shortAddress(h.address)}
-                            </Link>
+                            </AddressHoverCard>
                           )}
                         </>
                       )}

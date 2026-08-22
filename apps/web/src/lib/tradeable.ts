@@ -20,7 +20,9 @@ const SPECIAL_POOLS = ["PEPECASH", "MINTS"];
 
 /**
  * Tradeable = graduated XCP-69 (conforming, with a live pool) plus the
- * verified special pools, deepest first. One leg is always XCP.
+ * verified special pools, deepest first. Every listed token has an XCP
+ * reference pool; the swap form may pair any two listed tokens when a direct
+ * pool or order-book market exists.
  */
 export async function fetchTradeableAssets(): Promise<string[]> {
   const fairminters = await fetchAllFairminters();

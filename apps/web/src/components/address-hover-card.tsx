@@ -8,8 +8,12 @@ import { fetchJson } from "@/lib/client";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import {
   commas,
+  compact,
   shortAddress,
+  tokenQty,
 } from "@/lib/format";
+import { big, type RawLike } from "@/lib/numeric";
+import { fetchLaunchpadAddressSummary } from "@/lib/api/launchpad-api";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import {
   type Fairminter,
@@ -442,6 +446,142 @@ export function AddressHoverCard({
         >
           Explorer ↗
         </a>
+      </div>
+    </HoverCard>
+  );
+}
+
+/**
+ * A launchpad-native preview for a trader row.
+ *
+ * Unlike AddressHoverCard this never calls XCP.io. One request, armed by the
+ * hover itself, reads the mint and market indexes xcp.fun already maintains.
+ * The caller supplies the live balance and pool reserves already present on
+ * the asset page; PnL is shown only when that balance exactly reconciles with
+ * the focused mint/trade history. Sends, LP actions and other outside movement
+ * therefore produce an activity summary, not a confident but wrong basis.
+ */
+export function LaunchpadAddressHoverCard({
+  source,
+  asset,
+  balanceRaw,
+  poolXcpRaw,
+  poolTokenRaw,
+  className = "",
+  children,
+}: {
+  source: string;
+  asset: string;
+  balanceRaw?: RawLike;
+  poolXcpRaw?: RawLike;
+  poolTokenRaw?: RawLike;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [armed, setArmed] = useState(false);
+  const coarse = useCoarsePointer();
+  const { data, isLoading } = useSWR(
+    armed ? ["launchpad-address-summary", source, asset] : null,
+    () => fetchLaunchpadAddressSummary(source, asset),
+    { revalidateOnFocus: false },
+  );
+
+  const balance = balanceRaw === undefined ? null : big(balanceRaw);
+  const xcpReserve = poolXcpRaw === undefined ? 0n : big(poolXcpRaw);
+  const tokenReserve = poolTokenRaw === undefined ? 0n : big(poolTokenRaw);
+  const tracked = data?.asset.tracked;
+  const reconciles = Boolean(
+    tracked?.complete &&
+      balance !== null &&
+      big(tracked.quantity) === balance &&
+      tokenReserve > 0n,
+  );
+  const value =
+    reconciles && balance !== null
+      ? (balance * xcpReserve) / tokenReserve
+      : null;
+  const pnl =
+    value !== null && tracked
+      ? big(tracked.realized_pnl_xcp) + value - big(tracked.cost_xcp)
+      : null;
+  const xcp = (raw: RawLike) => compact(tokenQty(raw, true));
+  const signedXcp = (raw: bigint) =>
+    `${raw > 0n ? "+" : ""}${compact(tokenQty(raw, true))} XCP`;
+
+  return (
+    <HoverCard
+      touch={coarse}
+      onArm={() => setArmed(true)}
+      trigger={
+        coarse ? (
+          <button type="button" className={`rounded ${FOCUS} ${className}`}>
+            {children}
+          </button>
+        ) : (
+          <Link
+            href={`/profile/${source}`}
+            className={`rounded hover:underline ${FOCUS} ${className}`}
+          >
+            {children}
+          </Link>
+        )
+      }
+    >
+      {isLoading || !data ? (
+        <p className="py-3 text-center text-sm text-gray-400">
+          {isLoading ? "Loading xcp.fun activity…" : "Activity unavailable."}
+        </p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="rounded-xl bg-gray-50 p-3">
+              <div className={LABEL}>{asset} balance</div>
+              <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
+                {balance === null ? "—" : compact(tokenQty(balance, true))}
+              </div>
+            </div>
+            <div className="rounded-xl bg-gray-50 p-3">
+              <div className={LABEL}>Total PnL</div>
+              <div
+                className={`mt-0.5 text-lg font-bold tabular-nums ${
+                  pnl === null
+                    ? "text-gray-400"
+                    : pnl >= 0n
+                      ? "text-green-700"
+                      : "text-red-600"
+                }`}
+              >
+                {pnl === null ? "—" : signedXcp(pnl)}
+              </div>
+            </div>
+          </div>
+          <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <span className="font-medium text-gray-900">This market</span>
+            {" · bought "}
+            <span className="tabular-nums">{xcp(data.asset.bought_xcp)} XCP</span>
+            {" · sold "}
+            <span className="tabular-nums">{xcp(data.asset.sold_xcp)} XCP</span>
+          </div>
+          <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <span className="font-medium text-gray-900">XCP-69 history</span>
+            {` · ${commas(data.mints.transactions)} mint${data.mints.transactions === 1 ? "" : "s"}`}
+            {` · ${commas(data.mints.launches)} launch${data.mints.launches === 1 ? "" : "es"}`}
+            {data.market.fills > 0
+              ? ` · ${commas(data.market.fills)} market fill${data.market.fills === 1 ? "" : "s"}`
+              : ""}
+          </div>
+          {pnl === null &&
+            (data.asset.mints > 0 || data.asset.buys > 0 || data.asset.sells > 0) && (
+              <p className="mt-2 text-[10px] text-gray-400">
+                PnL is withheld because the live balance includes activity outside indexed mints and trades.
+              </p>
+            )}
+        </>
+      )}
+      <div className="mt-2 text-xs font-medium">
+        <Link href={`/profile/${source}`} className="text-purple-600 hover:underline">
+          View profile
+        </Link>
       </div>
     </HoverCard>
   );

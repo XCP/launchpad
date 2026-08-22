@@ -25,6 +25,7 @@ import {
 } from "#api/queries/launches";
 import { J, router } from "#api/read/respond";
 import { getRewardAccount, listRewardBatches } from "#api/queries/rewards";
+import { getAddressLaunchpadSummary } from "#api/queries/address-summary";
 
 export const launchesRoute = router();
 
@@ -147,7 +148,15 @@ launchesRoute.get("/v2/stats", async (c) => {
   };
   const activity = totals
     ? { ...totals, active_xcp: activeXcp }
-    : { mints: 0, minters: 0, paid_xcp: 0, active_xcp: activeXcp, fee_sats: 0 };
+    : {
+        mints: 0,
+        minters: 0,
+        paid_xcp: 0,
+        active_xcp: activeXcp,
+        fee_sats: 0,
+        fee_samples: 0,
+        median_fee_sats: 0,
+      };
   return J(
     c,
     {
@@ -231,6 +240,23 @@ launchesRoute.get("/v2/events/by/:source", async (c) => {
     result_count: result.length,
     next_offset: result.length === limit ? offset + limit : null,
   }, 15);
+});
+
+// A compact, xcp.fun-only address preview for the trade table. This is
+// deliberately asset-scoped: it lets the card reconcile tracked mint/trade
+// quantity with the live holder balance the page already fetched, without
+// walking a wallet's general Counterparty history or calling an explorer.
+launchesRoute.get("/v2/addresses/:source/summary", async (c) => {
+  const source = c.req.param("source");
+  const asset = c.req.query("asset")?.trim().toUpperCase();
+  if (!/^[A-Za-z0-9]{26,90}$/.test(source)) {
+    return c.json({ error: "invalid address" }, 400);
+  }
+  if (!asset || !/^[A-Z0-9]{4,12}$/.test(asset)) {
+    return c.json({ error: "invalid asset" }, 400);
+  }
+  const result = await getAddressLaunchpadSummary(c.env.DB, source, asset);
+  return J(c, { result }, 60);
 });
 
 // An address's own mints across every launch — the profile activity feed.

@@ -226,9 +226,10 @@ export function PositionsTab({ address }: { address: string }) {
       <p className="text-xs text-gray-400">
         Total PnL combines profit or loss already realized by partial sales
         with the unrealized result on tokens still held. It uses average-cost
-        accounting over your indexed mint-and-trade history. A dash means
-        tokens entered or left through a transfer, liquidity, or another action
-        without a matching XCP price, so exact PnL is not claimed.
+        accounting over your indexed mint-and-trade history. Incoming sends
+        and distributions enter at their market value on arrival. A dash means another
+        balance movement could not be reconciled or priced, so exact PnL is
+        not claimed.
         Positions cover graduated XCP-69 launches — the ones with a locked pool
         quoting them against XCP.
       </p>

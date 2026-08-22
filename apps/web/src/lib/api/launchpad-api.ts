@@ -359,6 +359,51 @@ export async function fetchEventsBySource(source: string): Promise<AssetEvent[] 
   }
 }
 
+export interface LaunchpadAddressSummary {
+  mints: {
+    transactions: number;
+    launches: number;
+    paid_xcp: string;
+  };
+  market: {
+    fills: number;
+    assets: number;
+    bought_xcp: string;
+    sold_xcp: string;
+  };
+  asset: {
+    mints: number;
+    buys: number;
+    sells: number;
+    bought_xcp: string;
+    sold_xcp: string;
+    tracked: {
+      quantity: string;
+      cost_xcp: string;
+      realized_pnl_xcp: string;
+      complete: boolean;
+    };
+  };
+}
+
+/** One hover-gated request over xcp.fun indexes; no explorer fan-out. */
+export async function fetchLaunchpadAddressSummary(
+  source: string,
+  asset: string,
+): Promise<LaunchpadAddressSummary | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/v2/addresses/${encodeURIComponent(source)}/summary?asset=${encodeURIComponent(asset)}`,
+      { signal: AbortSignal.timeout(3_000) },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: LaunchpadAddressSummary };
+    return data.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
   return {
     fm: toFairminter(row),
@@ -599,6 +644,10 @@ export interface LaunchStats {
     active_xcp: number;
     /** Bitcoin satoshi spent on mint transaction fees. */
     fee_sats: number;
+    /** Mints whose Bitcoin fee has been indexed. */
+    fee_samples?: number;
+    /** Median observed Bitcoin fee per mint transaction. */
+    median_fee_sats?: number;
   };
   markets?: {
     /** XCP satoshi currently held across graduated pools. */

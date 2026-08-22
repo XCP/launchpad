@@ -26,6 +26,10 @@ export interface PairedDelta {
   tokenDelta: bigint;
   /** Signed XCP sats: negative paid, positive received. */
   xcpDelta: bigint;
+  /** A transfer across the wallet boundary, not a purchase or sale. Incoming
+   * flows enter at their contemporaneous market value; outgoing flows carry
+   * basis out without realizing profit or loss. */
+  external?: boolean;
 }
 
 export interface PositionInput {
@@ -74,16 +78,15 @@ interface Book {
 }
 
 /**
- * @param priceAt Optional XCP-sats-per-raw-token at a block, used to value
- *   plain transfers in — tokens that arrived without payment still have a cost
- *   basis, just not one the ledger states. Without it such a position reports
- *   no PnL rather than a flattering one.
+ * `valueAt` prices an incoming external quantity as a whole. Pool prices are
+ * rational reserve ratios, usually below one XCP sat per raw token unit, so a
+ * rounded integer unit price would silently value most divisible tokens at 0.
  */
 export function computePositions(
   deltas: PairedDelta[],
   universe: PositionInput[],
   liveBalances: Map<string, Raw>,
-  priceAt?: (asset: string, block: number) => bigint | null,
+  valueAt?: (asset: string, block: number, quantity: bigint) => bigint | null,
 ): { open: Position[]; closed: ClosedPosition[] } {
   const priced = new Set(universe.map((u) => u.asset));
 
@@ -104,13 +107,12 @@ export function computePositions(
 
     if (d.tokenDelta > 0n) {
       let cost = d.xcpDelta < 0n ? -d.xcpDelta : 0n;
-      if (cost === 0n) {
-        // Tokens that arrived without payment still have a basis, just not one
-        // the chain states. Marked to the market at the time if we can price
-        // it; otherwise the position reports no PnL rather than a flattering one.
-        const mark = priceAt?.(d.asset, d.block) ?? null;
+      if (d.external) {
+        const mark = valueAt?.(d.asset, d.block, d.tokenDelta) ?? null;
         if (mark === null) b.unpriced = true;
-        else cost = mark * d.tokenDelta;
+        else cost = mark;
+      } else if (cost === 0n) {
+        b.unpriced = true;
       }
       b.qty += d.tokenDelta;
       b.cost += cost;
@@ -118,7 +120,7 @@ export function computePositions(
       const sold = -d.tokenDelta;
       const proceeds = d.xcpDelta > 0n ? d.xcpDelta : 0n;
       const basis = b.qty > 0n ? (b.cost * sold) / b.qty : 0n;
-      b.realized += proceeds - basis;
+      if (!d.external) b.realized += proceeds - basis;
       b.cost -= basis;
       b.qty -= sold;
       if (b.qty < 0n) b.qty = 0n;

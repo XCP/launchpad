@@ -7,7 +7,7 @@ export const revalidate = 60;
 export const metadata = {
   title: "Swap — xcp.fun",
   description:
-    "Swap XCP against graduated XCP-69 launches. Every pair trades against permanently locked liquidity — pool and order book, best price first.",
+    "Swap graduated XCP-69 assets through Counterparty pools and the order book, including direct token pairs when liquidity exists.",
 };
 
 export default async function SwapPage() {

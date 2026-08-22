@@ -9,6 +9,31 @@ export function defaultTradeAsset(assets: string[]): string {
     : (assets[0] ?? "");
 }
 
+export type TradePairLeg = "give" | "get";
+
+/**
+ * Change one side of a pair without ever producing a same-asset swap.
+ * Choosing the opposite side's asset flips the pair — familiar DEX behavior
+ * — while every other choice changes only the side the user opened.
+ */
+export function selectTradeAsset(
+  giveAsset: string,
+  getAsset: string,
+  leg: TradePairLeg,
+  nextAsset: string,
+): { giveAsset: string; getAsset: string } {
+  if (leg === "give") {
+    if (nextAsset === giveAsset) return { giveAsset, getAsset };
+    return nextAsset === getAsset
+      ? { giveAsset: nextAsset, getAsset: giveAsset }
+      : { giveAsset: nextAsset, getAsset };
+  }
+  if (nextAsset === getAsset) return { giveAsset, getAsset };
+  return nextAsset === giveAsset
+    ? { giveAsset: getAsset, getAsset: nextAsset }
+    : { giveAsset, getAsset: nextAsset };
+}
+
 /** A stable selector order: MINTS first, then the server's existing depth
  * order. This never depends on wallet data that can arrive after opening. */
 export function orderTradeAssets(assets: string[]): string[] {
