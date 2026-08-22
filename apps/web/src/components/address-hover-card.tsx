@@ -535,7 +535,7 @@ export function LaunchpadAddressHoverCard({
         <>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-gray-50 p-3">
-              <div className={LABEL}>{asset} balance</div>
+              <div className={LABEL}>Balance</div>
               <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
                 {balance === null ? "—" : compact(tokenQty(balance, true))}
               </div>
@@ -555,19 +555,20 @@ export function LaunchpadAddressHoverCard({
               </div>
             </div>
           </div>
-          <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            <span className="font-medium text-gray-900">This market</span>
-            {" · bought "}
-            <span className="tabular-nums">{xcp(data.asset.bought_xcp)} XCP</span>
-            {" · sold "}
+          <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <span className="font-medium text-gray-900">Mint </span>
+            <span className="tabular-nums">{xcp(data.asset.minted_xcp ?? "0")}</span>
+            {" · Buy "}
+            <span className="tabular-nums">{xcp(data.asset.bought_xcp)}</span>
+            {" · Sell "}
             <span className="tabular-nums">{xcp(data.asset.sold_xcp)} XCP</span>
           </div>
-          <div className="mt-2 rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            <span className="font-medium text-gray-900">XCP-69 history</span>
+          <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+            <span className="font-medium text-gray-900">XCP-69</span>
             {` · ${commas(data.mints.transactions)} mint${data.mints.transactions === 1 ? "" : "s"}`}
             {` · ${commas(data.mints.launches)} launch${data.mints.launches === 1 ? "" : "es"}`}
             {data.market.fills > 0
-              ? ` · ${commas(data.market.fills)} market fill${data.market.fills === 1 ? "" : "s"}`
+              ? ` · ${commas(data.market.fills)} fill${data.market.fills === 1 ? "" : "s"}`
               : ""}
           </div>
           {pnl === null &&

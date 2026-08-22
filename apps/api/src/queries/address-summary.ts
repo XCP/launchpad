@@ -40,6 +40,7 @@ export interface AddressLaunchpadSummary {
     mints: number;
     buys: number;
     sells: number;
+    minted_xcp: string;
     bought_xcp: string;
     sold_xcp: string;
     tracked: TrackedPosition;
@@ -191,11 +192,15 @@ export async function getAddressLaunchpadSummary(
   let mints = 0;
   let buys = 0;
   let sells = 0;
+  let mintedXcp = 0n;
   let boughtXcp = 0n;
   let soldXcp = 0n;
   for (const row of rows) {
     const xcp = BigInt(row.xcp_delta);
-    if (row.kind === "mint") mints += 1;
+    if (row.kind === "mint") {
+      mints += 1;
+      if (xcp < 0n) mintedXcp += -xcp;
+    }
     if (row.kind === "buy") {
       buys += 1;
       if (xcp < 0n) boughtXcp += -xcp;
@@ -213,6 +218,7 @@ export async function getAddressLaunchpadSummary(
       mints,
       buys,
       sells,
+      minted_xcp: mintedXcp.toString(),
       bought_xcp: boughtXcp.toString(),
       sold_xcp: soldXcp.toString(),
       tracked: foldTrackedPosition(rows, truncated),

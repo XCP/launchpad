@@ -375,6 +375,8 @@ export interface LaunchpadAddressSummary {
     mints: number;
     buys: number;
     sells: number;
+    /** Optional during a rolling deploy while an older edge response expires. */
+    minted_xcp?: string;
     bought_xcp: string;
     sold_xcp: string;
     tracked: {
