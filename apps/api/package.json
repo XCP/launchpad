@@ -18,11 +18,11 @@
     "migrate:remote": "wrangler d1 migrations apply launchpad-db --remote"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260702.1",
+    "@cloudflare/workers-types": "5.20260822.1",
     "typescript": "^5",
-    "wrangler": "^4.0.0"
+    "wrangler": "4.125.0"
   },
   "dependencies": {
-    "hono": "^4.12.28"
+    "hono": "^4.13.3"
   }
 }

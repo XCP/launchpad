@@ -1,5 +1,5 @@
 {
-  "name": "launchpad",
+  "name": "@xcp/launchpad-web",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -20,22 +20,22 @@
     "@scure/btc-signer": "^2.2.0",
     "babel-plugin-react-compiler": "^1.0.0",
     "bignumber.js": "^9.3.1",
-    "next": "^16.2.11",
+    "next": "16.3.2",
     "radix-ui": "^1.6.7",
-    "react": "19.2.3",
-    "react-dom": "19.2.3",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "swr": "^2.4.0"
   },
   "devDependencies": {
-    "@opennextjs/cloudflare": "^1.16.5",
+    "@opennextjs/cloudflare": "1.20.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "^16.2.11",
+    "eslint-config-next": "16.3.2",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "wrangler": "^4.0.0"
+    "wrangler": "4.125.0"
   }
 }
