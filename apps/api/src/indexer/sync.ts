@@ -29,6 +29,9 @@ const SQL_VAR_LIMIT = 100;
 // How many launch upserts ride in one batch. Same bound as the mint inserts'
 // INSERT_CHUNK, for the same reason.
 const UPSERT_CHUNK = 100;
+const DESCRIPTION_BACKFILL_LIMIT = 15;
+const DISPLAY_DESCRIPTION_MAX = 2_000;
+const METADATA_ORIGIN = "https://xcp.fun";
 
 interface StoredLaunch {
   tx_hash: string;
@@ -71,6 +74,7 @@ export interface SyncResult {
   events_ingested: number;
   announce_backfilled: number;
   fees_backfilled: number;
+  descriptions_backfilled: number;
   /** Rows the /v2/stats rollup rewrote. 0 on a tick where nothing that feeds
    *  it moved — which should be most of them. */
   rollup_written: number;
@@ -438,6 +442,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   const resolved = await resolveUndecided(db);
   const announceBackfilled = await backfillAnnounceBlocks(db);
   const feesBackfilled = await backfillMissingFees(db);
+  const descriptionsBackfilled = await backfillDisplayDescriptions(db);
 
   // Last, because it summarises everything above — and only when something
   // above could have changed the summary. On a quiet tick this is skipped
@@ -454,10 +459,82 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
     events_ingested: eventsIngested,
     announce_backfilled: announceBackfilled,
     fees_backfilled: feesBackfilled,
+    descriptions_backfilled: descriptionsBackfilled,
     rollup_written: rollup
       ? rollup.totals_written + rollup.buckets_written
       : 0,
   };
+}
+
+/** Flatten prose before it enters a list response. The metadata writer already
+ * caps descriptions at 2,000 characters; repeating that boundary here keeps
+ * imported/plain-text launches from making the mirror unbounded. */
+function displayDescription(raw: unknown): string {
+  if (typeof raw !== "string") return "";
+  return raw.replace(/\s+/g, " ").trim().slice(0, DISPLAY_DESCRIPTION_MAX);
+}
+
+/**
+ * Mirror creator prose once, in a bounded worklist that drains to empty.
+ *
+ * The on-chain description is often only a pointer to xcp.fun JSON. Browsers
+ * should not fan out to that JSON for every card, and the API must never fetch
+ * an issuer-controlled URL. Our own metadata is safe to read; literal
+ * on-chain prose is already in hand; every other URL resolves to the checked
+ * empty-string state. Transient failures stay NULL and retry on a later tick.
+ */
+async function backfillDisplayDescriptions(db: D1Database): Promise<number> {
+  const missing = await q<{ tx_hash: string; asset: string; description: string | null }>(
+    db,
+    `SELECT tx_hash, asset, description FROM launches
+      WHERE display_description IS NULL
+      ORDER BY tx_index LIMIT ?1`,
+    DESCRIPTION_BACKFILL_LIMIT,
+  );
+  if (missing.length === 0) return 0;
+
+  let backfilled = 0;
+  for (const row of missing) {
+    const pointer = row.description?.trim() ?? "";
+    let prose = "";
+
+    if (pointer && !/^https?:\/\//i.test(pointer)) {
+      prose = displayDescription(pointer);
+    } else if (pointer) {
+      let url: URL;
+      try {
+        url = new URL(pointer);
+      } catch {
+        url = new URL(METADATA_ORIGIN);
+      }
+      if (url.origin === METADATA_ORIGIN && url.pathname.toLowerCase().endsWith(".json")) {
+        try {
+          const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+          // A missing/malformed object is a settled absence, not something to
+          // request forever. Only a server failure is likely to heal by itself.
+          if (res.status >= 500) continue;
+          if (res.ok) {
+            const meta = (await res.json().catch(() => null)) as {
+              description?: unknown;
+            } | null;
+            prose = displayDescription(meta?.description);
+          }
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    const result = await db
+      .prepare(
+        `UPDATE launches SET display_description = ?1
+          WHERE tx_hash = ?2 AND display_description IS NULL`,
+      )
+      .bind(prose, row.tx_hash)
+      .run();
+    if ((result.meta.rows_written ?? 0) > 0) backfilled += 1;
+  }
+  return backfilled;
 }
 
 /**

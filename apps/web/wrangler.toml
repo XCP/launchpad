@@ -39,6 +39,14 @@ binding = "ASSETS"
 binding = "METADATA"
 bucket_name = "launchpad-metadata"
 
+# The API owns this index; the web worker only updates the creator-description
+# mirror after an owner-authorized metadata edit. Reads still go through the
+# cached public API.
+[[d1_databases]]
+binding = "DB"
+database_name = "launchpad-db"
+database_id = "b93ee0d6-a291-4d80-9fac-1dd4dc0c3cbe"
+
 # Next's data/route cache. The binding name is fixed by the adapter's
 # r2-incremental-cache override; renaming it turns caching back off silently.
 [[r2_buckets]]
@@ -52,4 +60,3 @@ bucket_name = "launchpad-inc-cache"
 # 56,310 objects in its first day against a key space of 12,444 pairs and
 # 248,029 assets. Expiry is safe: a missing entry is a cache miss, so the next
 # request re-renders and re-caches it.
-

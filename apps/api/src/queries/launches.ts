@@ -43,9 +43,12 @@ export interface LaunchRow {
   /** Block of this launch's most recent mint; null if it has never minted.
    *  See migration 0012 — derived from launch_mints, never counted. */
   last_mint_block: number | null;
+  /** Creator prose mirrored from hosted metadata. Empty means checked with no
+   *  safe prose; null means the metadata worklist has not reached it yet. */
+  display_description: string | null;
 }
 
-const COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
+const BASE_COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
   announce_block, original_deadline, start_block, end_block, price,
   quantity_by_price, hard_cap, soft_cap, pool_quantity, max_mint_per_tx,
   max_mint_per_address, premint_quantity, minted_asset_commission_int,
@@ -54,6 +57,18 @@ const COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
   paid_quantity, current_deadline_block, mints, minters, pool_xcp_reserve,
   pool_token_reserve, pool_xcp_sats, seen_at_block, updated_at,
   last_mint_block`;
+
+/** Detail reads get the full creator prose. */
+const COLUMNS = `${BASE_COLUMNS}, display_description`;
+
+/** Lists only need the one-line card copy, and only graduated cards render it.
+ *  This bounds the cached homepage payload even if an issuer used the full
+ *  2,000-character description allowance. */
+const LIST_COLUMNS = `${BASE_COLUMNS},
+  CASE WHEN phase = 'graduated'
+       THEN substr(display_description, 1, 280)
+       ELSE NULL
+  END AS display_description`;
 
 /**
  * The phases, in the order the index page stacks them.
@@ -90,7 +105,7 @@ export async function listLaunches(
   perPhase: number,
 ): Promise<LaunchRow[]> {
   const stmt = db.prepare(
-    `SELECT ${COLUMNS} FROM launches
+    `SELECT ${LIST_COLUMNS} FROM launches
       WHERE conforming = 1 AND phase = ?1
       ORDER BY rank_key DESC, tx_index DESC
       LIMIT ?2`,
@@ -274,7 +289,7 @@ export async function listLaunchPage(
   const statements = [
     db
       .prepare(
-        `SELECT ${COLUMNS} FROM launches
+        `SELECT ${LIST_COLUMNS} FROM launches
           WHERE conforming = 1 AND phase = ?1${notMintedPage}
           ORDER BY ${order}
           LIMIT ?2 OFFSET ?3`,
@@ -297,7 +312,7 @@ export async function listLaunchPage(
         // one that happened to be sequenced last. The launch's own tx_index
         // still ends the sort, so the result is total and cannot flicker
         // between two renders.
-        `SELECT ${COLUMNS} FROM launches
+        `SELECT ${LIST_COLUMNS} FROM launches
           WHERE conforming = 1 AND phase = 'minting' AND last_mint_block IS NOT NULL${notMintedKing}
           ORDER BY last_mint_block DESC,
                    COALESCE(last_mint_count, 0) DESC,

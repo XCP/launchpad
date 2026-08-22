@@ -26,7 +26,7 @@ import type { MempoolOrder } from "@launchpad/xcp69/mempool";
  * workers.dev stays enabled regardless: the LaunchRoom and SitePresence
  * sockets still connect there, and a WebSocket has nothing to cache.
  */
-const API_BASE = "https://api.xcp.fun";
+const API_BASE = process.env.NEXT_PUBLIC_LAUNCHPAD_API_BASE ?? "https://api.xcp.fun";
 
 interface ApiLaunchRow {
   tx_hash: string;
@@ -63,6 +63,8 @@ interface ApiLaunchRow {
   minters: number;
   /** Optional because a worker older than migration 0012 does not send it. */
   last_mint_block?: number | null;
+  /** Optional during the API/web rolling deploy. */
+  display_description?: string | null;
 }
 
 export interface IndexedLaunch {
@@ -83,6 +85,8 @@ export interface IndexedLaunch {
   /** Block of this launch's most recent mint; null if it has never minted.
    *  What the crown is ordered by, and what the badge counts back from. */
   lastMintBlock: number | null;
+  /** Creator prose from D1; null until the bounded metadata worklist resolves it. */
+  displayDescription: string | null;
 }
 
 function toFairminter(row: ApiLaunchRow): Fairminter {
@@ -417,7 +421,23 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
     announceBlock: row.announce_block,
     minters: row.minters,
     lastMintBlock: row.last_mint_block ?? null,
+    displayDescription: row.display_description?.trim() || null,
   };
+}
+
+/** One indexed launch, including its full mirrored creator description. */
+export async function fetchIndexedLaunch(asset: string): Promise<IndexedLaunch | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/launches/${encodeURIComponent(asset)}`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiLaunchRow | null };
+    return data.result ? toIndexedLaunch(data.result) : null;
+  } catch {
+    return null;
+  }
 }
 
 /** Every phase's top `perPhase` in one response — a universe to price a

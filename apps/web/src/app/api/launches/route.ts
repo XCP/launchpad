@@ -5,6 +5,7 @@ import {
   metadataIconUrl,
   metadataImageUrl,
   metadataJsonUrl,
+  updateIndexedDescription,
 } from "@/lib/metadata";
 
 import {
@@ -301,6 +302,7 @@ export async function PUT(request: Request) {
   await bucket.put(`j/${asset}`, json, {
     httpMetadata: { contentType: "application/json" },
   });
+  await updateIndexedDescription(asset, description);
 
   return NextResponse.json({ json_url: metadataJsonUrl(asset) });
 }

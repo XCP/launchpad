@@ -64,6 +64,7 @@ export function LaunchView({
   poolVolume,
   devTrades = [],
   concentration,
+  displayDescription,
 }: {
   asset: string;
   fm: Fairminter;
@@ -80,6 +81,7 @@ export function LaunchView({
   poolVolume: PairActivity;
   devTrades?: DevTrade[];
   concentration?: { top10Pct: number; devPct: number };
+  displayDescription: string | null;
 }) {
   const progress = saleProgress(fm);
   // An inscribed launch's description IS the image (hex-encoded on the
@@ -621,6 +623,10 @@ export function LaunchView({
             </div>
           </div>
         </div>
+
+        {displayDescription && (
+          <LaunchDescription text={displayDescription} marginClassName="mt-4" />
+        )}
 
         {/* The three numbers people actually come for. Market cap and volume
             used to be buried among seven equal-weight facts below the chart;

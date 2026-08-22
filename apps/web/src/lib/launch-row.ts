@@ -37,6 +37,8 @@ export interface SectionRow {
    *  row came from a path that cannot answer it. Only the crowned row uses
    *  it, to say how long ago that was. */
   lastMintBlock: number | null;
+  /** Creator prose for the graduated card, already mirrored into D1. */
+  displayDescription: string | null;
 }
 
 /**
@@ -60,6 +62,8 @@ export interface RowSource {
   lastMintBlock?: number | null;
   /** Optional because the launch index tracks minters, not current owners. */
   holders?: number | null;
+  /** Optional on the live Counterparty fallback and older API workers. */
+  displayDescription?: string | null;
 }
 
 /**
@@ -86,6 +90,7 @@ export function toSectionRow(p: RowSource): SectionRow {
     progress: saleProgress(p.fm),
     // Undefined on the live-derivation path, which has no index to ask.
     lastMintBlock: p.lastMintBlock ?? null,
+    displayDescription: p.displayDescription?.trim() || null,
   };
 }
 

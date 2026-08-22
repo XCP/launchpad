@@ -32,6 +32,15 @@ export interface R2Bucket {
   ): Promise<unknown>;
 }
 
+interface DescriptionDbStatement {
+  bind(...values: unknown[]): DescriptionDbStatement;
+  run(): Promise<unknown>;
+}
+
+interface DescriptionDb {
+  prepare(query: string): DescriptionDbStatement;
+}
+
 export async function getMetadataRuntime() {
   const { env, ctx } = await getCloudflareContext({ async: true });
   const bucket = (env as Record<string, unknown>).METADATA as R2Bucket | undefined;
@@ -41,6 +50,24 @@ export async function getMetadataRuntime() {
 
 export async function getMetadataBucket(): Promise<R2Bucket> {
   return (await getMetadataRuntime()).bucket;
+}
+
+/** Keep D1's display copy in step with an owner-authorized metadata edit.
+ *  Creation is intentionally not mirrored here: the fairminter row does not
+ *  exist yet, so the API indexer's one-time worklist picks it up after the
+ *  transaction appears on-chain. */
+export async function updateIndexedDescription(asset: string, description: string): Promise<void> {
+  const { env } = await getCloudflareContext({ async: true });
+  const db = (env as Record<string, unknown>).DB as DescriptionDb | undefined;
+  if (!db) return;
+  const prose = description.replace(/\s+/g, " ").trim().slice(0, 2_000);
+  await db
+    .prepare(
+      `UPDATE launches SET display_description = ?1
+        WHERE asset = ?2 AND display_description IS NOT ?1`,
+    )
+    .bind(prose, asset)
+    .run();
 }
 
 type CloudflareCacheStorage = CacheStorage & { default?: Cache };

@@ -1015,9 +1015,10 @@ function Card({
           ? `${commas(minters)} minters`
           : `${commas(minters)} of ${XCP69_MIN_PARTICIPANTS} minters`
       : phase === "graduated"
-        ? row.holders === null
-          ? "— holders"
-          : `${commas(row.holders)} holder${row.holders === 1 ? "" : "s"}`
+        ? row.displayDescription ??
+          (minters === null
+            ? "XCP-69 market"
+            : `${commas(minters)} minter${minters === 1 ? "" : "s"}`)
         : `Opens at Block ${fm.start_block.toLocaleString()}`;
 
   // Bottom-right, always a time — the one axis every phase shares, pointing
@@ -1185,7 +1186,12 @@ function Card({
 
       <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500">
         <div className="flex items-center justify-between gap-2">
-          <span className="min-w-0 truncate tabular-nums">{fact}</span>
+          <span
+            className="min-w-0 truncate tabular-nums"
+            title={phase === "graduated" && row.displayDescription ? row.displayDescription : undefined}
+          >
+            {fact}
+          </span>
           <span className="shrink-0 tabular-nums">{when}</span>
         </div>
         {/* The creator, on its own line. It does not help rank one launch

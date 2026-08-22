@@ -17,6 +17,7 @@ import {
 import {
   fetchCandles,
   fetchEventsBySource,
+  fetchIndexedLaunch,
   fetchLaunchFees,
   type ChartCandle,
 } from "@/lib/api/launchpad-api";
@@ -49,6 +50,10 @@ const SHARE_DESCRIPTION_MAX = 200;
  */
 async function shareDescription(asset: string): Promise<string | null> {
   try {
+    const indexed = await fetchIndexedLaunch(asset);
+    if (indexed?.displayDescription) {
+      return clamp(indexed.displayDescription, SHARE_DESCRIPTION_MAX);
+    }
     const fairminters = await fetchFairmintersByAsset(asset);
     const fm =
       fairminters.find((f) => xcp69Params(f)) ??
@@ -168,7 +173,7 @@ export default async function LaunchPage({
     isPendingConfirmation = true;
   }
 
-  const [mints, pool, original, xcpUsd, btcUsd, feeSats] = await Promise.all([
+  const [mints, pool, original, xcpUsd, btcUsd, feeSats, indexed] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask. Same for
     // anything still unconfirmed — the tx_hash isn't indexed yet either.
     fm.status === "pending" || isPendingConfirmation
@@ -193,6 +198,7 @@ export default async function LaunchPage({
     fm.status === "open" && !isPendingConfirmation
       ? fetchLaunchFees(asset)
       : Promise.resolve(null),
+    fetchIndexedLaunch(asset),
   ]);
   // The creator's own trades on this asset, for the chart's markers. Indexed
   // by address, so this is one read — and only worth asking once a market
@@ -275,6 +281,7 @@ export default async function LaunchPage({
       concentration={concentration}
       holderCount={holderCount}
       poolVolume={poolVolume}
+      displayDescription={indexed?.displayDescription ?? null}
     />
   );
 }
