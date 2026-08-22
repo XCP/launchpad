@@ -19,6 +19,7 @@
     "migrate:api:remote": "npm run migrate:remote --workspace apps/api"
   },
   "devDependencies": {
+    "esbuild": "0.28.2",
     "vitest": "^4.1.10"
   }
 }
