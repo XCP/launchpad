@@ -444,21 +444,28 @@ export function SwapWidget({
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
-      {/* Sell well — compact changes the number/chip geometry, not where its
-          controls live. */}
+      {/* In compact rails, balance/slippage sit with the asset chip. That keeps
+          the footer about value only and matches the wide form's right edge. */}
       <Well
         focusable
         layout={compact ? "stack" : "row"}
         label="Sell"
         topRight={presetRow || undefined}
         chip={chipFor(giveAsset, "give")}
+        chipRight={compact ? balanceLabel : undefined}
         footer={
-          <>
+          compact ? (
             <span>
               {giveUsd === null ? "USD unavailable" : `≈ ${usdFmt(giveUsd)}`}
             </span>
-            {balanceLabel}
-          </>
+          ) : (
+            <>
+              <span>
+                {giveUsd === null ? "USD unavailable" : `≈ ${usdFmt(giveUsd)}`}
+              </span>
+              {balanceLabel}
+            </>
+          )
         }
       >
         <AmountInput
@@ -482,13 +489,20 @@ export function SwapWidget({
         label="Buy"
         topRight={availableLabel || undefined}
         chip={chipFor(getAsset, "get")}
+        chipRight={compact ? slippageControl : undefined}
         footer={
-          <>
+          compact ? (
             <span>
               {getUsd === null ? "USD unavailable" : `≈ ${usdFmt(getUsd)}`}
             </span>
-            {slippageControl}
-          </>
+          ) : (
+            <>
+              <span>
+                {getUsd === null ? "USD unavailable" : `≈ ${usdFmt(getUsd)}`}
+              </span>
+              {slippageControl}
+            </>
+          )
         }
       >
         <div
