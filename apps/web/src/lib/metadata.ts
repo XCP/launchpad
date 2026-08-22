@@ -32,9 +32,25 @@ export interface R2Bucket {
   ): Promise<unknown>;
 }
 
-export async function getMetadataBucket(): Promise<R2Bucket> {
-  const { env } = await getCloudflareContext({ async: true });
+export async function getMetadataRuntime() {
+  const { env, ctx } = await getCloudflareContext({ async: true });
   const bucket = (env as Record<string, unknown>).METADATA as R2Bucket | undefined;
   if (!bucket) throw new Error("METADATA R2 binding not available");
-  return bucket;
+  return { bucket, ctx };
+}
+
+export async function getMetadataBucket(): Promise<R2Bucket> {
+  return (await getMetadataRuntime()).bucket;
+}
+
+type CloudflareCacheStorage = CacheStorage & { default?: Cache };
+const METADATA_CACHE_ORIGIN = "https://launchpad.me-bbe.workers.dev";
+
+export function getMetadataEdgeCache(): Cache | null {
+  const runtime = globalThis as typeof globalThis & { caches?: CloudflareCacheStorage };
+  return runtime.caches?.default ?? null;
+}
+
+export function metadataCacheKey(pathname: string): Request {
+  return new Request(`${METADATA_CACHE_ORIGIN}${pathname}`, { method: "GET" });
 }

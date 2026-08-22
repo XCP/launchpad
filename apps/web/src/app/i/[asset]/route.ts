@@ -1,4 +1,9 @@
-import { METADATA_ORIGIN, getMetadataBucket } from "@/lib/metadata";
+import {
+  METADATA_ORIGIN,
+  getMetadataEdgeCache,
+  getMetadataRuntime,
+  metadataCacheKey,
+} from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
 
 /**
@@ -61,25 +66,38 @@ export async function GET(
     }
   }
 
-  const bucket = await getMetadataBucket();
-  const object = await bucket.get(`i/${asset.toUpperCase()}`);
+  const normalizedAsset = asset.toUpperCase();
+  const cache = getMetadataEdgeCache();
+  const cacheKey = metadataCacheKey(`/i/${encodeURIComponent(normalizedAsset)}`);
+  const cached = await cache?.match(cacheKey);
+  if (cached) {
+    const headers = new Headers(cached.headers);
+    headers.set("x-metadata-cache", "HIT");
+    return new Response(cached.body, { status: cached.status, headers });
+  }
+
+  const { bucket, ctx } = await getMetadataRuntime();
+  const object = await bucket.get(`i/${normalizedAsset}`);
   if (!object) {
     const fb = new URL(request.url).searchParams.get("fb") === "full" ? "full" : "icon";
     return new Response(null, {
       status: 302,
       headers: {
-        location: `${CDN_BASE}/img/${fb}/${encodeURIComponent(asset.toUpperCase())}`,
+        location: `${CDN_BASE}/img/${fb}/${encodeURIComponent(normalizedAsset)}`,
         // Short-lived: launches upload art before broadcast, so a cached
         // redirect can only ever cover assets that were never ours to serve.
         "cache-control": "public, max-age=300",
       },
     });
   }
-  return new Response(object.body, {
+  const response = new Response(object.body, {
     headers: {
       "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
       "cache-control": "public, max-age=31536000, immutable",
       "access-control-allow-origin": "*",
+      "x-metadata-cache": "MISS",
     },
   });
+  if (cache) ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => undefined));
+  return response;
 }
