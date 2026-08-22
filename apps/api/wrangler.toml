@@ -57,6 +57,13 @@ database_name = "launchpad-db"
 database_id = "b93ee0d6-a291-4d80-9fac-1dd4dc0c3cbe"
 migrations_dir = "migrations"
 
+# The launch metadata is already ours and already lives in R2. Reading it
+# directly avoids a Worker -> custom-domain -> Worker loop, which Cloudflare
+# can reject even though the same public JSON URL works in a browser.
+[[r2_buckets]]
+binding = "METADATA"
+bucket_name = "launchpad-metadata"
+
 # One room per launch, hibernating WebSockets: a viewer just sitting on the
 # page costs nothing between messages, and N viewers of the same launch share
 # one poll loop instead of each hitting Counterparty independently.

@@ -4,6 +4,9 @@ import type { SitePresence } from "#api/durable/site-presence";
 
 export interface Env {
   DB: D1Database;
+  /** Creator JSON shared with the web worker. The indexer reads this directly
+   *  rather than asking Cloudflare to route an HTTP request back to itself. */
+  METADATA: R2Bucket;
   LAUNCH_ROOM: DurableObjectNamespace<LaunchRoom>;
   SITE_PRESENCE: DurableObjectNamespace<SitePresence>;
   /** One instance, site-wide — the rate limit being managed belongs to the

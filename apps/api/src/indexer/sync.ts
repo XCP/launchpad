@@ -89,7 +89,10 @@ const FEE_BACKFILL_LIMIT = 15;
  * nothing, because D1 bills per row a statement TOUCHES, not per row that
  * changed.
  */
-export async function syncLaunches(db: D1Database): Promise<SyncResult> {
+export async function syncLaunches(
+  db: D1Database,
+  metadata: R2Bucket,
+): Promise<SyncResult> {
   const [all, height] = await Promise.all([fetchAllFairminters(), fetchBlockHeight()]);
   const candidates = all.filter((fm) => fm.asset && xcp69Params(fm));
   const storedByTxHash = await fetchStoredByTxHash(
@@ -442,7 +445,7 @@ export async function syncLaunches(db: D1Database): Promise<SyncResult> {
   const resolved = await resolveUndecided(db);
   const announceBackfilled = await backfillAnnounceBlocks(db);
   const feesBackfilled = await backfillMissingFees(db);
-  const descriptionsBackfilled = await backfillDisplayDescriptions(db);
+  const descriptionsBackfilled = await backfillDisplayDescriptions(db, metadata);
 
   // Last, because it summarises everything above — and only when something
   // above could have changed the summary. On a quiet tick this is skipped
@@ -479,11 +482,15 @@ function displayDescription(raw: unknown): string {
  *
  * The on-chain description is often only a pointer to xcp.fun JSON. Browsers
  * should not fan out to that JSON for every card, and the API must never fetch
- * an issuer-controlled URL. Our own metadata is safe to read; literal
- * on-chain prose is already in hand; every other URL resolves to the checked
- * empty-string state. Transient failures stay NULL and retry on a later tick.
+ * an issuer-controlled URL. Our own metadata is safe to read directly from
+ * its R2 bucket; literal on-chain prose is already in hand; every other URL
+ * resolves to the checked empty-string state. Transient R2 failures stay NULL
+ * and retry on a later tick.
  */
-async function backfillDisplayDescriptions(db: D1Database): Promise<number> {
+async function backfillDisplayDescriptions(
+  db: D1Database,
+  metadata: R2Bucket,
+): Promise<number> {
   const missing = await q<{ tx_hash: string; asset: string; description: string | null }>(
     db,
     `SELECT tx_hash, asset, description FROM launches
@@ -509,12 +516,14 @@ async function backfillDisplayDescriptions(db: D1Database): Promise<number> {
       }
       if (url.origin === METADATA_ORIGIN && url.pathname.toLowerCase().endsWith(".json")) {
         try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-          // A missing/malformed object is a settled absence, not something to
-          // request forever. Only a server failure is likely to heal by itself.
-          if (res.status >= 500) continue;
-          if (res.ok) {
-            const meta = (await res.json().catch(() => null)) as {
+          // The public URL is only the provenance check. The object itself is
+          // keyed by the indexed asset, so a launch cannot make us read some
+          // other creator's JSON by pointing at a different xcp.fun path.
+          const object = await metadata.get(`j/${row.asset.toUpperCase()}`);
+          // Missing or malformed metadata is a settled absence. R2 errors are
+          // the transient case and leave NULL for a later retry.
+          if (object) {
+            const meta = (await new Response(object.body).json().catch(() => null)) as {
               description?: unknown;
             } | null;
             prose = displayDescription(meta?.description);

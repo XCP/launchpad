@@ -252,7 +252,9 @@ export default {
           let fastSyncRan = false;
           if (fastSyncClaimed) {
             fastSyncRan = await withLock(env.DB, 110, async () => {
-              await runScheduledJob("sync_after_mempool", () => syncLaunches(env.DB));
+              await runScheduledJob("sync_after_mempool", () =>
+                syncLaunches(env.DB, env.METADATA),
+              );
               await runScheduledJob("announce_after_mempool", async () => {
                 const height = await fetchBlockHeight();
                 return announceLive(env, height);
@@ -274,7 +276,7 @@ export default {
 
     ctx.waitUntil(
       withLock(env.DB, 110, async () => {
-        await runScheduledJob("sync_launches", () => syncLaunches(env.DB));
+        await runScheduledJob("sync_launches", () => syncLaunches(env.DB, env.METADATA));
         // After the indexer, never inside it. The feed reads committed state
         // rather than the tick's own deltas, so an announcement can only
         // describe something D1 already believes — and a tick that dies
