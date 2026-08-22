@@ -553,7 +553,7 @@ export function ActivityTabs({
                           {t.buy ? "↗ Buy" : "↘ Sell"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
-                          {formatPrice(ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8))}
+                          {(ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8)).toFixed(8)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
                           {compact(tokens)}
