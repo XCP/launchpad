@@ -665,3 +665,197 @@ export async function fetchMinterEarnings(
     return [];
   }
 }
+
+export type RewardTransactionMethod = "mpma" | "enhanced_send";
+export type RewardTransactionStatus = "broadcast" | "confirmed" | "replaced" | "failed";
+export type VisibleRewardTransactionStatus = Extract<
+  RewardTransactionStatus,
+  "broadcast" | "confirmed"
+>;
+
+export interface RewardPayout {
+  batchId: string;
+  asset: string;
+  firstMintNumber: number;
+  cutoffMintNumber: number;
+  mintCount: number;
+  quantity: string;
+  txHash: string;
+  method: RewardTransactionMethod;
+  status: VisibleRewardTransactionStatus;
+  confirmedBlock: number | null;
+}
+
+export interface RewardAccount {
+  source: string;
+  earnedMints: number;
+  launches: number;
+  /** Raw XCP committed by eligible mint transactions. */
+  committedXcp: string;
+  /** Raw MINTS earned over the programme lifetime; never a wallet balance. */
+  lifetimeEarnedQuantity: string;
+  /** Raw MINTS attached to confirmed reward transactions. */
+  paidQuantity: string;
+  /** Raw MINTS attached to broadcast, not-yet-confirmed transactions. */
+  sentPendingQuantity: string;
+  /** Raw MINTS earned but not yet attached to a transaction. */
+  awaitingQuantity: string;
+  hasRewardTx: boolean;
+  payouts: RewardPayout[];
+}
+
+interface ApiRewardPayout {
+  batch_id: string;
+  asset: string;
+  first_mint_number: number;
+  cutoff_mint_number: number;
+  mint_count: number;
+  quantity: string;
+  tx_hash: string;
+  method: RewardTransactionMethod;
+  status: VisibleRewardTransactionStatus;
+  confirmed_block: number | null;
+}
+
+interface ApiRewardAccount {
+  source: string;
+  earned_mints: number;
+  launches: number;
+  committed_xcp: string;
+  lifetime_earned_quantity: string;
+  paid_quantity: string;
+  sent_pending_quantity: string;
+  awaiting_quantity: string;
+  has_reward_tx: boolean;
+  payouts: ApiRewardPayout[];
+}
+
+/** One address's programme ledger. Null means it has no eligible mints. */
+export async function fetchRewardAccount(source: string): Promise<RewardAccount | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/rewards/by/${encodeURIComponent(source)}`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ApiRewardAccount | null };
+    const row = data.result;
+    if (!row) return null;
+    return {
+      source: row.source,
+      earnedMints: row.earned_mints,
+      launches: row.launches,
+      committedXcp: row.committed_xcp,
+      lifetimeEarnedQuantity: row.lifetime_earned_quantity,
+      paidQuantity: row.paid_quantity,
+      sentPendingQuantity: row.sent_pending_quantity,
+      awaitingQuantity: row.awaiting_quantity,
+      hasRewardTx: row.has_reward_tx,
+      payouts: row.payouts.map((p) => ({
+        batchId: p.batch_id,
+        asset: p.asset,
+        firstMintNumber: p.first_mint_number,
+        cutoffMintNumber: p.cutoff_mint_number,
+        mintCount: p.mint_count,
+        quantity: p.quantity,
+        txHash: p.tx_hash,
+        method: p.method,
+        status: p.status,
+        confirmedBlock: p.confirmed_block,
+      })),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export interface RewardBatchTransaction {
+  txHash: string;
+  method: RewardTransactionMethod;
+  status: RewardTransactionStatus;
+  btcFeeSats: number | null;
+  recoverableSats: number | null;
+  confirmedBlock: number | null;
+}
+
+export interface RewardBatch {
+  id: string;
+  asset: string;
+  firstMintNumber: number;
+  cutoffMintNumber: number;
+  cutoffBlock: number;
+  eligibleMints: number;
+  recipientCount: number;
+  totalQuantity: string;
+  sentRecipientCount: number;
+  sentQuantity: string;
+  status: "frozen" | "broadcast" | "confirmed" | "failed";
+  createdAt: number;
+  broadcastAt: number | null;
+  confirmedAt: number | null;
+  transactions: RewardBatchTransaction[];
+}
+
+interface ApiRewardBatch {
+  id: string;
+  asset: string;
+  first_mint_number: number;
+  cutoff_mint_number: number;
+  cutoff_block: number;
+  eligible_mints: number;
+  recipient_count: number;
+  total_quantity: string;
+  sent_recipient_count: number;
+  sent_quantity: string;
+  status: RewardBatch["status"];
+  created_at: number;
+  broadcast_at: number | null;
+  confirmed_at: number | null;
+  transactions: Array<{
+    tx_hash: string;
+    method: RewardTransactionMethod;
+    status: RewardTransactionStatus;
+    btc_fee_sats: number | null;
+    recoverable_sats: number | null;
+    confirmed_block: number | null;
+  }>;
+}
+
+/** Public distributions; frozen batches without a tx never appear here. */
+export async function fetchRewardBatches(): Promise<RewardBatch[]> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/rewards/batches`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { result?: ApiRewardBatch[] };
+    if (!Array.isArray(data.result)) return [];
+    return data.result.map((b) => ({
+      id: b.id,
+      asset: b.asset,
+      firstMintNumber: b.first_mint_number,
+      cutoffMintNumber: b.cutoff_mint_number,
+      cutoffBlock: b.cutoff_block,
+      eligibleMints: b.eligible_mints,
+      recipientCount: b.recipient_count,
+      totalQuantity: b.total_quantity,
+      sentRecipientCount: b.sent_recipient_count,
+      sentQuantity: b.sent_quantity,
+      status: b.status,
+      createdAt: b.created_at,
+      broadcastAt: b.broadcast_at,
+      confirmedAt: b.confirmed_at,
+      transactions: b.transactions.map((tx) => ({
+        txHash: tx.tx_hash,
+        method: tx.method,
+        status: tx.status,
+        btcFeeSats: tx.btc_fee_sats,
+        recoverableSats: tx.recoverable_sats,
+        confirmedBlock: tx.confirmed_block,
+      })),
+    }));
+  } catch {
+    return [];
+  }
+}

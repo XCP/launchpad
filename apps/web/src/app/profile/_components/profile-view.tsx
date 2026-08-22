@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import useSWR from "swr";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { RewardsCard } from "@/app/profile/_components/rewards-card";
 import { ConnectButton } from "@/components/connect-button";
@@ -12,10 +13,12 @@ import { HistoryTab } from "@/app/profile/_components/history-tab";
 import { LaunchesTab } from "@/app/profile/_components/launches-tab";
 import { MintingTab } from "@/app/profile/_components/minting-tab";
 import { PositionsTab } from "@/app/profile/_components/positions-tab";
+import { RewardsTab } from "@/app/profile/_components/rewards-tab";
+import { fetchRewardAccount } from "@/lib/api/launchpad-api";
 
-type Tab = "positions" | "history" | "activity" | "minting" | "launches";
+type Tab = "positions" | "history" | "activity" | "rewards" | "minting" | "launches";
 
-const TABS: { id: Tab; label: string }[] = [
+const BASE_TABS: { id: Tab; label: string }[] = [
   { id: "positions", label: "Positions" },
   { id: "history", label: "Closed" },
   { id: "activity", label: "Activity" },
@@ -40,6 +43,20 @@ export function ProfileView({ viewing }: { viewing?: string }) {
 
   const address = viewing ?? connectedAddress;
   const isSelf = !viewing || viewing === connectedAddress;
+  const { data: rewardAccount } = useSWR(
+    address ? ["reward-account", address] : null,
+    () => fetchRewardAccount(address!),
+    { revalidateOnFocus: false },
+  );
+  // A profile does not get an empty tab for an accrued promise. Reward
+  // history exists only once this address has a real transaction to inspect.
+  const tabs = rewardAccount?.hasRewardTx
+    ? [
+        ...BASE_TABS.slice(0, 3),
+        { id: "rewards" as const, label: "Rewards" },
+        ...BASE_TABS.slice(3),
+      ]
+    : BASE_TABS;
 
   if (!address || (!viewing && status !== "connected")) {
     return (
@@ -112,7 +129,11 @@ export function ProfileView({ viewing }: { viewing?: string }) {
         </p>
       )}
 
-      <RewardsCard address={address} isSelf={isSelf} />
+      <RewardsCard
+        account={rewardAccount ?? null}
+        isSelf={isSelf}
+        onOpenHistory={rewardAccount?.hasRewardTx ? () => setTab("rewards") : undefined}
+      />
 
       <div className="rounded-2xl border border-gray-200 bg-white">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
@@ -121,7 +142,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
               variant="card"
               className="!flex-nowrap overflow-x-auto text-xs sm:text-sm [&_[role=tab]]:!px-2"
             >
-              {TABS.map((t) => (
+              {tabs.map((t) => (
                 <SegmentedTrigger key={t.id} value={t.id} variant="card" grow={false}>
                   {t.label}
                 </SegmentedTrigger>
@@ -133,6 +154,9 @@ export function ProfileView({ viewing }: { viewing?: string }) {
           {tab === "positions" && <PositionsTab address={address} />}
           {tab === "history" && <HistoryTab address={address} />}
           {tab === "activity" && <ActivityTab address={address} />}
+          {tab === "rewards" && rewardAccount?.hasRewardTx && (
+            <RewardsTab account={rewardAccount} />
+          )}
           {tab === "minting" && <MintingTab address={address} />}
           {tab === "launches" && <LaunchesTab address={address} />}
         </div>

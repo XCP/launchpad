@@ -711,19 +711,26 @@ export function minterEarnings(
   // One query for both callers. A profile asking about itself and the
   // leaderboard listing everyone must never report different totals for the
   // same address, which two queries would eventually manage.
-  const where = source ? "AND m.source = ?3" : "";
+  const where = source ? "WHERE m.source = ?3" : "";
   const binds: (number | string)[] = source
     ? [limit, offset, source]
     : [limit, offset];
   return q<MinterEarning>(
     db,
-    `SELECT m.source,
+    `WITH eligible AS (
+       SELECT m.tx_hash, m.launch_tx, m.block_index, m.tx_index,
+              m.source, m.paid_quantity
+         FROM launch_mints m
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+        ORDER BY m.block_index, COALESCE(m.tx_index, 0), m.tx_hash
+        LIMIT 10000
+     )
+     SELECT m.source,
             COUNT(*) AS mints,
             COUNT(DISTINCT m.launch_tx) AS launches,
             CAST(SUM(CAST(m.paid_quantity AS INTEGER)) AS TEXT) AS paid
-       FROM launch_mints m
-       JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
-      WHERE 1 = 1 ${where}
+       FROM eligible m
+       ${where}
       GROUP BY m.source
       ORDER BY mints DESC, paid DESC
       LIMIT ?1 OFFSET ?2`,

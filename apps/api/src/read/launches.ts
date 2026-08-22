@@ -24,6 +24,7 @@ import {
   sumFees,
 } from "#api/queries/launches";
 import { J, router } from "#api/read/respond";
+import { getRewardAccount, listRewardBatches } from "#api/queries/rewards";
 
 export const launchesRoute = router();
 
@@ -187,6 +188,22 @@ launchesRoute.get("/v2/minters", async (c) => {
   // 60s cache means D1 sees each (limit, offset) at most once a minute.
   const offset = Math.min(Math.max(0, Number(c.req.query("offset") ?? 0) || 0), 100_000);
   const result = await minterEarnings(c.env.DB, limit, source, offset);
+  return J(c, { result, result_count: result.length }, 60);
+});
+
+// Programme accounting for one address. `has_reward_tx` is the product
+// boundary: before it turns true the address has accrued rewards, but there is
+// no transaction history to justify a Rewards tab on its profile.
+launchesRoute.get("/v2/rewards/by/:source", async (c) => {
+  const source = c.req.param("source");
+  const result = await getRewardAccount(c.env.DB, source);
+  return J(c, { result }, 60);
+});
+
+// Only distributions with an actual broadcast/confirmed transaction are
+// public. A frozen operator manifest is preparation, not payment history.
+launchesRoute.get("/v2/rewards/batches", async (c) => {
+  const result = await listRewardBatches(c.env.DB);
   return J(c, { result, result_count: result.length }, 60);
 });
 

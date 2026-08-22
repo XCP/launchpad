@@ -1,9 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
-import { fetchLaunchPage, fetchLaunchStats, fetchMinterEarnings } from "@/lib/api/launchpad-api";
+import {
+  fetchLaunchPage,
+  fetchLaunchStats,
+  fetchMinterEarnings,
+  fetchRewardBatches,
+} from "@/lib/api/launchpad-api";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { commas, price as priceFmt } from "@/lib/format";
+import { commas, commasRaw, price as priceFmt, shortAddress } from "@/lib/format";
 import { ratio } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
 import { TokenImage } from "@/components/token-image";
@@ -34,7 +39,7 @@ const raiseXcp = XCP69_RAISE_SATS / 1e8;
  */
 export default async function RewardsPage() {
   const height = await fetchBlockHeight().catch(() => 0);
-  const [stats, earners, graduates, mintsPool, xcpUsd, btcUsd] = await Promise.all([
+  const [stats, earners, graduates, mintsPool, xcpUsd, btcUsd, rewardBatches] = await Promise.all([
     fetchLaunchStats(height).catch(() => null),
     fetchMinterEarnings(25).catch(() => []),
     fetchLaunchPage("graduated", "graduated", 3, 0).catch(() => null),
@@ -44,8 +49,12 @@ export default async function RewardsPage() {
     fetchPool("MINTS").catch(() => null),
     fetchXcpUsd().catch(() => null),
     fetchBtcUsd().catch(() => null),
+    fetchRewardBatches().catch(() => []),
   ]);
-  const mintsSoFar = stats?.activity.mints ?? 0;
+  // The chain keeps minting after this programme ends; the progress meter is
+  // programme progress, so it stops at its cap rather than saying 10,001 of
+  // 10,000 later.
+  const mintsSoFar = Math.min(MINT_CAP, stats?.activity.mints ?? 0);
   const graduated = stats?.counts.graduated ?? 0;
   const remaining = Math.max(0, MINT_CAP - mintsSoFar);
 
@@ -152,6 +161,67 @@ export default async function RewardsPage() {
         </div>
       </section>
 
+      {rewardBatches.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold">Distributions</h2>
+          <p className="mt-2 text-sm leading-relaxed text-gray-600">
+            Completed and confirming reward batches, linked to the transactions
+            that sent them.
+          </p>
+          <div className="mt-4 space-y-3">
+            {rewardBatches.map((batch) => {
+              const fullyLinked = batch.sentRecipientCount === batch.recipientCount;
+              const confirmed =
+                fullyLinked && batch.transactions.every((tx) => tx.status === "confirmed");
+              const state = confirmed ? "Confirmed" : fullyLinked ? "Confirming" : "Partially sent";
+              return (
+                <div key={batch.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-gray-900">
+                        Mints {commas(batch.firstMintNumber)}–{commas(batch.cutoffMintNumber)}
+                      </p>
+                      <p className="mt-0.5 text-xs text-gray-400">
+                        {commas(batch.recipientCount)} recipients · {commas(batch.eligibleMints)} mint transactions
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold tabular-nums text-gray-900">
+                        {commasRaw(batch.sentQuantity)} {batch.asset}
+                      </p>
+                      {!fullyLinked && (
+                        <p className="text-[11px] tabular-nums text-gray-400">
+                          of {commasRaw(batch.totalQuantity)} in the batch
+                        </p>
+                      )}
+                      <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                        confirmed ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                      }`}>
+                        {state}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+                    {batch.transactions.map((tx) => (
+                      <a
+                        key={tx.txHash}
+                        href={`https://xcp.io/tx/${tx.txHash}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-purple-600 hover:underline"
+                        title={tx.txHash}
+                      >
+                        {tx.method === "mpma" ? "MPMA" : "Send"} {shortAddress(tx.txHash)} ↗
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* ---------------- who has earned what ---------------- */}
       <section>
         <h2 className="text-lg font-bold">Earned so far</h2>
@@ -182,8 +252,9 @@ export default async function RewardsPage() {
             gain by splitting a mint into smaller pieces.
           </Faq>
           <Faq q="When do I get paid?">
-            Rewards accrue as you mint and are sent out in batches. Nothing
-            expires; the count above is what is left of the programme.
+            Rewards accrue as you mint and are sent in batches. Once yours is
+            sent, its transaction appears on your profile. Lifetime earned is
+            an all-time total, not your wallet balance.
           </Faq>
           <Faq q="Doesn't minting cost me the XCP?">
             No — a mint escrows XCP against the launch. If it graduates you
