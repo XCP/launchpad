@@ -3,13 +3,13 @@
  *
  * value(b) = Σ over assets of  balanceAt(asset, b) × poolPriceAt(asset, b)
  *
- * Two things make this exact rather than approximate. Balances come from the
- * same signed delta stream cost basis uses, accumulated in BigInt. And price
- * is never materialised as a number: a pool quoting 690 XCP against 31,000,000
- * tokens prices one raw token unit at ~0.000022 XCP sats, which any integer
- * ratio would floor to zero — so each snapshot's reserves are carried through
- * and the value is computed as `balance * xcpReserve / tokenReserve`, which is
- * exact in raw units.
+ * Two things make this exact rather than approximate. Balances come from a
+ * complete signed movement stream anchored to the authoritative live balance,
+ * accumulated in BigInt. And price is never materialised as a number: a pool
+ * quoting 690 XCP against 31,000,000 tokens prices one raw token unit at
+ * ~0.000022 XCP sats, which any integer ratio would floor to zero — so each
+ * snapshot's reserves are carried through and the value is computed as
+ * `balance * xcpReserve / tokenReserve`, which is exact in raw units.
  *
  * The series itself is in block space. Wall-clock time, where it's needed
  * (dating a point against the daily XCP/USD calendar), comes from real
@@ -28,6 +28,41 @@ export interface BalanceDelta {
   block: number;
   /** Signed raw token units. */
   tokenDelta: bigint;
+}
+
+/**
+ * Turn a complete recent movement window plus today's authoritative balances
+ * into a self-contained chart stream.
+ *
+ * The opening delta is the balance at the boundary: live balance minus every
+ * movement after it. This avoids fetching a wallet's lifetime just to learn
+ * what it carried into a 1/7/30-day chart, while the dated movements preserve
+ * every change inside that window exactly.
+ */
+export function anchorBalanceWindow(
+  movements: BalanceDelta[],
+  liveBalances: Map<string, string>,
+  fromBlock: number,
+): BalanceDelta[] {
+  const netAfter = new Map<string, bigint>();
+  const recent = movements.filter((movement) => movement.block > fromBlock);
+  for (const movement of recent) {
+    netAfter.set(
+      movement.asset,
+      (netAfter.get(movement.asset) ?? 0n) + movement.tokenDelta,
+    );
+  }
+
+  const assets = new Set([...liveBalances.keys(), ...recent.map((movement) => movement.asset)]);
+  const opening: BalanceDelta[] = [];
+  for (const asset of assets) {
+    const balance = BigInt(liveBalances.get(asset) ?? "0");
+    const atBoundary = balance - (netAfter.get(asset) ?? 0n);
+    if (atBoundary !== 0n) {
+      opening.push({ asset, block: fromBlock, tokenDelta: atBoundary });
+    }
+  }
+  return [...opening, ...recent].sort((a, b) => a.block - b.block);
 }
 
 export interface PriceSnapshot {

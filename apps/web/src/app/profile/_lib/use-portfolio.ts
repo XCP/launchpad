@@ -8,10 +8,15 @@ import {
   fetchPoolPriceHistory,
   type PoolSnapshot,
 } from "@/lib/api/counterparty";
+import { fetchAddressLedgerSince } from "@/lib/api/explorer";
 import { fetchEventsBySource, fetchMintsBySource, fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { fetchXcpUsd } from "@/lib/api/price";
 import { big } from "@/lib/numeric";
-import type { BalanceDelta, PriceSnapshot } from "@/lib/portfolio-chart";
+import {
+  anchorBalanceWindow,
+  type BalanceDelta,
+  type PriceSnapshot,
+} from "@/lib/portfolio-chart";
 import { computePositions, type ClosedPosition, type PairedDelta, type Position, type PositionInput } from "@/lib/positions";
 
 export interface Portfolio {
@@ -26,7 +31,14 @@ export interface Portfolio {
   tipBlock: number;
   /** Real Unix seconds for the tip — the newest time anchor. */
   tipTime: number | null;
+  /** Whether `deltas` completely explain value changes over the chart window. */
+  historyComplete: boolean;
+  /** Assets whose fast mint/trade reconstruction needed the ledger fallback. */
+  historyIssues: string[];
 }
+
+/** The largest chart window offered by the UI. */
+const HISTORY_BLOCKS = 4_320;
 
 /** Positions and closed positions come out of one pass over the ledger, so
  *  both tabs share a cache key and the work happens once. */
@@ -34,10 +46,10 @@ export function usePortfolio(address: string) {
   const { data, isLoading } = useSWR(
     ["portfolio", address],
     async () => {
-      // Five focused requests. This used to also paginate the address's whole
-      // credit/debit ledger — ~14,000 rows across 17 requests — to pair XCP
-      // legs with token legs. apps/api does that pairing now, so the same
-      // answer costs one indexed read.
+      // Five focused requests on the normal path. This used to also paginate
+      // the address's whole credit/debit ledger — ~14,000 rows across 17
+      // requests — to pair XCP legs with token legs. apps/api does that pairing
+      // now, so the same answer costs one indexed read.
       const [launches, xcpUsd, mints, events, tipBlock] = await Promise.all([
         fetchSearchIndex(),
         fetchXcpUsd(),
@@ -79,12 +91,6 @@ export function usePortfolio(address: string) {
           xcpDelta: big(e.xcpDelta),
         })),
       ];
-      const deltas: BalanceDelta[] = paired.map((d) => ({
-        asset: d.asset,
-        block: d.block,
-        tokenDelta: d.tokenDelta,
-      }));
-
       // Live balances for the graduated universe only. Paging every balance
       // this address holds was 1,766 rows to answer a question about at most a
       // handful of assets.
@@ -95,8 +101,48 @@ export function usePortfolio(address: string) {
         }),
       );
 
-      // Price history only for assets actually held — the chart can't show
-      // what isn't in the portfolio, so fetching the rest would be waste.
+      const positions = computePositions(paired, universe, balances);
+      const incomplete = [
+        ...positions.open.filter((position) => position.withheld).map((position) => position.asset),
+        ...positions.closed.filter((position) => position.withheld).map((position) => position.asset),
+      ];
+      const historyIssues = [...new Set(incomplete)];
+
+      // Fast and cheap for most wallets: mint + market deltas already reconcile
+      // exactly. Only a mismatch pays for the bounded ledger fallback, which
+      // dates sends, liquidity, dispensers, burns, attach/detach, etc. This
+      // restores an exact value chart without pretending those movements have
+      // an XCP cost basis for PnL.
+      let historyComplete = historyIssues.length === 0;
+      let deltas: BalanceDelta[] = paired.map((d) => ({
+        asset: d.asset,
+        block: d.block,
+        tokenDelta: d.tokenDelta,
+      }));
+      if (!historyComplete && positions.open.length > 0 && tipBlock > 0) {
+        try {
+          const fromBlock = Math.max(0, tipBlock - HISTORY_BLOCKS);
+          const ledger = await fetchAddressLedgerSince(address, fromBlock);
+          if (ledger.complete) {
+            const universeAssets = new Set(universe.map((asset) => asset.asset));
+            const movements = ledger.movements
+              .filter((entry) => universeAssets.has(entry.asset))
+              .map((entry) => ({
+                asset: entry.asset,
+                block: entry.block,
+                tokenDelta: BigInt(entry.quantity) * BigInt(entry.direction),
+              }));
+            deltas = anchorBalanceWindow(movements, balances, fromBlock);
+            historyComplete = true;
+          }
+        } catch {
+          // Keep the honest unavailable state. Current balances/values and the
+          // per-position PnL guard remain independently authoritative.
+        }
+      }
+
+      // Price history only for assets that appear in the chart window. This
+      // includes a token moved out during the window, not just today's holdings.
       const held = new Set(deltas.map((d) => d.asset));
       const prices = new Map<string, PriceSnapshot[]>();
       await Promise.all(
@@ -120,13 +166,15 @@ export function usePortfolio(address: string) {
       );
 
       return {
-        ...computePositions(paired, universe, balances),
+        ...positions,
         divisible,
         xcpUsd,
         deltas,
         prices,
         tipBlock,
         tipTime,
+        historyComplete,
+        historyIssues,
       };
     },
     // Block-paced: none of this can change between blocks, and blocks land

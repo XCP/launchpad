@@ -600,6 +600,12 @@ export interface LaunchStats {
     /** Bitcoin satoshi spent on mint transaction fees. */
     fee_sats: number;
   };
+  markets?: {
+    /** XCP satoshi currently held across graduated pools. */
+    pool_xcp: number;
+    /** Current combined graduated market cap, in XCP satoshi. */
+    market_cap_xcp: number;
+  };
   /** Mints per ~144-block bucket; `bucket` is `block_index / 144`. */
   daily: { bucket: number; n: number; minters: number }[];
   /** Refunded launch closures per ~144-block bucket. */

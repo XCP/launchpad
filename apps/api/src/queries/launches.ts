@@ -381,18 +381,34 @@ export interface PhaseCount {
   n: number;
   /** Raw XCP satoshi currently recorded on launches in this phase. */
   paid_xcp: number;
+  /** Raw XCP satoshi currently held by pools in this phase. */
+  pool_xcp: number;
+  /** Current combined market cap in raw XCP satoshi. */
+  market_cap_xcp: number;
 }
 
-/** How many conforming launches sit in each phase, and their current XCP. One grouped read — the
- *  homepage shows a slice per section and needs to say how big the whole is,
- *  and /stats is the same question asked directly. Summing the launch rows
- *  also gives us active escrow without rescanning the append-only mint table. */
+/** How many conforming launches sit in each phase, and their current capital.
+ *  One grouped read — the homepage shows a slice per section and needs to say
+ *  how big the whole is, and /stats is the same question asked directly.
+ *  Summing launch rows also gives us active escrow and graduated market data
+ *  without rescanning mints or making one pool request per asset. */
 export function countByPhase(db: D1Database): Promise<PhaseCount[]> {
   return q<PhaseCount>(
     db,
     `SELECT phase,
             COUNT(*) AS n,
-            CAST(COALESCE(SUM(CAST(paid_quantity AS INTEGER)), 0) AS INTEGER) AS paid_xcp
+            CAST(COALESCE(SUM(CAST(paid_quantity AS INTEGER)), 0) AS INTEGER) AS paid_xcp,
+            CAST(COALESCE(SUM(pool_xcp_sats), 0) AS INTEGER) AS pool_xcp,
+            CAST(COALESCE(SUM(
+              CASE
+                WHEN pool_token_reserve IS NOT NULL
+                 AND CAST(pool_token_reserve AS REAL) > 0
+                THEN CAST(hard_cap AS REAL)
+                   * CAST(pool_xcp_reserve AS REAL)
+                   / CAST(pool_token_reserve AS REAL)
+                ELSE 0
+              END
+            ), 0) AS INTEGER) AS market_cap_xcp
        FROM launches
       WHERE conforming = 1
       GROUP BY phase`,

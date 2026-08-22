@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchLaunchStats } from "@/lib/api/launchpad-api";
-import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
+import { fetchXcpUsd } from "@/lib/api/price";
 import { commas, fromSats, usd } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
 
@@ -28,10 +28,9 @@ const WINDOW_DAYS = 28;
  */
 export default async function StatsPage() {
   const height = await fetchBlockHeight();
-  const [stats, xcpUsd, btcUsd] = await Promise.all([
+  const [stats, xcpUsd] = await Promise.all([
     fetchLaunchStats(height),
     fetchXcpUsd(),
-    fetchBtcUsd(),
   ]);
 
   if (!stats) {
@@ -46,7 +45,8 @@ export default async function StatsPage() {
   const settled = counts.graduated + counts.refunded;
   const committedXcp = fromSats(activity.paid_xcp);
   const activeXcp = fromSats(activity.active_xcp);
-  const feeBtc = fromSats(activity.fee_sats);
+  const poolXcp = fromSats(stats.markets?.pool_xcp ?? 0);
+  const marketCapXcp = fromSats(stats.markets?.market_cap_xcp ?? 0);
 
   // Fill the window so quiet days read as quiet rather than as missing. The
   // bucket is `block / 144`, so the newest bucket is the one the tip is in.
@@ -82,15 +82,15 @@ export default async function StatsPage() {
       </div>
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <Stat label="Minted" value={commas(activity.mints)} hint="mint transactions" />
+        <Stat label="Mints" value={commas(activity.mints)} hint="mint transactions" />
         <Stat label="Minters" value={commas(activity.minters)} hint="distinct addresses" />
         <Stat
           label="Active escrow"
           value={`${commas(activeXcp)} XCP`}
           hint={
             xcpUsd
-              ? `≈ ${usd(activeXcp * xcpUsd)} baking in open mints`
-              : "baking in open mints"
+              ? `≈ ${usd(activeXcp * xcpUsd)} committed to open mints`
+              : "committed to open mints"
           }
         />
         <Stat
@@ -99,9 +99,14 @@ export default async function StatsPage() {
           hint={xcpUsd ? `≈ ${usd(committedXcp * xcpUsd)}` : "across all mint history"}
         />
         <Stat
-          label="Bitcoin fees"
-          value={`${commas(activity.fee_sats)} sats`}
-          hint={btcUsd ? `≈ ${usd(feeBtc * btcUsd)} paid to miners` : "paid to miners"}
+          label="XCP in pools"
+          value={`${commas(poolXcp)} XCP`}
+          hint={xcpUsd ? `≈ ${usd(poolXcp * xcpUsd)} in locked pools` : "in locked pools"}
+        />
+        <Stat
+          label="Market cap"
+          value={xcpUsd ? usd(marketCapXcp * xcpUsd) : `${commas(marketCapXcp)} XCP`}
+          hint={`${commas(marketCapXcp)} XCP · graduated coins`}
         />
       </section>
 

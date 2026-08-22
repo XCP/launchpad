@@ -86,8 +86,8 @@ export function PositionsTab({ address }: { address: string }) {
   };
 
   const totalXcpSats = open.reduce((sum, p) => sum + p.valueXcpSats, 0n);
-  const chartComplete =
-    open.every((p) => !p.withheld) && (portfolio?.closed ?? []).every((p) => !p.withheld);
+  const chartComplete = portfolio?.historyComplete ?? false;
+  const historyIssues = portfolio?.historyIssues ?? [];
 
   const tip = portfolio?.tipBlock ?? 0;
   const series =
@@ -159,8 +159,10 @@ export function PositionsTab({ address }: { address: string }) {
       )}
       {!chartComplete && open.length > 0 && (
         <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
-          Value history is hidden because some balance movements cannot be dated reliably.
-          Current holdings and values still come from live balances.
+          No value chart{historyIssues.length > 0 ? ` for ${historyIssues.join(", ")}` : ""}:
+          its recent transfer or liquidity history did not load completely, so
+          we cannot know how many tokens this wallet held at each point. Current
+          holdings and value are live and accurate.
         </p>
       )}
 
@@ -224,9 +226,9 @@ export function PositionsTab({ address }: { address: string }) {
       <p className="text-xs text-gray-400">
         Total PnL combines profit or loss already realized by partial sales
         with the unrealized result on tokens still held. It uses average-cost
-        accounting over your indexed mint-and-trade history. It is withheld
-        when transfers or incomplete activity mean that history can&apos;t be
-        reconciled with your live balance.
+        accounting over your indexed mint-and-trade history. A dash means
+        tokens entered or left through a transfer, liquidity, or another action
+        without a matching XCP price, so exact PnL is not claimed.
         Positions cover graduated XCP-69 launches — the ones with a locked pool
         quoting them against XCP.
       </p>

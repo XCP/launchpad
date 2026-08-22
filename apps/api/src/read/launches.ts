@@ -140,6 +140,11 @@ launchesRoute.get("/v2/stats", async (c) => {
   for (const r of rows) counts[r.phase] = r.n;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const activeXcp = rows.find((r) => r.phase === "minting")?.paid_xcp ?? 0;
+  const graduated = rows.find((r) => r.phase === "graduated");
+  const markets = {
+    pool_xcp: graduated?.pool_xcp ?? 0,
+    market_cap_xcp: graduated?.market_cap_xcp ?? 0,
+  };
   const activity = totals
     ? { ...totals, active_xcp: activeXcp }
     : { mints: 0, minters: 0, paid_xcp: 0, active_xcp: activeXcp, fee_sats: 0 };
@@ -150,6 +155,7 @@ launchesRoute.get("/v2/stats", async (c) => {
         counts,
         total,
         activity,
+        markets,
         // Bucket index is `block / 144`; the client turns it back into an
         // approximate day using the height it already has.
         daily: buckets,
