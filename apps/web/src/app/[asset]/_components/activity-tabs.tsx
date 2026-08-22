@@ -3,7 +3,10 @@
 import Link from "next/link";
 import { useState } from "react";
 import useSWR from "swr";
-import type { Fairmint } from "@/lib/api/counterparty";
+import {
+  fetchHolderBalances,
+  type Fairmint,
+} from "@/lib/api/counterparty";
 import {
   commas,
   commasRaw,
@@ -26,13 +29,13 @@ import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
 import { AddressHoverCard } from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
 import { mergePairTrades } from "@launchpad/xcp69/trades";
+import {
+  currentHolderCount,
+  includeFormerHolders,
+  type HolderRow,
+} from "@/lib/holders";
 
 const PER_PAGE = 25;
-
-interface HolderRow {
-  address: string;
-  quantity: Raw;
-}
 
 interface TradeRow {
   key: string;
@@ -109,37 +112,11 @@ export function ActivityTabs({
   const { state: roomState } = useLaunchRoom();
 
   const { data: holders } = useSWR<HolderRow[]>(
-    tab === "holders"
-      ? `${COUNTERPARTY_API_BASE}/assets/${asset}/balances?limit=1000`
-      : null,
-    async (url: string) => {
-      const rows: { address: string | null; utxo: string | null; quantity: Raw }[] =
-        (await fetchJson(url)).result ?? [];
-      return rows
-        .filter((r) => big(r.quantity) > 0n)
-        .map((r) => ({
-          address: r.address ?? (r.utxo ? `utxo:${r.utxo.slice(0, 12)}…` : "—"),
-          quantity: r.quantity,
-        }))
-        // Not `b.quantity - a.quantity`: legacy holdings can exceed 2^53.
-        .sort((a, b) => compareRawDesc(a.quantity, b.quantity));
-    },
+    !minting ? [asset, "holder-balances"] : null,
+    () => fetchHolderBalances(asset),
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
-  /** Synthesised, not fetched — the pool has no address to report a balance
-   *  for. Marked unmistakably in the row itself, because a fabricated entry in
-   *  a list of on-chain facts has to announce that it is one. */
-  const POOL_ROW = "__pool__";
-  const holderRows: HolderRow[] =
-    poolTokensRaw && big(poolTokensRaw) > 0n
-      ? [...(holders ?? []), { address: POOL_ROW, quantity: poolTokensRaw }].sort((a, b) =>
-          compareRawDesc(a.quantity, b.quantity),
-        )
-      : (holders ?? []);
-  // Shares are of circulating PLUS the locked pool, which is what makes them
-  // read as shares of supply rather than of whatever is left over.
-  const holderTotal = sumRaw(holderRows.map((h) => h.quantity));
-
+  const liveHolderCount = holders ? currentHolderCount(holders) : null;
   // Trades come over the room's shared socket when it's connected — one poll
   // per launch instead of one per viewer, and new fills simply appear. This
   // fetch is the fallback for a socket that never connected.
@@ -192,10 +169,35 @@ export function ActivityTabs({
   );
   const trades = roomTrades ?? fetchedTrades;
 
+  /** Synthesised, not fetched — the pool has no address to report a balance
+   *  for. Marked unmistakably in the row itself, because a fabricated entry in
+   *  a list of on-chain facts has to announce that it is one. */
+  const POOL_ROW = "__pool__";
+  // Counterparty's balance endpoint is a live snapshot, not holder history.
+  // Restore absent minters/traders at zero so the table can show who sold out,
+  // while the tab/header/card counts above remain strictly current balances.
+  const holderHistory = includeFormerHolders(
+    holders ?? [],
+    [
+      ...mints.map((mint) => mint.source),
+      ...(trades ?? []).map((trade) => trade.addr),
+    ],
+  );
+  const holderRows: HolderRow[] =
+    poolTokensRaw && big(poolTokensRaw) > 0n
+      ? [
+          ...holderHistory,
+          { address: POOL_ROW, quantity: big(poolTokensRaw) },
+        ].sort((a, b) => compareRawDesc(a.quantity, b.quantity))
+      : holderHistory;
+  // Shares are of circulating PLUS the locked pool, which is what makes them
+  // read as shares of supply rather than of whatever is left over.
+  const holderTotal = sumRaw(holderRows.map((h) => h.quantity));
+
   // Your open orders on this pair (connected only).
   const { data: orders, mutate: refreshOrders } = useSWR<OpenOrder[]>(
-    tab === "orders" && address
-      ? `${COUNTERPARTY_API_BASE}/addresses/${address}/orders?status=open&limit=100`
+    !minting && address
+      ? `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/orders?status=open&limit=100`
       : null,
     async (url: string) =>
       ((await fetchJson(url)).result as OpenOrder[]).filter(
@@ -275,7 +277,7 @@ export function ActivityTabs({
         : t === "trades"
           ? `Trades${trades ? ` (${trades.length})` : ""}`
           : t === "holders"
-            ? `Holders${holders ? ` (${holders.length})` : ""}`
+            ? `Holders${liveHolderCount !== null ? ` (${liveHolderCount})` : ""}`
             : `Orders${orders ? ` (${orders.length})` : ""}`;
 
   const count =
@@ -549,10 +551,20 @@ export function ActivityTabs({
                           {fixedRaw(t.xcpRaw)}
                         </td>
                         <td className="px-3 py-2">
-                          <Link href={`/profile/${t.addr}`} className="flex items-center gap-1.5 whitespace-nowrap font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline">
-                            <Identicon address={t.addr} />
-                            {shortAddress(t.addr)}
-                          </Link>
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            <Link
+                              href={`/profile/${t.addr}`}
+                              className="flex items-center gap-1.5 font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline"
+                            >
+                              <Identicon address={t.addr} />
+                              {shortAddress(t.addr)}
+                            </Link>
+                            {issuerSource === t.addr && (
+                              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                                dev
+                              </span>
+                            )}
+                          </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
                           <a href={`https://xcp.io/tx/${t.txHash}`} target="_blank" rel="noreferrer" className="hover:text-purple-700 hover:underline">
@@ -572,7 +584,7 @@ export function ActivityTabs({
       {tab === "holders" &&
         (!holders ? (
           <p className="p-6 text-center text-sm text-gray-400">Loading holders…</p>
-        ) : holders.length === 0 ? (
+        ) : holderRows.length === 0 ? (
           <p className="p-6 text-center text-sm text-gray-500">No holders found.</p>
         ) : (
           <>
@@ -589,6 +601,12 @@ export function ActivityTabs({
                 const pct = ratio(h.quantity, holderTotal) * 100;
                 const isPool = h.address === POOL_ROW;
                 const isUtxo = h.address.startsWith("utxo:");
+                const soldOut = h.quantity === 0n;
+                const displayedQuantity = tokenQty(h.quantity, divisible);
+                const quantityText =
+                  displayedQuantity > 0 && displayedQuantity < 0.01
+                    ? commasRaw(h.quantity, divisible ? 8 : 0)
+                    : compact(displayedQuantity);
                 return (
                   <li
                     key={h.address}
@@ -617,7 +635,7 @@ export function ActivityTabs({
                         <>
                           <Identicon address={h.address} />
                           {isUtxo ? (
-                            h.address
+                            `${h.address.slice(0, 17)}…`
                           ) : (
                             <Link
                               href={`/profile/${h.address}`}
@@ -639,10 +657,16 @@ export function ActivityTabs({
                       )}
                     </span>
                     <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900">
-                      {compact(tokenQty(h.quantity, divisible))}{" "}
-                      <span className="text-gray-400">
-                        ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
-                      </span>
+                      {soldOut ? (
+                        <span className="text-gray-400">0 · sold out</span>
+                      ) : (
+                        <>
+                          {quantityText}{" "}
+                          <span className="text-gray-400">
+                            ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
+                          </span>
+                        </>
+                      )}
                     </span>
                   </li>
                 );

@@ -1,5 +1,10 @@
 import type { MempoolMint } from "@launchpad/xcp69/mempool";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import {
+  coalesceHolderBalances,
+  currentHolderCount,
+  type AssetBalanceLocation,
+} from "@/lib/holders";
 import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
 
@@ -55,13 +60,13 @@ interface RawDebit {
   event: string;
 }
 
-async function pageAll<T>(path: string): Promise<T[]> {
+async function pageAll<T>(path: string, revalidate = 30): Promise<T[]> {
   const all: T[] = [];
   let cursor: number | null = null;
   do {
     const page: Paginated<T> = await get(
       `${path}${path.includes("?") ? "&" : "?"}limit=1000${cursor !== null ? `&cursor=${cursor}` : ""}`,
-      30,
+      revalidate,
     );
     all.push(...page.result);
     cursor = page.next_cursor;
@@ -125,6 +130,18 @@ export interface HolderConcentration {
   devPct: number;
 }
 
+/** Every present or former ownership row, coalesced to one row per owner. */
+export async function fetchHolderBalances(
+  asset: string,
+  revalidate = 300,
+) {
+  const rows = await pageAll<AssetBalanceLocation>(
+    `/assets/${encodeURIComponent(asset)}/balances`,
+    revalidate,
+  );
+  return coalesceHolderBalances(rows);
+}
+
 /**
  * Live number of distinct positive-balance holders for an asset.
  *
@@ -137,18 +154,7 @@ export interface HolderConcentration {
  */
 export async function fetchHolderCount(asset: string): Promise<number | null> {
   try {
-    const rows = await pageAll<{
-      address: string | null;
-      utxo: string | null;
-      quantity: Raw;
-    }>(`/assets/${encodeURIComponent(asset)}/balances`);
-    const holders = new Set<string>();
-    for (const row of rows) {
-      if (big(row.quantity) <= 0n) continue;
-      if (row.address) holders.add(`address:${row.address}`);
-      else if (row.utxo) holders.add(`utxo:${row.utxo}`);
-    }
-    return holders.size;
+    return currentHolderCount(await fetchHolderBalances(asset));
   } catch {
     return null;
   }
@@ -174,21 +180,12 @@ export async function fetchHolderConcentration(
   const supply = big(supplyRaw);
   if (supply <= 0n) return { top10Pct: 0, devPct: 0 };
   try {
-    const rows = await pageAll<{ address: string | null; quantity: Raw }>(
-      `/assets/${encodeURIComponent(asset)}/balances`,
+    const held = (await fetchHolderBalances(asset)).filter(
+      (row) => row.quantity > 0n,
     );
-    const held = rows
-      .filter((r) => big(r.quantity) > 0n)
-      .map((r) => ({ address: r.address, qty: big(r.quantity) }));
-
-    const byAddress = new Map<string, bigint>();
-    for (const r of held) {
-      const key = r.address ?? "(utxo)";
-      byAddress.set(key, (byAddress.get(key) ?? 0n) + r.qty);
-    }
-    const sorted = [...byAddress.values()].sort((a, b) => (b > a ? 1 : b < a ? -1 : 0));
+    const sorted = held.map((row) => row.quantity);
     const top10 = sorted.slice(0, 10).reduce((sum, q) => sum + q, 0n);
-    const dev = byAddress.get(creator) ?? 0n;
+    const dev = held.find((row) => row.address === creator)?.quantity ?? 0n;
 
     // ratio() scales through bigint division before narrowing, which is the
     // whole reason it exists — supply here is 1e16.

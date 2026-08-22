@@ -9,10 +9,9 @@ import { PendingDot } from "@/components/pending-dot";
 import { useMempool } from "@/hooks/use-mempool";
 import { LABEL } from "@/components/ui/tokens";
 import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/format";
-import type { MempoolMint } from "@/lib/api/counterparty";
+import { fetchHolderCount, type MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
-import { fetchHolderCount } from "@/lib/api/xcpio";
 import {
   type LaunchPage,
   PER_PAGE,
@@ -412,9 +411,10 @@ function Section({
     : (data ?? initial).rows;
 
   // The launch index knows who minted; ownership can change afterward. Ask
-  // Explorer only for the graduated page on screen, and retain that answer
-  // for five minutes. Page one arrives prefilled by the server, so the common
-  // path makes no browser-side burst at all.
+  // Counterparty only for the graduated page on screen, and retain that
+  // answer for five minutes. Page one arrives prefilled by the server, so the
+  // common path makes no browser-side burst at all. Counts are derived from
+  // positive balances; zero-balance former holders belong only in history.
   const holderAssets =
     phase === "graduated" && shown.some((row) => row.holders === null)
       ? shown.map((row) => row.fm.asset)
