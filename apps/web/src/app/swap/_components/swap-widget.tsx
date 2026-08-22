@@ -290,9 +290,10 @@ export function SwapWidget({
       <AssetChip asset={a} onClick={() => setSelectorOpen(true)} />
     );
 
-  // Wide layout: presets live in the label row, always visible while
-  // connected — no hover hunting (Radiant convention). The balance keeps
-  // the bottom-right corner as a click-to-fill.
+  // Presets live in the label row in both layouts, always visible while
+  // connected — compact cards should not turn a primary control into a hover
+  // interaction. The balance keeps the footer's bottom-right corner as a
+  // click-to-fill.
   const presetRow = effBalance !== undefined && effBalance > 0n && (
     <span className="flex items-center gap-1">
       {PRESETS.map((p) => (
@@ -339,44 +340,6 @@ export function SwapWidget({
     </button>
   );
 
-  // Compact rail keeps the space-saving hover swap: balance at rest,
-  // presets on hover.
-  const balanceControls = effBalance !== undefined && (
-    <span className="group/bal flex min-w-0 items-center gap-1">
-      <button
-        type="button"
-        className="group-hover/bal:hidden"
-        onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
-      >
-        Balance: {commasRaw(effBalance)}
-        {pendingOutgoing > 0n && (
-          <span className="text-gray-400">
-            {" "}
-            · {commasRaw(pendingOutgoing)} pending
-          </span>
-        )}
-      </button>
-      <span className="hidden items-center gap-1 group-hover/bal:flex">
-        {effBalance > 0n ? (
-          PRESETS.map((p) => (
-            <button
-              key={p}
-              type="button"
-              onClick={() =>
-                setAmount(fmtAmount(approx(percentOf(effBalance, p)) / SATS))
-              }
-              className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
-            >
-              {p === 100 ? "Max" : `${p}%`}
-            </button>
-          ))
-        ) : (
-          <span>Balance: 0</span>
-        )}
-      </span>
-    </span>
-  );
-
   const buttonLabel = busy
     ? compose.status === "composing"
       ? "Composing…"
@@ -420,20 +383,18 @@ export function SwapWidget({
 
   return (
     <div className="rounded-3xl border border-gray-200 bg-white p-2">
-      {/* Sell well — inset follows focus; balance row swaps to presets on hover */}
+      {/* Sell well — compact changes the number/chip geometry, not where its
+          controls live. */}
       <Well
         focusable
         layout={compact ? "stack" : "row"}
         label="Sell"
-        topRight={!compact ? presetRow || undefined : undefined}
-        chipRight={
-          compact && effBalance !== undefined ? balanceControls : undefined
-        }
+        topRight={presetRow || undefined}
         chip={chipFor(giveAsset)}
         footer={
           <>
             <span>≈ {usdFmt(giveUsd ?? 0)}</span>
-            {!compact && balanceLabel}
+            {balanceLabel}
           </>
         }
       >
@@ -456,13 +417,12 @@ export function SwapWidget({
       <Well
         layout={compact ? "stack" : "row"}
         label="Buy"
-        topRight={compact ? slippageControl : availableLabel || undefined}
+        topRight={availableLabel || undefined}
         chip={chipFor(getAsset)}
-        chipRight={compact ? availableLabel || undefined : undefined}
         footer={
           <>
             <span>≈ {usdFmt(getUsd ?? 0)}</span>
-            {!compact && slippageControl}
+            {slippageControl}
           </>
         }
       >
