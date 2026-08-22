@@ -624,10 +624,6 @@ export function LaunchView({
           </div>
         </div>
 
-        {displayDescription && (
-          <LaunchDescription text={displayDescription} marginClassName="mt-4" />
-        )}
-
         {/* The three numbers people actually come for. Market cap and volume
             used to be buried among seven equal-weight facts below the chart;
             price was alone up here. */}
@@ -693,6 +689,10 @@ export function LaunchView({
               <span className="text-gray-400">{xcpPriceLabel(athPrice)}</span>
             </span>
           </div>
+        )}
+
+        {displayDescription && (
+          <LaunchDescription text={displayDescription} marginClassName="mt-4" />
         )}
       </div>
 
