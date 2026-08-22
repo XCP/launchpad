@@ -93,8 +93,8 @@ export default async function StatsPage() {
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat
           label="Market cap"
-          value={xcpUsd ? usd(marketCapXcp * xcpUsd) : `${formatXcp(marketCapXcp)} XCP`}
-          hint={`${formatXcp(marketCapXcp)} XCP · graduated coins`}
+          value={`${formatXcp(marketCapXcp)} XCP`}
+          hint={xcpUsd ? `≈ ${usd(marketCapXcp * xcpUsd)} · graduated coins` : "graduated coins"}
         />
         <Stat
           label="XCP in pools"
