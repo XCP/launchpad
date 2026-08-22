@@ -48,7 +48,7 @@ export function MintingTab({ address }: { address: string }) {
 
   // A tx can appear in both feeds during the indexer's short catch-up window.
   // Count it as confirmed once the indexed mint exists rather than showing the
-  // same XCP as both baking and waiting.
+  // same XCP as both committed and waiting.
   const confirmedTxids = new Set((mints ?? []).map((mint) => mint.txHash));
   for (const mint of mempool ?? []) {
     if (confirmedTxids.has(mint.txHash)) continue;
@@ -64,7 +64,7 @@ export function MintingTab({ address }: { address: string }) {
     const right = b.paid + b.pendingPaid;
     return left === right ? a.asset.localeCompare(b.asset) : left > right ? -1 : 1;
   });
-  const baking = rows.reduce((sum, row) => sum + row.paid, 0n);
+  const committed = rows.reduce((sum, row) => sum + row.paid, 0n);
   const pending = rows.reduce((sum, row) => sum + row.pendingPaid, 0n);
 
   if (isLoading) {
@@ -82,7 +82,7 @@ export function MintingTab({ address }: { address: string }) {
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
-        No XCP baking in open mints right now.
+        No XCP committed to open mints right now.
       </p>
     );
   }
@@ -91,11 +91,11 @@ export function MintingTab({ address }: { address: string }) {
     <div className="space-y-4">
       <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
         <p className="text-xs font-medium uppercase tracking-wider text-amber-700">
-          XCP baking
+          XCP committed
         </p>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-2xl font-bold tabular-nums text-gray-900">
-            {commasRaw(baking)} XCP
+            {commasRaw(committed)} XCP
           </p>
           <p className="text-xs text-gray-500">
             across {rows.filter((row) => row.paid > 0n).length}{" "}
@@ -120,7 +120,7 @@ export function MintingTab({ address }: { address: string }) {
             <span>Token</span>
             <span className="text-right">Mints</span>
             <span className="text-right">If launched</span>
-            <span className="text-right">XCP baking</span>
+            <span className="text-right">XCP committed</span>
           </div>
           <ul className="divide-y divide-gray-100">
             {rows.map((row) => (
