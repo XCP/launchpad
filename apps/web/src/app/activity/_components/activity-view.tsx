@@ -101,7 +101,18 @@ export function ActivityView() {
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
       <div className="flex items-center justify-between gap-3">
-        <SegmentedList className="w-fit">
+        {/* Wraps rather than overflowing the page. Four labels carrying four
+            counts is ~371px of tab strip, and a 390px phone has ~358px of
+            content width — so before this the strip pushed the BODY sideways,
+            which is the one thing a page must never do however much its tables
+            scroll inside themselves.
+            Wrapping rather than scrolling because four tabs is a small enough
+            set to show whole: a scrollable strip hides "Launches" behind a
+            gesture and, on desktop Chrome, draws a scrollbar through the pill
+            track to say so. `min-w-0` is the load-bearing half — a flex item
+            defaults to min-width:auto and refuses to shrink below its content,
+            so max-w-full alone would have done nothing. */}
+        <SegmentedList className="w-fit min-w-0 max-w-full flex-wrap">
           {TABS.map((t) => {
             // Orders is the live book's size and arrives with that feed; the
             // other three are cumulative and arrive together. A count that is
