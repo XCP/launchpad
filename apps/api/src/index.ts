@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { Env } from "#api/env";
 import { syncLaunches } from "#api/indexer/sync";
+import { activityRoute } from "#api/read/activity";
 import { launchesRoute } from "#api/read/launches";
 import { mintClosed } from "#api/telegram/format";
 import { announceLive, queueAnnouncements } from "#api/telegram/live";
@@ -68,6 +69,7 @@ app.use("*", async (c, next) => {
 app.get("/", (c) => c.text("launchpad-api ok"));
 app.get("/health", (c) => c.text("ok"));
 app.route("/", launchesRoute);
+app.route("/", activityRoute);
 
 /**
  * Post one sample announcement, to prove the bot is wired up.

@@ -36,6 +36,7 @@ const LINKS = [
 /** Secondary, and kept beside the wallet per the header's reading order:
  *  what you came to do on the left, what you look up on the right. */
 const SECONDARY = [
+  { href: "/activity", label: "Activity" },
   { href: "/stats", label: "Stats" },
   { href: "/faq", label: "FAQ" },
   { href: "/docs", label: "Docs" },

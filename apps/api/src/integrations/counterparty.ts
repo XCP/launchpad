@@ -181,6 +181,64 @@ export async function fetchMempoolOrders(): Promise<MempoolOrder[]> {
   }
 }
 
+/** One order on a pair's book, in any state. Non-verbose: the fields the
+ *  activity tape needs are all in the plain row, and asset divisibility is
+ *  answered from D1 rather than from `*_asset_divisible` so one database
+ *  decides how a quantity is scaled. */
+export interface CpOrder {
+  tx_hash: string;
+  tx_index: number;
+  block_index: number;
+  source: string;
+  give_asset: string;
+  give_quantity: number | string;
+  give_remaining: number | string;
+  get_asset: string;
+  get_quantity: number | string;
+  get_remaining: number | string;
+  expire_index: number;
+  /** `open`, `filled`, `cancelled` or `expired`. Counterparty has no
+   *  "partially filled" status — that is an open order whose remaining is
+   *  below its original, and the tape derives it. */
+  status: string;
+}
+
+/** Runaway bound, not a page budget — see fetchMatches. A single pair's whole
+ *  order history is tens of rows today; this is far above any real one. */
+const MAX_ORDER_PAGES = 20;
+
+/**
+ * Every order ever placed on one asset, in any state, newest first.
+ *
+ * Per-asset rather than chain-wide, and that is forced rather than chosen.
+ * `/orders` unfiltered is 566,000 rows — 260,000 filled, 216,000 expired —
+ * so there is no page budget at which a chain-wide walk both terminates and
+ * tells the truth. Filtering it to `status=open` was tractable (about four
+ * pages) but can only ever show the live book, which is half the question:
+ * an order that filled is the more interesting event.
+ *
+ * Asked per asset, the same question is small. This site knows exactly which
+ * assets have a market — the caller passes them — and each one's entire order
+ * history arrives in one request.
+ *
+ * Failures throw. An empty book and a failed lookup must not be the same
+ * answer; the caller decides what to do with a pair it could not read.
+ */
+export async function fetchAssetOrders(asset: string): Promise<CpOrder[]> {
+  const rows: CpOrder[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < MAX_ORDER_PAGES; page++) {
+    const qs = cursor ? `&cursor=${cursor}` : "";
+    const data: { result: CpOrder[]; next_cursor: number | null } = await get(
+      `/assets/${encodeURIComponent(asset)}/orders?limit=500${qs}`,
+    );
+    rows.push(...data.result);
+    cursor = data.next_cursor;
+    if (!cursor) return rows;
+  }
+  throw new Error(`order history truncated after ${MAX_ORDER_PAGES} pages: ${asset}`);
+}
+
 /** One fairminter by tx_hash — O(1), for the live room's poll tick. Never
  *  used by the main indexer pass, which already has every row from the
  *  bulk listing; this is only for the single asset someone is watching. */

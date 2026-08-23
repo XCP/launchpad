@@ -9,6 +9,7 @@
 import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
 import type { MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
+import type { Raw } from "@/lib/numeric";
 
 /**
  * The custom domain, for the same reason next.config.ts 308s every
@@ -935,4 +936,301 @@ export async function fetchRewardBatches(): Promise<RewardBatch[]> {
   } catch {
     return [];
   }
+}
+
+/* --------------------------------------------------------------------- */
+/* The sitewide activity tape                                            */
+/* --------------------------------------------------------------------- */
+
+/**
+ * /activity's four feeds.
+ *
+ * Same wire discipline as the rest of this file: apps/api serves D1 column
+ * names, and the mapping to the camelCase the components read happens exactly
+ * here. Quantities stay `Raw` — strings on the wire, never parsed into a
+ * double on the way past — so the page can divide them at full precision.
+ *
+ * Each returns null on any failure rather than an empty array. A tape that
+ * blanks itself on one bad request is worse than one that holds its last good
+ * answer, and the caller cannot tell the two apart from `[]`.
+ */
+export interface ActivityMint {
+  txHash: string;
+  asset: string;
+  source: string;
+  block: number;
+  earned: Raw;
+  paid: Raw;
+  divisible: boolean;
+  /** The launch's phase — whether this mint became tokens, became a refund,
+   *  or is still escrowed with the question open. */
+  phase: LaunchPhase;
+}
+
+export interface ActivityTrade {
+  key: string;
+  txHash: string | null;
+  asset: string;
+  address: string;
+  block: number;
+  /** Signed from the address's side: tokens in is positive. */
+  tokenDelta: Raw;
+  xcpDelta: Raw;
+  side: "buy" | "sell";
+  venue: "pool" | "book";
+  divisible: boolean;
+}
+
+/** Counterparty names four; `partial` is derived by apps/api because "open,
+ *  but partly taken" is the state a reader most needs and the one the protocol
+ *  does not name. There is no `closed` — filled, cancelled and expired are the
+ *  three ways an order ends. */
+export type OrderState = "open" | "partial" | "filled" | "cancelled" | "expired";
+
+export interface ActivityOrder {
+  txHash: string;
+  asset: string;
+  source: string;
+  side: "buy" | "sell";
+  state: OrderState;
+  block: number;
+  expireBlock: number;
+  /** Original size; the order's price is a statement about these. */
+  tokenQuantity: Raw;
+  xcpQuantity: Raw;
+  /** Still unfilled. A half-filled order has not changed its price. */
+  tokenRemaining: Raw;
+  xcpRemaining: Raw;
+  /** 0–1 of the original already taken. */
+  filled: number;
+  divisible: boolean;
+}
+
+export interface ActivityLaunch {
+  txHash: string;
+  asset: string;
+  source: string;
+  /** Null while a launch is still unconfirmed. */
+  block: number | null;
+  startBlock: number;
+  endBlock: number;
+  price: Raw;
+  quantityByPrice: Raw;
+  hardCap: Raw;
+  paid: Raw;
+  divisible: boolean;
+  phase: LaunchPhase;
+  mints: number;
+  minters: number;
+}
+
+async function activity<Row, T>(
+  path: string,
+  limit: number,
+  map: (row: Row) => T,
+  params = "",
+): Promise<T[] | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/activity/${path}?limit=${limit}${params}`, {
+      // The poll IS the freshness. Cloudflare rewrites max-age on anything it
+      // serves from its own cache to the zone's Browser Cache TTL, so without
+      // this the tab would be told to hold a 30-second answer for hours. The
+      // edge cache — the thing that actually protects D1 and Counterparty — is
+      // untouched by this: the request still stops at the colo.
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: Row[] };
+    if (!Array.isArray(data.result)) return null;
+    return data.result.map(map);
+  } catch {
+    return null;
+  }
+}
+
+interface ApiActivityMint {
+  tx_hash: string;
+  asset: string;
+  source: string;
+  block_index: number;
+  earn_quantity: string;
+  paid_quantity: string;
+  divisible: number;
+  phase: LaunchPhase;
+}
+
+export function fetchActivityMints(limit = 50): Promise<ActivityMint[] | null> {
+  return activity<ApiActivityMint, ActivityMint>("mints", limit, (r) => ({
+    txHash: r.tx_hash,
+    asset: r.asset,
+    source: r.source,
+    block: r.block_index,
+    earned: r.earn_quantity,
+    paid: r.paid_quantity,
+    divisible: Boolean(r.divisible),
+    phase: r.phase,
+  }));
+}
+
+interface ApiActivityTrade {
+  event: string;
+  tx_hash: string | null;
+  asset: string;
+  address: string;
+  block_index: number;
+  token_delta: string;
+  xcp_delta: string;
+  kind: string;
+  venue: string;
+  divisible: number;
+}
+
+export function fetchActivityTrades(limit = 50): Promise<ActivityTrade[] | null> {
+  return activity<ApiActivityTrade, ActivityTrade>("trades", limit, (r) => ({
+    // The indexer's own match identity, which is unique per fill and already
+    // distinguishes two fills of one transaction. React needs a stable key
+    // and the tx hash is not one.
+    key: `${r.event}:${r.asset}`,
+    txHash: r.tx_hash,
+    asset: r.asset,
+    address: r.address,
+    block: r.block_index,
+    tokenDelta: r.token_delta,
+    xcpDelta: r.xcp_delta,
+    side: r.kind === "sell" ? "sell" : "buy",
+    venue: r.venue === "book" ? "book" : "pool",
+    divisible: Boolean(r.divisible),
+  }));
+}
+
+interface ApiActivityOrder {
+  tx_hash: string;
+  asset: string;
+  source: string;
+  side: string;
+  state: string;
+  block_index: number;
+  expire_index: number;
+  token_quantity: Raw;
+  xcp_quantity: Raw;
+  token_remaining: Raw;
+  xcp_remaining: Raw;
+  filled: number;
+  divisible: number;
+}
+
+const ORDER_STATES: OrderState[] = ["open", "partial", "filled", "cancelled", "expired"];
+
+export interface ActivityTotals {
+  mints: number;
+  trades: number;
+  launches: number;
+}
+
+/** Cumulative counts for the activity tab labels. Orders are not here — the
+ *  book is Counterparty's, and fetchActivityOrders reports its own total. */
+export async function fetchActivityTotals(): Promise<ActivityTotals | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/activity/totals`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(6_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: ActivityTotals | null };
+    return data.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The order book, with the size of the whole book beside the page of it.
+ *
+ * Written out rather than run through `activity` above: this is the one feed
+ * whose envelope carries a number the page needs (the tab label wants the
+ * book's size, not this page's length), and threading an envelope through a
+ * helper that four callers share, for one of them, costs more than the
+ * duplication saves.
+ *
+ * `liveOnly` narrows to orders still resting on the book, server-side —
+ * the newest page of a pair's order history is mostly finished orders, so
+ * filtering here would answer "the live book" with whatever survived a page.
+ */
+export async function fetchActivityOrders(
+  limit = 50,
+  liveOnly = false,
+): Promise<{ rows: ActivityOrder[]; total: number } | null> {
+  try {
+    const res = await fetch(
+      `${API_BASE}/v2/activity/orders?limit=${limit}${liveOnly ? "&live=1" : ""}`,
+      { cache: "no-store", signal: AbortSignal.timeout(12_000) },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: ApiActivityOrder[];
+      total?: number;
+    };
+    if (!Array.isArray(data.result)) return null;
+    const rows = data.result.map((r) => ({
+      txHash: r.tx_hash,
+      asset: r.asset,
+      source: r.source,
+      side: r.side === "sell" ? ("sell" as const) : ("buy" as const),
+      // Validated rather than cast: an unknown state from a newer API must
+      // fall back to something renderable, not index a style table with
+      // undefined.
+      state: ORDER_STATES.find((s) => s === r.state) ?? "open",
+      block: r.block_index,
+      expireBlock: r.expire_index,
+      tokenQuantity: r.token_quantity,
+      xcpQuantity: r.xcp_quantity,
+      tokenRemaining: r.token_remaining,
+      xcpRemaining: r.xcp_remaining,
+      filled:
+        typeof r.filled === "number" && r.filled >= 0 ? Math.min(1, r.filled) : 0,
+      divisible: Boolean(r.divisible),
+    }));
+    return { rows, total: typeof data.total === "number" ? data.total : rows.length };
+  } catch {
+    return null;
+  }
+}
+
+interface ApiActivityLaunch {
+  tx_hash: string;
+  asset: string;
+  source: string;
+  announce_block: number | null;
+  start_block: number;
+  end_block: number;
+  price: string;
+  quantity_by_price: string;
+  hard_cap: string;
+  divisible: number;
+  phase: LaunchPhase;
+  mints: number;
+  minters: number;
+  paid_quantity: string | null;
+}
+
+export function fetchActivityLaunches(limit = 50): Promise<ActivityLaunch[] | null> {
+  return activity<ApiActivityLaunch, ActivityLaunch>("launches", limit, (r) => ({
+    txHash: r.tx_hash,
+    asset: r.asset,
+    source: r.source,
+    block: r.announce_block,
+    startBlock: r.start_block,
+    endBlock: r.end_block,
+    price: r.price,
+    quantityByPrice: r.quantity_by_price,
+    hardCap: r.hard_cap,
+    // Null until a launch has taken anything; see the project rule about
+    // fairminter quantity fields being null before the first mint.
+    paid: r.paid_quantity ?? "0",
+    divisible: Boolean(r.divisible),
+    phase: r.phase,
+    mints: r.mints,
+    minters: r.minters,
+  }));
 }
