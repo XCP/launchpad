@@ -4,6 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { fileIsAnimatedWebp } from "@/lib/animated-webp";
 import { fetchJson } from "@/lib/client";
+import { fetchIndexedLaunch } from "@/lib/api/launchpad-api";
 import { useSession } from "@/providers/session-context";
 import { isValidTelegram, isValidX } from "@/lib/social";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -65,15 +66,27 @@ export function EditPanel({ asset }: { asset: string }) {
     setLoaded(true);
     try {
       const res = await fetch(`/j/${asset}.json`);
-      if (!res.ok) return;
-      const meta = await res.json();
-      setDescription(meta.description ?? "");
-      for (const s of meta.social ?? []) {
-        if (s.type === "twitter") setX(s.data ?? "");
-        if (s.type === "telegram") setTelegram(s.data ?? "");
+      if (res.ok) {
+        const meta = await res.json();
+        setDescription(meta.description ?? "");
+        for (const s of meta.social ?? []) {
+          if (s.type === "twitter") setX(s.data ?? "");
+          if (s.type === "telegram") setTelegram(s.data ?? "");
+        }
+        return;
       }
     } catch {
       // Prefill is best-effort; an empty form is still editable.
+    }
+    // Nothing hosted here yet — a launch composed somewhere else has no
+    // file until the first save. Its words, if it has any, are in the index,
+    // and starting from them is what keeps "replace the image" from
+    // silently blanking a description the owner never meant to touch.
+    try {
+      const indexed = await fetchIndexedLaunch(asset);
+      if (indexed?.displayDescription) setDescription(indexed.displayDescription);
+    } catch {
+      // Same: best-effort.
     }
   };
 
@@ -155,8 +168,9 @@ export function EditPanel({ asset }: { asset: string }) {
       </summary>
       <div className="space-y-4 border-t border-gray-100 p-4">
         <p className="text-xs text-gray-500">
-          The on-chain description URL is locked forever; the info behind it is
-          yours to curate.
+          What xcp.fun shows for this launch, and what the hosted metadata says
+          if your on-chain description points here. The on-chain field itself is
+          locked forever; everything behind it is yours to curate.
         </p>
         <div>
           <label htmlFor="edit-description" className="text-sm font-medium text-gray-700">

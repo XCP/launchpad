@@ -81,3 +81,24 @@ export function getMetadataEdgeCache(): Cache | null {
 export function metadataCacheKey(pathname: string): Request {
   return new Request(`${METADATA_CACHE_ORIGIN}${pathname}`, { method: "GET" });
 }
+
+/**
+ * Evict the edge-cached copies of a launch's metadata after an owner edits
+ * it. Without this, "Saved. Cached pages may take a minute to refresh" was a
+ * promise the cache never kept: the JSON and the image are served with a
+ * one-year shared TTL on the assumption that they are written once, and the
+ * editor is the one path that makes that false. Pass the same pathnames the
+ * serving routes build their keys from.
+ *
+ * Best-effort by design — a failed delete leaves a stale edge entry that
+ * expires on its own, which is not worth failing a completed write over.
+ */
+export async function purgeMetadataCache(pathnames: string[]): Promise<void> {
+  const cache = getMetadataEdgeCache();
+  if (!cache) return;
+  await Promise.all(
+    pathnames.map((pathname) =>
+      cache.delete(metadataCacheKey(pathname)).catch(() => false),
+    ),
+  );
+}

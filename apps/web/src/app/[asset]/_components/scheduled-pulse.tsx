@@ -50,6 +50,7 @@ export function ScheduledPulse({
   deadlineBlock,
   initialHeight,
   mintForm,
+  waitingCta,
 }: {
   asset: string;
   startBlock: number;
@@ -57,14 +58,28 @@ export function ScheduledPulse({
   initialHeight: number;
   /** Shown in the countdown's place once minting is effectively open. */
   mintForm?: ReactNode;
+  /** The "get XCP first" nudge — rendered ONLY while this is still a
+   *  countdown. It used to sit outside this component, so the moment the
+   *  form appeared the card carried two full-width primary buttons: "Mint
+   *  10,000 GENXSIXNINE" directly above "Get XCP before it opens", one of
+   *  them urging preparation for a thing the other was already doing. A
+   *  screen gets one primary action, and once the form is live that action
+   *  is minting. */
+  waitingCta?: ReactNode;
 }) {
   const height = useChainHeight(startBlock, initialHeight);
   const remaining = Math.max(startBlock - height, 0);
+  // `height` is Counterparty's parsed height, not Bitcoin's tip, so this is
+  // true exactly when the opening block has been parsed — which is also
+  // when the fairminter's own status flips to open.
   const open = remaining <= 0;
-  // A transaction broadcast while the tip is start_block − 1 can only
-  // confirm at start_block or later, which is exactly what consensus
-  // requires — so the form opens a block early rather than a block late.
-  const mintable = height >= startBlock - 1;
+  // This used to open the form a block early, reasoning that a transaction
+  // broadcast at start_block − 1 can only confirm at start_block anyway. The
+  // reasoning holds for consensus and fails at compose: Counterparty refuses
+  // to build the mint at all while the fairminter is pending, answering
+  // `fairminter is not open for asset: GENXSIXNINE`. A button that can only
+  // return an error is worse than no button, so the form waits for open.
+  const mintable = open;
   const router = useRouter();
   useEffect(() => {
     if (!mintable) return;
@@ -134,7 +149,12 @@ export function ScheduledPulse({
   if (mintable && mintForm) {
     return (
       <div className="mt-6">
-        <div className={`mb-3 text-center ${LABEL}`}>minting is open</div>
+        {/* The status pill above is rendered from the server's phase, which
+            lags until Counterparty's record flips and the refresh below
+            lands — so for a few seconds this label sits under a pill that
+            still says "Scheduled". "live" is the honest word for that gap:
+            the chain has opened minting, the page hasn't caught up yet. */}
+        <div className={`mb-3 text-center ${LABEL}`}>minting is live</div>
         {mintForm}
       </div>
     );
@@ -230,6 +250,7 @@ export function ScheduledPulse({
           </>
         )}
       </p>
+      {waitingCta}
     </div>
   );
 }

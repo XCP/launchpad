@@ -60,7 +60,13 @@ async function pickFundingUtxo(address: string, minValue: number): Promise<Utxo>
 /**
  * Commit/reveal an XCP-69 fairminter inscription: the image becomes the
  * permanent on-chain description, the inscription output is burned, and the
- * CIP-25 JSON URL rides in the ord metadata.
+ * fairminter message rides in the ord metadata.
+ *
+ * No URL rides along with it. buildFairminterInscriptionMetadata leaves the
+ * hosted JSON out on purpose — a link would rot on an artifact that cannot —
+ * so the relationship points the other way: the JSON names the inscription
+ * (see the POST handler in app/api/launches), and its address is derived from
+ * the asset name by convention.
  */
 export async function inscribeLaunch(opts: {
   asset: string;

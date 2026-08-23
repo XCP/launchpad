@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[asset]/_components/launch-chrome";
 import { HostedDescription, HostedSocials, InscriptionChip, LaunchDescription, isOurMetadata } from "@/app/[asset]/_components/launch-metadata";
 import { DenomToggle, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[asset]/_components/launch-stats";
+import { classifyDescription, proseDescription } from "@launchpad/xcp69/description";
 import { ScheduledPulse } from "@/app/[asset]/_components/scheduled-pulse";
 import { AddressHoverCard, IssuerChips, IssuerLine } from "@/components/address-hover-card";
 import type { Fairmint, PairActivity, Pool } from "@/lib/api/counterparty";
@@ -84,10 +85,14 @@ export function LaunchView({
   displayDescription: string | null;
 }) {
   const progress = saleProgress(fm);
-  // An inscribed launch's description IS the image (hex-encoded on the
+  // An inscribed launch's description IS its content (hex-encoded on the
   // wire) rather than our hosted JSON URL — mime_type is the only signal
   // that distinguishes the two, since a raw hex blob isn't a URL either.
-  const isInscribed = fm.mime_type?.startsWith("image/") ?? false;
+  // Any type but text/plain: an image is the common case, but GENXSIXNINE
+  // inscribed a whole text/html mint viewer, and reading only image/* left
+  // that one classified as a plain description — which is how 33 KB of
+  // markup ended up rendered as the creator's prose.
+  const isInscribed = classifyDescription(fm.description, fm.mime_type) === "inscription";
   // sort_pair orders the pool lexically — XCP can sit on either side.
   const xcpIsA = pool?.asset_a === "XCP";
   // Raw reserves, not `_normalized`: the normalized strings are API-side
@@ -208,7 +213,7 @@ export function LaunchView({
       rawEquals(fm.hard_cap, XCP69_EXACT.HARD_CAP) &&
       rawEquals(fm.soft_cap, XCP69_EXACT.SOFT_CAP) &&
       rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY);
-    const isUrlDescription = /^https?:\/\//i.test(fm.description ?? "");
+    const descriptionKind = classifyDescription(fm.description, fm.mime_type);
     const blocksLeft = fm.start_block - blockHeight;
     // "opens in now" is what blocksEta returns at the boundary, where the
     // record is still pending but the chain has caught up.
@@ -222,18 +227,30 @@ export function LaunchView({
     const shareSubline = conforming
       ? "0.01 XCP / 1,000 · sells out or refunds"
       : "an XCP fairminter on xcp.fun";
-    const prose = (fm.description ?? "").trim();
-    const hasProse =
-      prose.length > 12 && prose.toUpperCase() !== asset.toUpperCase();
-    // Only real prose earns the space: a URL is machine metadata, and a
-    // one-word "description" is noise the poster reads better without.
+    const prose = proseDescription(fm.description, fm.mime_type, asset);
+    // Only real prose earns the space: a URL is machine metadata, a
+    // one-word "description" is noise the poster reads better without, and
+    // an inscription's description is its content — 33 KB of HTML that used
+    // to render here as `<!doctype html><html lang="en">…` under a "Show
+    // more" link.
+    //
+    // `curated` comes first because it is the only copy that exists for a
+    // launch composed outside this site: the owner's words, written through
+    // the editor into our own storage, where the on-chain field is an
+    // inscription or a stranger's URL and can never hold them. It is also
+    // already on the server, so a hosted-metadata launch skips the client
+    // fetch and paints its description with the rest of the page.
+    //
     // Shared between phases since it renders in two different spots —
     // before the countdown on scheduled, below the live bar on minting —
     // each needing its own top margin to land in the same visual place.
+    const curated = displayDescription?.trim() ?? "";
     const renderDescription = (marginClassName: string) =>
-      isOurMetadata(fm.description) ? (
+      curated ? (
+        <LaunchDescription text={curated} marginClassName={marginClassName} />
+      ) : isOurMetadata(fm.description) ? (
         <HostedDescription url={fm.description} marginClassName={marginClassName} />
-      ) : isUrlDescription ? (
+      ) : descriptionKind === "url" ? (
         // Someone else's host: link it rather than fetch it, so viewing a
         // launch never reports the visitor to the issuer's server.
         <p className={`${marginClassName} text-sm text-gray-500`}>
@@ -246,9 +263,9 @@ export function LaunchView({
             {fm.description}
           </a>
         </p>
-      ) : (
-        hasProse && <LaunchDescription text={prose} marginClassName={marginClassName} />
-      );
+      ) : prose ? (
+        <LaunchDescription text={prose} marginClassName={marginClassName} />
+      ) : null;
     return (
       <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
       <div className="mx-auto max-w-2xl">
@@ -357,15 +374,17 @@ export function LaunchView({
                   <MintPanel asset={asset} xcpUsd={xcpUsd} />
                 ) : undefined
               }
+              waitingCta={
+                standardTerms ? (
+                  <Link
+                    href="/dispense"
+                    className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+                  >
+                    Get XCP before it opens
+                  </Link>
+                ) : undefined
+              }
             />
-            {standardTerms && (
-              <Link
-                href="/dispense"
-                className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
-              >
-                Get XCP before it opens
-              </Link>
-            )}
           </div>
         )}
 

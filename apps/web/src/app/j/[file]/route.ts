@@ -26,7 +26,13 @@ export async function GET(
   const response = new Response(object.body, {
     headers: {
       "content-type": "application/json",
-      "cache-control": "public, max-age=31536000, immutable",
+      // Shared caches keep it for a year and the editor evicts them on write
+      // (purgeMetadataCache); browsers get a minute. It used to be
+      // `immutable`, which is a promise this file cannot keep — the owner
+      // can rewrite it from the edit panel, and `immutable` tells the
+      // browser not to revalidate even on a reload, so the person who just
+      // saved was the one guaranteed to keep seeing the old copy.
+      "cache-control": "public, max-age=60, s-maxage=31536000",
       "access-control-allow-origin": "*",
       "x-metadata-cache": "MISS",
     },

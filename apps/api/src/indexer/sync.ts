@@ -1,3 +1,4 @@
+import { classifyDescription } from "@launchpad/xcp69/description";
 import { big } from "@launchpad/xcp69/numeric";
 import { one, q } from "#api/db";
 import {
@@ -486,6 +487,14 @@ function displayDescription(raw: unknown): string {
  * its R2 bucket; literal on-chain prose is already in hand; every other URL
  * resolves to the checked empty-string state. Transient R2 failures stay NULL
  * and retry on a later tick.
+ *
+ * An inscribed launch resolves to that same checked-empty state: its
+ * description field holds content, not words — GENXSIXNINE's is 33 KB of an
+ * HTML mint viewer — and mirroring the first 2,000 characters of that put
+ * `<!doctype html><html lang="en">…` on the card, in the detail blockquote,
+ * and in the og:description of every shared link. The owner writes real words
+ * for those through the metadata editor instead, which updates this column
+ * directly (see updateIndexedDescription in the web app).
  */
 async function backfillDisplayDescriptions(
   db: D1Database,
@@ -504,10 +513,14 @@ async function backfillDisplayDescriptions(
   for (const row of missing) {
     const pointer = row.description?.trim() ?? "";
     let prose = "";
+    // D1 stores the description but not the fairminter's mime_type, so the
+    // shared classifier reads the shape of the bytes instead — the same
+    // verdict the site reaches from the mime_type it still has in hand.
+    const kind = classifyDescription(pointer);
 
-    if (pointer && !/^https?:\/\//i.test(pointer)) {
+    if (kind === "prose") {
       prose = displayDescription(pointer);
-    } else if (pointer) {
+    } else if (kind === "url") {
       let url: URL;
       try {
         url = new URL(pointer);

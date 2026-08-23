@@ -5,6 +5,7 @@ import {
   metadataIconUrl,
   metadataImageUrl,
   metadataJsonUrl,
+  purgeMetadataCache,
   updateIndexedDescription,
 } from "@/lib/metadata";
 
@@ -15,7 +16,12 @@ import {
   sameOrigin,
 } from "@/lib/session";
 import { sanitizeTelegram, sanitizeX } from "@/lib/social";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import {
+  COUNTERPARTY_API_BASE,
+  inscriptionContentUrl,
+  inscriptionId,
+  inscriptionPageUrl,
+} from "@/lib/constants";
 
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
@@ -53,6 +59,48 @@ async function assetHasRealFairminter(asset: string): Promise<boolean> {
   }
 }
 
+/** A CBOR-free, registry-agnostic pointer to the launch's inscription, for
+ *  the JSON below. The id is the durable fact; the URLs are the convenience.
+ *
+ *  Every inscribed launch's hosted JSON is an orphan — nothing on-chain
+ *  points at it, because for an inscription the description IS the content,
+ *  not a URL. That cuts both ways: the JSON is the only place that can carry
+ *  a human-followable link back to the artifact, and it is the only record
+ *  tying our copy of the art to the thing the token actually is. Without it,
+ *  a reader who found this file would see `image: xcp.fun/full/ASSET` and
+ *  have no way to know the canonical bytes live on Bitcoin. */
+function inscriptionRecord(
+  revealTxid: string,
+  contentType?: string | null,
+): Record<string, string> {
+  return {
+    id: inscriptionId(revealTxid),
+    ...(contentType ? { content_type: contentType } : {}),
+    content_url: inscriptionContentUrl(revealTxid),
+    page_url: inscriptionPageUrl(revealTxid),
+  };
+}
+
+/** The asset's real (non-rejected) fairminter, when it has one. `mime_type`
+ *  is what makes a launch inscribed; `tx_hash` is the reveal that carries it. */
+async function fetchRealFairminter(
+  asset: string,
+): Promise<{ tx_hash?: string; mime_type?: string; status?: string } | null> {
+  try {
+    const res = await fetch(
+      `${COUNTERPARTY_API_BASE}/assets/${asset}/fairminters?limit=100&verbose=true`,
+      { cache: "no-store" },
+    );
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: { tx_hash?: string; mime_type?: string; status?: string }[];
+    };
+    return (data.result ?? []).find((fm) => !fm.status?.startsWith("invalid")) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Stores a launch's image + enhanced-asset-info JSON, called from the create
  * flow before composing the fairminter (so the on-chain description URL
@@ -69,6 +117,11 @@ export async function POST(request: Request) {
   const xUrl = sanitizeX(String(form.get("x") ?? ""));
   const telegramUrl = sanitizeTelegram(String(form.get("telegram") ?? ""));
   const image = form.get("image");
+  // Written by the create flow's second pass: the first one runs before the
+  // inscription exists, so the reveal txid — and with it the inscription id —
+  // is only knowable once the envelope has been broadcast.
+  const inscriptionTxid = String(form.get("inscription_txid") ?? "").toLowerCase();
+  const inscribed = /^[0-9a-f]{64}$/.test(inscriptionTxid);
 
   if (!ASSET_NAME_REGEX.test(asset)) {
     return NextResponse.json({ error: "Invalid asset name" }, { status: 400 });
@@ -135,6 +188,11 @@ export async function POST(request: Request) {
       { type: "icon", size: "48x48", data: metadataIconUrl(asset) },
       { type: "standard", data: metadataImageUrl(asset), hash: imageHash },
     ],
+    // The bytes above are our copy of the art; on an inscribed launch the
+    // originals are the on-chain description itself, and this is what says so.
+    ...(inscribed
+      ? { inscription: inscriptionRecord(inscriptionTxid, image.type) }
+      : {}),
     ...(social.length > 0 ? { social } : {}),
   });
   await bucket.put(`j/${asset}`, json, {
@@ -258,18 +316,39 @@ export async function PUT(request: Request) {
   }
 
   const bucket = await getMetadataBucket();
+  // Create if absent, don't refuse. Launches composed here have their JSON
+  // written before broadcast, so an existing file used to be a safe
+  // assumption — but a fairminter composed anywhere else has never had one,
+  // and refusing those told the owner of a real XCP-69 launch "No metadata
+  // exists for GENXSIXNINE" with no path to ever making some exist. What
+  // authorizes this write is owning the asset, checked above; whether we
+  // already hold a file is a fact about us, not about the asker.
   const existing = await bucket.get(`j/${asset}`);
-  if (!existing) {
-    return NextResponse.json(
-      { error: `No metadata exists for ${asset}` },
-      { status: 404 },
-    );
-  }
-  const current = JSON.parse(await new Response(existing.body).text()) as {
-    images?: { type: string; size?: string; data: string; hash?: string }[];
-  };
+  const current = existing
+    ? ((await new Response(existing.body).json().catch(() => null)) as {
+        images?: { type: string; size?: string; data: string; hash?: string }[];
+        inscription?: Record<string, string>;
+      } | null)
+    : null;
 
-  let imageHash = current.images?.find((i) => i.type === "standard")?.hash;
+  // Derived from the chain rather than carried over, because the chain is
+  // where the answer actually lives and an edit is a cheap moment to ask: one
+  // request, on a route that already makes two. This is also the only way an
+  // inscribed launch composed OUTSIDE xcp.fun ever gets the link — nothing in
+  // our create flow ran for it, so nobody wrote the record at launch time.
+  // A lookup that fails keeps whatever the file already had, so a Counterparty
+  // hiccup can't quietly strip the pointer.
+  const fairminter = await fetchRealFairminter(asset);
+  const inscribedType =
+    fairminter?.mime_type && fairminter.mime_type !== "text/plain"
+      ? fairminter.mime_type
+      : null;
+  const inscription =
+    inscribedType && fairminter?.tx_hash
+      ? inscriptionRecord(fairminter.tx_hash, inscribedType)
+      : current?.inscription;
+
+  let imageHash = current?.images?.find((i) => i.type === "standard")?.hash;
   if (newImageBytes && newImage) {
     imageHash = imageSha;
     await bucket.put(`i/${asset}`, newImageBytes, {
@@ -297,12 +376,22 @@ export async function PUT(request: Request) {
         ...(imageHash ? { hash: imageHash } : {}),
       },
     ],
+    ...(inscription ? { inscription } : {}),
     ...(social.length > 0 ? { social } : {}),
   });
   await bucket.put(`j/${asset}`, json, {
     httpMetadata: { contentType: "application/json" },
   });
+  // D1 is what the site actually renders — the card blurb, the detail
+  // blockquote, the share unfurl — and for a launch whose on-chain
+  // description points somewhere that isn't ours (an inscription, a
+  // third-party host) it is the ONLY place these words can appear. The R2
+  // JSON above stays the canonical published copy either way.
   await updateIndexedDescription(asset, description);
+  await purgeMetadataCache([
+    `/j/${encodeURIComponent(asset)}.json`,
+    ...(newImageBytes ? [`/i/${encodeURIComponent(asset)}`] : []),
+  ]);
 
   return NextResponse.json({ json_url: metadataJsonUrl(asset) });
 }

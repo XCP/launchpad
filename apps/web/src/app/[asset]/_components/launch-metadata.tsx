@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { fetchJson } from "@/lib/client";
 import { METADATA_ORIGIN } from "@/lib/metadata";
+import { inscriptionContentUrl } from "@/lib/constants";
 
 import { FOCUS } from "@/components/ui/tokens";
 
@@ -138,16 +139,21 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
   );
 }
 
-/** For an inscribed launch: the image is the on-chain description itself
+/** For an inscribed launch: the content is the on-chain description itself
  *  (see fm.mime_type), not a URL — this is the only place that fact is
  *  visible, so it gets its own chip, linked out to where the inscription
  *  actually lives. `txHash` is the fairminter's creating transaction,
  *  which is also the inscription's reveal transaction (same tx carries
- *  both the ordinal envelope and the Counterparty message). */
+ *  both the ordinal envelope and the Counterparty message).
+ *
+ *  /content, not /inscription: this points at the inscribed thing itself
+ *  rather than the record describing it. GENXSIXNINE inscribed a live mint
+ *  viewer as text/html, so /content opens the artwork running; /inscription
+ *  opens a page of metadata about a page. Same id either way. */
 export function InscriptionChip({ txHash }: { txHash: string }) {
   return (
     <a
-      href={`https://ordinals.com/inscription/${txHash}i0`}
+      href={inscriptionContentUrl(txHash)}
       target="_blank"
       rel="noreferrer"
       className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums transition-colors hover:border-purple-300 hover:text-purple-600"

@@ -380,6 +380,20 @@ export default function CreatePage() {
           broadcast: broadcastTransaction,
           onStep: setInscribeStep,
         });
+        // Second pass, now that the reveal exists: the inscription id is
+        // <reveal txid>i0, and the JSON written in step 1 could not have
+        // known it. Still inside the freely-rewritable window — the
+        // fairminter is in the mempool, not confirmed — so this takes the
+        // same path the first write did. Best-effort: the launch is already
+        // broadcast and irreversible, and an owner edit derives the same
+        // record from the chain later, so a failure here is not worth
+        // showing an error over a launch that succeeded.
+        try {
+          form.set("inscription_txid", revealTxid);
+          await fetch("/api/launches", { method: "POST", body: form });
+        } catch {
+          // See above: the pointer is recoverable, the launch is done.
+        }
         setInscribeTxid(revealTxid);
         return;
       }

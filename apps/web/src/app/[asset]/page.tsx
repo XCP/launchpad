@@ -22,6 +22,7 @@ import {
   type ChartCandle,
 } from "@/lib/api/launchpad-api";
 import { foldPointsToCandles, type ChartResolution } from "@/lib/candles";
+import { proseDescription } from "@launchpad/xcp69/description";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import {
@@ -74,9 +75,14 @@ async function shareDescription(asset: string): Promise<string | null> {
         .catch(() => null)) as { description?: unknown } | null;
       const words = typeof meta?.description === "string" ? meta.description.trim() : "";
       if (words) return clamp(words, SHARE_DESCRIPTION_MAX);
-    } else if (onChain && !/^https?:\/\//i.test(onChain)) {
-      // A launch composed elsewhere can put real text on-chain.
-      return clamp(onChain, SHARE_DESCRIPTION_MAX);
+    } else {
+      // A launch composed elsewhere can put real text on-chain — or its
+      // content, which is not text at all. An inscribed launch's description
+      // is an image, an SVG, or a whole HTML page; unfurling
+      // `<!doctype html><html lang="en">…` as the creator's pitch is worse
+      // than falling through to the issuer line below.
+      const words = proseDescription(onChain, fm.mime_type, asset);
+      if (words) return clamp(words, SHARE_DESCRIPTION_MAX);
     }
 
     return fm.source ? `Launched by ${fm.source}` : null;

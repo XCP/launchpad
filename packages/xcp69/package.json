@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./xcp69": "./src/xcp69.ts",
+    "./description": "./src/description.ts",
     "./numeric": "./src/numeric.ts",
     "./candles": "./src/candles.ts",
     "./mempool": "./src/mempool.ts",

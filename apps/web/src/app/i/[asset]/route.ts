@@ -7,6 +7,17 @@ import {
 import { CDN_BASE } from "@/lib/constants";
 
 /**
+ * A replaceable image cannot be `immutable`. The edit panel rewrites this
+ * object in place at a URL that never changes, so a year-long browser TTL
+ * with no revalidation meant a replaced image stayed replaced for everyone
+ * except the caches. Shared caches still hold it for a year — the editor
+ * evicts them on write (purgeMetadataCache) — and an hour is what a browser
+ * keeps, which self-heals a replacement without re-fetching hero art on
+ * every navigation.
+ */
+const IMAGE_CACHE_CONTROL = "public, max-age=3600, s-maxage=31536000";
+
+/**
  * Serves a launch's uploaded token image — and for everything else, a 302 to
  * the CDN's copy rather than a 404. The chain still prefers our original
  * (every launch created here uploads its art to R2 before broadcast), but a
@@ -59,7 +70,7 @@ export async function GET(
       return new Response(res.body, {
         headers: {
           "content-type": res.headers.get("content-type") ?? "image/png",
-          "cache-control": "public, max-age=31536000, immutable",
+          "cache-control": IMAGE_CACHE_CONTROL,
           "access-control-allow-origin": "*",
         },
       });
@@ -93,7 +104,7 @@ export async function GET(
   const response = new Response(object.body, {
     headers: {
       "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
-      "cache-control": "public, max-age=31536000, immutable",
+      "cache-control": IMAGE_CACHE_CONTROL,
       "access-control-allow-origin": "*",
       "x-metadata-cache": "MISS",
     },
