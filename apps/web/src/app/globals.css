@@ -3,6 +3,19 @@
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;
+
+  /* The width at which the site header can show its full navigation, and
+   * therefore where its burger menu gives way. A measured number rather than
+   * a chosen one: laid out with both nav groups, the inline status chips and
+   * a CONNECTED wallet — the widest state the row ever has — the header needs
+   * 822px. Tailwind's own stops straddle that uselessly, `md` (768px) being
+   * 54px short and `lg` (1024px) hiding the links on every tablet, so the
+   * header gets a named stop of its own with room to spare.
+   *
+   * It is here rather than inline as `min-[880px]:` because four classes in
+   * site-header.tsx have to agree on it; one name is one decision, four magic
+   * numbers are four chances to change three of them. */
+  --breakpoint-nav: 880px;
 }
 
 /* XCP-69 signature: the holographic conformance border, carried over from xcp.fun */

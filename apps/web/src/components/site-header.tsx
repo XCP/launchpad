@@ -18,8 +18,22 @@ import { TELEGRAM_URL, TelegramChip } from "@/components/telegram-chip";
  *  - Launch has left the header entirely. It is the homepage's call to action,
  *    not a permanent fixture, and it competed with the section links on every
  *    other page for space none of them had.
- *  - Below `sm` the links collapse into one menu button, which is the only
- *    honest way to fit five destinations on a phone.
+ *  - Below `nav` (880px, defined in globals.css) the links collapse into one
+ *    menu button, which is the only honest way to fit six destinations on a
+ *    narrow screen.
+ *
+ * That threshold is measured, not chosen, and it is not one of Tailwind's own
+ * stops because none of them fits. In the band between the burger and `lg` the
+ * row carries both nav groups, the inline status chips and the wallet, and it
+ * needs 761px with a Connect button — but 822px once a wallet is connected and
+ * that button becomes a 137px address pill. The connected state is the one a
+ * desktop visitor is usually in, so it is the one the breakpoint has to clear.
+ *
+ * `sm` (640px) was therefore wrong by ~180px and had been since before Activity
+ * joined the secondary links; `md` (768px) is still 54px short. The row does not
+ * break when it overruns — it squeezes the one group allowed to shrink — so the
+ * failure was quiet rather than visible, which is exactly why it survived.
+ * `lg` (1024px) would fit but hides the links on every tablet, so 880px it is.
  *
  * The wallet is desktop-only, and that is a statement of fact rather than a
  * layout compromise: the XCP Wallet is a browser extension, and no mobile
@@ -84,7 +98,7 @@ export function SiteHeader() {
               XCP<span className="text-purple-600">.FUN</span>
             </span>
           </Link>
-          <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 sm:flex">
+          <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 nav:flex">
             {LINKS.map((l) => (
               <Link key={l.href} href={l.href} className="hover:text-gray-900">
                 {l.label}
@@ -125,14 +139,14 @@ export function SiteHeader() {
             {queued ? <MempoolChip /> : <RewardsChip />}
             <TelegramChip />
           </span>
-          <nav className="hidden items-center gap-4 sm:flex">
+          <nav className="hidden items-center gap-4 nav:flex">
             {SECONDARY.map((l) => (
               <Link key={l.href} href={l.href} className="hover:text-gray-900">
                 {l.label}
               </Link>
             ))}
           </nav>
-          <div className="hidden sm:block">
+          <div className="hidden nav:block">
             <HeaderWallet />
           </div>
           <MobileMenu />
@@ -156,7 +170,7 @@ function MobileMenu() {
     <DM.Root>
       <DM.Trigger
         aria-label="Open menu"
-        className="flex size-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 sm:hidden"
+        className="flex size-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 nav:hidden"
       >
         {/* Three bars, drawn rather than shipped as an icon dependency. */}
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden fill="none">
