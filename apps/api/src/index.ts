@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { Env } from "#api/env";
+import { MIRRORS, refreshMirrors } from "#api/indexer/mirrors";
 import { syncOrders } from "#api/indexer/orders";
 import { syncLaunches } from "#api/indexer/sync";
 import { activityRoute } from "#api/read/activity";
@@ -309,5 +310,24 @@ export default {
         });
       }),
     );
+
+    /**
+     * Outside the lock, and deliberately so. This touches no D1 row and
+     * nothing the indexer reads, so serializing it against the index buys
+     * nothing — while the two foreign hops it makes are the one part of this
+     * tick whose latency belongs to somebody else's web server. Inside the
+     * lock, a slow issuer host would spend the indexer's 110-second budget.
+     *
+     * Its own waitUntil for the same reason: an unreachable mirror host must
+     * not be able to look like an indexer failure, or stop one.
+     */
+    if (MIRRORS.length > 0) {
+      ctx.waitUntil(
+        runScheduledJob("refresh_mirrors", async () => {
+          const height = await fetchBlockHeight();
+          return refreshMirrors(env.METADATA, height);
+        }).then(() => undefined),
+      );
+    }
   },
 } satisfies ExportedHandler<Env>;

@@ -18,12 +18,18 @@ export const metadataIconUrl = (asset: string) =>
   `${METADATA_ORIGIN}/icon/${asset}`;
 
 /** Minimal structural R2 types — avoids a workers-types dependency. */
-interface R2Object {
-  body: ReadableStream;
+interface R2ObjectMeta {
+  /** Changes on every write. What /i/[asset] versions its resize source
+   *  with, so a replaced picture cannot be served from a transform cached
+   *  against the old one. */
+  etag?: string;
   httpMetadata?: { contentType?: string };
 }
+interface R2Object extends R2ObjectMeta {
+  body: ReadableStream;
+}
 export interface R2Bucket {
-  head(key: string): Promise<unknown | null>;
+  head(key: string): Promise<R2ObjectMeta | null>;
   get(key: string): Promise<R2Object | null>;
   put(
     key: string,
