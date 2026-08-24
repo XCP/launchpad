@@ -81,7 +81,7 @@ export function SiteHeader() {
           than on whatever gap the two nav groups happen to leave — those
           change width with the wallet's state, and a "centre" that drifts
           when you connect isn't one. */}
-      <div className="relative mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-5">
           <Link
             href="/"
@@ -107,23 +107,32 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        {/* Dead centre of the HEADER, absolutely placed so it doesn't drift
-            when the wallet changes width. Only from `lg`: below that the two
-            nav groups leave under ~110px of true centre, and a "centred" chip
-            that overlaps the links beside it is worse than one that doesn't
-            claim to be centred. Narrower screens get it inline, below. */}
-        <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
+        {/* In the flow between the two nav groups, NOT absolutely centred.
+            It used to be absolute — dead centre of the header, so it could not
+            drift when the wallet changed width — and that is precisely how it
+            broke: absolute centring places the cluster by the row's midpoint
+            while ignoring that the groups either side are different widths. On
+            a connected wallet with all three chips up, its right edge landed on
+            top of the secondary nav and "Telegram" sat over "Activity".
+
+            Widening the window could never fix that. This row is capped at
+            `max-w-5xl`, so it is 1024px on a 1440px monitor exactly as it is on
+            a 1024px one, and the collision was identical at every size above
+            lg. The content genuinely fits — 274 + ~317 + 342 plus padding is
+            965 of 1024 — so flexbox was the right tool all along: as a normal
+            child the cluster simply cannot overlap its siblings, and the worst
+            case is that it sits a little off true centre when the wallet
+            changes width. Drifting beats colliding. */}
+        <div className="hidden shrink-0 items-center gap-2 lg:flex">
           {/* Rewards is always on; mempool joins it only when something is
-              queued, so the group re-centres itself as one unit. Telegram sits
+              queued, so the group grows and shrinks as one unit. Telegram sits
               last — the two before it are about this site's own state, and it
               is the one that leaves. That also makes it the only chip whose
               position is fixed: second normally, third when the mempool has
               something to say. */}
-          <div className="pointer-events-auto flex items-center gap-2">
-            <RewardsChip />
-            <MempoolChip />
-            <TelegramChip />
-          </div>
+          <RewardsChip />
+          <MempoolChip />
+          <TelegramChip />
         </div>
 
         <div className="flex shrink-0 items-center gap-4 text-sm font-medium text-gray-600">
