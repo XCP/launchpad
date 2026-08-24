@@ -68,9 +68,16 @@ const TABS: { id: Tab; label: string }[] = [
  * and one tab-specific tail column. A reader who learns to scan one row has
  * learned all four.
  *
- * Only the visible tab fetches. apps/api serves these as four routes for that
- * reason: a page built to be left open should not pay for the three feeds
- * nobody is looking at.
+ * Every tape loads once; only the visible one keeps polling. That split is
+ * what lets all five tabs carry a count on arrival — Orders and Pools have no
+ * cumulative row in D1 to count from, their totals come back with their own
+ * feeds, so a tab nobody has opened has nothing to show. Loading them once
+ * costs one edge-cached request each and buys two things: the counts, and tab
+ * switches that render immediately instead of on a fresh round trip.
+ *
+ * The polling is where the real cost of a page left open lives, and that stays
+ * on the tab in front of you. apps/api serving these as five routes is what
+ * makes both halves possible.
  */
 export function ActivityView() {
   const [tab, setTab] = useState<Tab>("mints");
@@ -217,13 +224,23 @@ export function ActivityView() {
   );
 }
 
-/** A tape's subscription. `keepPreviousData` is what stops the table blanking
- *  itself on every poll; the null key is what stops an unwatched tab polling
- *  at all. Generic over the whole payload rather than over a row array, because
- *  the orders feed carries the book's total beside its page. */
+/**
+ * A tape's subscription.
+ *
+ * Every tape has a real key, so every tape loads once — that is what puts a
+ * count on all five tabs and makes switching instant. Only the active one gets
+ * an interval, so a page left open all afternoon polls one feed rather than
+ * five. Same reason `revalidateOnFocus` follows `active`: coming back to the
+ * tab should refresh what you are looking at, not everything.
+ *
+ * `keepPreviousData` stops the table blanking itself on every poll. Generic
+ * over the whole payload rather than over a row array, because the orders and
+ * pools feeds carry their totals beside their page.
+ */
 function useFeed<D>(active: boolean, key: string, fetcher: () => Promise<D | null>) {
-  return useSWR(active ? key : null, fetcher, {
-    refreshInterval: REFRESH_MS,
+  return useSWR(key, fetcher, {
+    refreshInterval: active ? REFRESH_MS : 0,
+    revalidateOnFocus: active,
     keepPreviousData: true,
   });
 }
