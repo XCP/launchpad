@@ -14,14 +14,14 @@
  * maps /v2/mints/by/:source.
  */
 import type { Raw } from "@launchpad/xcp69/numeric";
-import { fetchAssetOrders, fetchPoolEvents } from "#api/integrations/counterparty";
+import { fetchPoolEvents } from "#api/integrations/counterparty";
+import { countOrders } from "#api/indexer/orders";
 import {
-  countMarketAssets,
   getActivityTotals,
   listConformingAssetInfo,
-  listMarketAssets,
   listRecentLaunches,
   listRecentMints,
+  listRecentOrders,
   listRecentTrades,
 } from "#api/queries/activity";
 import { J, router, type Ctx } from "#api/read/respond";
@@ -53,12 +53,6 @@ const ORDERS_TTL = 60;
  *  repeating it here would make this tab a second copy of that one rather than
  *  the thing it exists to show — where the liquidity itself came from and went. */
 const POOL_EVENTS = ["OPEN_POOL", "NEW_POOL_DEPOSIT", "NEW_POOL_WITHDRAWAL"] as const;
-
-/** Ceiling on the order fan-out: one subrequest per asset, and a Worker has a
- *  hard subrequest limit. Deepest pools are read first, and the response says
- *  how many markets exist versus how many were read, so a truncated book is
- *  visible rather than silently presented as the whole one. */
-const MAX_ORDER_ASSETS = 24;
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(Math.max(n, lo), hi);
 
@@ -104,45 +98,20 @@ activityRoute.get("/v2/activity/launches", async (c) => {
 });
 
 /** The states an order can be in. Counterparty has four; `partial` is derived
- *  here because "open, but someone has already taken part of it" is the state
- *  a reader most needs to see and the one the protocol does not name. */
+ *  here because "open, but partly taken" is the state a reader most needs to
+ *  see and the one the protocol does not name. */
 type OrderState = "open" | "partial" | "filled" | "cancelled" | "expired";
 
-interface OrderRow {
-  tx_hash: string;
-  source: string;
-  asset: string;
-  /** From the order's own point of view: it is buying the token if it is
-   *  offering XCP for it. Not the taker's side — an order is an offer. */
-  side: "buy" | "sell";
-  state: OrderState;
-  block_index: number;
-  expire_index: number;
-  /** Original size, which is what the order's price is a statement about. */
-  token_quantity: Raw;
-  xcp_quantity: Raw;
-  /** What is still unfilled. Price comes from the quantities above, amount
-   *  from these: a half-filled order has not changed its price. */
-  token_remaining: Raw;
-  xcp_remaining: Raw;
-  /** How much of the original has been taken, 0–1, rounded to four places.
-   *  Derived here rather than in the browser because it is the same division
-   *  for every client and the operands are raw integers. */
-  filled: number;
-  divisible: number;
+/** Raw quantities are TEXT in D1 and can exceed 2^53, so the fill fraction is
+ *  computed in bigint and only becomes a double at the end. */
+function rawInt(value: string): bigint | null {
+  return /^-?\d+$/.test(value) ? BigInt(value) : null;
 }
 
-/** Raw quantities arrive as a JSON number or, above 2^53, a lossless string.
- *  BigInt() throws on anything that is not a plain integer literal, and a
- *  throw here would take the whole route with it. */
-function rawInt(value: Raw): bigint | null {
-  const s = String(value);
-  return /^-?\d+$/.test(s) ? BigInt(s) : null;
-}
-
-/** Fraction of the give leg already taken. An unreadable quantity yields 0
- *  rather than a guess — the row still renders, just without a fill meter. */
-function filledFraction(quantity: Raw, remaining: Raw): number {
+/** Fraction of the GIVE leg already taken — the leg the maker is parting with,
+ *  which is the token on an ask and XCP on a bid. An unreadable quantity
+ *  yields 0 rather than a guess: the row still renders, just without a meter. */
+function filledFraction(quantity: string, remaining: string): number {
   const total = rawInt(quantity);
   const left = rawInt(remaining);
   if (total === null || left === null || total <= 0n) return 0;
@@ -162,104 +131,60 @@ function orderState(status: string, filled: number): OrderState {
 /**
  * The order book across every XCP-69 market, newest first, in every state.
  *
- * Not just the live book. An order that filled, expired or was cancelled is
- * the more informative event — it says what the market actually did, where a
- * resting offer only says what someone hopes it will do — so all four
- * Counterparty states arrive here and the client distinguishes them visually.
+ * Answered from D1 since migration 0022. It used to be the one route on this
+ * page that fanned out to Counterparty — one subrequest per graduated market
+ * per edge-cache miss, a cost that grew with the site's success — and that is
+ * now the indexer's problem, where it is gated by a digest and usually costs
+ * nothing at all. See src/indexer/orders.ts.
  *
- * That is also why this cannot be one chain-wide request. `/orders` unfiltered
- * is over half a million rows; asked per asset it is tens. The fan-out is
- * bounded by MAX_ORDER_ASSETS and ordered by pool depth, and `markets` /
- * `markets_read` report the bound so a capped answer never reads as a complete
- * one.
- *
- * Only TOKEN/XCP pairs. A launch's token can be offered against anything on
- * Counterparty, but XCP is the denomination every price on this site is quoted
- * in, and a book mixing denominations is a list of numbers that cannot be
- * compared to each other.
- *
- * A pair that fails to read is skipped rather than failing the tape, but if
- * EVERY pair fails the route 503s: an empty book and an unreachable node must
- * not look the same, and J only caches what it returns, so the failure is not
- * stored at the edge.
+ * `live=1` narrows to orders still resting on the book. Filtering here and not
+ * in the browser is the point: the newest fifty orders on a busy pair are
+ * mostly finished ones, so a client-side filter over one page would answer
+ * "show me the live book" with whatever handful survived that page. It is also
+ * a separate URL and a separate index, so the two answers neither share an
+ * edge-cache entry nor the same query plan.
  */
 activityRoute.get("/v2/activity/orders", async (c) => {
-  const [markets, total] = await Promise.all([
-    listMarketAssets(c.env.DB, MAX_ORDER_ASSETS),
-    countMarketAssets(c.env.DB),
+  const live = c.req.query("live") === "1";
+  const { limit, offset } = paging(c);
+  const [rows, counted] = await Promise.all([
+    listRecentOrders(c.env.DB, live, limit, offset),
+    countOrders(c.env.DB, live),
   ]);
 
-  const books = await Promise.all(
-    markets.map((m) =>
-      fetchAssetOrders(m.asset)
-        .then((orders) => ({ market: m, orders }))
-        .catch(() => null),
-    ),
-  );
-  const read = books.filter((b) => b !== null);
-  if (markets.length > 0 && read.length === 0) {
-    return c.json({ error: "order book unavailable" }, 503);
-  }
+  const total = counted?.n ?? rows.length;
+  const result = rows.map((o) => {
+    // The give leg is the token on an ask and XCP on a bid.
+    const filled =
+      o.side === "sell"
+        ? filledFraction(o.token_quantity, o.token_remaining)
+        : filledFraction(o.xcp_quantity, o.xcp_remaining);
+    return {
+      tx_hash: o.tx_hash,
+      source: o.source,
+      asset: o.asset,
+      side: o.side === "sell" ? "sell" : "buy",
+      state: orderState(o.status, filled),
+      block_index: o.block_index,
+      expire_index: o.expire_index,
+      token_quantity: o.token_quantity,
+      xcp_quantity: o.xcp_quantity,
+      token_remaining: o.token_remaining,
+      xcp_remaining: o.xcp_remaining,
+      filled,
+      divisible: o.divisible,
+    };
+  });
 
-  const rows: OrderRow[] = [];
-  for (const { market, orders } of read) {
-    for (const o of orders) {
-      const buying = o.give_asset === "XCP";
-      // Exactly one leg must be XCP. Without this an order swapping two launch
-      // tokens would be priced as if the other side were XCP satoshi.
-      if (buying === (o.get_asset === "XCP")) continue;
-      if ((buying ? o.get_asset : o.give_asset) !== market.asset) continue;
-      const filled = filledFraction(o.give_quantity, o.give_remaining);
-      rows.push({
-        tx_hash: o.tx_hash,
-        source: o.source,
-        asset: market.asset,
-        side: buying ? "buy" : "sell",
-        state: orderState(o.status, filled),
-        block_index: o.block_index,
-        expire_index: o.expire_index,
-        token_quantity: buying ? o.get_quantity : o.give_quantity,
-        xcp_quantity: buying ? o.give_quantity : o.get_quantity,
-        token_remaining: buying ? o.get_remaining : o.give_remaining,
-        xcp_remaining: buying ? o.give_remaining : o.get_remaining,
-        filled,
-        divisible: market.divisible,
-      });
-    }
-  }
-
-  // One chronology out of several per-asset ones. tx_index breaks a block tie
-  // the way the chain itself does, so the order is stable between requests
-  // and a pager cannot repeat or skip a row.
-  rows.sort((a, b) => b.block_index - a.block_index || b.tx_hash.localeCompare(a.tx_hash));
-
-  // `live=1` narrows to orders still resting on the book. Filtering HERE and
-  // not in the browser is the whole point: the newest fifty orders on a pair
-  // are mostly finished ones, so a client-side filter over one page would
-  // answer "show me the live book" with whatever handful survived that page.
-  // It is also a separate URL, so the edge cache keeps the two answers apart
-  // instead of one poisoning the other.
-  const live = c.req.query("live") === "1";
-  const visible = live
-    ? rows.filter((r) => r.state === "open" || r.state === "partial")
-    : rows;
-
-  const { limit, offset } = paging(c);
-  const slice = visible.slice(offset, offset + limit);
   return J(
     c,
     {
-      result: slice,
-      result_count: slice.length,
-      total: visible.length,
-      // Always the unfiltered count, so a client can say what hiding cost
-      // without asking twice.
-      total_all: rows.length,
-      markets: total?.n ?? markets.length,
-      markets_read: read.length,
-      next_offset: offset + limit < visible.length ? offset + limit : null,
+      result,
+      result_count: result.length,
+      total,
+      next_offset: offset + limit < total ? offset + limit : null,
     },
-    ORDERS_TTL,
+    INDEXED_TTL,
   );
 });
 

@@ -1,7 +1,9 @@
 import { Hono } from "hono";
 import type { Env } from "#api/env";
+import { syncOrders } from "#api/indexer/orders";
 import { syncLaunches } from "#api/indexer/sync";
 import { activityRoute } from "#api/read/activity";
+import { listMarketAssets } from "#api/queries/activity";
 import { launchesRoute } from "#api/read/launches";
 import { mintClosed } from "#api/telegram/format";
 import { announceLive, queueAnnouncements } from "#api/telegram/live";
@@ -279,6 +281,20 @@ export default {
     ctx.waitUntil(
       withLock(env.DB, 110, async () => {
         await runScheduledJob("sync_launches", () => syncLaunches(env.DB, env.METADATA));
+        // The order book, mirrored so /v2/activity/orders can answer from D1
+        // instead of fanning out to Counterparty per edge-cache miss. AFTER
+        // syncLaunches, because its worklist is the set of graduated launches
+        // and this tick may have just graduated one — running it first would
+        // leave that market's book unmirrored for five minutes while the page
+        // already listed the launch as tradable.
+        //
+        // Cheap by construction rather than by luck: each market's book is
+        // hashed and compared against the stored hash, so a tick where nothing
+        // moved issues no writes at all. See src/indexer/orders.ts.
+        await runScheduledJob("sync_orders", async () => {
+          const markets = await listMarketAssets(env.DB, 100);
+          return syncOrders(env.DB, markets.map((m) => m.asset));
+        });
         // After the indexer, never inside it. The feed reads committed state
         // rather than the tick's own deltas, so an announcement can only
         // describe something D1 already believes — and a tick that dies

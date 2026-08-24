@@ -149,6 +149,57 @@ export function listRecentLaunches(
   );
 }
 
+export interface OrderRow {
+  tx_hash: string;
+  tx_index: number;
+  block_index: number;
+  source: string;
+  asset: string;
+  side: string;
+  token_quantity: string;
+  xcp_quantity: string;
+  token_remaining: string;
+  xcp_remaining: string;
+  status: string;
+  expire_index: number;
+  divisible: number;
+}
+
+/**
+ * The mirrored order book, newest first.
+ *
+ * `live` narrows to what is still resting, and it is not a WHERE bolted onto
+ * the same plan — migration 0022 gives it a partial index of its own, because
+ * terminal orders accumulate forever while open ones do not, so the live book
+ * shrinks as a share of this table and deserves not to be found by filtering
+ * everything that ever rested.
+ *
+ * The join is a covering-index lookup per row for divisibility. Storing it on
+ * the order would denormalise a fact that already has one home and can, in
+ * principle, be corrected there.
+ */
+export function listRecentOrders(
+  db: D1Database,
+  live: boolean,
+  limit: number,
+  offset: number,
+): Promise<OrderRow[]> {
+  return q<OrderRow>(
+    db,
+    `SELECT o.tx_hash, o.tx_index, o.block_index, o.source, o.asset, o.side,
+            o.token_quantity, o.xcp_quantity, o.token_remaining, o.xcp_remaining,
+            o.status, o.expire_index,
+            COALESCE(l.divisible, 1) AS divisible
+       FROM orders o
+       LEFT JOIN launches l ON l.asset = o.asset
+      ${live ? "WHERE o.status = 'open'" : ""}
+      ORDER BY o.block_index DESC, o.tx_index DESC
+      LIMIT ?1 OFFSET ?2`,
+    limit,
+    offset,
+  );
+}
+
 export interface ConformingAsset {
   asset: string;
   divisible: number;
@@ -221,14 +272,5 @@ export function getActivityTotals(db: D1Database): Promise<ActivityTotals | null
        (SELECT COALESCE(mints, 0) FROM mint_totals WHERE id = 1) AS mints,
        (SELECT COUNT(*) FROM asset_events WHERE primary_actor = 1) AS trades,
        (SELECT COUNT(*) FROM launches WHERE conforming = 1) AS launches`,
-  );
-}
-
-/** How many graduated launches exist, so a capped fan-out can say what it
- *  left out instead of quietly presenting a slice as the whole book. */
-export function countMarketAssets(db: D1Database): Promise<{ n: number } | null> {
-  return one<{ n: number }>(
-    db,
-    `SELECT COUNT(*) AS n FROM launches WHERE conforming = 1 AND phase = 'graduated'`,
   );
 }
