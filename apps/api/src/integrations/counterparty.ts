@@ -239,6 +239,71 @@ export async function fetchAssetOrders(asset: string): Promise<CpOrder[]> {
   throw new Error(`order history truncated after ${MAX_ORDER_PAGES} pages: ${asset}`);
 }
 
+/**
+ * A pool's lifecycle, as Counterparty reports it.
+ *
+ * `params` differs by event: OPEN_POOL names the opening reserves and the LP
+ * asset it minted, while a deposit or withdrawal names the quantities moved
+ * and the LP minted or destroyed against them. One interface with optional
+ * halves rather than three, because the route normalises all three into one
+ * row anyway and three shapes would only move that branch upstream.
+ */
+export interface CpPoolEvent {
+  event: string;
+  event_index: number;
+  block_index: number;
+  params: {
+    asset_a: string;
+    asset_b: string;
+    source: string;
+    tx_hash: string;
+    /** Absent on OPEN_POOL, which cannot be invalid — the pool either opened
+     *  or the event was never written. */
+    status?: string;
+    lp_asset?: string;
+    reserve_a?: number | string;
+    reserve_b?: number | string;
+    quantity_a?: number | string;
+    quantity_b?: number | string;
+    quantity_minted?: number | string;
+    quantity_destroyed?: number | string;
+  };
+}
+
+/** Runaway bound, not a page budget. Chain-wide these three feeds are tens of
+ *  events in total — a pool opens when a launch graduates and is otherwise
+ *  touched by hand — so this is orders of magnitude above any real history. */
+const MAX_POOL_EVENT_PAGES = 20;
+
+/**
+ * Pool creations, deposits and withdrawals across the whole chain, newest
+ * first, unfiltered.
+ *
+ * Chain-wide and NOT per-asset, which is the opposite of how the order book
+ * has to be read — and for the opposite reason. Orders are half a million
+ * rows, so they can only be asked for one market at a time; these are counted
+ * in tens, so one request per event type answers for every launch at once and
+ * costs nothing extra as the site grows. The covered-set filter runs in the
+ * route, where D1 is.
+ *
+ * A failed feed throws rather than returning what it had: a partial history
+ * here is indistinguishable from a quiet one, and the caller decides.
+ */
+export async function fetchPoolEvents(name: string): Promise<CpPoolEvent[]> {
+  const rows: CpPoolEvent[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < MAX_POOL_EVENT_PAGES; page++) {
+    const qs = cursor ? `&cursor=${cursor}` : "";
+    const data: { result: CpPoolEvent[]; next_cursor: number | null } = await get(
+      `/events/${name}?limit=500${qs}`,
+    );
+    rows.push(...(data.result ?? []));
+    cursor = data.next_cursor;
+    if (!cursor) return rows;
+  }
+  throw new Error(`pool event feed truncated after ${MAX_POOL_EVENT_PAGES} pages: ${name}`);
+}
+
 /** One fairminter by tx_hash — O(1), for the live room's poll tick. Never
  *  used by the main indexer pass, which already has every row from the
  *  bulk listing; this is only for the single asset someone is watching. */

@@ -1197,6 +1197,89 @@ export async function fetchActivityOrders(
   }
 }
 
+/** How a pool's liquidity moved. Counterparty names three events; swaps are
+ *  not among them — a swap is a trade and lives on the trades tape. */
+export type PoolEventKind = "created" | "deposit" | "withdraw";
+
+export interface ActivityPoolEvent {
+  key: string;
+  txHash: string;
+  kind: PoolEventKind;
+  block: number;
+  source: string;
+  /** The XCP-69 side — the asset the row is about. */
+  asset: string;
+  assetDivisible: boolean;
+  assetQuantity: Raw;
+  /** The other half of the pair. "XCP" for every pool a graduation opens, but
+   *  two launch tokens can also be pooled against each other. */
+  counterAsset: string;
+  counterDivisible: boolean;
+  counterQuantity: Raw;
+  /** LP minted (created, deposit) or destroyed (withdraw). */
+  lpQuantity: Raw | null;
+  /** The pool the protocol opened at graduation, whose LP went straight to the
+   *  unspendable address — so its liquidity can never be withdrawn. */
+  graduation: boolean;
+}
+
+interface ApiActivityPoolEvent {
+  tx_hash: string;
+  event_index: number;
+  kind: string;
+  block_index: number;
+  source: string;
+  asset: string;
+  asset_divisible: number;
+  asset_quantity: Raw;
+  counter_asset: string;
+  counter_divisible: number;
+  counter_quantity: Raw;
+  lp_quantity: Raw | null;
+  graduation: boolean;
+}
+
+const POOL_KINDS: PoolEventKind[] = ["created", "deposit", "withdraw"];
+
+/** Pool creations, deposits and withdrawals across every XCP-69 market, with
+ *  the size of the whole history beside the page of it. */
+export async function fetchActivityPools(
+  limit = 50,
+): Promise<{ rows: ActivityPoolEvent[]; total: number } | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/activity/pools?limit=${limit}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(12_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: ApiActivityPoolEvent[];
+      total?: number;
+    };
+    if (!Array.isArray(data.result)) return null;
+    const rows = data.result.map((r) => ({
+      // event_index is Counterparty's total order over the chain, so it is
+      // unique per row even when one transaction produces several.
+      key: `${r.tx_hash}:${r.event_index}`,
+      txHash: r.tx_hash,
+      kind: POOL_KINDS.find((k) => k === r.kind) ?? "deposit",
+      block: r.block_index,
+      source: r.source,
+      asset: r.asset,
+      assetDivisible: Boolean(r.asset_divisible),
+      assetQuantity: r.asset_quantity,
+      counterAsset: r.counter_asset,
+      counterDivisible: Boolean(r.counter_divisible),
+      counterQuantity: r.counter_quantity,
+      lpQuantity: r.lp_quantity,
+      graduation: Boolean(r.graduation),
+    }));
+    return { rows, total: typeof data.total === "number" ? data.total : rows.length };
+  } catch {
+    return null;
+  }
+}
+
 interface ApiActivityLaunch {
   tx_hash: string;
   asset: string;

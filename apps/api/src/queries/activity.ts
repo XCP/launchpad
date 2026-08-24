@@ -152,16 +152,20 @@ export function listRecentLaunches(
 export interface ConformingAsset {
   asset: string;
   divisible: number;
+  /** The pool this launch mints its liquidity into at graduation. It is what
+   *  distinguishes the pool the protocol created — whose LP went straight to
+   *  the unspendable address and can never be withdrawn — from an ordinary
+   *  pool somebody opened by hand on the same asset. */
+  lp_asset: string | null;
 }
 
-/** The covered set, with the one column a caller needs to format a quantity it
- *  got from somewhere other than D1. listConformingAssets answers the
- *  membership question alone and stays the cheaper read for callers that only
- *  ask that. */
+/** The covered set, with the columns a caller needs to interpret a row it got
+ *  from somewhere other than D1. listConformingAssets answers the membership
+ *  question alone and stays the cheaper read for callers that only ask that. */
 export function listConformingAssetInfo(db: D1Database): Promise<ConformingAsset[]> {
   return q<ConformingAsset>(
     db,
-    `SELECT asset, divisible FROM launches WHERE conforming = 1`,
+    `SELECT asset, divisible, lp_asset FROM launches WHERE conforming = 1`,
   );
 }
 

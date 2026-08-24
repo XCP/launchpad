@@ -12,12 +12,15 @@ import {
   fetchActivityLaunches,
   fetchActivityMints,
   fetchActivityOrders,
+  fetchActivityPools,
   fetchActivityTotals,
   fetchActivityTrades,
   type ActivityLaunch,
   type ActivityMint,
   type ActivityOrder,
+  type ActivityPoolEvent,
   type ActivityTrade,
+  type PoolEventKind,
 } from "@/lib/api/launchpad-api";
 import { blocksEta, commas, compact, fixedRaw, shortAddress, tokenQty } from "@/lib/format";
 import { big, ratio, type RawLike } from "@/lib/numeric";
@@ -37,12 +40,16 @@ const REFRESH_MS = 30_000;
  *  honest alternative — a block-time lookup per row — is fifty of them. */
 const HEIGHT_REFRESH_MS = 60_000;
 
-type Tab = "mints" | "trades" | "orders" | "launches";
+type Tab = "mints" | "trades" | "orders" | "pools" | "launches";
 
+// Pools sits beside Orders rather than at the end: both are about a market
+// rather than about a launch, and the pair reads as "what is on offer" then
+// "what is backing it".
 const TABS: { id: Tab; label: string }[] = [
   { id: "mints", label: "Mints" },
   { id: "trades", label: "Trades" },
   { id: "orders", label: "Orders" },
+  { id: "pools", label: "Pools" },
   { id: "launches", label: "Launches" },
 ];
 
@@ -94,6 +101,7 @@ export function ActivityView() {
   const orders = useFeed(tab === "orders", `activity:orders:${hideFilled}`, () =>
     fetchActivityOrders(ROWS, hideFilled),
   );
+  const pools = useFeed(tab === "pools", "activity:pools", () => fetchActivityPools(ROWS));
   const launches = useFeed(tab === "launches", "activity:launches", () =>
     fetchActivityLaunches(ROWS),
   );
@@ -121,11 +129,13 @@ export function ActivityView() {
             const n =
               t.id === "orders"
                 ? (orders.data?.total ?? null)
-                : t.id === "mints"
-                  ? (totals?.mints ?? null)
-                  : t.id === "trades"
-                    ? (totals?.trades ?? null)
-                    : (totals?.launches ?? null);
+                : t.id === "pools"
+                  ? (pools.data?.total ?? null)
+                  : t.id === "mints"
+                    ? (totals?.mints ?? null)
+                    : t.id === "trades"
+                      ? (totals?.trades ?? null)
+                      : (totals?.launches ?? null);
             return (
               <SegmentedTrigger key={t.id} value={t.id} grow={false}>
                 {t.label}
@@ -165,6 +175,7 @@ export function ActivityView() {
               void mints.mutate();
               void trades.mutate();
               void orders.mutate();
+              void pools.mutate();
               void launches.mutate();
             }}
           />
@@ -187,6 +198,14 @@ export function ActivityView() {
           empty={hideFilled ? "Nothing resting on the book right now." : EMPTY.orders}
         >
           {(rows) => <OrderTape rows={rows} height={height} />}
+        </Feed>
+      </TabsContent>
+      <TabsContent value="pools" className="mt-4">
+        <Feed
+          feed={{ data: pools.data && pools.data.rows, isLoading: pools.isLoading }}
+          empty={EMPTY.pools}
+        >
+          {(rows) => <PoolTape rows={rows} height={height} />}
         </Feed>
       </TabsContent>
       <TabsContent value="launches" className="mt-4">
@@ -242,6 +261,7 @@ const EMPTY: Record<Tab, string> = {
   mints: "No mints yet — the first one will appear here.",
   trades: "Nothing has traded yet. A launch has to graduate before it has a market.",
   orders: "The book is empty — no resting orders on any XCP-69 pair.",
+  pools: "No pools yet. A launch has to graduate before its liquidity exists.",
   launches: "No launches yet.",
 };
 
@@ -420,6 +440,92 @@ const STATE_TONE: Record<ActivityOrder["state"], Tone> = {
   filled: "green",
   cancelled: "gray",
   expired: "gray",
+};
+
+/**
+ * Where the liquidity came from, and where it went.
+ *
+ * The trades tape says what a pool DID; this says what it is made of. Three
+ * events, and the distinction that matters most is not between them but inside
+ * "Created": a pool opened by a graduation had its LP minted straight to the
+ * unspendable address, so that liquidity is locked forever and no withdrawal
+ * row can ever appear against it. A pool somebody opened by hand on the same
+ * asset looks identical in the feed and is not locked at all. The badge is the
+ * only thing that tells them apart, so it is not decoration.
+ *
+ * Counterparty reports an opening twice — the pool, and the deposit that
+ * seeded it — and apps/api folds those into one row before they get here.
+ *
+ * Not every pool is against XCP: two launch tokens can be pooled against each
+ * other. Those rows keep the same shape but cannot carry an XCP price, and say
+ * so with an em dash rather than a misleading zero.
+ */
+function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number }) {
+  return (
+    <Tape columns={["When", "Pool", "Event", "Price", "Tokens", "XCP", "Address", "LP"]}>
+      {rows.map((r) => {
+        const vsXcp = r.counterAsset === "XCP";
+        return (
+          <tr key={r.key} className="transition-colors hover:bg-gray-50/70">
+            <When block={r.block} height={height} txHash={r.txHash} />
+            <td className="whitespace-nowrap px-3 py-2">
+              <span className="flex items-center gap-2">
+                <TokenImage
+                  asset={r.asset}
+                  className="size-6 shrink-0 rounded object-cover"
+                />
+                <Link
+                  href={`/${r.asset}`}
+                  className={`font-medium text-gray-900 hover:text-purple-700 ${FOCUS}`}
+                >
+                  {r.asset}
+                </Link>
+                <span className="text-xs text-gray-400">/ {r.counterAsset}</span>
+              </span>
+            </td>
+            <Cell>
+              <Pill tone={POOL_TONE[r.kind]}>{POOL_LABEL[r.kind]}</Pill>
+            </Cell>
+            <Num>{vsXcp ? priceText(r.counterQuantity, r.assetQuantity, r.assetDivisible) : "—"}</Num>
+            <Num strong>{compact(tokenQty(r.assetQuantity, r.assetDivisible))}</Num>
+            <Num strong>
+              {vsXcp ? fixedRaw(r.counterQuantity) : "—"}
+            </Num>
+            <Who address={r.source} />
+            <Cell right>
+              {/* LP assets are divisible, like every numeric asset Counterparty
+                  mints for a pool. */}
+              <span className="block text-xs text-gray-900 tabular-nums">
+                {r.lpQuantity === null
+                  ? "—"
+                  : `${r.kind === "withdraw" ? "−" : r.kind === "deposit" ? "+" : ""}${compact(
+                      tokenQty(r.lpQuantity, true),
+                    )}`}
+              </span>
+              <span className="block text-[11px] text-gray-400">
+                {r.graduation ? "locked forever" : r.kind === "created" ? "open LP" : ""}
+              </span>
+            </Cell>
+          </tr>
+        );
+      })}
+    </Tape>
+  );
+}
+
+const POOL_LABEL: Record<PoolEventKind, string> = {
+  created: "Created",
+  deposit: "Deposit",
+  withdraw: "Withdraw",
+};
+
+/** Purple for the one the protocol does — a graduation opening its pool is a
+ *  launch event, and purple is what a Mint wears on the tape beside it. Green
+ *  adds liquidity, red removes it, matching Buy and Sell on the trades tape. */
+const POOL_TONE: Record<PoolEventKind, Tone> = {
+  created: "purple",
+  deposit: "green",
+  withdraw: "red",
 };
 
 function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number }) {

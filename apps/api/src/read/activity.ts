@@ -14,10 +14,11 @@
  * maps /v2/mints/by/:source.
  */
 import type { Raw } from "@launchpad/xcp69/numeric";
-import { fetchAssetOrders } from "#api/integrations/counterparty";
+import { fetchAssetOrders, fetchPoolEvents } from "#api/integrations/counterparty";
 import {
   countMarketAssets,
   getActivityTotals,
+  listConformingAssetInfo,
   listMarketAssets,
   listRecentLaunches,
   listRecentMints,
@@ -46,6 +47,12 @@ const INDEXED_TTL = 30;
  *  cache costs the reader nothing and is the difference between one upstream
  *  fan-out per colo per minute and one per visitor. */
 const ORDERS_TTL = 60;
+
+/** The three feeds that describe a pool's life. Swaps are deliberately absent:
+ *  POOL_MATCH is a trade, it is already the `pool` half of the trades tape, and
+ *  repeating it here would make this tab a second copy of that one rather than
+ *  the thing it exists to show — where the liquidity itself came from and went. */
+const POOL_EVENTS = ["OPEN_POOL", "NEW_POOL_DEPOSIT", "NEW_POOL_WITHDRAWAL"] as const;
 
 /** Ceiling on the order fan-out: one subrequest per asset, and a Worker has a
  *  hard subrequest limit. Deepest pools are read first, and the response says
@@ -251,6 +258,159 @@ activityRoute.get("/v2/activity/orders", async (c) => {
       markets: total?.n ?? markets.length,
       markets_read: read.length,
       next_offset: offset + limit < visible.length ? offset + limit : null,
+    },
+    ORDERS_TTL,
+  );
+});
+
+type PoolEventKind = "created" | "deposit" | "withdraw";
+
+interface PoolEventRow {
+  tx_hash: string;
+  event_index: number;
+  kind: PoolEventKind;
+  block_index: number;
+  source: string;
+  /** The XCP-69 side — the asset this row is about. */
+  asset: string;
+  asset_divisible: number;
+  asset_quantity: Raw;
+  /** The other half of the pair. "XCP" for every pool a graduation opens, but
+   *  not always: two launch tokens can be pooled against each other, and that
+   *  is real activity on both of them. */
+  counter_asset: string;
+  counter_divisible: number;
+  counter_quantity: Raw;
+  /** LP minted (created, deposit) or destroyed (withdraw). */
+  lp_quantity: Raw | null;
+  /** True when this is the pool the protocol opened at graduation, identified
+   *  by the launch's own recorded lp_asset rather than guessed from the shape
+   *  of the event. That pool's LP was minted to the unspendable address, so
+   *  its liquidity is locked forever — which is the single most important
+   *  thing a reader can know about a row in this tape. */
+  graduation: boolean;
+}
+
+/** Raw quantities arrive as a JSON number or, above 2^53, a lossless string. */
+const rawOr0 = (v: number | string | undefined): Raw => (v === undefined ? "0" : v);
+
+/**
+ * Where the liquidity came from and where it went.
+ *
+ * The trades tape answers what a pool DID; this answers what it IS made of —
+ * the graduation that opened it, and every hand that has added to or taken
+ * from it since. XCP-69's own pools are opened with their LP minted straight
+ * to the unspendable address, so the liquidity a launch graduates with can
+ * never leave; anything anyone deposits on top of that can, and this is the
+ * tape where that difference is visible.
+ *
+ * Three chain-wide requests, not a per-market fan-out. These feeds are tens of
+ * events in total across all of Counterparty — a pool opens when a launch
+ * graduates and is otherwise touched by hand — so unlike the order book this
+ * costs the same whether the site has three markets or three hundred.
+ */
+activityRoute.get("/v2/activity/pools", async (c) => {
+  const [feeds, covered] = await Promise.all([
+    Promise.all(POOL_EVENTS.map((name) => fetchPoolEvents(name).catch(() => null))),
+    listConformingAssetInfo(c.env.DB),
+  ]);
+  if (feeds.every((f) => f === null)) {
+    return c.json({ error: "pool history unavailable" }, 503);
+  }
+
+  const info = new Map(covered.map((a) => [a.asset, a]));
+  // Every lp_asset this site's launches minted, so a pool opened by hand on one
+  // of our assets is never mislabelled as a graduation.
+  const graduationLp = new Set(
+    covered.map((a) => a.lp_asset).filter((lp): lp is string => Boolean(lp)),
+  );
+
+  const rows: PoolEventRow[] = [];
+  feeds.forEach((feed, i) => {
+    if (!feed) return;
+    const name = POOL_EVENTS[i]!;
+    const kind: PoolEventKind =
+      name === "OPEN_POOL" ? "created" : name === "NEW_POOL_DEPOSIT" ? "deposit" : "withdraw";
+
+    for (const e of feed) {
+      const p = e.params;
+      // OPEN_POOL carries no status; the other two must be valid.
+      if (p.status !== undefined && p.status !== "valid") continue;
+
+      // Which half is ours. XCP is never ours, so a TOKEN/XCP pool resolves
+      // immediately; a TOKEN/TOKEN pool between two launches is reported
+      // against asset_a, which is the side Counterparty itself names first.
+      const aMine = info.has(p.asset_a);
+      const bMine = info.has(p.asset_b);
+      if (!aMine && !bMine) continue;
+      const flip = !aMine;
+
+      const asset = flip ? p.asset_b : p.asset_a;
+      const counter = flip ? p.asset_a : p.asset_b;
+      const mine = info.get(asset)!;
+      const open = kind === "created";
+      const qa = rawOr0(open ? p.reserve_a : p.quantity_a);
+      const qb = rawOr0(open ? p.reserve_b : p.quantity_b);
+
+      rows.push({
+        tx_hash: p.tx_hash,
+        event_index: e.event_index,
+        kind,
+        block_index: e.block_index,
+        source: p.source,
+        asset,
+        asset_divisible: mine.divisible,
+        asset_quantity: flip ? qb : qa,
+        counter_asset: counter,
+        // XCP is divisible; a launch token answers from D1; anything else on
+        // the chain is assumed divisible, which is the common case and only
+        // affects a decimal point on a counter amount.
+        counter_divisible: counter === "XCP" ? 1 : (info.get(counter)?.divisible ?? 1),
+        counter_quantity: flip ? qa : qb,
+        lp_quantity: open
+          ? null
+          : kind === "deposit"
+            ? rawOr0(p.quantity_minted)
+            : rawOr0(p.quantity_destroyed),
+        graduation: open && Boolean(p.lp_asset) && graduationLp.has(p.lp_asset!),
+      });
+    }
+  });
+
+  // A pool opening is reported TWICE: OPEN_POOL for the pool, and a
+  // NEW_POOL_DEPOSIT for the liquidity that opened it, in the same
+  // transaction. To a reader that is one event, and printing it as two makes
+  // every graduation look like somebody immediately doubled the pool. So the
+  // seed deposit folds into the created row — which is also the only place the
+  // created row can get an LP quantity, since OPEN_POOL does not carry one.
+  //
+  // Matched on transaction AND asset, not transaction alone: nothing stops one
+  // transaction from opening more than one pool.
+  const seedKey = (r: PoolEventRow) => `${r.tx_hash}:${r.asset}`;
+  const openedBy = new Set(rows.filter((r) => r.kind === "created").map(seedKey));
+  const seeds = new Map(
+    rows.filter((r) => r.kind === "deposit").map((r) => [seedKey(r), r] as const),
+  );
+  for (const r of rows) {
+    if (r.kind === "created") r.lp_quantity = seeds.get(seedKey(r))?.lp_quantity ?? null;
+  }
+  const merged = rows.filter((r) => !(r.kind === "deposit" && openedBy.has(seedKey(r))));
+
+  // One chronology out of three feeds. event_index is Counterparty's own total
+  // order over everything that has ever happened, so it breaks a block tie
+  // exactly the way the chain does and keeps paging stable between requests.
+  merged.sort((a, b) => b.block_index - a.block_index || b.event_index - a.event_index);
+
+  const { limit, offset } = paging(c);
+  const slice = merged.slice(offset, offset + limit);
+  return J(
+    c,
+    {
+      result: slice,
+      result_count: slice.length,
+      total: merged.length,
+      feeds_read: feeds.filter(Boolean).length,
+      next_offset: offset + limit < merged.length ? offset + limit : null,
     },
     ORDERS_TTL,
   );
