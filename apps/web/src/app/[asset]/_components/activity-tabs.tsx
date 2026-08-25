@@ -260,6 +260,9 @@ export function ActivityTabs({
   });
   const bids = book.filter((r) => r.isBuy).sort((a, b) => b.price - a.price);
   const asks = book.filter((r) => !r.isBuy).sort((a, b) => a.price - b.price);
+  // Asks descend toward the spread and bids fall away from it, so the two best
+  // prices meet in the middle — the way a book is read.
+  const ordered = [...asks].reverse().concat(bids);
   const busy = isBusy(compose.status);
 
   // Pending mints for this launch, from the page's shared room — the same
@@ -344,7 +347,7 @@ export function ActivityTabs({
           ? (trades?.length ?? 0)
           : tab === "holders"
             ? holderRows.length
-            : (orders?.length ?? 0);
+            : ordered.length;
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
   const page = Math.min(pageParam, totalPages);
   const from = (page - 1) * PER_PAGE;
@@ -779,56 +782,88 @@ export function ActivityTabs({
           </p>
         ) : (
           <>
-            {/* Asks descend toward the spread and bids fall away from it, so the
-                two best prices meet in the middle, the way a book is read. */}
-            <ul className="divide-y divide-gray-100">
-              {[...asks].reverse().concat(bids).map(({ o, isBuy, tokens, price }) => {
-                const mine = address ? o.source === address : false;
-                const filled = 1 - ratio(o.give_remaining, o.give_quantity);
-                return (
-                  <li
-                    key={o.tx_hash}
-                    className={`flex items-center justify-between gap-2 px-4 py-2 text-sm ${mine ? "bg-purple-50/60" : ""}`}
-                  >
-                    <div className="min-w-0">
-                      <span
-                        className={
-                          isBuy
-                            ? "font-medium text-green-700"
-                            : "font-medium text-red-600"
-                        }
-                      >
-                        {isBuy ? "Buy" : "Sell"}
-                      </span>{" "}
-                      {commasRaw(tokens)} @ {formatPrice(price)}
-                      {mine && (
-                        <span className="ml-2 shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
-                          yours
-                        </span>
-                      )}
-                      <span className="ml-2 text-xs text-gray-500">
-                        {(filled * 100).toFixed(0)}% filled ·{" "}
-                        {o.expire_index === null
-                          ? "GTC"
-                          : `expires block ${o.expire_index.toLocaleString()}`}
-                      </span>
-                    </div>
-                    {mine && (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() =>
-                          compose.composeCancel({ offer_hash: o.tx_hash })
-                        }
-                        className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
-                      >
-                        {busy ? "…" : "Cancel"}
-                      </button>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
+            <div className="overflow-x-auto">
+              {/* Same shape as Trades above it: a book and a tape are the same
+                  columns at different moments, so reading one should teach you
+                  to read the other. */}
+              <table className="w-full min-w-[43rem] text-sm">
+                <thead>
+                  <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                    <th className="px-4 py-2">Side</th>
+                    <th className="px-3 py-2 text-right">Price</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2 text-right">XCP</th>
+                    <th className="px-3 py-2">Address</th>
+                    <th className="px-4 py-2 text-right">Filled / expires</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {ordered.slice(from, from + PER_PAGE).map(({ o, isBuy, tokens, xcp, price }) => {
+                    const mine = address ? o.source === address : false;
+                    const filled = 1 - ratio(o.give_remaining, o.give_quantity);
+                    return (
+                      <tr key={o.tx_hash} className={mine ? "bg-purple-50/60" : undefined}>
+                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${isBuy ? "text-green-700" : "text-red-600"}`}>
+                          {isBuy ? "↗ Buy" : "↘ Sell"}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
+                          {(price / (divisible ? 1 : 1e8)).toFixed(8)}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                          {compact(tokenQty(tokens, divisible))}
+                        </td>
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                          {fixedRaw(xcp)}
+                        </td>
+                        <td className="px-3 py-2">
+                          <span className="flex items-center gap-1.5 whitespace-nowrap">
+                            <LaunchpadAddressHoverCard
+                              source={o.source}
+                              asset={asset}
+                              balanceRaw={holderBalance.get(o.source)}
+                              poolXcpRaw={poolXcpRaw}
+                              poolTokenRaw={poolTokensRaw}
+                              className="flex items-center gap-1.5 font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline"
+                            >
+                              <Identicon address={o.source} />
+                              {shortAddress(o.source)}
+                            </LaunchpadAddressHoverCard>
+                            {issuerSource === o.source && (
+                              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                                dev
+                              </span>
+                            )}
+                            {mine && (
+                              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                                you
+                              </span>
+                            )}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
+                          {mine ? (
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => compose.composeCancel({ offer_hash: o.tx_hash })}
+                              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                            >
+                              {busy ? "…" : "Cancel"}
+                            </button>
+                          ) : (
+                            <>
+                              {(filled * 100).toFixed(0)}% ·{" "}
+                              {o.expire_index === null ? "GTC" : commas(o.expire_index)}
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {pager}
             {compose.status === "confirmed" && (
               <p className="border-t border-gray-100 px-4 py-2 text-xs text-green-700">
                 Cancel broadcast — the remainder refunds when it confirms.{" "}
@@ -840,13 +875,8 @@ export function ActivityTabs({
                     refreshOrders();
                   }}
                 >
-                  Dismiss
+                  Refresh
                 </button>
-              </p>
-            )}
-            {compose.status === "error" && (
-              <p className="border-t border-gray-100 px-4 py-2 text-xs text-red-600">
-                {compose.error}
               </p>
             )}
           </>
