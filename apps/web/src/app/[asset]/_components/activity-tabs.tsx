@@ -63,11 +63,13 @@ interface PendingMint {
 
 interface OpenOrder {
   tx_hash: string;
+  source: string;
   give_asset: string;
   get_asset: string;
   give_quantity: Raw;
   get_quantity: Raw;
   give_remaining: Raw;
+  get_remaining: Raw;
   expire_index: number | null;
 }
 
@@ -229,19 +231,35 @@ export function ActivityTabs({
   // read as shares of supply rather than of whatever is left over.
   const holderTotal = sumRaw(holderRows.map((h) => h.quantity));
 
-  // Your open orders on this pair (connected only).
+  /**
+   * The PAIR'S open order book -- everyone's, not just yours.
+   *
+   * This used to fetch /addresses/<you>/orders, so the tab showed your own
+   * orders and its empty state read "No open orders on this pair" while the
+   * pair had eleven live orders on the book. A sentence about the reader,
+   * rendered as a statement about the market, on the page about that market.
+   *
+   * Your own orders now live on /profile, where a personal holding belongs.
+   * They are still marked and cancellable here, because the row you can act on
+   * is worth finding in the depth around it.
+   */
   const { data: orders, mutate: refreshOrders } = useSWR<OpenOrder[]>(
-    !minting && address
-      ? `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/orders?status=open&limit=100`
+    !minting
+      ? `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(asset)}/XCP?status=open&verbose=true&limit=200`
       : null,
-    async (url: string) =>
-      ((await fetchJson(url)).result as OpenOrder[]).filter(
-        (o) =>
-          (o.give_asset === asset && o.get_asset === "XCP") ||
-          (o.give_asset === "XCP" && o.get_asset === asset),
-      ),
+    async (url: string) => (await fetchJson(url)).result as OpenOrder[],
     { refreshInterval: 15_000 },
   );
+  // Remaining quantities, not original ones: a half-filled order offers what is
+  // left of it, and drawing the original overstates the depth actually there.
+  const book = (orders ?? []).map((o) => {
+    const isBuy = o.get_asset === asset;
+    const tokens = isBuy ? o.get_remaining : o.give_remaining;
+    const xcp = isBuy ? o.give_remaining : o.get_remaining;
+    return { o, isBuy, tokens, xcp, price: ratio(xcp, tokens) };
+  });
+  const bids = book.filter((r) => r.isBuy).sort((a, b) => b.price - a.price);
+  const asks = book.filter((r) => !r.isBuy).sort((a, b) => a.price - b.price);
   const busy = isBusy(compose.status);
 
   // Pending mints for this launch, from the page's shared room — the same
@@ -753,28 +771,24 @@ export function ActivityTabs({
         ))}
 
       {tab === "orders" &&
-        (!address ? (
+        (!orders ? (
+          <p className="p-6 text-center text-sm text-gray-400">Loading order book…</p>
+        ) : book.length === 0 ? (
           <p className="p-6 text-center text-sm text-gray-500">
-            Connect your wallet to see your open orders.
-          </p>
-        ) : !orders ? (
-          <p className="p-6 text-center text-sm text-gray-400">Loading orders…</p>
-        ) : orders.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">
-            No open orders on this pair.
+            No open orders on this pair — every trade here is going through the pool.
           </p>
         ) : (
           <>
+            {/* Asks descend toward the spread and bids fall away from it, so the
+                two best prices meet in the middle, the way a book is read. */}
             <ul className="divide-y divide-gray-100">
-              {orders.map((o) => {
-                const isBuy = o.get_asset === asset;
-                const tokens = isBuy ? o.get_quantity : o.give_quantity;
-                const xcp = isBuy ? o.give_quantity : o.get_quantity;
+              {[...asks].reverse().concat(bids).map(({ o, isBuy, tokens, price }) => {
+                const mine = address ? o.source === address : false;
                 const filled = 1 - ratio(o.give_remaining, o.give_quantity);
                 return (
                   <li
                     key={o.tx_hash}
-                    className="flex items-center justify-between gap-2 px-4 py-2 text-sm"
+                    className={`flex items-center justify-between gap-2 px-4 py-2 text-sm ${mine ? "bg-purple-50/60" : ""}`}
                   >
                     <div className="min-w-0">
                       <span
@@ -786,7 +800,12 @@ export function ActivityTabs({
                       >
                         {isBuy ? "Buy" : "Sell"}
                       </span>{" "}
-                      {commasRaw(tokens)} @ {formatPrice(ratio(xcp, tokens))}
+                      {commasRaw(tokens)} @ {formatPrice(price)}
+                      {mine && (
+                        <span className="ml-2 shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                          yours
+                        </span>
+                      )}
                       <span className="ml-2 text-xs text-gray-500">
                         {(filled * 100).toFixed(0)}% filled ·{" "}
                         {o.expire_index === null
@@ -794,16 +813,18 @@ export function ActivityTabs({
                           : `expires block ${o.expire_index.toLocaleString()}`}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() =>
-                        compose.composeCancel({ offer_hash: o.tx_hash })
-                      }
-                      className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
-                    >
-                      {busy ? "…" : "Cancel"}
-                    </button>
+                    {mine && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() =>
+                          compose.composeCancel({ offer_hash: o.tx_hash })
+                        }
+                        className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                      >
+                        {busy ? "…" : "Cancel"}
+                      </button>
+                    )}
                   </li>
                 );
               })}

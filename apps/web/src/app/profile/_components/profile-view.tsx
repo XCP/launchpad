@@ -12,14 +12,18 @@ import { ActivityTab } from "@/app/profile/_components/activity-tab";
 import { HistoryTab } from "@/app/profile/_components/history-tab";
 import { LaunchesTab } from "@/app/profile/_components/launches-tab";
 import { MintingTab } from "@/app/profile/_components/minting-tab";
+import { OrdersTab } from "@/app/profile/_components/orders-tab";
 import { PositionsTab } from "@/app/profile/_components/positions-tab";
 import { RewardsTab } from "@/app/profile/_components/rewards-tab";
 import { fetchRewardAccount } from "@/lib/api/launchpad-api";
 
-type Tab = "positions" | "history" | "activity" | "rewards" | "minting" | "launches";
+type Tab = "positions" | "orders" | "history" | "activity" | "rewards" | "minting" | "launches";
 
 const BASE_TABS: { id: Tab; label: string }[] = [
   { id: "positions", label: "Positions" },
+  // Open orders sit between what you hold and what you have closed, because
+  // that is what they are: a position you have committed to but not yet taken.
+  { id: "orders", label: "Orders" },
   { id: "history", label: "Closed" },
   { id: "activity", label: "Activity" },
   { id: "minting", label: "Minting" },
@@ -51,11 +55,17 @@ export function ProfileView({ viewing }: { viewing?: string }) {
   // A profile does not get an empty tab for an accrued promise. Reward
   // history exists only once this address has a real transaction to inspect.
   const tabs = rewardAccount?.hasRewardTx
-    ? [
-        ...BASE_TABS.slice(0, 3),
-        { id: "rewards" as const, label: "Rewards" },
-        ...BASE_TABS.slice(3),
-      ]
+    ? (() => {
+        // Anchored to the tab it follows, not to an index: the previous
+        // slice(0, 3) silently moved Rewards the moment a tab was inserted
+        // above it.
+        const after = BASE_TABS.findIndex((t) => t.id === "activity") + 1;
+        return [
+          ...BASE_TABS.slice(0, after),
+          { id: "rewards" as const, label: "Rewards" },
+          ...BASE_TABS.slice(after),
+        ];
+      })()
     : BASE_TABS;
 
   if (!address || (!viewing && status !== "connected")) {
@@ -152,6 +162,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
         </Tabs>
         <div className="p-4">
           {tab === "positions" && <PositionsTab address={address} />}
+          {tab === "orders" && <OrdersTab address={address} canCancel={!viewing} />}
           {tab === "history" && <HistoryTab address={address} />}
           {tab === "activity" && <ActivityTab address={address} />}
           {tab === "rewards" && rewardAccount?.hasRewardTx && (
