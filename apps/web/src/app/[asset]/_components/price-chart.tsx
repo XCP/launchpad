@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import type { ChartCandle } from "@/lib/api/launchpad-api";
 import type { ChartResolution } from "@/lib/candles";
@@ -33,7 +33,12 @@ const RANGES: {
   { id: "24h", label: "24H", seconds: 86_400, resolution: "1h" },
   { id: "7d", label: "7D", seconds: 7 * 86_400, resolution: "1h" },
   { id: "30d", label: "30D", seconds: 30 * 86_400, resolution: "1d" },
-  { id: "all", label: "All", seconds: Number.POSITIVE_INFINITY, resolution: "1d" },
+  {
+    id: "all",
+    label: "All",
+    seconds: Number.POSITIVE_INFINITY,
+    resolution: "1d",
+  },
 ];
 
 /**
@@ -43,7 +48,9 @@ const RANGES: {
  * because the visible window is anchored at the newest candle too — and a
  * wall-clock read would render differently on server and client.
  */
-function defaultRange(candles: Record<ChartResolution, ChartCandle[]>): ChartRange {
+function defaultRange(
+  candles: Record<ChartResolution, ChartCandle[]>,
+): ChartRange {
   const source = candles["1d"].length > 0 ? candles["1d"] : candles["1h"];
   if (source.length === 0) return "all";
   const span = source[source.length - 1]!.time - source[0]!.time;
@@ -64,6 +71,11 @@ interface Plotted {
   yLow: number;
   volY: number;
   up: boolean;
+  /** Open and close in the denomination being DRAWN. `candle` stays raw XCP —
+   *  the hover labels convert it themselves, so keeping both apart is what
+   *  stops a dollar value being multiplied by the rate twice. */
+  vOpen: number;
+  vClose: number;
   candle: ChartCandle;
 }
 
@@ -112,7 +124,10 @@ export function PriceChart({
     "xcp-usd-history",
     async () => {
       const res = await fetch("/api/xcp-history?days=400");
-      return ((await res.json()) as { result?: { day: string; usd: number }[] }).result ?? [];
+      return (
+        ((await res.json()) as { result?: { day: string; usd: number }[] })
+          .result ?? []
+      );
     },
     { revalidateOnFocus: false },
   );
@@ -127,63 +142,128 @@ export function PriceChart({
 
   const hasAny = candles["1h"].length > 0 || candles["1d"].length > 0;
 
-  const { points, yTicks, mintY, maxVol, bodyW } = useMemo(() => {
-    const cfg = RANGES.find((r) => r.id === range)!;
-    const source = candles[cfg.resolution];
-    const newest = source[source.length - 1]?.time ?? 0;
-    const visible = source.filter((c) => newest - c.time <= cfg.seconds);
-    if (visible.length === 0) {
-      return { points: [], yTicks: [], mintY: 0, maxVol: 0n, bodyW: 0 };
-    }
+  /** Rate on a given day, falling back to the most recent earlier day. Never
+   *  to today's rate: that is the error this exists to avoid. */
+  const rateAt = useCallback(
+    (unixSeconds: number): number | null => {
+      if (!rates || rates.length === 0) return null;
+      const day = new Date(unixSeconds * 1000).toISOString().slice(0, 10);
+      let found: number | null = null;
+      for (const r of rates) {
+        if (r.day <= day) found = r.usd;
+        else break;
+      }
+      return found ?? rates[0]!.usd;
+    },
+    [rates],
+  );
 
-    // Wicks, not closes, set the extent — a high that isn't on the axis is a
-    // high the chart is hiding.
-    const lo = Math.min(...visible.map((c) => c.low), MINT_PRICE);
-    const hi = Math.max(...visible.map((c) => c.high), MINT_PRICE);
+  const { points, yTicks, mintPath, mintLabelY, maxVol, bodyW } =
+    useMemo(() => {
+      const cfg = RANGES.find((r) => r.id === range)!;
+      const source = candles[cfg.resolution];
+      const newest = source[source.length - 1]?.time ?? 0;
+      const visible = source.filter((c) => newest - c.time <= cfg.seconds);
+      if (visible.length === 0) {
+        return {
+          points: [],
+          yTicks: [],
+          mintPath: "",
+          mintLabelY: 0,
+          maxVol: 0n,
+          bodyW: 0,
+        };
+      }
 
-    // Log scaling compresses a 100× move into something readable; these prices
-    // are always positive so no guard beyond the zero check is needed.
-    const scale = (v: number) => (log ? Math.log10(Math.max(v, Number.MIN_VALUE)) : v);
-    const sLo = scale(lo);
-    const sHi = scale(hi);
-    const spread = sHi - sLo || Math.abs(sHi) || 1;
-    const yOf = (p: number) => PAD.top + PLOT_H * (1 - (scale(p) - sLo) / spread);
-    const innerW = W - PAD.left - PAD.right;
-    const slot = innerW / visible.length;
-    const xOf = (i: number) => PAD.left + slot * (i + 0.5);
+      // Convert BEFORE scaling, each candle at the rate of its OWN day. Doing it
+      // only in the labels — which is what this did until now — left the geometry
+      // in XCP, so switching to USD relabelled the axis without moving a pixel
+      // and the shape silently stayed a graph of the XCP price.
+      //
+      // In XCP mode the rate is exactly 1, so one code path draws both.
+      const valued = visible.map((candle) => {
+        const rate = inUsd ? (rateAt(candle.time) ?? xcpUsd ?? 1) : 1;
+        return {
+          candle,
+          open: candle.open * rate,
+          high: candle.high * rate,
+          low: candle.low * rate,
+          close: candle.close * rate,
+          // Fixed in XCP and therefore MOVING in dollars: every minter paid the
+          // same XCP on a different day. A flat dollar line is the one claim this
+          // reference must not make.
+          mint: MINT_PRICE * rate,
+        };
+      });
 
-    const peak = visible.reduce((m, c) => {
-      const v = big(c.volumeXcpRaw);
-      return v > m ? v : m;
-    }, 0n);
-    const volTop = PAD.top + PLOT_H + 10;
-    const volOf = (v: bigint) => (peak > 0n ? Number((v * 1000n) / peak) / 1000 : 0);
+      // Wicks, not closes, set the extent — a high that isn't on the axis is a
+      // high the chart is hiding.
+      const lo = Math.min(
+        ...valued.map((v) => v.low),
+        ...valued.map((v) => v.mint),
+      );
+      const hi = Math.max(
+        ...valued.map((v) => v.high),
+        ...valued.map((v) => v.mint),
+      );
 
-    const plotted: Plotted[] = visible.map((candle, i) => ({
-      x: xOf(i),
-      yOpen: yOf(candle.open),
-      yClose: yOf(candle.close),
-      yHigh: yOf(candle.high),
-      yLow: yOf(candle.low),
-      volY: volTop + (VOL_H - 10) * (1 - volOf(big(candle.volumeXcpRaw))),
-      up: candle.close >= candle.open,
-      candle,
-    }));
+      // Log scaling compresses a 100× move into something readable; these prices
+      // are always positive so no guard beyond the zero check is needed.
+      const scale = (v: number) =>
+        log ? Math.log10(Math.max(v, Number.MIN_VALUE)) : v;
+      const sLo = scale(lo);
+      const sHi = scale(hi);
+      const spread = sHi - sLo || Math.abs(sHi) || 1;
+      const yOf = (p: number) =>
+        PAD.top + PLOT_H * (1 - (scale(p) - sLo) / spread);
+      const innerW = W - PAD.left - PAD.right;
+      const slot = innerW / visible.length;
+      const xOf = (i: number) => PAD.left + slot * (i + 0.5);
 
-    const ticks = [lo, log ? Math.sqrt(lo * hi) : (lo + hi) / 2, hi].map((v) => ({
-      v,
-      y: yOf(v),
-    }));
-    return {
-      points: plotted,
-      yTicks: ticks,
-      mintY: yOf(MINT_PRICE),
-      maxVol: peak,
-      // Bodies never touch: a candle keeps a gap even when hundreds are shown,
-      // and never grows so wide that a handful of them read as a bar chart.
-      bodyW: Math.max(1.5, Math.min(18, slot - 2)),
-    };
-  }, [candles, range, log]);
+      const peak = visible.reduce((m, c) => {
+        const v = big(c.volumeXcpRaw);
+        return v > m ? v : m;
+      }, 0n);
+      const volTop = PAD.top + PLOT_H + 10;
+      const volOf = (v: bigint) =>
+        peak > 0n ? Number((v * 1000n) / peak) / 1000 : 0;
+
+      const plotted: Plotted[] = valued.map((v, i) => ({
+        x: xOf(i),
+        yOpen: yOf(v.open),
+        yClose: yOf(v.close),
+        yHigh: yOf(v.high),
+        yLow: yOf(v.low),
+        volY: volTop + (VOL_H - 10) * (1 - volOf(big(v.candle.volumeXcpRaw))),
+        up: v.close >= v.open,
+        vOpen: v.open,
+        vClose: v.close,
+        candle: v.candle,
+      }));
+
+      const ticks = [lo, log ? Math.sqrt(lo * hi) : (lo + hi) / 2, hi].map(
+        (v) => ({
+          v,
+          y: yOf(v),
+        }),
+      );
+      return {
+        points: plotted,
+        yTicks: ticks,
+        mintPath: valued
+          .map(
+            (v, i) =>
+              `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(v.mint).toFixed(1)}`,
+          )
+          .join(""),
+        // The caption sits at the left edge, so it tracks the leftmost value.
+        mintLabelY: yOf(valued[0]!.mint),
+        maxVol: peak,
+        // Bodies never touch: a candle keeps a gap even when hundreds are shown,
+        // and never grows so wide that a handful of them read as a bar chart.
+        bodyW: Math.max(1.5, Math.min(18, slot - 2)),
+      };
+    }, [candles, range, log, inUsd, rateAt, xcpUsd]);
 
   if (!hasAny) {
     return (
@@ -195,7 +275,12 @@ export function PriceChart({
 
   // The line and its fill, from the same plotted points the candles use — so
   // switching modes can never draw two different histories.
-  const linePath = points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.yClose.toFixed(1)}`).join("");
+  const linePath = points
+    .map(
+      (p, i) =>
+        `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.yClose.toFixed(1)}`,
+    )
+    .join("");
   const areaPath =
     points.length > 0
       ? `${linePath}L${points[points.length - 1]!.x.toFixed(1)},${(PAD.top + PLOT_H).toFixed(1)}L${points[0]!.x.toFixed(1)},${(PAD.top + PLOT_H).toFixed(1)}Z`
@@ -205,20 +290,7 @@ export function PriceChart({
   // The header's colour describes the RANGE — where it closed against where it
   // opened — not the hovered candle, which said nothing true about the chart.
   const last = points[points.length - 1];
-  const rising = last && first ? last.candle.close >= first.candle.open : true;
-
-  /** Rate on a given day, falling back to the most recent earlier day. Never
-   *  to today's rate: that is the error this exists to avoid. */
-  const rateAt = (unixSeconds: number): number | null => {
-    if (!rates || rates.length === 0) return null;
-    const day = new Date(unixSeconds * 1000).toISOString().slice(0, 10);
-    let found: number | null = null;
-    for (const r of rates) {
-      if (r.day <= day) found = r.usd;
-      else break;
-    }
-    return found ?? rates[0]!.usd;
-  };
+  const rising = last && first ? last.vClose >= first.vOpen : true;
 
   const priceLabel = (p: number, at?: number) => {
     if (!inUsd) return xcp(p, true);
@@ -232,22 +304,30 @@ export function PriceChart({
   const devMarks = devTrades
     .map((t) => {
       const bucket = points.find((p) => p.candle.lastBlock >= t.block) ?? null;
-      return bucket ? { ...t, x: bucket.x, y: bucket.up ? bucket.yClose : bucket.yOpen } : null;
+      return bucket
+        ? { ...t, x: bucket.x, y: bucket.up ? bucket.yClose : bucket.yOpen }
+        : null;
     })
     .filter((m): m is DevTrade & { x: number; y: number } => m !== null)
-    .filter((m, i, all) => all.findIndex((o) => o.x === m.x && o.kind === m.kind) === i);
+    .filter(
+      (m, i, all) =>
+        all.findIndex((o) => o.x === m.x && o.kind === m.kind) === i,
+    );
 
   const onMove = (e: React.MouseEvent<SVGSVGElement>) => {
     const rect = svgRef.current?.getBoundingClientRect();
     if (!rect || points.length === 0) return;
     const x = ((e.clientX - rect.left) / rect.width) * W;
     let nearest = points[0]!;
-    for (const p of points) if (Math.abs(p.x - x) < Math.abs(nearest.x - x)) nearest = p;
+    for (const p of points)
+      if (Math.abs(p.x - x) < Math.abs(nearest.x - x)) nearest = p;
     setHover(nearest);
   };
 
-  const control = "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors";
-  const bucketLabel = RANGES.find((r) => r.id === range)!.resolution === "1h" ? "hour" : "day";
+  const control =
+    "rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors";
+  const bucketLabel =
+    RANGES.find((r) => r.id === range)!.resolution === "1h" ? "hour" : "day";
 
   return (
     <div className="relative">
@@ -263,7 +343,9 @@ export function PriceChart({
               onClick={() => setRange(r.id)}
               aria-pressed={range === r.id}
               className={`${control} ${
-                range === r.id ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                range === r.id
+                  ? "bg-gray-900 text-white"
+                  : "text-gray-500 hover:bg-gray-100"
               }`}
             >
               {r.label}
@@ -280,7 +362,9 @@ export function PriceChart({
                 onClick={() => setMode(m)}
                 aria-pressed={mode === m}
                 className={`${control} ${
-                  mode === m ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                  mode === m
+                    ? "bg-gray-900 text-white"
+                    : "text-gray-500 hover:bg-gray-100"
                 }`}
               >
                 {m === "line" ? "Line" : "Candles"}
@@ -319,7 +403,7 @@ export function PriceChart({
           onMouseMove={onMove}
           onMouseLeave={() => setHover(null)}
           role="img"
-          aria-label={`${asset} price against XCP, ${points.length} ${bucketLabel} ${mode === "line" ? "points" : "candles"}`}
+          aria-label={`${asset} price against ${inUsd ? "USD" : "XCP"}, ${points.length} ${bucketLabel} ${mode === "line" ? "points" : "candles"}`}
         >
           {yTicks.map((t) => (
             <g key={t.v}>
@@ -331,22 +415,30 @@ export function PriceChart({
                 stroke="#f3f4f6"
                 strokeWidth={1}
               />
-              <text x={W - PAD.right + 6} y={t.y + 3} fontSize={9} fill="#6b7280">
-                {xcp(t.v)}
+              <text
+                x={W - PAD.right + 6}
+                y={t.y + 3}
+                fontSize={9}
+                fill="#6b7280"
+              >
+                {inUsd ? usd(t.v) : xcp(t.v)}
               </text>
             </g>
           ))}
 
-          <line
-            x1={PAD.left}
-            x2={W - PAD.right}
-            y1={mintY}
-            y2={mintY}
+          <path
+            d={mintPath}
+            fill="none"
             stroke="#d1d5db"
             strokeWidth={1}
             strokeDasharray="4 3"
           />
-          <text x={PAD.left + 2} y={mintY - 4} fontSize={10} fill="#6b7280">
+          <text
+            x={PAD.left + 2}
+            y={mintLabelY - 4}
+            fontSize={10}
+            fill="#6b7280"
+          >
             mint price
           </text>
 
@@ -363,7 +455,12 @@ export function PriceChart({
               />
               {/* A single bucket has no line to draw, so mark the point. */}
               {points.length === 1 && (
-                <circle cx={points[0]!.x} cy={points[0]!.yClose} r={3} fill="#9333ea" />
+                <circle
+                  cx={points[0]!.x}
+                  cy={points[0]!.yClose}
+                  r={3}
+                  fill="#9333ea"
+                />
               )}
             </>
           ) : (
@@ -376,8 +473,21 @@ export function PriceChart({
               const height = Math.max(1, Math.abs(p.yClose - p.yOpen));
               return (
                 <g key={p.candle.time}>
-                  <line x1={p.x} x2={p.x} y1={p.yHigh} y2={p.yLow} stroke={colour} strokeWidth={1} />
-                  <rect x={p.x - bodyW / 2} y={top} width={bodyW} height={height} fill={colour} />
+                  <line
+                    x1={p.x}
+                    x2={p.x}
+                    y1={p.yHigh}
+                    y2={p.yLow}
+                    stroke={colour}
+                    strokeWidth={1}
+                  />
+                  <rect
+                    x={p.x - bodyW / 2}
+                    y={top}
+                    width={bodyW}
+                    height={height}
+                    fill={colour}
+                  />
                 </g>
               );
             })
@@ -425,7 +535,14 @@ export function PriceChart({
           ))}
 
           {hover && mode === "line" && (
-            <circle cx={hover.x} cy={hover.yClose} r={4} fill="#9333ea" stroke="#fff" strokeWidth={2} />
+            <circle
+              cx={hover.x}
+              cy={hover.yClose}
+              r={4}
+              fill="#9333ea"
+              stroke="#fff"
+              strokeWidth={2}
+            />
           )}
 
           {hover && (
@@ -442,13 +559,22 @@ export function PriceChart({
 
           <text x={PAD.left} y={H - 6} fontSize={10} fill="#6b7280">
             {points[0]
-              ? new Date(points[0].candle.time * 1000).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })
+              ? new Date(points[0].candle.time * 1000).toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                  },
+                )
               : ""}
           </text>
-          <text x={W - PAD.right} y={H - 6} fontSize={10} fill="#6b7280" textAnchor="end">
+          <text
+            x={W - PAD.right}
+            y={H - 6}
+            fontSize={10}
+            fill="#6b7280"
+            textAnchor="end"
+          >
             now
           </text>
         </svg>
@@ -461,7 +587,8 @@ export function PriceChart({
             // Follows the crosshair, flipping side near the right edge so it
             // never runs off the card.
             left: `${(hover.x / W) * 100}%`,
-            transform: hover.x > W * 0.62 ? "translateX(-105%)" : "translateX(8px)",
+            transform:
+              hover.x > W * 0.62 ? "translateX(-105%)" : "translateX(8px)",
             top: 34,
           }}
         >
@@ -492,7 +619,9 @@ export function PriceChart({
             {new Date(hover.candle.time * 1000).toLocaleString("en-US", {
               month: "short",
               day: "numeric",
-              ...(bucketLabel === "hour" ? { hour: "numeric", minute: "2-digit" } : {}),
+              ...(bucketLabel === "hour"
+                ? { hour: "numeric", minute: "2-digit" }
+                : {}),
             })}
           </div>
         </div>
