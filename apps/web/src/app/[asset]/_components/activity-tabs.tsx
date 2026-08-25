@@ -670,9 +670,27 @@ export function ActivityTabs({
                           <span aria-hidden className="text-sm">
                             {poolLock.fullyLocked ? "🔒" : "🔓"}
                           </span>
-                          <span className="font-sans font-medium text-gray-900">
-                            Pool
-                          </span>
+                          {/* The pool is not an address, so there is nothing
+                              to resolve on an explorer — but its LP token IS an
+                              asset, and that page is where the reserves, the
+                              LP supply and the burn actually live. Linking the
+                              row there is the only way a reader can check the
+                              lock claim for themselves. */}
+                          {lpAsset ? (
+                            <a
+                              href={`https://xcpdex.com/${lpAsset}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="font-sans font-medium text-gray-900 hover:text-purple-700 hover:underline"
+                              title={`LP token ${lpAsset}`}
+                            >
+                              Pool
+                            </a>
+                          ) : (
+                            <span className="font-sans font-medium text-gray-900">
+                              Pool
+                            </span>
+                          )}
                           <span
                             className={`shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${
                               poolLock.fullyLocked
