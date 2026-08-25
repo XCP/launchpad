@@ -63,30 +63,32 @@ export interface LpBalance {
 }
 
 /**
- * The pool's tokens, split by whether the liquidity behind them can be pulled.
+ * How much of the liquidity behind the pool's tokens can never be pulled.
  *
- * The holders table used to show the pool as a single row captioned "Locked
- * pool · LP burned", which was true by luck rather than by check: an XCP-69
- * graduation burns its LP, so every pool on the site happened to be fully
- * locked. Nothing enforced it. The first person to deposit liquidity WITHOUT
- * burning the LP would have had their withdrawable position captioned as
- * burned, and the table would have been asserting a guarantee that did not
- * exist — the single most misleading thing this page could say.
+ * The holders table used to caption the pool "Locked pool · LP burned"
+ * unconditionally. That was true by luck, not by check: an XCP-69 graduation
+ * burns its LP, so every pool happened to be fully locked and nothing enforced
+ * it. The first deposit that KEPT its LP would have had a withdrawable position
+ * captioned as permanently burned — the table asserting a guarantee that does
+ * not exist.
  *
- * Locked share is measured, not assumed: LP sitting at a provably unspendable
- * address against total LP outstanding. Pool tokens divide on that ratio,
- * because an LP token is a claim on a proportion of both reserves.
+ * ONE row, not two. An earlier pass split the pool into "Locked" and "Unlocked"
+ * rows, which reads well in isolation and is wrong in a ranking: the pool is a
+ * single concentration of supply, and cutting it in half understates it twice
+ * over while reordering the table around a boundary that is not a holder. The
+ * lock is a property OF the pool row, so it belongs on that row as a qualifier.
  *
- * Integer math throughout, and `unlocked` is the REMAINDER rather than a second
- * division, so the two always sum to the pool exactly and the rounding dust
- * (at most one raw unit) lands on the unlocked side — the side that claims
- * less, which is the right direction for a number people trust.
+ * `lockedPercent` FLOORS, and `fullyLocked` is an exact equality rather than a
+ * percentage test. 99.6% burned must read "99% burned", never "100%": rounding
+ * up would manufacture the same false guarantee this function exists to
+ * prevent, just three decimal places further in. Claim less than is true, never
+ * more.
  */
-export function splitPoolByLock(
+export function poolLockStatus(
   poolTokens: bigint,
   lpBalances: LpBalance[],
   burnAddresses: Iterable<string>,
-): { locked: bigint; unlocked: bigint } {
+): { locked: bigint; unlocked: bigint; lockedPercent: number; fullyLocked: boolean } {
   const burnt = new Set(burnAddresses);
   let total = 0n;
   let burned = 0n;
@@ -96,9 +98,15 @@ export function splitPoolByLock(
     total += q;
     if (row.address && burnt.has(row.address)) burned += q;
   }
-  // No LP supply visible means no basis for the claim. Report it all unlocked
-  // rather than defaulting to locked: the caption has to be earned.
-  if (total <= 0n) return { locked: 0n, unlocked: poolTokens };
+  // No LP supply visible is not evidence of a burn. Claim nothing.
+  if (total <= 0n) {
+    return { locked: 0n, unlocked: poolTokens, lockedPercent: 0, fullyLocked: false };
+  }
   const locked = (poolTokens * burned) / total;
-  return { locked, unlocked: poolTokens - locked };
+  return {
+    locked,
+    unlocked: poolTokens - locked,
+    lockedPercent: Number((burned * 100n) / total),
+    fullyLocked: burned === total,
+  };
 }

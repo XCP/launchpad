@@ -37,7 +37,7 @@ import { mergePairTrades } from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
   includeFormerHolders,
-  splitPoolByLock,
+  poolLockStatus,
   type HolderRow,
   type LpBalance,
 } from "@/lib/holders";
@@ -196,7 +196,6 @@ export function ActivityTabs({
    *  for. Marked unmistakably in the row itself, because a fabricated entry in
    *  a list of on-chain facts has to announce that it is one. */
   const POOL_ROW = "__pool__";
-  const POOL_ROW_UNLOCKED = "__pool_unlocked__";
   // Counterparty's balance endpoint is a live snapshot, not holder history.
   // Restore absent minters/traders at zero so the table can show who sold out,
   // while the tab/header/card counts above remain strictly current balances.
@@ -207,29 +206,23 @@ export function ActivityTabs({
       ...(trades ?? []).map((trade) => trade.addr),
     ],
   );
-  // Until the LP balances land, claim nothing: an unproven lock shows as the
-  // ordinary pool row rather than borrowing a guarantee it hasn't checked.
-  const poolSplit =
-    poolTokensRaw && big(poolTokensRaw) > 0n
-      ? splitPoolByLock(big(poolTokensRaw), lpBalances ?? [], [BURN_ADDRESS])
-      : { locked: 0n, unlocked: 0n };
+  // One row: the pool is a single concentration of supply, and how much of it
+  // is locked is a property OF that row, not a second holder.
+  const poolLock = poolLockStatus(
+    big(poolTokensRaw ?? 0),
+    lpBalances ?? [],
+    [BURN_ADDRESS],
+  );
   const holderRows: HolderRow[] =
     poolTokensRaw && big(poolTokensRaw) > 0n
       ? [
           ...holderHistory,
-          ...(poolSplit.locked > 0n
-            ? [{ address: POOL_ROW, quantity: poolSplit.locked }]
-            : []),
-          ...(poolSplit.unlocked > 0n
-            ? [{ address: POOL_ROW_UNLOCKED, quantity: poolSplit.unlocked }]
-            : []),
+          { address: POOL_ROW, quantity: big(poolTokensRaw) },
         ].sort((a, b) => compareRawDesc(a.quantity, b.quantity))
       : holderHistory;
   const holderBalance = new Map(
     holderRows
-      .filter(
-        (row) => row.address !== POOL_ROW && row.address !== POOL_ROW_UNLOCKED,
-      )
+      .filter((row) => row.address !== POOL_ROW)
       .map((row) => [row.address, row.quantity]),
   );
   // Shares are of circulating PLUS the locked pool, which is what makes them
@@ -646,7 +639,6 @@ export function ActivityTabs({
               {holderRows.slice(from, from + PER_PAGE).map((h, i) => {
                 const pct = ratio(h.quantity, holderTotal) * 100;
                 const isPool = h.address === POOL_ROW;
-                const isUnlockedPool = h.address === POOL_ROW_UNLOCKED;
                 const isUtxo = h.address.startsWith("utxo:");
                 const soldOut = h.quantity === 0n;
                 const displayedQuantity = tokenQty(h.quantity, divisible);
@@ -668,28 +660,33 @@ export function ActivityTabs({
                       <span className="w-8 text-right text-xs text-gray-400">
                         {from + i + 1}
                       </span>
-                      {isPool || isUnlockedPool ? (
+                      {isPool ? (
                         <>
-                          {/* The caption follows the LP, not the pool. Liquidity
-                              whose LP is burned can never be withdrawn; liquidity
-                              whose LP someone still holds can leave at any block,
-                              and calling that "locked" would be the most
+                          {/* The chip follows the LP, not the pool. Liquidity
+                              whose LP is burned can never be withdrawn; whatever
+                              LP someone still holds can leave at any block, and
+                              captioning that "locked" would be the most
                               misleading thing this table could print. */}
                           <span aria-hidden className="text-sm">
-                            {isPool ? "🔒" : "🔓"}
+                            {poolLock.fullyLocked ? "🔒" : "🔓"}
                           </span>
                           <span className="font-sans font-medium text-gray-900">
-                            {isPool ? "Locked pool" : "Unlocked pool"}
+                            Pool
                           </span>
-                          {isPool ? (
-                            <span className="shrink-0 rounded-full border border-green-200 bg-green-50 px-1.5 py-px text-[10px] font-medium text-green-700">
-                              LP burned
-                            </span>
-                          ) : (
-                            <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
-                              withdrawable
-                            </span>
-                          )}
+                          <span
+                            className={`shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${
+                              poolLock.fullyLocked
+                                ? "border-green-200 bg-green-50 text-green-700"
+                                : "border-amber-200 bg-amber-50 text-amber-700"
+                            }`}
+                            title={
+                              poolLock.fullyLocked
+                                ? "Every LP token is burned — this liquidity can never be withdrawn."
+                                : `${poolLock.lockedPercent}% of the LP is burned. The rest can be withdrawn by whoever holds it.`
+                            }
+                          >
+                            {poolLock.lockedPercent}% locked
+                          </span>
                         </>
                       ) : (
                         <>
