@@ -19,6 +19,23 @@
 import { big, type Raw } from "@/lib/numeric";
 
 /** One acquisition or disposal, both legs known. */
+/**
+ * Why a position's PnL cannot be stated.
+ *
+ * A CODE, not a sentence. The wording belongs to whatever is rendering it —
+ * these reached the screen as `title` attributes, which is a tooltip nobody
+ * hovers for a full second and nobody on a phone can reach at all, so the user
+ * saw a bare dash and no reason. Naming the cases lets each surface say them in
+ * its own voice, and lets the closed list say them at all.
+ *
+ *  untracked    — the wallet holds the token, but this site records no mint or
+ *                 trade for it, so there is no cost to measure against.
+ *  unpriced     — tokens arrived by transfer at a moment nothing could price.
+ *  unreconciled — the live balance disagrees with the mints and trades tracked
+ *                 here, so something moved where this page cannot see it.
+ */
+export type WithheldReason = "untracked" | "unpriced" | "unreconciled";
+
 export interface PairedDelta {
   asset: string;
   block: number;
@@ -51,14 +68,14 @@ export interface Position {
   /** Realized on tokens already disposed of. */
   realizedXcpSats: bigint;
   /** Why PnL is withheld, if it is. */
-  withheld?: string;
+  withheld?: WithheldReason;
 }
 
 export interface ClosedPosition {
   asset: string;
   /** Null when the focused event history does not explain the live zero. */
   realizedXcpSats: bigint | null;
-  withheld?: string;
+  withheld?: WithheldReason;
 }
 
 /** Whole-position PnL, including profit already realized by partial sales. */
@@ -137,7 +154,20 @@ export function computePositions(
     const valueXcpSats =
       tokenReserve > 0n ? (live * big(u.poolXcpReserve)) / tokenReserve : 0n;
 
-    if (live <= 0n) {
+    // A pool sale can never hand back the entire balance: the constant-product
+    // maths divides in integers, so selling out leaves a few raw units behind.
+    // 4,986 raw CAPTAINDAN prices at 0.22 XCP satoshi, which floors to zero —
+    // the wallet is out, but a `live > 0` test keeps the position open forever,
+    // printing a 0.00 holding worth $0 with its realised PnL stranded beside it.
+    //
+    // The line is "worth less than one satoshi", not a token count, because a
+    // count means different things either side of divisibility and because this
+    // is the honest statement: what remains cannot be sold for anything.
+    // Guarded on a live pool — without one nothing can be priced, and a real
+    // holding would be indistinguishable from crumbs.
+    const dust = live > 0n && tokenReserve > 0n && valueXcpSats === 0n;
+
+    if (live <= 0n || dust) {
       // Fully exited — only interesting if they ever held it.
       if (b?.everHeld)
         closed.push(
@@ -146,7 +176,7 @@ export function computePositions(
             : {
                 asset: u.asset,
                 realizedXcpSats: null,
-                withheld: "activity does not reconcile with the live balance",
+                withheld: "unreconciled",
               },
         );
       continue;
@@ -156,10 +186,10 @@ export function computePositions(
     // something happened this model didn't see, and every number derived from
     // it is suspect — so report the value (which needs no history) and withhold
     // the rest rather than publish a confident wrong figure.
-    let withheld: string | undefined;
-    if (!b) withheld = "no history found for this asset";
-    else if (b.unpriced) withheld = "received tokens with no recorded price";
-    else if (b.qty !== live) withheld = "history doesn't reconcile with the live balance";
+    let withheld: WithheldReason | undefined;
+    if (!b) withheld = "untracked";
+    else if (b.unpriced) withheld = "unpriced";
+    else if (b.qty !== live) withheld = "unreconciled";
 
     open.push({
       asset: u.asset,

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TokenImage } from "@/components/token-image";
 import { compact, fromSats, usd } from "@/lib/format";
 import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
+import { WITHHELD_COPY } from "@/lib/withheld-copy";
 
 export function HistoryTab({ address }: { address: string }) {
   const { portfolio, isLoading } = usePortfolio(address);
@@ -42,7 +43,19 @@ export function HistoryTab({ address }: { address: string }) {
               <TokenImage asset={c.asset} className="size-7 shrink-0 rounded" />
               <span className="truncate font-medium">{c.asset}</span>
             </Link>
-            <Realized sats={c.realizedXcpSats} xcpUsd={xcpUsd} />
+            <span className="shrink-0 text-right">
+              <Realized sats={c.realizedXcpSats} xcpUsd={xcpUsd} />
+              {/* This list dropped the reason entirely — it was computed and
+                  then never passed, so a dash here explained nothing at all. */}
+              {c.withheld && (
+                <span
+                  className="mt-0.5 block text-[10px] leading-tight text-gray-400"
+                  title={WITHHELD_COPY[c.withheld].full}
+                >
+                  {WITHHELD_COPY[c.withheld].short}
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ul>

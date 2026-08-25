@@ -9,6 +9,7 @@ import { buildPortfolioSeries, rateLookup, timeLookup, type DailyRate, type Time
 import { PortfolioChart, WindowPicker, WINDOW_BLOCKS, type Window } from "@/app/profile/_components/portfolio-chart";
 import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
 import { totalPnlXcpSats } from "@/lib/positions";
+import { WITHHELD_COPY } from "@/lib/withheld-copy";
 
 type Denom = "usd" | "xcp";
 
@@ -28,36 +29,53 @@ function holding(n: number): string {
 function Pnl({
   sats,
   format,
-  unavailable,
 }: {
   sats: bigint | null;
   format: (s: bigint) => string;
-  unavailable?: string;
 }) {
-  if (sats === null)
-    return <span className="text-gray-400" title={unavailable}>—</span>;
+  if (sats === null) return <span className="text-gray-400">—</span>;
   const up = sats >= 0n;
-  // Magnitude taken in integer space, before any conversion to a double —
-  // the sign is carried by the label, not by the arithmetic.
+  // Magnitude taken in integer space, before any conversion to a double — the
+  // sign is carried by the label, not by the arithmetic.
+  //
+  // Gains print bare and losses keep their minus, which is not an inconsistency
+  // but the point. A leading "+" on every gain stacked three deep down this
+  // cell and said nothing the green had not already said. A loss is the case
+  // where being misread matters, and red-versus-green is the one distinction
+  // roughly one man in twelve cannot make — "$0.49" and "$0.77" are the same
+  // glyphs to them, and this table has shown both, adjacent. One character
+  // fixes that without putting the clutter back.
   return (
     <span className={up ? "text-green-700" : "text-red-600"}>
-      {up ? "+" : "−"}
+      {up ? "" : "−"}
       {format(up ? sats : -sats)}
     </span>
   );
 }
 
-/** Change across the visible window — the number the chart is really about.
- *  Computed on the converted values, so in dollars it reflects the move in
- *  XCP/USD as well as the move in the positions themselves. */
-function PnlOverWindow({ values, format }: { values: number[]; format: (v: number) => string }) {
-  const change = values[values.length - 1]! - values[0]!;
-  const up = change >= 0;
+/**
+ * Where the portfolio started this window and where it stands now.
+ *
+ * It used to print the difference alone, in PnL green, which made it a claim it
+ * could not support: this is the change in what the wallet is WORTH, and that
+ * moves for three unrelated reasons — the positions repricing, the owner buying
+ * more, and XCP/USD itself moving. A wallet younger than the window showed its
+ * entire balance as a gain, because it began the window at nothing.
+ *
+ * So it states both ends instead of the delta, and stays grey. Naming the
+ * baseline makes the young-wallet case explain itself rather than overclaim,
+ * and dropping the colour leaves green meaning exactly one thing on this page:
+ * profit, in the PnL column, nowhere else.
+ */
+function ValueOverWindow({ values, format }: { values: number[]; format: (v: number) => string }) {
+  const from = values[0]!;
+  const to = values[values.length - 1]!;
   return (
-    <p className={`text-sm tabular-nums ${up ? "text-green-700" : "text-red-600"}`}>
-      {up ? "+" : "−"}
-      {format(Math.abs(change))}
-      <span className="ml-1 text-gray-400">this window</span>
+    <p className="text-sm tabular-nums text-gray-500">
+      {format(from)}
+      <span className="mx-1.5 text-gray-400">→</span>
+      <span className="text-gray-900">{format(to)}</span>
+      <span className="ml-1.5 text-gray-400">this window</span>
     </p>
   );
 }
@@ -151,7 +169,7 @@ export function PositionsTab({ address }: { address: string }) {
       {chartComplete && chartValues.length >= 2 && chartValues.some((v) => v > 0) && (
         <div className="space-y-2">
           <div className="flex items-center justify-between gap-3">
-            <PnlOverWindow values={chartValues} format={chartLabel} />
+            <ValueOverWindow values={chartValues} format={chartLabel} />
             <WindowPicker value={windowKey} onChange={setWindowKey} />
           </div>
           <PortfolioChart values={chartValues} format={chartLabel} />
@@ -179,7 +197,7 @@ export function PositionsTab({ address }: { address: string }) {
       ) : (
         <div className="overflow-x-auto">
           <div className="min-w-[36rem]">
-            <div className="grid grid-cols-[minmax(0,1fr)_9rem_7rem_7rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500">
               <span>Token</span>
               <span className="text-right">Holding</span>
               <span className="text-right">Value</span>
@@ -191,7 +209,7 @@ export function PositionsTab({ address }: { address: string }) {
                 return (
                   <li
                     key={p.asset}
-                    className="grid grid-cols-[minmax(0,1fr)_9rem_7rem_7rem] items-center gap-x-4 py-2.5 text-sm"
+                    className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] items-center gap-x-4 py-2.5 text-sm"
                   >
                     <Link href={`/${p.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600">
                       <TokenImage asset={p.asset} className="size-7 shrink-0 rounded" />
@@ -204,14 +222,35 @@ export function PositionsTab({ address }: { address: string }) {
                       {money(p.valueXcpSats)}
                     </span>
                     <span className="text-right tabular-nums">
-                      <Pnl
-                        sats={totalPnlXcpSats(p)}
-                        format={money}
-                        unavailable={p.withheld}
-                      />
+                      <Pnl sats={totalPnlXcpSats(p)} format={money} />
+                      {/* The reason lives on the row, not in a title attribute:
+                          a dash that will not say why is the least useful thing
+                          this table can print. */}
+                      {p.withheld && (
+                        <span
+                          className="mt-0.5 block text-[10px] leading-tight text-gray-400"
+                          title={WITHHELD_COPY[p.withheld].full}
+                        >
+                          {WITHHELD_COPY[p.withheld].short}
+                        </span>
+                      )}
+                      {/* Realized is PART of the total above, not a second
+                          figure to add to it. Two green numbers stacked with no
+                          word between them read as though they sum — and on a
+                          fully exited position, where unrealized is zero and the
+                          two are equal, it printed the same amount twice with
+                          nothing to explain why. Naming both halves is what
+                          makes the total legible. */}
+                      {/* Grey, and phrased as a subset. The total above is the
+                          whole position; this names the part already banked.
+                          Colouring it made it read as a second gain to be added
+                          — which is exactly the question it kept prompting — so
+                          it stays neutral and says "of which". */}
                       {p.realizedXcpSats !== 0n && p.unrealizedXcpSats !== null && (
-                        <span className="mt-0.5 block text-[10px] text-gray-400">
-                          <Pnl sats={p.realizedXcpSats} format={money} /> realized
+                        <span className="mt-0.5 block whitespace-nowrap text-[10px] text-gray-400">
+                          of which {p.realizedXcpSats < 0n ? "−" : ""}
+                          {money(p.realizedXcpSats < 0n ? -p.realizedXcpSats : p.realizedXcpSats)}{" "}
+                          realized
                         </span>
                       )}
                     </span>
