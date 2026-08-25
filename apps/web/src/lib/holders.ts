@@ -55,3 +55,50 @@ export function includeFormerHolders(
     .map(([address, quantity]) => ({ address, quantity }))
     .sort((a, b) => compareRawDesc(a.quantity, b.quantity));
 }
+
+/** One LP balance location, from the LP asset's own balances endpoint. */
+export interface LpBalance {
+  address: string | null;
+  quantity: Raw;
+}
+
+/**
+ * The pool's tokens, split by whether the liquidity behind them can be pulled.
+ *
+ * The holders table used to show the pool as a single row captioned "Locked
+ * pool · LP burned", which was true by luck rather than by check: an XCP-69
+ * graduation burns its LP, so every pool on the site happened to be fully
+ * locked. Nothing enforced it. The first person to deposit liquidity WITHOUT
+ * burning the LP would have had their withdrawable position captioned as
+ * burned, and the table would have been asserting a guarantee that did not
+ * exist — the single most misleading thing this page could say.
+ *
+ * Locked share is measured, not assumed: LP sitting at a provably unspendable
+ * address against total LP outstanding. Pool tokens divide on that ratio,
+ * because an LP token is a claim on a proportion of both reserves.
+ *
+ * Integer math throughout, and `unlocked` is the REMAINDER rather than a second
+ * division, so the two always sum to the pool exactly and the rounding dust
+ * (at most one raw unit) lands on the unlocked side — the side that claims
+ * less, which is the right direction for a number people trust.
+ */
+export function splitPoolByLock(
+  poolTokens: bigint,
+  lpBalances: LpBalance[],
+  burnAddresses: Iterable<string>,
+): { locked: bigint; unlocked: bigint } {
+  const burnt = new Set(burnAddresses);
+  let total = 0n;
+  let burned = 0n;
+  for (const row of lpBalances) {
+    const q = big(row.quantity);
+    if (q <= 0n) continue;
+    total += q;
+    if (row.address && burnt.has(row.address)) burned += q;
+  }
+  // No LP supply visible means no basis for the claim. Report it all unlocked
+  // rather than defaulting to locked: the caption has to be earned.
+  if (total <= 0n) return { locked: 0n, unlocked: poolTokens };
+  const locked = (poolTokens * burned) / total;
+  return { locked, unlocked: poolTokens - locked };
+}

@@ -787,6 +787,7 @@ export function LaunchView({
         issuerSource={fm.source}
         poolXcpRaw={pool ? String(poolXcpRaw) : undefined}
         poolTokensRaw={pool ? String(poolTokensRaw) : undefined}
+        lpAsset={pool?.lp_asset ?? null}
       />
       </LaunchRoomProvider>
       </div>

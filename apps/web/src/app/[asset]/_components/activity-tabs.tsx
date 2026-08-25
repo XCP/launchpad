@@ -5,8 +5,10 @@ import { useState } from "react";
 import useSWR from "swr";
 import {
   fetchHolderBalances,
+  fetchLpBalances,
   type Fairmint,
 } from "@/lib/api/counterparty";
+import { BURN_ADDRESS } from "@/lib/inscriber/constants";
 import {
   commas,
   commasRaw,
@@ -35,7 +37,9 @@ import { mergePairTrades } from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
   includeFormerHolders,
+  splitPoolByLock,
   type HolderRow,
+  type LpBalance,
 } from "@/lib/holders";
 
 const PER_PAGE = 25;
@@ -82,6 +86,7 @@ export function ActivityTabs({
   blockHeight,
   poolXcpRaw,
   poolTokensRaw,
+  lpAsset,
 }: {
   asset: string;
   mints: Fairmint[];
@@ -100,6 +105,9 @@ export function ActivityTabs({
    *  roughly a third of it is locked away. Passed in so it can be shown in
    *  the ranking where it belongs. */
   poolTokensRaw?: Raw;
+  /** The pool's LP token. Its holders decide whether the pool row may call
+   *  itself locked — see splitPoolByLock. */
+  lpAsset?: string | null;
 }) {
   const { address } = useWallet();
   const { orders: mempoolOrders } = useMempool(30_000);
@@ -123,6 +131,15 @@ export function ActivityTabs({
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
   const liveHolderCount = holders ? currentHolderCount(holders) : null;
+
+  // Who holds the LP decides whether the pool's tokens are actually locked.
+  // Slow-moving — liquidity events are rare — so this polls far less often
+  // than balances do.
+  const { data: lpBalances } = useSWR<LpBalance[]>(
+    !minting && lpAsset ? [lpAsset, "lp-balances"] : null,
+    () => fetchLpBalances(lpAsset!),
+    { revalidateOnFocus: false, refreshInterval: 300_000 },
+  );
   // Trades come over the room's shared socket when it's connected — one poll
   // per launch instead of one per viewer, and new fills simply appear. This
   // fetch is the fallback for a socket that never connected.
@@ -179,6 +196,7 @@ export function ActivityTabs({
    *  for. Marked unmistakably in the row itself, because a fabricated entry in
    *  a list of on-chain facts has to announce that it is one. */
   const POOL_ROW = "__pool__";
+  const POOL_ROW_UNLOCKED = "__pool_unlocked__";
   // Counterparty's balance endpoint is a live snapshot, not holder history.
   // Restore absent minters/traders at zero so the table can show who sold out,
   // while the tab/header/card counts above remain strictly current balances.
@@ -189,16 +207,29 @@ export function ActivityTabs({
       ...(trades ?? []).map((trade) => trade.addr),
     ],
   );
+  // Until the LP balances land, claim nothing: an unproven lock shows as the
+  // ordinary pool row rather than borrowing a guarantee it hasn't checked.
+  const poolSplit =
+    poolTokensRaw && big(poolTokensRaw) > 0n
+      ? splitPoolByLock(big(poolTokensRaw), lpBalances ?? [], [BURN_ADDRESS])
+      : { locked: 0n, unlocked: 0n };
   const holderRows: HolderRow[] =
     poolTokensRaw && big(poolTokensRaw) > 0n
       ? [
           ...holderHistory,
-          { address: POOL_ROW, quantity: big(poolTokensRaw) },
+          ...(poolSplit.locked > 0n
+            ? [{ address: POOL_ROW, quantity: poolSplit.locked }]
+            : []),
+          ...(poolSplit.unlocked > 0n
+            ? [{ address: POOL_ROW_UNLOCKED, quantity: poolSplit.unlocked }]
+            : []),
         ].sort((a, b) => compareRawDesc(a.quantity, b.quantity))
       : holderHistory;
   const holderBalance = new Map(
     holderRows
-      .filter((row) => row.address !== POOL_ROW)
+      .filter(
+        (row) => row.address !== POOL_ROW && row.address !== POOL_ROW_UNLOCKED,
+      )
       .map((row) => [row.address, row.quantity]),
   );
   // Shares are of circulating PLUS the locked pool, which is what makes them
@@ -615,6 +646,7 @@ export function ActivityTabs({
               {holderRows.slice(from, from + PER_PAGE).map((h, i) => {
                 const pct = ratio(h.quantity, holderTotal) * 100;
                 const isPool = h.address === POOL_ROW;
+                const isUnlockedPool = h.address === POOL_ROW_UNLOCKED;
                 const isUtxo = h.address.startsWith("utxo:");
                 const soldOut = h.quantity === 0n;
                 const displayedQuantity = tokenQty(h.quantity, divisible);
@@ -636,15 +668,28 @@ export function ActivityTabs({
                       <span className="w-8 text-right text-xs text-gray-400">
                         {from + i + 1}
                       </span>
-                      {isPool ? (
+                      {isPool || isUnlockedPool ? (
                         <>
-                          <span aria-hidden className="text-sm">🔒</span>
+                          {/* The caption follows the LP, not the pool. Liquidity
+                              whose LP is burned can never be withdrawn; liquidity
+                              whose LP someone still holds can leave at any block,
+                              and calling that "locked" would be the most
+                              misleading thing this table could print. */}
+                          <span aria-hidden className="text-sm">
+                            {isPool ? "🔒" : "🔓"}
+                          </span>
                           <span className="font-sans font-medium text-gray-900">
-                            Locked pool
+                            {isPool ? "Locked pool" : "Unlocked pool"}
                           </span>
-                          <span className="shrink-0 rounded-full border border-green-200 bg-green-50 px-1.5 py-px text-[10px] font-medium text-green-700">
-                            LP burned
-                          </span>
+                          {isPool ? (
+                            <span className="shrink-0 rounded-full border border-green-200 bg-green-50 px-1.5 py-px text-[10px] font-medium text-green-700">
+                              LP burned
+                            </span>
+                          ) : (
+                            <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
+                              withdrawable
+                            </span>
+                          )}
                         </>
                       ) : (
                         <>

@@ -4,6 +4,7 @@ import {
   coalesceHolderBalances,
   currentHolderCount,
   type AssetBalanceLocation,
+  type LpBalance,
 } from "@/lib/holders";
 import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
@@ -140,6 +141,26 @@ export async function fetchHolderBalances(
     revalidate,
   );
   return coalesceHolderBalances(rows);
+}
+
+/**
+ * Raw LP-token balance locations, uncoalesced.
+ *
+ * The pool row in the holders table needs to know how much of the liquidity
+ * behind it is BURNED rather than merely deposited, and that is a property of
+ * who holds the LP token — not of the pool's own reserves. Uncoalesced because
+ * the split only cares about per-location addresses, and coalescing would fold
+ * UTXO-attached rows into a synthetic key that is not an address.
+ */
+export async function fetchLpBalances(
+  lpAsset: string,
+  revalidate = 300,
+): Promise<LpBalance[]> {
+  const rows = await pageAll<AssetBalanceLocation>(
+    `/assets/${encodeURIComponent(lpAsset)}/balances`,
+    revalidate,
+  );
+  return rows.map((row) => ({ address: row.address, quantity: row.quantity }));
 }
 
 /**
