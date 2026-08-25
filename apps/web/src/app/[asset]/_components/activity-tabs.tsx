@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import useSWR from "swr";
 import {
   fetchHolderBalances,
@@ -14,7 +14,6 @@ import {
   commasRaw,
   compact,
   fixedRaw,
-  price as formatPrice,
   shortAddress,
   tokenQty,
 } from "@/lib/format";
@@ -260,9 +259,16 @@ export function ActivityTabs({
   });
   const bids = book.filter((r) => r.isBuy).sort((a, b) => b.price - a.price);
   const asks = book.filter((r) => !r.isBuy).sort((a, b) => a.price - b.price);
-  // Asks descend toward the spread and bids fall away from it, so the two best
-  // prices meet in the middle — the way a book is read.
+  // Asks descend toward the spread and bids fall away from it, so the two rows
+  // that touch in the middle are the LOWEST ask and the HIGHEST bid. That
+  // adjacency is the whole point of the layout: those two numbers are the
+  // spread, and any other ordering puts a pair next to each other that means
+  // nothing together.
   const ordered = [...asks].reverse().concat(bids);
+  // Where the sides meet, so the boundary can be drawn rather than inferred.
+  const spreadAt = asks.length;
+  const bestAsk = asks[0]?.price ?? null;
+  const bestBid = bids[0]?.price ?? null;
   const busy = isBusy(compose.status);
 
   // Pending mints for this launch, from the page's shared room — the same
@@ -798,11 +804,36 @@ export function ActivityTabs({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {ordered.slice(from, from + PER_PAGE).map(({ o, isBuy, tokens, xcp, price }) => {
+                  {ordered.slice(from, from + PER_PAGE).map(({ o, isBuy, tokens, xcp, price }, i) => {
                     const mine = address ? o.source === address : false;
                     const filled = 1 - ratio(o.give_remaining, o.give_quantity);
+                    // The gap between the two sides, drawn where they meet — but
+                    // only when this page actually contains the boundary, and
+                    // only when both sides exist to have a gap between them.
+                    const boundary =
+                      from + i === spreadAt && bestAsk !== null && bestBid !== null;
                     return (
-                      <tr key={o.tx_hash} className={mine ? "bg-purple-50/60" : undefined}>
+                      <Fragment key={o.tx_hash}>
+                      {boundary && (
+                        <tr className="bg-gray-50/80">
+                          <td colSpan={6} className="px-4 py-1.5 text-center text-[11px] text-gray-500">
+                            spread{" "}
+                            <span className="tabular-nums text-gray-700">
+                              {(bestBid / (divisible ? 1 : 1e8)).toFixed(8)}
+                            </span>{" "}
+                            →{" "}
+                            <span className="tabular-nums text-gray-700">
+                              {(bestAsk / (divisible ? 1 : 1e8)).toFixed(8)}
+                            </span>
+                            {bestBid > 0 && (
+                              <span className="ml-1.5 text-gray-400">
+                                ({(bestAsk / bestBid).toFixed(2)}× apart)
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                      <tr className={mine ? "bg-purple-50/60" : undefined}>
                         <td className={`whitespace-nowrap px-4 py-2 font-medium ${isBuy ? "text-green-700" : "text-red-600"}`}>
                           {isBuy ? "↗ Buy" : "↘ Sell"}
                         </td>
@@ -858,6 +889,7 @@ export function ActivityTabs({
                           )}
                         </td>
                       </tr>
+                      </Fragment>
                     );
                   })}
                 </tbody>
