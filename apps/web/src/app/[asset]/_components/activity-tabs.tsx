@@ -255,20 +255,78 @@ export function ActivityTabs({
     const isBuy = o.get_asset === asset;
     const tokens = isBuy ? o.get_remaining : o.give_remaining;
     const xcp = isBuy ? o.give_remaining : o.get_remaining;
-    return { o, isBuy, tokens, xcp, price: ratio(xcp, tokens) };
+    return {
+      o,
+      isBuy,
+      price: ratio(xcp, tokens),
+      amountText: compact(tokenQty(tokens, divisible)),
+      xcpText: fixedRaw(xcp),
+    };
   });
   const bids = book.filter((r) => r.isBuy).sort((a, b) => b.price - a.price);
   const asks = book.filter((r) => !r.isBuy).sort((a, b) => a.price - b.price);
+  /**
+   * The pool, quoted as the two prices it actually offers.
+   *
+   * A constant-product pool is not one price. It is a bid and an ask, and the
+   * gap between them is the fee: you buy at spot/(1-f) and sell at spot*(1-f),
+   * which for a 0.5% fee is a built-in 1.008% spread before size is considered
+   * at all. Showing the midpoint — as every "pool price" on this site does —
+   * quotes a number nobody can actually trade at, in either direction.
+   *
+   * AMOUNT is the honest part to get right. A limit order offers a fixed
+   * quantity; a pool never runs out but gets worse continuously, so "how much
+   * is available" is only answerable against a price bound. These rows offer
+   * what can be traded within 1% of the quote, which is the same shape of claim
+   * a limit order makes and therefore directly comparable to the rows around
+   * it. For constant product that is tok*(1 - 1/sqrt(1+b)) to buy and
+   * tok*(1/sqrt(1-b) - 1) to sell.
+   *
+   * They sort into the book by price rather than sitting above or below it,
+   * because that is the order execution actually takes: best price first,
+   * whichever venue holds it. On CAPTAINDAN the pool's ask lands INSIDE the
+   * limit book, which is exactly what happened when a real 2,000 XCP order
+   * filled pool -> book -> pool across three prices in one block.
+   */
+  const POOL_FEE = 0.005;
+  const POOL_BAND = 0.01;
+  const poolTok = Number(big(poolTokensRaw ?? 0)) / 1e8;
+  const poolXcp = Number(big(poolXcpRaw ?? 0)) / 1e8;
+  const poolSpot = poolTok > 0 ? poolXcp / poolTok : 0;
+  const poolRows =
+    poolSpot > 0
+      ? [
+          {
+            o: null,
+            isPool: true as const,
+            isBuy: false,
+            price: poolSpot / (1 - POOL_FEE),
+            amountText: compact(poolTok * (1 - 1 / Math.sqrt(1 + POOL_BAND))),
+            xcpText: (poolXcp * (Math.sqrt(1 + POOL_BAND) - 1)).toFixed(8),
+          },
+          {
+            o: null,
+            isPool: true as const,
+            isBuy: true,
+            price: poolSpot * (1 - POOL_FEE),
+            amountText: compact(poolTok * (1 / Math.sqrt(1 - POOL_BAND) - 1)),
+            xcpText: (poolXcp * (1 - Math.sqrt(1 - POOL_BAND))).toFixed(8),
+          },
+        ]
+      : [];
+  const allAsks = [...asks, ...poolRows.filter((r) => !r.isBuy)].sort((a, b) => a.price - b.price);
+  const allBids = [...bids, ...poolRows.filter((r) => r.isBuy)].sort((a, b) => b.price - a.price);
   // Asks descend toward the spread and bids fall away from it, so the two rows
   // that touch in the middle are the LOWEST ask and the HIGHEST bid. That
   // adjacency is the whole point of the layout: those two numbers are the
   // spread, and any other ordering puts a pair next to each other that means
   // nothing together.
-  const ordered = [...asks].reverse().concat(bids);
-  // Where the sides meet, so the boundary can be drawn rather than inferred.
-  const spreadAt = asks.length;
-  const bestAsk = asks[0]?.price ?? null;
-  const bestBid = bids[0]?.price ?? null;
+  const ordered = [...allAsks].reverse().concat(allBids);
+  const spreadAt = allAsks.length;
+  // The market's real spread, not the limit book's. Quoting book-only made
+  // CAPTAINDAN read "12.05x apart" while the pool was quoting 1% around spot.
+  const bestAsk = allAsks[0]?.price ?? null;
+  const bestBid = allBids[0]?.price ?? null;
   const busy = isBusy(compose.status);
 
   // Pending mints for this launch, from the page's shared room — the same
@@ -804,16 +862,19 @@ export function ActivityTabs({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {ordered.slice(from, from + PER_PAGE).map(({ o, isBuy, tokens, xcp, price }, i) => {
-                    const mine = address ? o.source === address : false;
-                    const filled = 1 - ratio(o.give_remaining, o.give_quantity);
+                  {ordered.slice(from, from + PER_PAGE).map((row, i) => {
+                    const { isBuy, price, amountText, xcpText } = row;
+                    const pool = "isPool" in row;
+                    const o = row.o;
+                    const mine = o && address ? o!.source === address : false;
+                    const filled = o ? 1 - ratio(o!.give_remaining, o!.give_quantity) : 0;
                     // The gap between the two sides, drawn where they meet — but
                     // only when this page actually contains the boundary, and
                     // only when both sides exist to have a gap between them.
                     const boundary =
                       from + i === spreadAt && bestAsk !== null && bestBid !== null;
                     return (
-                      <Fragment key={o.tx_hash}>
+                      <Fragment key={o ? o.tx_hash : `pool-${isBuy ? "bid" : "ask"}`}>
                       {boundary && (
                         <tr className="bg-gray-50/80">
                           <td colSpan={6} className="px-4 py-1.5 text-center text-[11px] text-gray-500">
@@ -833,33 +894,42 @@ export function ActivityTabs({
                           </td>
                         </tr>
                       )}
-                      <tr className={mine ? "bg-purple-50/60" : undefined}>
-                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${isBuy ? "text-green-700" : "text-red-600"}`}>
-                          {isBuy ? "↗ Buy" : "↘ Sell"}
+                      <tr className={mine ? "bg-purple-50/60" : pool ? "bg-blue-50/40" : undefined}>
+                        {/* Bid and Ask, not Buy and Sell: a trade is a buy or a
+                            sell because it happened, a resting order is only an
+                            intent. The pool is neither side's intent — it is a
+                            standing counterparty to both — so it says so. */}
+                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${pool ? "text-blue-700" : isBuy ? "text-green-700" : "text-red-600"}`}>
+                          {pool ? "◆ Pool" : isBuy ? "↗ Bid" : "↘ Ask"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
                           {(price / (divisible ? 1 : 1e8)).toFixed(8)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
-                          {compact(tokenQty(tokens, divisible))}
+                          {amountText}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
-                          {fixedRaw(xcp)}
+                          {xcpText}
                         </td>
                         <td className="px-3 py-2">
+                          {pool ? (
+                            <span className="whitespace-nowrap text-xs text-gray-500">
+                              constant-product pool · 0.5% fee
+                            </span>
+                          ) : (
                           <span className="flex items-center gap-1.5 whitespace-nowrap">
                             <LaunchpadAddressHoverCard
-                              source={o.source}
+                              source={o!.source}
                               asset={asset}
-                              balanceRaw={holderBalance.get(o.source)}
+                              balanceRaw={holderBalance.get(o!.source)}
                               poolXcpRaw={poolXcpRaw}
                               poolTokenRaw={poolTokensRaw}
                               className="flex items-center gap-1.5 font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline"
                             >
-                              <Identicon address={o.source} />
-                              {shortAddress(o.source)}
+                              <Identicon address={o!.source} />
+                              {shortAddress(o!.source)}
                             </LaunchpadAddressHoverCard>
-                            {issuerSource === o.source && (
+                            {issuerSource === o!.source && (
                               <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
                                 dev
                               </span>
@@ -870,13 +940,18 @@ export function ActivityTabs({
                               </span>
                             )}
                           </span>
+                          )}
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
-                          {mine ? (
+                          {pool ? (
+                            <span title="A pool never runs out, it only gets worse. This is what it can absorb before its price moves 1%.">
+                              within 1%
+                            </span>
+                          ) : mine ? (
                             <button
                               type="button"
                               disabled={busy}
-                              onClick={() => compose.composeCancel({ offer_hash: o.tx_hash })}
+                              onClick={() => compose.composeCancel({ offer_hash: o!.tx_hash })}
                               className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
                             >
                               {busy ? "…" : "Cancel"}
@@ -884,7 +959,7 @@ export function ActivityTabs({
                           ) : (
                             <>
                               {(filled * 100).toFixed(0)}% ·{" "}
-                              {o.expire_index === null ? "GTC" : commas(o.expire_index)}
+                              {o!.expire_index === null ? "GTC" : commas(o!.expire_index)}
                             </>
                           )}
                         </td>
