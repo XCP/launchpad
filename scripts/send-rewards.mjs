@@ -442,4 +442,4 @@ for (const row of queue) {
   }
 }
 
-console.log(`\n${sent} sent, ${failed} failed, ${rows.filter((r) => r.status !== "SENT").length} still to do`);
+console.log(`\n${sent} sent, ${failed} failed, ${rows.filter((r) => r.status === "").length} still to send, ${rows.filter((r) => r.status === "PENDING").length} awaiting confirmation`);
