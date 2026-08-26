@@ -2,7 +2,7 @@
  * The only module in this worker allowed to call the Counterparty API. The
  * poller reads through here; every read route answers from D1.
  */
-import { parseJsonLossless } from "@launchpad/xcp69/numeric";
+import { parseJsonLossless, rawEquals, SATS_PER_UNIT } from "@launchpad/xcp69/numeric";
 import type { MempoolMint, MempoolOrder } from "@launchpad/xcp69/mempool";
 import type { CounterpartyEvent } from "@launchpad/xcp69/trades";
 
@@ -382,6 +382,35 @@ export async function fetchPool(asset: string): Promise<CpPool | null> {
     return data.result ?? null;
   } catch {
     return null;
+  }
+}
+
+export interface CpDispenser {
+  give_quantity: number | string;
+  give_remaining: number | string;
+  satoshirate: number | string;
+}
+
+/**
+ * Open XCP dispensers, cheapest first — the book the project marks XCP at.
+ *
+ * Mirrors the web app's `fetchXcpDispensers` deliberately: the same filters
+ * (no oracle-priced rows, 1 XCP per vend) so the alert quotes the same ask the
+ * site prints. One page is enough because only the head of the book is ever
+ * read; the standing pagination rule is about exhausting a listing you intend
+ * to index, and this indexes nothing.
+ */
+export async function fetchXcpDispensers(): Promise<CpDispenser[]> {
+  try {
+    const data: { result: CpDispenser[] } = await get(
+      `/assets/XCP/dispensers?status=open&exclude_with_oracle=true&sort=price:asc&limit=100`,
+    );
+    // rawEquals, not `=== 1e8`: give_quantity arrives as a raw integer that
+    // may have come through parseJsonLossless as a string, and coercing money
+    // to a double to compare it is the one thing this repo does not do.
+    return (data.result ?? []).filter((d) => rawEquals(d.give_quantity, SATS_PER_UNIT));
+  } catch {
+    return [];
   }
 }
 

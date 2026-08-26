@@ -2,6 +2,7 @@
 
 import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
+import { bestAskSats, perXcpSats } from "@launchpad/xcp69/dispenser-price";
 import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
 import { ConnectButton } from "@/components/connect-button";
@@ -16,7 +17,6 @@ import { commas, commasRaw, satsPerVb, shortAddress, usd as usdFmt } from "@/lib
 import {
   approx,
   big,
-  minRaw,
   parseUnitsToRaw,
   percentOf,
   SATS,
@@ -59,50 +59,6 @@ async function fetchBusyDispensers(): Promise<Set<string>> {
   return new Set(
     events.map((e) => e.params?.source).filter((s): s is string => Boolean(s)),
   );
-}
-
-/**
- * The cheapest price anyone can actually deal at, in sats per XCP.
- *
- * The reference for both sides of this form. The USD market rate is not: the
- * dispenser book trades well above spot — roughly $2.25 against a $1.50 market
- * as this was written — so measuring against it told a buyer they were paying
- * a 50% premium for the cheapest XCP available, and told a seller their most
- * competitive possible ask was a premium too. A number that reports the same
- * verdict at every price a user could pick is not informing the decision, and
- * it made the Floor button and the line beneath it describe one price in
- * opposite terms.
- *
- * Computed with Math.min rather than taken from the head of the list. The feed
- * arrives sorted price-ascending, but a rule that leans on someone else's sort
- * breaks silently the day it changes, and this one decides what a user is
- * shown and what a button sets. Empty dispensers are excluded — one that
- * cannot take a sale is not competition, and cannot be undercut.
- *
- * Null when there is nothing open, which is the honest answer: with no book
- * there is no floor, and every caller hides its comparison rather than
- * inventing one.
- */
-/**
- * Sats per whole XCP for one dispenser, derived from the two raw integers it
- * is actually defined by rather than from the API's pre-divided `price`.
- *
- * `satoshirate` is what a vend costs and `give_quantity` is what it gives, so
- * this is the quotient of two exact quantities. Taking `price` instead would
- * mean accepting a division someone else already did in a double, and then
- * rounding it again here.
- */
-function perXcpSats(r: Dispenser): bigint {
-  const give = big(r.give_quantity);
-  if (give <= 0n) return 0n;
-  return (big(r.satoshirate) * SATS_PER_UNIT) / give;
-}
-
-function floorPrice(rows: Dispenser[]): number | null {
-  const live = rows.filter((r) => big(r.give_remaining) > 0n && perXcpSats(r) > 0n);
-  if (live.length === 0) return null;
-  const cheapest = live.reduce((lo, r) => minRaw(lo, perXcpSats(r)), perXcpSats(live[0]));
-  return approx(cheapest);
 }
 
 /**
@@ -444,7 +400,7 @@ function LoadCard({
   // the buyer did — a warning label on the page rather than a fact about
   // this order. `open` and not `dispensers`: a dispenser with a pending
   // mempool trigger is not routable, so it is not this route's floor either.
-  const floorSats = floorPrice(open);
+  const floorSats = bestAskSats(open);
   const vsFloor =
     floorSats !== null && blendedSatsPerXcp > 0
       ? (blendedSatsPerXcp / floorSats - 1) * 100
@@ -851,7 +807,7 @@ function UnloadCard({
   // against; `undercutSats` is what the buttons SET — one satoshi below it, by
   // the smallest unit that exists, so this dispenser vends first. Clamped at
   // 1: a book already at a satoshi cannot be undercut, and zero is not a price.
-  const floorSats = floorPrice(dispensers);
+  const floorSats = bestAskSats(dispensers);
   const undercutSats = floorSats === null ? null : Math.max(1, floorSats - 1);
 
   // A price field in sats is a whole number of satoshi, so it parses as an

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { fetchXcpUsd } from "@/lib/api/price";
+
 /**
  * Daily XCP/USD, last N days.
  *
@@ -12,6 +14,12 @@ import { NextResponse } from "next/server";
  * backfilled to 2014), but its /v2/price page ships ~500 KB to say so. This
  * fetches it once per revalidate window, server-side, and hands clients only
  * the days a chart can actually show.
+ *
+ * History stays on the explorer because nothing else has a past: the dispenser
+ * book the site now marks XCP at (see `@/lib/api/price`) is a snapshot of open
+ * asks, not a series. Only the LAST point is replaced — a chart whose tip
+ * disagreed by a third with the figure printed beside it on the same page
+ * would read as one of the two being broken.
  */
 const UPSTREAM = "https://api.xcp.io/v2/price";
 const MAX_DAYS = 400;
@@ -42,12 +50,21 @@ export async function GET(request: Request) {
       .map((r) => ({ day: r.day, usd: r.usd }))
       .filter((r) => typeof r.usd === "number" && r.usd > 0);
 
-    // The current day may not be in the calendar yet; the ticker's own latest
-    // reading is the right value for today rather than yesterday's close.
+    // Today. The calendar may not carry it yet, and where it does the close it
+    // holds is the explorer's mark, not the site's — so the sitewide spot wins
+    // either way, and the explorer's own latest reading only stands in when the
+    // book could not price. The DAY comes from the explorer either way: it owns
+    // the calendar these rows are keyed by, and guessing it here would put the
+    // tip on the wrong side of a UTC boundary.
     const latest = data.result?.xcp;
-    if (latest?.day && typeof latest.usd === "number" && latest.usd > 0) {
-      if (tail[tail.length - 1]?.day !== latest.day) {
-        tail.push({ day: latest.day, usd: latest.usd });
+    const spot = await fetchXcpUsd();
+    const today =
+      spot ?? (typeof latest?.usd === "number" && latest.usd > 0 ? latest.usd : null);
+    if (latest?.day && today) {
+      if (tail[tail.length - 1]?.day === latest.day) {
+        tail[tail.length - 1] = { day: latest.day, usd: today };
+      } else {
+        tail.push({ day: latest.day, usd: today });
       }
     }
 

@@ -8,6 +8,7 @@
     "./description": "./src/description.ts",
     "./numeric": "./src/numeric.ts",
     "./candles": "./src/candles.ts",
+    "./dispenser-price": "./src/dispenser-price.ts",
     "./mempool": "./src/mempool.ts",
     "./trades": "./src/trades.ts"
   }
