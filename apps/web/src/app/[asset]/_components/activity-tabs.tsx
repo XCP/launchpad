@@ -374,10 +374,6 @@ export function ActivityTabs({
       .sort((a, b) => compareRawDesc(a.earned, b.earned));
   })();
   const mintersTotal = sumRaw(minters.map((r) => r.earned));
-  const freshness = useAddressFreshness(
-    minting ? minters.map((r) => r.source) : [],
-    blockHeight ?? 0,
-  );
 
   // During the sale there is no market and no separate holder set — the
   // minters ARE the holders — so "who is in" and "what's still queued"
@@ -415,6 +411,21 @@ export function ActivityTabs({
   const totalPages = Math.max(1, Math.ceil(count / PER_PAGE));
   const page = Math.min(pageParam, totalPages);
   const from = (page - 1) * PER_PAGE;
+
+  // The addresses actually on screen, not the biggest 25 overall.
+  //
+  // This used to pass every minter, and the hook caps at 25 — which, with a page size of 25,
+  // meant precisely the first page was ever checked. Nobody ranked 26th or lower could be
+  // labelled, and the absence of the chip reads as "this address has history" when it really
+  // meant "we did not look". On a launch with two hundred minters that quietly presented a
+  // hundred and seventy-five of them as established.
+  //
+  // Following the page instead keeps the cost identical — one lookup per visible row, the same
+  // ceiling the cap was there to enforce — and makes the chip mean the same thing on every page.
+  const freshness = useAddressFreshness(
+    minting ? minters.slice(from, from + PER_PAGE).map((r) => r.source) : [],
+    blockHeight ?? 0,
+  );
 
   const pager = totalPages > 1 && (
     <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
