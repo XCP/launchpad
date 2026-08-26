@@ -74,9 +74,29 @@ export function readPendingServer(): PendingItem[] {
   return EMPTY;
 }
 
+/**
+ * The in-memory cache and the event are the parts that matter; the write is
+ * how the dock survives a reload.
+ *
+ * Guarded, because a throw here does not stay here. `registerPending` is
+ * called immediately after a successful broadcast, inside the per-leg
+ * try/catch in the dispense router — so a browser that refuses storage
+ * ("Access to storage is not allowed from this context", which extensions and
+ * partitioned contexts both produce) turned a transaction that IS on the
+ * network into a leg rendered as failed. The user is then invited to retry
+ * something that already went out.
+ *
+ * `load()` above has always been guarded; this was the one writer that was
+ * not. lib/wallet/spent-utxos.ts guards the same call for the same reason.
+ */
 function write(items: PendingItem[]) {
   cache = items;
-  localStorage.setItem(KEY, JSON.stringify(items));
+  try {
+    localStorage.setItem(KEY, JSON.stringify(items));
+  } catch {
+    // Private mode, blocked storage, or quota. The dock still updates from
+    // the cache above; it just will not survive a reload.
+  }
   window.dispatchEvent(new Event(EVENT));
 }
 
