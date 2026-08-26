@@ -7,3 +7,8 @@ next-env.d.ts
 .env*
 .wrangler/
 .DS_Store
+
+# Reward batch output: regenerate with scripts/reward-batch.mjs --cutoff N.
+# The manifest is the batch's evidence, but it is reproducible from the script
+# and the cutoff, and it is recorded in D1 once the batch is frozen.
+dist/

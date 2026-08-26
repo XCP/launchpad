@@ -73,10 +73,18 @@ export function MintPanel({
   const { data: alreadyMintedRaw } = useSWR(
     address ? ["mint-committed", asset, address] : null,
     async ([, ticker, addr]) => {
+      // Resolved here rather than passed in, so the allowance is measured
+      // against the same launch the panel is quoting.
+      const fm = (await fetchFairmintersByAsset(ticker)).find((f) => xcp69Params(f));
+      if (!fm) return null;
       const [confirmed, mempool] = await Promise.all([
-        fetchAddressFairmints(addr, ticker),
+        fetchAddressFairmints(addr, ticker, fm.tx_hash),
         fetchMempoolSnapshot(),
       ]);
+      // Unconfirmed mints carry no fairminter hash, but they do not need one:
+      // only an open fairminter accepts mints, and only one can be open for a
+      // ticker at a time, so a pending mint of this asset is a mint of this
+      // launch.
       const pending = (mempool?.mints ?? [])
         .filter((m) => m.source === addr && m.asset === ticker)
         .reduce((sum, m) => sum + big(m.earnQuantity), 0n);
@@ -86,18 +94,26 @@ export function MintPanel({
   );
 
   // Three ceilings, and the smallest wins: the standard's per-transaction cap,
-  // what is left of the sale, and what this address may still take. A missing
-  // read applies no clamp rather than a false one — the protocol enforces all
-  // three regardless, and guessing low here would block a legitimate mint.
+  // what is left of the sale, and what this address may still take.
+  //
+  // Undefined (not loaded, or the read failed) and null (no launch found) both
+  // mean "do not clamp". Failing open is deliberate: the protocol enforces the
+  // cap either way, so a wrong guess here can only cost a fee — while a wrong
+  // guess the other way silently refuses a mint someone is entitled to.
   const addressLots =
-    alreadyMintedRaw !== undefined ? remainingLotsForAddress(big(alreadyMintedRaw)) : MAX_LOTS;
+    alreadyMintedRaw !== undefined && alreadyMintedRaw !== null
+      ? remainingLotsForAddress(big(alreadyMintedRaw))
+      : MAX_LOTS;
   const maxLots = Math.min(
     MAX_LOTS,
     remainingLots !== undefined && remainingLots !== null ? remainingLots : MAX_LOTS,
     addressLots,
   );
-  /** True once this address has taken its full allowance for the launch. */
-  const addressCapped = alreadyMintedRaw !== undefined && addressLots === 0;
+  /** True once this address has taken its full allowance for the launch.
+   *  Requires a real answer -- an unread or failed allowance must not be
+   *  reported to the user as a limit they have hit. */
+  const addressCapped =
+    alreadyMintedRaw !== undefined && alreadyMintedRaw !== null && addressLots === 0;
 
   const typedTokens = parseFloat(tokens) || 0;
   const lots = Math.max(0, Math.min(maxLots, Math.floor(typedTokens / TOKENS_PER_LOT)));

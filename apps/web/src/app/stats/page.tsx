@@ -52,10 +52,10 @@ export default async function StatsPage() {
 
   const { counts, total, activity, daily, blocks_per_bucket } = stats;
   const settled = counts.graduated + counts.refunded;
-  const committedXcp = fromSats(activity.paid_xcp);
   const activeXcp = fromSats(activity.active_xcp);
   const poolXcp = fromSats(stats.markets?.pool_xcp ?? 0);
   const marketCapXcp = fromSats(stats.markets?.market_cap_xcp ?? 0);
+  const tradeXcp = fromSats(stats.markets?.trade_xcp ?? 0);
 
   // Fill the window so quiet days read as quiet rather than as missing. The
   // bucket is `block / 144`, so the newest bucket is the one the tip is in.
@@ -94,9 +94,9 @@ export default async function StatsPage() {
           phone with `order-*` and released back to source order at `sm`, where
           three-across already pairs them sensibly. On two columns the pairs
           are what matter: market cap beside the pools backing it, mints beside
-          the minters who made them, and the two escrow figures — money still
-          committed, money ever committed — side by side rather than split
-          across the whole grid. */}
+          the minters who made them, and the two money-in-motion figures — XCP
+          committed to open mints, XCP that has actually traded — side by side
+          rather than split across the whole grid. */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat
           className="order-1 sm:order-none"
@@ -115,9 +115,14 @@ export default async function StatsPage() {
         />
         <Stat
           className="order-6 sm:order-none"
-          label="Ever escrowed"
-          value={`${formatXcp(committedXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(committedXcp * xcpUsd)}` : "across all mint history"}
+          label="Trade volume"
+          // Trades only, deliberately, and not added to mint escrow. The two
+          // are not the same kind of number: escrowed XCP comes back on a
+          // refunded launch, so it was committed rather than transacted.
+          // This is XCP that actually changed hands, which is the harder
+          // number to produce and the one worth showing on its own.
+          value={`${formatXcp(tradeXcp)} XCP`}
+          hint={xcpUsd ? `≈ ${usd(tradeXcp * xcpUsd)} traded, all time` : "traded, all time"}
         />
         <Stat
           className="order-3 sm:order-none"

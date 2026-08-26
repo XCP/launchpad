@@ -641,6 +641,36 @@ export function activityTotals(db: D1Database): Promise<ActivityTotals[]> {
   );
 }
 
+/**
+ * XCP that has actually changed hands on XCP-69 assets, in raw satoshi.
+ *
+ * `primary_actor = 1` is load-bearing. An order match writes TWO rows -- one
+ * per side -- because the table exists to reconstruct both addresses'
+ * histories. Summing all of them would report every book trade twice. The
+ * taker's row is the one flagged as primary, and it is also the one that
+ * caused the fill, so counting only those counts each trade exactly once. A
+ * taker crossing the pool and then the book produces several primary rows,
+ * which is correct: that is several fills.
+ *
+ * Absolute value because a delta is signed by direction. A buy and a sell of
+ * the same size are the same volume, and netting them to zero would report a
+ * busy market as a dead one.
+ *
+ * A full pass over asset_events, which has one index and not this one. That is
+ * affordable at the current scale -- a few hundred rows -- and this sits
+ * behind the same cache as the rest of /v2/stats. If the table reaches the
+ * size where getMintTotals needed a rollup (see migration 0010), this needs
+ * the same treatment rather than a bigger scan.
+ */
+export function tradeVolumeXcp(db: D1Database): Promise<{ trade_xcp: number }[]> {
+  return q<{ trade_xcp: number }>(
+    db,
+    `SELECT CAST(COALESCE(SUM(ABS(CAST(xcp_delta AS INTEGER))), 0) AS INTEGER) AS trade_xcp
+       FROM asset_events
+      WHERE primary_actor = 1`,
+  );
+}
+
 export interface MintBucket {
   bucket: number;
   n: number;

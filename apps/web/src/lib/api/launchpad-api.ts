@@ -677,6 +677,8 @@ export interface LaunchStats {
     pool_xcp: number;
     /** Current combined graduated market cap, in XCP satoshi. */
     market_cap_xcp: number;
+    /** XCP satoshi that has changed hands trading XCP-69 assets, ever. */
+    trade_xcp?: number;
   };
   /** Mints per ~144-block bucket; `bucket` is `block_index / 144`. */
   daily: { bucket: number; n: number; minters: number }[];

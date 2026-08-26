@@ -22,6 +22,7 @@ import {
   listMinters,
   listSearchIndex,
   sumFees,
+  tradeVolumeXcp,
 } from "#api/queries/launches";
 import { J, router } from "#api/read/respond";
 import { getRewardAccount, listRewardBatches } from "#api/queries/rewards";
@@ -125,12 +126,13 @@ launchesRoute.get("/v2/stats", async (c) => {
   const height = Number(c.req.query("height") ?? 0) || 0;
   const since = height > 0 ? Math.max(0, height - ACTIVITY_BUCKETS * BLOCKS_PER_DAY) : 0;
   const sinceBucket = Math.floor(since / BLOCKS_PER_DAY);
-  const [rows, totals, buckets, refundBuckets] = await Promise.all([
+  const [rows, totals, buckets, refundBuckets, tradeVolume] = await Promise.all([
     countByPhase(c.env.DB),
     getMintTotals(c.env.DB),
     // Whole buckets, so the window is expressed in the unit the rollup stores.
     listMintBuckets(c.env.DB, sinceBucket),
     refundsByBucket(c.env.DB, sinceBucket),
+    tradeVolumeXcp(c.env.DB),
   ]);
   const counts: Record<string, number> = {
     scheduled: 0,
@@ -145,6 +147,7 @@ launchesRoute.get("/v2/stats", async (c) => {
   const markets = {
     pool_xcp: graduated?.pool_xcp ?? 0,
     market_cap_xcp: graduated?.market_cap_xcp ?? 0,
+    trade_xcp: tradeVolume[0]?.trade_xcp ?? 0,
   };
   const activity = totals
     ? { ...totals, active_xcp: activeXcp }
