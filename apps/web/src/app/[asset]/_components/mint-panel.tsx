@@ -11,6 +11,8 @@ import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
+import { fetchAddressFairmints } from "@/lib/client";
+import { fetchMempoolSnapshot } from "@/lib/api/launchpad-api";
 import { commas, commasRaw, satsPerVb, usd as usdFmt } from "@/lib/format";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
@@ -19,7 +21,7 @@ import { useSpendableBalance } from "@/hooks/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { saleTarget, xcp69Params, XCP69 } from "@/lib/xcp69";
+import { remainingLotsForAddress, saleTarget, xcp69Params, XCP69 } from "@/lib/xcp69";
 
 const SATS = 1e8;
 const MINT_VBYTES = 250;
@@ -59,10 +61,43 @@ export function MintPanel({
     },
     { refreshInterval: 20_000, revalidateOnFocus: false },
   );
-  const maxLots =
-    remainingLots !== undefined && remainingLots !== null
-      ? Math.min(MAX_LOTS, remainingLots)
-      : MAX_LOTS;
+  // What this address has already committed to THIS launch, confirmed and
+  // pending, which is what the per-address cap is measured against.
+  //
+  // Both halves are needed and the pending half is the one that bites. Core
+  // validates a fairmint against the ledger, and the mempool is not the
+  // ledger — so a second mint from an address that already has one in flight
+  // reports `status: valid` right up until it confirms, and is then recorded
+  // invalid. No XCP moves on that path, but the Bitcoin fee is spent and the
+  // failure shows up minutes later with nothing attached to explain it.
+  const { data: alreadyMintedRaw } = useSWR(
+    address ? ["mint-committed", asset, address] : null,
+    async ([, ticker, addr]) => {
+      const [confirmed, mempool] = await Promise.all([
+        fetchAddressFairmints(addr, ticker),
+        fetchMempoolSnapshot(),
+      ]);
+      const pending = (mempool?.mints ?? [])
+        .filter((m) => m.source === addr && m.asset === ticker)
+        .reduce((sum, m) => sum + big(m.earnQuantity), 0n);
+      return (confirmed + pending).toString();
+    },
+    { refreshInterval: 20_000, revalidateOnFocus: true },
+  );
+
+  // Three ceilings, and the smallest wins: the standard's per-transaction cap,
+  // what is left of the sale, and what this address may still take. A missing
+  // read applies no clamp rather than a false one — the protocol enforces all
+  // three regardless, and guessing low here would block a legitimate mint.
+  const addressLots =
+    alreadyMintedRaw !== undefined ? remainingLotsForAddress(big(alreadyMintedRaw)) : MAX_LOTS;
+  const maxLots = Math.min(
+    MAX_LOTS,
+    remainingLots !== undefined && remainingLots !== null ? remainingLots : MAX_LOTS,
+    addressLots,
+  );
+  /** True once this address has taken its full allowance for the launch. */
+  const addressCapped = alreadyMintedRaw !== undefined && addressLots === 0;
 
   const typedTokens = parseFloat(tokens) || 0;
   const lots = Math.max(0, Math.min(maxLots, Math.floor(typedTokens / TOKENS_PER_LOT)));
@@ -121,7 +156,9 @@ export function MintPanel({
       : compose.status === "signing"
         ? "Confirm in wallet…"
         : "Broadcasting…"
-    : lots === 0
+    : addressCapped
+      ? "Address limit reached"
+      : lots === 0
       ? "Enter an amount"
       : xcpBalance === undefined
         ? balanceError
@@ -165,6 +202,13 @@ export function MintPanel({
                   {" "}
                   · adjusts to {commas(mintTokens)}
                 </span>
+              )}
+              {/* Said plainly, because the alternative is a transaction that
+                  looks fine, costs a Bitcoin fee, and is rejected minutes
+                  later with nothing to explain why. Counts pending mints, so
+                  it reads the same before and after a mint confirms. */}
+              {addressCapped && (
+                <span className="text-amber-600"> · you have minted this launch&rsquo;s max</span>
               )}
             </span>
             <span>

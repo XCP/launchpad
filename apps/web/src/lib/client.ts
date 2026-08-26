@@ -48,6 +48,33 @@ export async function fetchBalance(
   return sumRaw(rows.filter((r) => !r.utxo).map((r) => r.quantity));
 }
 
+/**
+ * Raw token units this address has already minted from one launch, confirmed.
+ *
+ * Only `valid` rows count. The endpoint returns invalid fairmints too — an
+ * address that has already tripped the per-address cap has one on file — and
+ * counting those would subtract an allowance that was never actually spent,
+ * locking someone out of a mint they are entitled to on the strength of one
+ * that never happened.
+ *
+ * Pairs with the mempool half in the mint panel: this is what the ledger
+ * knows, and the ledger is precisely what has not seen an unconfirmed mint.
+ */
+export async function fetchAddressFairmints(
+  address: string,
+  asset: string,
+): Promise<bigint> {
+  const data = await fetchJson(
+    `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/fairmints/${encodeURIComponent(asset)}`,
+  );
+  const rows: { earn_quantity?: Raw; status?: string }[] = Array.isArray(data.result)
+    ? data.result
+    : [];
+  return sumRaw(
+    rows.filter((r) => r.status === "valid").map((r) => r.earn_quantity ?? ("0" as Raw)),
+  );
+}
+
 export interface PendingAssetDebit {
   quantity: bigint;
   txids: Set<string>;

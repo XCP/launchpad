@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  remainingLotsForAddress,
   announcedBeforeStart,
   isXcp69,
   launchPhase,
@@ -222,5 +223,40 @@ describe("saleProgress / saleTarget", () => {
 
   it("falls back to the hard cap when there is no soft cap", () => {
     expect(saleTarget(conforming({ soft_cap: "0" }))).toBe(String(XCP69_EXACT.HARD_CAP));
+  });
+});
+
+describe("remainingLotsForAddress", () => {
+  const CAP = Number(XCP69_EXACT.MAX_MINT_PER_ADDRESS / XCP69_EXACT.QUANTITY_BY_PRICE);
+
+  it("offers the whole allowance to an address that has not minted", () => {
+    expect(remainingLotsForAddress(0n)).toBe(CAP);
+  });
+
+  it("subtracts what has already been committed", () => {
+    // Half the cap taken leaves half of it available.
+    expect(remainingLotsForAddress(XCP69_EXACT.MAX_MINT_PER_ADDRESS / 2n)).toBe(CAP / 2);
+  });
+
+  it("offers nothing once the cap is reached", () => {
+    // The case this exists for. Under this standard max_mint_per_tx equals
+    // max_mint_per_address, so a second full mint looks identical to a legal
+    // first one and core only rejects it at confirmation -- after the fee.
+    expect(remainingLotsForAddress(XCP69_EXACT.MAX_MINT_PER_ADDRESS)).toBe(0);
+  });
+
+  it("clamps rather than going negative past the cap", () => {
+    // Reachable: two mints can sit in the mempool together, each valid
+    // against a ledger that has seen neither, summing to twice the cap. A
+    // negative here would become a negative lot count and a nonsense quote.
+    expect(remainingLotsForAddress(XCP69_EXACT.MAX_MINT_PER_ADDRESS * 2n)).toBe(0);
+  });
+
+  it("never offers a partial lot", () => {
+    // Mints are whole 1,000-token lots; core rejects a quantity that is not a
+    // multiple of quantity_by_price, so rounding up here would compose a
+    // transaction guaranteed to fail.
+    const oneLot = XCP69_EXACT.QUANTITY_BY_PRICE;
+    expect(remainingLotsForAddress(XCP69_EXACT.MAX_MINT_PER_ADDRESS - oneLot - 1n)).toBe(1);
   });
 });

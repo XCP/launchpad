@@ -90,25 +90,49 @@ export default async function StatsPage() {
         </p>
       </div>
 
+      {/* Two columns on a phone, three above it. The tiles are ordered for the
+          phone with `order-*` and released back to source order at `sm`, where
+          three-across already pairs them sensibly. On two columns the pairs
+          are what matter: market cap beside the pools backing it, mints beside
+          the minters who made them, and the two escrow figures — money still
+          committed, money ever committed — side by side rather than split
+          across the whole grid. */}
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <Stat
+          className="order-1 sm:order-none"
           label="Market cap"
           value={`${formatXcp(marketCapXcp)} XCP`}
           hint={xcpUsd ? `≈ ${usd(marketCapXcp * xcpUsd)} · graduated coins` : "graduated coins"}
         />
         <Stat
+          className="order-2 sm:order-none"
           label="XCP in pools"
+          // Not "locked pools": a graduated launch burns its LP, but the number
+          // also carries pools whose liquidity is not locked, and calling all
+          // of it locked promised something this figure cannot back.
           value={`${formatXcp(poolXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(poolXcp * xcpUsd)} in locked pools` : "in locked pools"}
+          hint={xcpUsd ? `≈ ${usd(poolXcp * xcpUsd)} in pools` : "in pools"}
         />
         <Stat
+          className="order-6 sm:order-none"
           label="Ever escrowed"
           value={`${formatXcp(committedXcp)} XCP`}
           hint={xcpUsd ? `≈ ${usd(committedXcp * xcpUsd)}` : "across all mint history"}
         />
-        <Stat label="Mints" value={commas(activity.mints)} hint="mint transactions" />
-        <Stat label="Minters" value={commas(activity.minters)} hint="distinct addresses" />
         <Stat
+          className="order-3 sm:order-none"
+          label="Mints"
+          value={commas(activity.mints)}
+          hint="mint transactions"
+        />
+        <Stat
+          className="order-4 sm:order-none"
+          label="Minters"
+          value={commas(activity.minters)}
+          hint="distinct addresses"
+        />
+        <Stat
+          className="order-5 sm:order-none"
           label="Active escrow"
           value={`${formatXcp(activeXcp)} XCP`}
           hint={
@@ -238,9 +262,21 @@ export default async function StatsPage() {
   );
 }
 
-function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  className = "",
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  /** Ordering only. Two columns read as three rows of pairs, and the pairs
+   *  that belong together are not the ones source order produces. */
+  className?: string;
+}) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className={`rounded-xl border border-gray-200 bg-white p-4 ${className}`}>
       <div className={LABEL}>{label}</div>
       <div className="mt-0.5 truncate text-xl font-bold text-gray-900 tabular-nums">{value}</div>
       <div className="mt-1 text-[11px] leading-snug text-gray-400">{hint}</div>

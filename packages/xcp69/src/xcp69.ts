@@ -104,6 +104,36 @@ export const XCP69_MIN_PARTICIPANTS = XCP69.SOFT_CAP / XCP69.MAX_MINT_PER_ADDRES
 export const XCP69_OPENING_MULTIPLE = XCP69.SOFT_CAP / XCP69.POOL_QUANTITY;
 
 /**
+ * How many lots one address may still mint from a launch, given what it has
+ * already committed to that same launch.
+ *
+ * The cap is per ADDRESS, not per transaction, and the two are equal under
+ * this standard (both 1,000,000 tokens) — which is exactly what makes the
+ * mistake easy: a second mint looks identical to a legal first one and is
+ * rejected only when it confirms. Core checks `already_minted + quantity >
+ * max_mint_per_address` and, when it fails, records the fairmint as invalid
+ * and returns BEFORE any debit or credit. So the minter keeps their XCP and
+ * loses only the Bitcoin fee. Nothing is stolen; a fee is simply burned for
+ * nothing, and the failure arrives minutes later with no explanation attached.
+ *
+ * `alreadyRaw` must include UNCONFIRMED mints, which is the part that is easy
+ * to leave out and the part that actually bites. Core validates against the
+ * ledger, and the mempool is not the ledger — so two pending mints from one
+ * address each report `status: valid` right up until the second one confirms.
+ * That is not hypothetical: EVOLVEDPEPE had exactly this pair sitting in the
+ * mempool, both at the full cap, both "valid".
+ *
+ * This is a courtesy, not enforcement. Anyone composing elsewhere bypasses it
+ * entirely and the protocol still holds the line. What it buys is a wasted fee
+ * not spent, and a limit shown before the money moves rather than after.
+ */
+export function remainingLotsForAddress(alreadyRaw: bigint): number {
+  const remaining = XCP69_EXACT.MAX_MINT_PER_ADDRESS - alreadyRaw;
+  if (remaining <= 0n) return 0;
+  return Number(remaining / XCP69_EXACT.QUANTITY_BY_PRICE);
+}
+
+/**
  * The site's editorial policy as a predicate: exact equality against the
  * standard's fixed values. Core has no on-chain standard marker.
  *
