@@ -12,14 +12,64 @@ import { COUNTERPARTY_API_BASE } from "@/lib/constants";
  * Shared client-side API helpers. Before this file, fetchJson and
  * fetchBalance were copy-pasted into six components; keep the copies dead.
  */
+/**
+ * Where a Counterparty read goes when the node will not talk to this browser,
+ * and null for any other URL. See app/api/cp/[...path]/route.ts for why the
+ * relay is same-origin and why it is second rather than first.
+ */
+function counterpartyRelay(url: string): string | null {
+  if (!url.startsWith(COUNTERPARTY_API_BASE)) return null;
+  try {
+    const parsed = new URL(url);
+    return `/api/cp${parsed.pathname}${parsed.search}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether asking again, from somewhere else, could plausibly answer.
+ *
+ * A thrown TypeError is the important case and the reason this exists: it is
+ * what a browser reports for a response it will not expose, which is what a
+ * Cloud Armor denial without CORS headers looks like from script. There is no
+ * status to read, so "the network died" and "you are being rate limited" are
+ * the same event here — and only one of them is worth a retry, so both get one.
+ *
+ * 403, 429 and 5xx are worth relaying because they are about this caller or
+ * this moment. A 404 or a 400 is about the request, and asking a second time
+ * from a different address gets the same answer a little later.
+ */
+function worthRelaying(error: unknown): boolean {
+  if (error instanceof HttpError) return error.status >= 500 || [403, 429].includes(error.status);
+  return true;
+}
+
+class HttpError extends Error {
+  constructor(readonly status: number) {
+    super(`HTTP ${status}`);
+  }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function fetchJson(url: string, timeoutMs = 10_000): Promise<any> {
+async function readJson(url: string, timeoutMs: number): Promise<any> {
   const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) throw new HttpError(res.status);
   // Not res.json(): JSON.parse rounds integers above 2^53-1. Oversized
   // integers arrive as strings (type quantity fields as Raw); safe-range
   // values keep their shape.
   return parseJsonLossless(await res.text());
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function fetchJson(url: string, timeoutMs = 10_000): Promise<any> {
+  try {
+    return await readJson(url, timeoutMs);
+  } catch (error) {
+    const relay = counterpartyRelay(url);
+    if (!relay || !worthRelaying(error)) throw error;
+    return readJson(relay, timeoutMs);
+  }
 }
 
 /**
