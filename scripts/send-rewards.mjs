@@ -68,9 +68,12 @@ const source = arg("source");
 const limit = Number(arg("limit", "0")) || Infinity;
 const feeRate = Number(arg("fee-rate", "2"));
 const dryRun = flag("dry-run");
+/** Reconcile the file against the chain and stop. No key is asked for, so this is the safe way
+ *  to repair markings — including from a machine that should never see the mnemonic. */
+const reconcileOnly = flag("reconcile-only");
 
 if (!csvPath || !source) {
-  console.error("usage: node scripts/send-rewards.mjs --csv <path> --source <address> [--limit N] [--fee-rate N] [--dry-run]");
+  console.error("usage: node scripts/send-rewards.mjs --csv <path> --source <address> [--limit N] [--fee-rate N] [--dry-run] [--reconcile-only]");
   process.exit(1);
 }
 
@@ -192,6 +195,66 @@ async function chainDepth(address) {
   }
 }
 
+/**
+ * Every send of one asset already made from this address, confirmed or still unconfirmed,
+ * summed per destination.
+ *
+ * This is what makes the run safe to re-run against a file whose markings are stale, missing, or
+ * simply wrong — the chain is asked, not the spreadsheet.
+ *
+ * The mempool half is the half that is easy to get wrong, and I got it wrong first: an individual
+ * Counterparty send is an ENHANCED_SEND event, not a SEND. Asking for `mempool/events/SEND`
+ * returns zero and reads exactly like "nothing has been sent", which is the most dangerous wrong
+ * answer available here — it would re-send to somebody already paid. MPMA_SEND is included for
+ * the same reason: a destination covered by the batch MPMA must not be paid twice.
+ *
+ * Both feeds are paginated to exhaustion. The MPMA alone puts 158 events in the mempool, so a
+ * single page is emphatically not the universe.
+ */
+async function sendsAlreadyMade(address, asset) {
+  const byDestination = new Map();
+  const record = (destination, quantity, txid, confirmed) => {
+    const prior = byDestination.get(destination) ?? { quantity: 0n, txid: null, confirmed: false };
+    byDestination.set(destination, {
+      quantity: prior.quantity + BigInt(quantity),
+      txid: prior.txid ?? txid,
+      confirmed: prior.confirmed || confirmed,
+    });
+  };
+
+  let cursor = null;
+  for (let page = 0; page < 30; page++) {
+    const { result, next_cursor } = await apiJson(
+      `${CP}/addresses/${address}/sends?limit=1000${cursor ? `&cursor=${cursor}` : ""}`,
+    );
+    for (const send of result ?? []) {
+      if (send.source === address && send.asset === asset && send.status === "valid") {
+        record(send.destination, send.quantity, send.tx_hash, true);
+      }
+    }
+    cursor = next_cursor;
+    if (!cursor) break;
+  }
+
+  cursor = null;
+  for (let page = 0; page < 30; page++) {
+    const { result, next_cursor } = await apiJson(
+      `${CP}/mempool/events?limit=1000${cursor ? `&cursor=${cursor}` : ""}`,
+    );
+    for (const event of result ?? []) {
+      if (event.event !== "ENHANCED_SEND" && event.event !== "MPMA_SEND") continue;
+      const p = event.params ?? {};
+      if (p.source === address && p.asset === asset) {
+        record(p.destination, p.quantity, event.tx_hash, false);
+      }
+    }
+    cursor = next_cursor;
+    if (!cursor) break;
+  }
+
+  return byDestination;
+}
+
 /** True once this transaction exists anywhere a node will admit to. */
 async function txExists(txid) {
   try {
@@ -272,27 +335,62 @@ async function broadcast(hex) {
 /* ------------------------------------------------------------------ */
 
 const { header, rows } = readRows(csvPath);
-const pending = rows.filter((r) => r.status === "PENDING");
-const todo = rows.filter((r) => r.status !== "SENT" && r.status !== "PENDING");
+const asset = rows[0]?.asset ?? "MINTS";
 
 console.log(`${csvPath}`);
-console.log(`  ${rows.length} rows · ${rows.filter((r) => r.status === "SENT").length} sent · ${pending.length} pending · ${todo.length} to do`);
+console.log(`  ${rows.length} rows · reconciling against the chain…`);
 
-// Settle anything a previous run signed but could not confirm it had broadcast. This is the
-// window that would otherwise produce a double payment.
-for (const row of pending) {
-  if (row.txid && (await txExists(row.txid))) {
-    row.status = "SENT";
-    console.log(`  ${row.address.slice(0, 12)}… already landed as ${row.txid.slice(0, 12)}…`);
-  } else {
-    row.status = "";
-    row.txid = "";
-    console.log(`  ${row.address.slice(0, 12)}… was pending but never landed; will retry`);
+// The chain decides, not the file. Markings can be stale, missing, or simply wrong, and the one
+// mistake that matters here is paying somebody twice — so every row is checked against what this
+// address has actually sent, confirmed AND unconfirmed, before anything is queued.
+const already = await sendsAlreadyMade(source, asset);
+
+let healed = 0;
+for (const row of rows) {
+  const expected = BigInt(row.quantity) * SATS;
+  const found = already.get(row.address);
+  if (found && found.quantity >= expected) {
+    // Broadcast but unconfirmed is PENDING, which is the same state this script writes between
+    // signing and acknowledgement — a transaction that exists and has not settled.
+    const status = found.confirmed ? "SENT" : "PENDING";
+    if (row.status !== status || (!row.txid && found.txid)) healed++;
+    row.status = status;
+    row.txid = row.txid || found.txid || "";
+    continue;
   }
+  if (found && found.quantity > 0n) {
+    // Paid, but not the right amount. Refusing to guess: topping up automatically could as
+    // easily be doubling a payment that was simply recorded oddly.
+    console.error(
+      `  ATTENTION ${row.address.slice(0, 20)}… expects ${row.quantity} ${asset} but has already ` +
+        `received ${Number(found.quantity / SATS)}. Left alone; decide by hand.`,
+    );
+    row.status = "REVIEW";
+    healed++;
+    continue;
+  }
+  // Nothing on chain. A row previously marked SENT or PENDING was not, so clear it.
+  if (row.status === "SENT" || row.status === "PENDING") {
+    console.log(`  ${row.address.slice(0, 20)}… was marked ${row.status} but nothing is on chain; will retry`);
+    healed++;
+  }
+  row.status = "";
+  row.txid = "";
 }
-if (pending.length > 0) writeRows(csvPath, header, rows);
+if (healed > 0) writeRows(csvPath, header, rows);
 
-const queue = rows.filter((r) => r.status !== "SENT").slice(0, limit === Infinity ? undefined : limit);
+const counts = { SENT: 0, PENDING: 0, REVIEW: 0, todo: 0 };
+for (const row of rows) counts[row.status || "todo"]++;
+console.log(
+  `  ${counts.SENT} confirmed · ${counts.PENDING} in mempool · ${counts.REVIEW} needs review · ${counts.todo} to send`,
+);
+
+if (reconcileOnly) {
+  console.log("\nreconcile only — file updated, nothing sent");
+  process.exit(0);
+}
+
+const queue = rows.filter((r) => r.status === "").slice(0, limit === Infinity ? undefined : limit);
 if (queue.length === 0) {
   console.log("nothing to do");
   process.exit(0);
