@@ -245,10 +245,11 @@ async function composeRequest(
   qp.set('verbose', 'true')
 
   const url = `${COUNTERPARTY_API_BASE}/${path}/compose/${type}?${qp.toString()}`
-  // Through the relay: composing is the one call a user cannot route around.
-  // When the node stops talking to a browser, everything else on the site
-  // degrades to stale numbers, but this degrades to "you cannot transact".
-  const res = await relayingFetch(url, 30_000)
+  // Through the relay, and essential: composing is the one call a user cannot
+  // route around. When the node stops talking to a browser everything else
+  // degrades to a stale number, but this degrades to "you cannot transact" --
+  // so it is exempt from the budget that stands the pollers down.
+  const res = await relayingFetch(url, 30_000, { essential: true })
   const body = await res.text()
   let data: { error?: unknown; result?: { rawtransaction?: string } } = {}
   try {
