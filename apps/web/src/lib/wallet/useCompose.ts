@@ -8,6 +8,7 @@ import { msSinceLastSpend, recentlySpentUtxos, registerSpentUtxos } from './spen
 import { pubkeyFromBip322 } from '@/lib/bip322'
 import { quantityParam } from '@/lib/numeric'
 import { COUNTERPARTY_API_BASE } from '@/lib/constants'
+import { relayingFetch } from '@/lib/counterparty-relay'
 
 /** A compose parameter value; bigint/string carry quantities beyond 2^53. */
 type ComposeValue = string | number | bigint
@@ -244,7 +245,10 @@ async function composeRequest(
   qp.set('verbose', 'true')
 
   const url = `${COUNTERPARTY_API_BASE}/${path}/compose/${type}?${qp.toString()}`
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) })
+  // Through the relay: composing is the one call a user cannot route around.
+  // When the node stops talking to a browser, everything else on the site
+  // degrades to stale numbers, but this degrades to "you cannot transact".
+  const res = await relayingFetch(url, 30_000)
   const body = await res.text()
   let data: { error?: unknown; result?: { rawtransaction?: string } } = {}
   try {
