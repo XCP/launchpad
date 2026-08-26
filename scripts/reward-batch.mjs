@@ -144,9 +144,17 @@ const payouts = [...byAddress.values()]
 const mpma = payouts.filter((p) => mpmaCapable(p.address));
 const manual = payouts.filter((p) => !mpmaCapable(p.address));
 
+/** Raw to whole units. Every payout is a whole number of MINTS by
+ *  construction -- REWARD_PER_MINT_RAW is exactly 100 * 1e8 -- so this never
+ *  needs a decimal point, and BigInt division cannot drift the way dividing
+ *  a float by 1e8 would at these magnitudes. */
+const display = (raw) => (BigInt(raw) / 100_000_000n).toString();
+
 const csv = (rows) =>
-  ["Address,Asset,Quantity", ...rows.map((r) => `${r.address},${ASSET},${r.quantity}`)].join("\n") +
-  "\n";
+  [
+    "Address,Asset,Quantity",
+    ...rows.map((r) => `${r.address},${ASSET},${display(r.quantity)}`),
+  ].join("\n") + "\n";
 
 const last = mints[mints.length - 1];
 const total = payouts.reduce((sum, p) => sum + BigInt(p.quantity), 0n);
