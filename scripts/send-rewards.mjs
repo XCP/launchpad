@@ -298,7 +298,7 @@ async function waitForRoom(address) {
  * `exclude_utxos_with_balances` keeps a UTXO carrying an attached Counterparty balance from being
  * spent as an ordinary coin, which would move somebody's assets to pay a fee.
  */
-async function compose(row, spentUtxos) {
+async function compose(row, spentUtxos, chainFrom) {
   const params = new URLSearchParams({
     destination: row.address,
     asset: row.asset,
@@ -309,6 +309,12 @@ async function compose(row, spentUtxos) {
     exclude_utxos_with_balances: "true",
   });
   if (spentUtxos.size > 0) params.set("exclude_utxos", [...spentUtxos].join(","));
+  // Hand the previous send's change straight to the composer. Everything else here works around
+  // an indexer that has not caught up yet; this needs no indexer at all, because the outpoint
+  // came from a transaction this process built and broadcast moments ago. The extension arrives
+  // at the same conclusion from the other direction — core/counterparty/utxoSelection keeps a
+  // register of just-broadcast change "because mempool.space takes a beat to list it".
+  if (chainFrom) params.set("inputs_set", chainFrom);
 
   const { result, error } = await apiJson(`${CP}/addresses/${source}/compose/send?${params}`);
   if (error) throw new Error(typeof error === "string" ? error : JSON.stringify(error));
@@ -329,6 +335,7 @@ async function compose(row, spentUtxos) {
  * serialized form would suggest, silently asks for a transaction that does not exist.
  */
 async function signComposed(result, key) {
+  const ourScript = bytesToHex(btc.p2pkh(key.publicKey).script);
   const tx = btc.Transaction.fromRaw(hexToBytes(result.rawtransaction), {
     allowUnknownOutputs: true,
     allowUnknownInputs: true,
@@ -346,7 +353,18 @@ async function signComposed(result, key) {
   }
   tx.sign(key.privateKey);
   tx.finalize();
-  return { hex: bytesToHex(tx.extract()), txid: tx.id, inputs };
+  // The output paying us back is the coin the next send will spend. Found by script rather than
+  // by position: the composer decides output order, and guessing "the last one" would eventually
+  // hand the next send somebody else's dust.
+  let change = null;
+  for (let i = 0; i < tx.outputsLength; i++) {
+    const output = tx.getOutput(i);
+    if (output.script && bytesToHex(output.script) === ourScript) {
+      change = `${tx.id}:${i}`;
+      break;
+    }
+  }
+  return { hex: bytesToHex(tx.extract()), txid: tx.id, inputs, change };
 }
 
 async function broadcast(hex) {
@@ -439,11 +457,14 @@ let failed = 0;
 /** Coins this run has already consumed. The node's own mempool view can lag a moment, and
  *  re-selecting a spent coin produces a conflicting transaction rather than a second payment. */
 const spentUtxos = new Set();
+/** The previous send's change, spent directly by the next one. Null before the first send, and
+ *  again whenever a send leaves no change to follow — then the composer chooses for itself. */
+let chainFrom = null;
 for (const row of queue) {
   const label = `${row.address.slice(0, 16)}… ${Number(row.quantity).toLocaleString("en-US")} ${row.asset}`;
   try {
     await waitForRoom(source);
-    const composed = await compose(row, spentUtxos);
+    const composed = await compose(row, spentUtxos, chainFrom);
     const signed = await signComposed(composed, key);
 
     if (dryRun) {
@@ -463,12 +484,16 @@ for (const row of queue) {
 
     await broadcast(signed.hex);
     for (const utxo of signed.inputs) spentUtxos.add(utxo);
+    chainFrom = signed.change;
     row.status = "SENT";
     writeRows(csvPath, header, rows);
     sent++;
     console.log(`SENT ${label} → ${signed.txid} (fee ${composed.btc_fee} sats)`);
   } catch (error) {
     failed++;
+    // Whatever went wrong, the coin this send meant to chain from is no longer a safe assumption.
+    // Letting the composer choose again is slower and correct; insisting is fast and wrong.
+    chainFrom = null;
     const message = error instanceof Error ? error.message : String(error);
     console.error(`FAIL ${label}: ${message}`);
     // A rejected chain is the one failure worth stopping for: everything after it fails the same
