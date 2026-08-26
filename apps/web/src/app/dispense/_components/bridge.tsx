@@ -35,6 +35,7 @@ import {
   updateSettings,
 } from "@/app/swap/_lib/trade-settings-store";
 import { fetchBalance, fetchJson } from "@/lib/client";
+import { fetchAddressStats, fetchHalfHourFeeRate } from "@/lib/esplora";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import {
   MAX_LEGS,
@@ -225,9 +226,8 @@ function LoadCard({
   const { data: btcBalanceSats } = useSWR(
     address ? [address, "btc-balance"] : null,
     async ([addr]) => {
-      const r = await fetchJson(`https://mempool.space/api/address/${addr}`);
-      const c = r.chain_stats;
-      return (c?.funded_txo_sum ?? 0) - (c?.spent_txo_sum ?? 0);
+      const { funded, spent } = await fetchAddressStats(addr);
+      return funded - spent;
     },
     { refreshInterval: 60_000 },
   );
@@ -258,12 +258,10 @@ function LoadCard({
   // /precise, matching the composer: this estimate decides whether an extra
   // leg is worth its fee, so it should weigh the fee the transaction will
   // actually pay rather than a rounded-up one.
-  const { data: feeRec } = useSWR<{ halfHourFee: number }>(
-    "https://mempool.space/api/v1/fees/precise",
-    (url: string) => fetchJson(url),
-    { refreshInterval: 60_000 },
-  );
-  const legFeeSats = Math.max(1, feeRec?.halfHourFee ?? 3) * 300;
+  const { data: halfHourFee } = useSWR("btc-halfhour-feerate", fetchHalfHourFeeRate, {
+    refreshInterval: 60_000,
+  });
+  const legFeeSats = Math.max(1, halfHourFee ?? 3) * 300;
 
   const d = open[0];
   const unitXcp = d ? d.give_quantity / SATS : 1;

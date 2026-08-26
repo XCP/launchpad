@@ -13,6 +13,7 @@ import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
+import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchJson } from "@/lib/client";
 import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
 import {
@@ -95,10 +96,7 @@ export function SwapWidget({
   // with UTXO count — but the rate is exactly what compose will pay.
   const { data: btcUsd } = useSWR(
     "btc-usd",
-    () =>
-      fetchJson("https://mempool.space/api/v1/prices").then(
-        (d: { USD: number }) => d.USD,
-      ),
+    fetchBtcUsd,
     { refreshInterval: 60_000 },
   );
   const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
@@ -589,7 +587,7 @@ export function SwapWidget({
                 <dt>TX fee</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
                   {satsPerVb(feeRate)} sat/vB
-                  {btcUsd !== undefined && (
+                  {btcUsd != null && (
                     <span className="text-gray-400">
                       {" "}
                       (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})

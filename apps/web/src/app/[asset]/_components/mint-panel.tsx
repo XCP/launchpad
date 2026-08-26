@@ -9,8 +9,8 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
+import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
-import { fetchJson } from "@/lib/client";
 import { commas, commasRaw, satsPerVb, usd as usdFmt } from "@/lib/format";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
@@ -84,10 +84,7 @@ export function MintPanel({
   });
   const { data: btcUsd } = useSWR(
     "btc-usd",
-    () =>
-      fetchJson("https://mempool.space/api/v1/prices").then(
-        (d: { USD: number }) => d.USD,
-      ),
+    fetchBtcUsd,
     { refreshInterval: 60_000 },
   );
 
@@ -260,7 +257,7 @@ export function MintPanel({
                 <dt>TX fee</dt>
                 <dd>
                   {satsPerVb(medianFeeRate)} sat/vB
-                  {btcUsd !== undefined && (
+                  {btcUsd != null && (
                     <span className="text-gray-500">
                       {" "}
                       (~{usdFmt(((medianFeeRate * MINT_VBYTES) / SATS) * btcUsd)})

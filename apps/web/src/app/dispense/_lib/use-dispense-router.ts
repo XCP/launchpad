@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { Dispenser } from "@/lib/api/counterparty";
+import { fetchAddressUtxos } from "@/lib/esplora";
 import { shortAddress } from "@/lib/format";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
@@ -64,17 +65,18 @@ interface Utxo {
   value: number;
 }
 
+/**
+ * The coins this load will be paid from.
+ *
+ * Through lib/esplora, not a bare fetch at one host: this call is the gate on
+ * the whole buy flow — nothing below it runs until it answers — and it used to
+ * be a single unguarded request to mempool.space. A user who could not reach
+ * that host got the browser's raw `TypeError: Failed to fetch` printed under
+ * the Buy button, and a user holding more than 500 UTXOs got an HTTP 400 that
+ * host returns by policy. Neither had anything wrong with their wallet.
+ */
 async function fetchConfirmedUtxos(address: string): Promise<Utxo[]> {
-  const res = await fetch(`https://mempool.space/api/address/${address}/utxo`, {
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) throw new Error("Couldn't read your BTC coins (UTXOs)");
-  const rows: {
-    txid: string;
-    vout: number;
-    value: number;
-    status: { confirmed: boolean };
-  }[] = await res.json();
+  const rows = await fetchAddressUtxos(address);
   return rows
     .filter((r) => r.status.confirmed)
     .map((r) => ({ txid: r.txid, vout: r.vout, value: r.value }))

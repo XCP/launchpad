@@ -10,6 +10,7 @@ import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
+import { fetchBtcUsd } from "@/lib/api/price-client";
 import { commasRaw, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
 import {
   approx,
@@ -94,10 +95,7 @@ export function TradePanel({
   const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
   const { data: btcUsd } = useSWR(
     "btc-usd",
-    () =>
-      fetchJson("https://mempool.space/api/v1/prices").then(
-        (d: { USD: number }) => d.USD,
-      ),
+    fetchBtcUsd,
     { refreshInterval: 60_000 },
   );
 
@@ -626,7 +624,7 @@ export function TradePanel({
                 <dt>TX fee</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
                   {satsPerVb(feeRate)} sat/vB
-                  {btcUsd !== undefined && (
+                  {btcUsd != null && (
                     <span className="text-gray-400">
                       {" "}
                       (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
