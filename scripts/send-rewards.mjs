@@ -276,6 +276,65 @@ async function waitForRoom(address) {
   }
 }
 
+/**
+ * Enough of both currencies to finish, checked before a key is asked for.
+ *
+ * Two things can run out and they fail at different moments. The asset runs out at compose, which
+ * is loud. Bitcoin runs out as "No UTXOs found", which reads like an indexer problem and is not.
+ * Either way the interesting number is the one BEFORE starting: finding out at row 40 of 65 means
+ * a half-finished distribution and a chain of unconfirmed transactions to unpick.
+ *
+ * Bitcoin is measured including the mempool, because coins committed to sends already in flight
+ * are not available however confirmed the balance looks. The asset is measured from Counterparty,
+ * whose balance may still count assets that unconfirmed sends have promised away — so a shortfall
+ * here is a warning rather than a refusal, and the arithmetic is shown so a person can judge it.
+ *
+ * An enhanced send has no dust output to the destination — the recipient is encoded in the data,
+ * which `btc_out: 0` on every compose confirms — so the Bitcoin cost of a send is its fee alone.
+ */
+async function preflight(rows, asset) {
+  const needAsset = rows.reduce((sum, r) => sum + BigInt(r.quantity), 0n) * SATS;
+  const { result } = await apiJson(
+    `${CP}/addresses/${source}/balances/${encodeURIComponent(asset)}?type=address`,
+  );
+  const haveAsset = (result ?? []).reduce((sum, b) => sum + BigInt(b.quantity ?? 0), 0n);
+
+  const stats = JSON.parse(await api(`${MEMPOOL}/address/${source}`));
+  const confirmed = stats.chain_stats.funded_txo_sum - stats.chain_stats.spent_txo_sum;
+  const inFlight = stats.mempool_stats.funded_txo_sum - stats.mempool_stats.spent_txo_sum;
+  const haveSats = confirmed + inFlight;
+  // Estimated from the vsize a compose already reported rather than a guess, plus a margin: the
+  // input count varies once the change chain breaks and the composer has to gather coins.
+  const needSats = Math.ceil(rows.length * 264 * feeRate * 1.5);
+
+  console.log(`  ${asset}: need ${(needAsset / SATS).toLocaleString("en-US")}, have ${(haveAsset / SATS).toLocaleString("en-US")}`);
+  console.log(`  BTC: need ~${needSats.toLocaleString("en-US")} sats at ${feeRate} sat/vB, have ${haveSats.toLocaleString("en-US")}`);
+
+  if (haveSats < needSats) {
+    throw new Error(
+      `Not enough Bitcoin to finish: ~${needSats} sats needed, ${haveSats} available. ` +
+        `Top the address up, or use --limit to send what the balance covers.`,
+    );
+  }
+  if (haveAsset < needAsset) {
+    console.warn(
+      `  WARNING: ${asset} balance looks short by ${((needAsset - haveAsset) / SATS).toLocaleString("en-US")}. ` +
+        `Counterparty may still be counting assets that unconfirmed sends have promised away; ` +
+        `if that is not the explanation, this run will stop partway.`,
+    );
+  }
+}
+
+/**
+ * Whether a failure will repeat for every remaining row.
+ *
+ * Running out of money, or filling the mempool chain, are conditions rather than accidents: the
+ * next sixty attempts fail identically and bury whichever error actually mattered. Stopping keeps
+ * the log readable and leaves the CSV in a state a re-run can continue from.
+ */
+const isTerminal = (message) =>
+  /insufficient|no utxos found|too-long-mempool-chain|too many/i.test(message);
+
 /* ------------------------------------------------------------------ */
 /* Compose, sign, broadcast                                            */
 /* ------------------------------------------------------------------ */
@@ -448,6 +507,8 @@ const totalMints = queue.reduce((sum, r) => sum + Number(r.quantity), 0);
 console.log(`\nabout to send ${queue.length} transactions totalling ${totalMints.toLocaleString("en-US")} ${queue[0].asset}`);
 console.log(`from ${source} at ${feeRate} sat/vB${dryRun ? " (dry run — nothing will be broadcast)" : ""}\n`);
 
+await preflight(queue, asset);
+
 const mnemonic = await promptHidden("Counterwallet mnemonic (hidden): ");
 const key = findKey(mnemonic.trim(), source);
 console.log(`key matches ${source} at ${COUNTERWALLET_PATH}/${key.index}\n`);
@@ -496,10 +557,8 @@ for (const row of queue) {
     chainFrom = null;
     const message = error instanceof Error ? error.message : String(error);
     console.error(`FAIL ${label}: ${message}`);
-    // A rejected chain is the one failure worth stopping for: everything after it fails the same
-    // way, and a hundred identical errors bury the one that mattered.
-    if (/too-long-mempool-chain|too many/i.test(message)) {
-      console.error("stopping: the mempool chain is full. Re-run after a block confirms.");
+    if (isTerminal(message)) {
+      console.error("stopping: that failure will repeat for every remaining row. Nothing after it was attempted.");
       break;
     }
   }
