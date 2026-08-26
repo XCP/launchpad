@@ -40,6 +40,11 @@ interface StoredLaunch {
   mints: number;
   minters: number;
   pool_xcp_reserve: string | null;
+  /** Carried so a tick that cannot reach the pool oracle can keep what was already
+   *  established rather than recomputing a verdict it has no evidence for. */
+  phase: string;
+  pool_token_reserve: string | null;
+  pool_xcp_sats: number | null;
 }
 
 /** One batched read instead of one SELECT per candidate inside the main
@@ -56,7 +61,8 @@ async function fetchStoredByTxHash(
     const placeholders = chunk.map((_, idx) => `?${idx + 1}`).join(",");
     const rows = await q<StoredLaunch>(
       db,
-      `SELECT tx_hash, earned_quantity, mints, minters, pool_xcp_reserve
+      `SELECT tx_hash, earned_quantity, mints, minters, pool_xcp_reserve,
+              phase, pool_token_reserve, pool_xcp_sats
          FROM launches WHERE tx_hash IN (${placeholders})`,
       ...chunk,
     );
@@ -140,8 +146,16 @@ export async function syncLaunches(
     let poolTokenReserve: string | null = null;
     let poolXcpSats = 0;
     let hasPool = false;
+    // True when the pool was asked about and the node would not say. The phase must then be left
+    // exactly as it was: absence of a pool means the sale REFUNDED, so treating an unanswered
+    // question as "no pool" rewrites a graduated launch as a failed one. That is not theoretical
+    // -- SEISMONSTER had graduated with 529 XCP in its pool and was demoted to refunded, losing
+    // its reserves from the site's market cap and pool totals along with it.
+    let poolUnknown = false;
     if (fm.status === "closed" && truthy(fm.pool_quantity)) {
-      const pool = await fetchPool(fm.asset);
+      const lookup = await fetchPool(fm.asset);
+      poolUnknown = !lookup.known;
+      const pool = lookup.known ? lookup.pool : null;
       if (pool) {
         hasPool = true;
         const xcpIsA = pool.asset_a === "XCP";
@@ -159,7 +173,22 @@ export async function syncLaunches(
         poolXcpSats = Number(big(xcpReserve));
       }
     }
-    const phase = launchPhase(fm, hasPool);
+    const priorLaunch = storedByTxHash.get(fm.tx_hash) ?? null;
+    // An unanswered pool question keeps whatever was already believed. With nothing stored there
+    // is nothing to keep, so the launch is skipped for this tick rather than recorded as a
+    // failure it may not be -- the next tick will ask again.
+    if (poolUnknown && !priorLaunch?.phase) {
+      console.warn({ event: "pool_unknown_skipped", asset: fm.asset });
+      continue;
+    }
+    const phase = poolUnknown ? priorLaunch!.phase : launchPhase(fm, hasPool);
+    if (poolUnknown) {
+      // Keep the reserves too. Blanking them would drop this launch out of market cap and pool
+      // totals for as long as the node stays quiet.
+      poolXcpReserve = priorLaunch!.pool_xcp_reserve ?? null;
+      poolTokenReserve = priorLaunch!.pool_token_reserve ?? null;
+      poolXcpSats = priorLaunch!.pool_xcp_sats ?? 0;
+    }
 
     // earned_quantity moves only when a new mint lands, and it's already in
     // hand from the /fairminters listing — free, no extra request. Reading

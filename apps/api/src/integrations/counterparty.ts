@@ -374,14 +374,32 @@ export interface CpPool {
   reserve_b: number | string;
 }
 
-export async function fetchPool(asset: string): Promise<CpPool | null> {
+/**
+ * A pool lookup that says whether it actually got an answer.
+ *
+ * The distinction is load-bearing, and collapsing it cost a launch its status. This is the
+ * launched-versus-refunded oracle: no pool means the sale failed and the XCP went back. So a
+ * `fetchPool` that returned null on a timeout was reporting "this launch refunded" every time the
+ * node was slow — and SEISMONSTER, which had graduated with 529 XCP in its pool, was rewritten as
+ * refunded and vanished from the site.
+ *
+ * A pool that does not exist answers 404. Anything else — a timeout, a 429, a 503 — is the node
+ * declining to say, which is not the same as saying no. Only the first is an answer.
+ */
+export type PoolLookup = { known: true; pool: CpPool | null } | { known: false };
+
+export async function fetchPool(asset: string): Promise<PoolLookup> {
+  const path = `/pools/${encodeURIComponent(asset)}/XCP?verbose=true`;
   try {
-    const data: { result: CpPool | null } = await get(
-      `/pools/${encodeURIComponent(asset)}/XCP?verbose=true`,
-    );
-    return data.result ?? null;
-  } catch {
-    return null;
+    const data: { result: CpPool | null } = await get(path);
+    return { known: true, pool: data.result ?? null };
+  } catch (error) {
+    // 404 is the node telling us there is no such pool, which is exactly the fact being asked
+    // for. Every other failure leaves the question open.
+    if (error instanceof Error && error.message.endsWith("HTTP 404")) {
+      return { known: true, pool: null };
+    }
+    return { known: false };
   }
 }
 
