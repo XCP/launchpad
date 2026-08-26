@@ -263,7 +263,13 @@ describe("token artwork", () => {
       trade({ asset: "A", buy: true, tokenRaw: raw(1n), xcpRaw: 1n, venue: "pool" }),
     ].map((a) => a.photo);
     expect(photos.every((p) => p === imageUrl("A"))).toBe(true);
-    expect(imageUrl("A")).toBe("https://xcp.fun/full/A");
+    // fb=full is load-bearing, not decoration: without it the route behind
+    // this URL falls back to cdn.xcp.io's 48x48 ICON for any launch whose art
+    // we do not hold, and Telegram blows that up to the width of the bubble.
+    expect(imageUrl("A")).toBe("https://xcp.fun/full/A?fb=full");
+    // A version makes replaced art a URL Telegram has not cached.
+    expect(imageUrl("A", 'abc"def')).toBe("https://xcp.fun/full/A?fb=full&v=abc%22def");
+    expect(imageUrl("A", null)).toBe(imageUrl("A"));
   });
 });
 

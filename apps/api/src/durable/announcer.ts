@@ -1,6 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "#api/env";
 import { nextAnnouncement, type Queued } from "#api/telegram/digest";
+import { stampArtVersion } from "#api/telegram/art";
 import { send } from "#api/telegram/send";
 
 /**
@@ -142,7 +143,10 @@ export class Announcer extends DurableObject<Env> {
     }
 
     const { announcement, rest } = nextAnnouncement(queue, DIGEST_THRESHOLD);
-    const result = await send(token, chat, announcement);
+    // Stamped here, at the last moment, rather than when the message was
+    // written: a backlog is paced at one message every few seconds, and art
+    // that moves can have moved again while this one waited its turn.
+    const result = await send(token, chat, await stampArtVersion(this.env.METADATA, announcement));
 
     if (!result.ok && result.retryAfter !== null) {
       // Rate limited with a number attached. Keep the message, wait exactly

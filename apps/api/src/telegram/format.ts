@@ -146,8 +146,26 @@ const addressLink = (addr: string) =>
  * the site and the on-chain description point at, so the channel shows what a
  * holder sees. Telegram fetches it by URL; a launch without artwork just
  * answers 404 and the caller falls back to a plain message.
+ *
+ * `fb=full` picks WHICH size that route falls back to when the art belongs to
+ * a launch opened somewhere else and we hold no copy. Its default is the icon,
+ * and cdn.xcp.io's icon is a 48x48 thumbnail — PEPECASH is 1,587 bytes as an
+ * icon and 131,270 as full art. Telegram scales a photo up to the bubble width
+ * whatever its size, so leaving this off did not make the message smaller, it
+ * made it blurry, on every foreign launch this channel has ever announced.
+ *
+ * `v` is the stored art's R2 etag, and it is what keeps evolving art current.
+ * Telegram caches a photo against the URL it was fetched from and re-sends the
+ * cached file rather than asking again, so a URL that never changes pins the
+ * FIRST answer it ever gave. EVOLVEDPEPE advances a stage every 5% of its
+ * raise and was announced before we mirrored it at all; the placeholder
+ * Telegram cached that day was still on every mint message days after the real
+ * art landed in R2. An etag changes on every write, so replaced art and each
+ * new mirror stage arrive at a URL Telegram has never seen.
  */
-export const imageUrl = (asset: string) => `https://xcp.fun/full/${asset}`;
+export const imageUrl = (asset: string, version?: string | null) =>
+  `${SITE}/full/${encodeURIComponent(asset)}?fb=full` +
+  (version ? `&v=${encodeURIComponent(version)}` : "");
 
 /**
  * A message and the picture to hang it on.
@@ -158,11 +176,16 @@ export const imageUrl = (asset: string) => `https://xcp.fun/full/${asset}`;
 export interface Announcement {
   text: string;
   photo: string | null;
+  /** The launch the artwork belongs to. Carried separately from the URL
+   *  because a message can wait in the queue for minutes, and the sender
+   *  restamps the URL with the art's version at the moment it goes out. */
+  asset: string | null;
 }
 
 const withPhoto = (asset: string, text: string): Announcement => ({
   text,
   photo: imageUrl(asset),
+  asset,
 });
 
 export interface LaunchFacts {

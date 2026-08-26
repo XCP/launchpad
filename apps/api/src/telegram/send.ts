@@ -43,24 +43,57 @@ export const playsAsAnimation = (contentType: string | null) =>
   contentType?.split(";")[0].trim().toLowerCase() === "image/gif";
 
 /**
- * What kind of image the artwork URL is serving, or null if it cannot be
- * asked. /full/<ASSET> streams the R2 original with its stored content type,
- * so a HEAD is enough and never pulls the bytes.
+ * Whether a cache-control header says "this answer is temporary".
  *
- * Failure is not an error here: null means "send it as a photo", which is
+ * Everything this site serves for an image is `public`. cdn.xcp.io marks the
+ * grey 48x48 placeholder it returns for an asset it has not ingested yet as
+ * `private, max-age=60` — its own statement that the bytes are provisional and
+ * not the asset's art. That difference is the whole test.
+ */
+export const isProvisionalArt = (cacheControl: string | null) =>
+  (cacheControl ?? "")
+    .toLowerCase()
+    .split(",")
+    .some((directive) => directive.trim() === "private");
+
+interface ArtProbe {
+  /** What the URL is serving, or null if it could not be asked. */
+  contentType: string | null;
+  /** True when the answer is a placeholder standing in for art that has not
+   *  arrived. Such a message goes out as text. */
+  provisional: boolean;
+}
+
+/**
+ * What the artwork URL is actually serving. /full/<ASSET> streams the R2
+ * original with its stored content type, so a HEAD is enough and never pulls
+ * the bytes; for a launch we hold nothing for it redirects out to the CDN,
+ * which is why this follows redirects and reads the answer that lands.
+ *
+ * A placeholder is worse than no picture at all. Telegram scales it up to the
+ * bubble width, so it arrives as a blurred grey square where the art should
+ * be — and then it is cached against this URL and re-sent on every later
+ * message about that launch, long after the real art exists. Sending nothing
+ * costs one image; sending the placeholder costs all of them.
+ *
+ * Failure is not an error here: nulls mean "send it as a photo", which is
  * exactly what this module did before it could tell the difference. A probe
  * that times out must not cost an announcement.
  */
-async function contentTypeOf(url: string): Promise<string | null> {
+async function probeArt(url: string): Promise<ArtProbe> {
   try {
     const res = await fetch(url, {
       method: "HEAD",
       redirect: "follow",
       signal: AbortSignal.timeout(5_000),
     });
-    return res.ok ? res.headers.get("content-type") : null;
+    if (!res.ok) return { contentType: null, provisional: false };
+    return {
+      contentType: res.headers.get("content-type"),
+      provisional: isProvisionalArt(res.headers.get("cache-control")),
+    };
   } catch {
-    return null;
+    return { contentType: null, provisional: false };
   }
 }
 
@@ -76,14 +109,19 @@ async function contentTypeOf(url: string): Promise<string | null> {
  * The animation attempt falls back to sendPhoto before it falls back to text:
  * the probe can be wrong (a redirect to the CDN, a missing content type) and a
  * still frame is a much smaller loss than a caption on its own.
+ *
+ * Art the probe calls provisional is skipped entirely and the message goes out
+ * as text. That is the one case where dropping the picture is the right trade:
+ * the picture is not the launch's.
  */
 export async function send(
   token: string,
   chatId: string,
   a: Announcement,
 ): Promise<SendResult> {
-  if (a.photo) {
-    if (playsAsAnimation(await contentTypeOf(a.photo))) {
+  const art = a.photo ? await probeArt(a.photo) : null;
+  if (a.photo && art && !art.provisional) {
+    if (playsAsAnimation(art.contentType)) {
       const anim = await call(token, "sendAnimation", {
         chat_id: chatId,
         animation: a.photo,

@@ -8,7 +8,8 @@
  */
 import { describe, expect, it } from "vitest";
 import { isAnimatedWebp } from "@/lib/animated-webp";
-import { playsAsAnimation } from "#api/telegram/send";
+import { isProvisionalArt, playsAsAnimation } from "#api/telegram/send";
+import { stampArtVersion } from "#api/telegram/art";
 
 /**
  * A WEBP header, built rather than fixtured so the one byte under test is
@@ -78,5 +79,80 @@ describe("playsAsAnimation", () => {
     for (const t of ["image/png", "image/jpeg", "image/webp", null]) {
       expect(playsAsAnimation(t)).toBe(false);
     }
+  });
+});
+
+describe("isProvisionalArt", () => {
+  it("knows the CDN's not-yet-ingested placeholder by its own header", () => {
+    // cdn.xcp.io answers for an asset it has never seen with a 48x48 grey
+    // square marked private — the one thing that distinguishes it from art.
+    expect(isProvisionalArt("private, max-age=60")).toBe(true);
+    expect(isProvisionalArt("Private, max-age=60")).toBe(true);
+  });
+
+  it("leaves everything this site serves alone", () => {
+    // Our own original, our mirror of somebody else's art, and the CDN's
+    // ingested copy. All three are the launch's real picture.
+    for (const cc of [
+      "public, max-age=3600, s-maxage=31536000",
+      "public, max-age=300",
+      "public, max-age=31536000, immutable",
+      null,
+    ]) {
+      expect(isProvisionalArt(cc)).toBe(false);
+    }
+  });
+
+  it("does not read the word out of a longer directive", () => {
+    // A substring match on "private" would fire on this and drop the picture
+    // from every announcement that carried it.
+    expect(isProvisionalArt("public, no-transform, privately-held=1")).toBe(false);
+  });
+});
+
+describe("stampArtVersion", () => {
+  const bucket = (etags: Record<string, string>) =>
+    ({
+      head: async (key: string) => (etags[key] ? { etag: etags[key] } : null),
+    }) as unknown as R2Bucket;
+
+  const announcement = { text: "minted", photo: "https://xcp.fun/full/A?fb=full", asset: "A" };
+
+  it("names the version of the art it is actually showing", async () => {
+    const a = await stampArtVersion(bucket({ "i/A": "v1" }), announcement);
+    expect(a.photo).toBe("https://xcp.fun/full/A?fb=full&v=v1");
+  });
+
+  it("moves to a URL Telegram has never seen when the art is replaced", async () => {
+    // The whole point. Telegram re-sends the file it cached against a URL
+    // rather than fetching it again, so a stage change that kept the URL
+    // would keep showing the previous stage forever.
+    const before = await stampArtVersion(bucket({ "m/A": "stage3" }), announcement);
+    const after = await stampArtVersion(bucket({ "m/A": "stage4" }), announcement);
+    expect(before.photo).not.toBe(after.photo);
+  });
+
+  it("prefers our own upload to our mirror of somebody else's", async () => {
+    const a = await stampArtVersion(bucket({ "i/A": "ours", "m/A": "theirs" }), announcement);
+    expect(a.photo).toContain("v=ours");
+  });
+
+  it("leaves a foreign launch's CDN art unstamped", async () => {
+    // Nothing of ours to version, and the CDN's copy is immutable anyway.
+    expect((await stampArtVersion(bucket({}), announcement)).photo).toBe(announcement.photo);
+  });
+
+  it("does not lose an announcement to a failing bucket", async () => {
+    const broken = {
+      head: async () => {
+        throw new Error("R2 is having a day");
+      },
+    } as unknown as R2Bucket;
+    expect((await stampArtVersion(broken, announcement)).photo).toBe(announcement.photo);
+  });
+
+  it("leaves a message with no picture alone", async () => {
+    const text = { text: "the queue got long", photo: null, asset: null };
+    expect(await stampArtVersion(bucket({ "i/A": "v1" }), text)).toEqual(text);
   });
 });

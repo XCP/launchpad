@@ -12,14 +12,14 @@ import { MINT_EMOJI } from "#api/telegram/format";
 const raw = (whole: bigint) => (whole * 100_000_000n).toString();
 
 const mintOf = (asset: string, tokens: bigint, xcpWhole: bigint): Queued => ({
-  a: { text: `one ${asset} mint`, photo: null },
+  a: { text: `one ${asset} mint`, photo: null, asset },
   mintOf: asset,
   earned: raw(tokens),
   paid: raw(xcpWhole),
 });
 
 const other = (): Queued => ({
-  a: { text: "a launch announcement", photo: null },
+  a: { text: "a launch announcement", photo: null, asset: null },
   mintOf: null,
   earned: "0",
   paid: "0",
