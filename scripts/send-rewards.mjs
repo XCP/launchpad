@@ -280,13 +280,38 @@ async function waitForRoom(address) {
 /* Compose, sign, broadcast                                            */
 /* ------------------------------------------------------------------ */
 
-async function compose(row) {
-  const quantity = (BigInt(row.quantity) * SATS).toString();
-  const url =
-    `${CP}/addresses/${source}/compose/send` +
-    `?destination=${encodeURIComponent(row.address)}&asset=${encodeURIComponent(row.asset)}` +
-    `&quantity=${quantity}&verbose=true&sat_per_vbyte=${feeRate}`;
-  const { result } = await apiJson(url);
+/**
+ * Compose one send, aware that the money is in flight.
+ *
+ * `allow_unconfirmed_inputs` is the load-bearing parameter and its absence is what broke the
+ * first real run. Each send spends the change of the one before, so from the second onward the
+ * only coin available is an unconfirmed one — and without this the node considers confirmed coins
+ * only. It then does one of two unhelpful things: re-selects the coin the previous send already
+ * spent, producing a conflicting transaction the network rejects as a replacement that does not
+ * raise the fee ("insufficient fee, rejecting replacement"), or finds nothing at all and says
+ * "No UTXOs found". Both were observed, in that order.
+ *
+ * `exclude_utxos` closes the same hole from our side. The node's view of what its own mempool has
+ * spent can lag by a moment, and this run knows exactly which coins it has consumed, so it says
+ * so rather than trusting the lookup to have caught up.
+ *
+ * `exclude_utxos_with_balances` keeps a UTXO carrying an attached Counterparty balance from being
+ * spent as an ordinary coin, which would move somebody's assets to pay a fee.
+ */
+async function compose(row, spentUtxos) {
+  const params = new URLSearchParams({
+    destination: row.address,
+    asset: row.asset,
+    quantity: (BigInt(row.quantity) * SATS).toString(),
+    sat_per_vbyte: String(feeRate),
+    verbose: "true",
+    allow_unconfirmed_inputs: "true",
+    exclude_utxos_with_balances: "true",
+  });
+  if (spentUtxos.size > 0) params.set("exclude_utxos", [...spentUtxos].join(","));
+
+  const { result, error } = await apiJson(`${CP}/addresses/${source}/compose/send?${params}`);
+  if (error) throw new Error(typeof error === "string" ? error : JSON.stringify(error));
   if (!result?.rawtransaction) throw new Error("compose returned no transaction");
   return result;
 }
@@ -314,9 +339,14 @@ async function signComposed(result, key) {
     const prevHex = await api(`${MEMPOOL}/tx/${txid}/hex`);
     tx.updateInput(i, { nonWitnessUtxo: hexToBytes(prevHex.trim()) });
   }
+  const inputs = [];
+  for (let i = 0; i < tx.inputsLength; i++) {
+    const input = tx.getInput(i);
+    inputs.push(`${bytesToHex(input.txid)}:${input.index}`);
+  }
   tx.sign(key.privateKey);
   tx.finalize();
-  return { hex: bytesToHex(tx.extract()), txid: tx.id };
+  return { hex: bytesToHex(tx.extract()), txid: tx.id, inputs };
 }
 
 async function broadcast(hex) {
@@ -406,14 +436,21 @@ console.log(`key matches ${source} at ${COUNTERWALLET_PATH}/${key.index}\n`);
 
 let sent = 0;
 let failed = 0;
+/** Coins this run has already consumed. The node's own mempool view can lag a moment, and
+ *  re-selecting a spent coin produces a conflicting transaction rather than a second payment. */
+const spentUtxos = new Set();
 for (const row of queue) {
   const label = `${row.address.slice(0, 16)}… ${Number(row.quantity).toLocaleString("en-US")} ${row.asset}`;
   try {
     await waitForRoom(source);
-    const composed = await compose(row);
+    const composed = await compose(row, spentUtxos);
     const signed = await signComposed(composed, key);
 
     if (dryRun) {
+      // Deliberately not recording the inputs as spent: nothing was broadcast, so the change
+      // this send would have created does not exist, and excluding its input would leave the
+      // next compose with no coin at all. A dry run past the first send is therefore only ever
+      // a repeat of the same one -- use --limit 1 to read it as a check that signing works.
       console.log(`DRY  ${label} → would be ${signed.txid} (fee ${composed.btc_fee} sats)`);
       continue;
     }
@@ -425,6 +462,7 @@ for (const row of queue) {
     writeRows(csvPath, header, rows);
 
     await broadcast(signed.hex);
+    for (const utxo of signed.inputs) spentUtxos.add(utxo);
     row.status = "SENT";
     writeRows(csvPath, header, rows);
     sent++;
