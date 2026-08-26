@@ -382,6 +382,43 @@ async function compose(row, spentUtxos, chainFrom) {
 }
 
 /**
+ * Compose, waiting out the node's own lag before giving up on the chain.
+ *
+ * Handing over the previous send's outpoint removes one race and introduces its mirror image: the
+ * transaction was broadcast a second ago and Counterparty's node has not indexed it yet, so the
+ * outpoint it is offered does not exist as far as that node is concerned — "invalid UTXOs:
+ * <txid>:1 (transaction not found)". Observed on roughly one send in three at full speed.
+ *
+ * It is a timing problem and the answer is time. A short wait and another attempt is enough,
+ * because the node is not refusing the coin, it simply has not heard of it. Only after several
+ * attempts does the chain get abandoned and the composer left to choose for itself, which is
+ * slower and always works.
+ *
+ * Retrying is safe here in a way it would not be after a broadcast: nothing has been signed or
+ * sent, so a repeated compose is a repeated question, not a repeated payment.
+ */
+async function composeChained(row, spentUtxos, chainFrom) {
+  const NOT_INDEXED = /invalid utxos|transaction not found/i;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      return await compose(row, spentUtxos, chainFrom);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (!chainFrom || !NOT_INDEXED.test(message)) throw error;
+      if (attempt === 3) {
+        // Out of patience with the chain. Letting the composer find its own coin costs a slower
+        // send and nothing else.
+        console.log("  (node still has not seen the previous send; letting the composer choose)");
+        chainFrom = null;
+        continue;
+      }
+      await sleep(2_500);
+    }
+  }
+  throw new Error("compose kept failing after falling back");
+}
+
+/**
  * Sign every input of a composed transaction.
  *
  * Built from `rawtransaction` rather than the `psbt` the same response carries: that PSBT arrives
@@ -525,7 +562,7 @@ for (const row of queue) {
   const label = `${row.address.slice(0, 16)}… ${Number(row.quantity).toLocaleString("en-US")} ${row.asset}`;
   try {
     await waitForRoom(source);
-    const composed = await compose(row, spentUtxos, chainFrom);
+    const composed = await composeChained(row, spentUtxos, chainFrom);
     const signed = await signComposed(composed, key);
 
     if (dryRun) {
