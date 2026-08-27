@@ -3,6 +3,7 @@ import {
   getMetadataEdgeCache,
   getMetadataRuntime,
   metadataCacheKey,
+  resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
 
@@ -89,10 +90,14 @@ export async function GET(
   // so the answer costs no body transfer, and asked first so that nothing
   // below can serve somebody else's provisional placeholder as if it were
   // this launch's art.
-  const original = await bucket.head(`i/${normalizedAsset}`);
-  const mirror = original ? null : await bucket.head(`m/${normalizedAsset}`);
-  const stored = original ?? mirror;
-  const cacheControl = original ? IMAGE_CACHE_CONTROL : MIRROR_CACHE_CONTROL;
+  const stored = await resolveMetadataArtLocation(
+    bucket,
+    cache,
+    ctx,
+    normalizedAsset,
+  );
+  const cacheControl =
+    stored?.kind === "original" ? IMAGE_CACHE_CONTROL : MIRROR_CACHE_CONTROL;
 
   if (!stored) {
     const fb = search.get("fb") === "full" ? "full" : "icon";
@@ -159,7 +164,7 @@ export async function GET(
     return new Response(cached.body, { status: cached.status, headers });
   }
 
-  const object = await bucket.get(original ? `i/${normalizedAsset}` : `m/${normalizedAsset}`);
+  const object = await bucket.get(stored.key);
   if (!object) {
     // Deleted between the head and the get. Rare, and the CDN is the same
     // answer the miss above would have given.

@@ -1,4 +1,9 @@
-import { METADATA_ORIGIN, getMetadataBucket } from "@/lib/metadata";
+import {
+  METADATA_ORIGIN,
+  getMetadataEdgeCache,
+  getMetadataRuntime,
+  resolveMetadataArtLocation,
+} from "@/lib/metadata";
 
 /**
  * Clean permanent URL for the 48x48 icon: /icon/<ASSET>. Performs the
@@ -29,11 +34,14 @@ export async function GET(
 ) {
   const { asset } = await params;
   const normalizedAsset = asset.toUpperCase();
-  const bucket = await getMetadataBucket();
-
-  const original = await bucket.head(`i/${normalizedAsset}`);
-  const mirror = original ? null : await bucket.head(`m/${normalizedAsset}`);
-  const stored = original ?? mirror;
+  const cache = getMetadataEdgeCache();
+  const { bucket, ctx } = await getMetadataRuntime();
+  const stored = await resolveMetadataArtLocation(
+    bucket,
+    cache,
+    ctx,
+    normalizedAsset,
+  );
   // A 404 rather than the CDN's guess: this is the icon an on-chain
   // description's metadata points at, and no icon is a better answer there
   // than a placeholder that looks like one.
@@ -63,7 +71,7 @@ export async function GET(
       "content-type": res.headers.get("content-type") ?? "image/png",
       // A mirror is a copy of a file its owner can change; an original is
       // ours and replaced only through the editor. Same split as /i.
-      "cache-control": original ? "public, max-age=3600" : "public, max-age=300",
+      "cache-control": stored.kind === "original" ? "public, max-age=3600" : "public, max-age=300",
       "access-control-allow-origin": "*",
     },
   });

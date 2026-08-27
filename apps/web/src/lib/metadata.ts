@@ -38,6 +38,12 @@ export interface R2Bucket {
   ): Promise<unknown>;
 }
 
+export interface MetadataArtLocation {
+  kind: "original" | "mirror";
+  key: string;
+  etag?: string;
+}
+
 interface DescriptionDbStatement {
   bind(...values: unknown[]): DescriptionDbStatement;
   run(): Promise<unknown>;
@@ -88,6 +94,68 @@ export function metadataCacheKey(pathname: string): Request {
   return new Request(`${METADATA_CACHE_ORIGIN}${pathname}`, { method: "GET" });
 }
 
+const ART_LOCATION_TTL = 300;
+const ART_LOCATION_KIND = "x-metadata-art-kind";
+const ART_LOCATION_ETAG = "x-metadata-art-etag";
+
+export function metadataArtLocationCacheKey(asset: string): Request {
+  return metadataCacheKey(`/_art-location/${encodeURIComponent(asset.toUpperCase())}`);
+}
+
+/**
+ * Resolve whether launch art is our original, a mirrored copy, or absent.
+ *
+ * Asset chips and Telegram previews ask for the same missing assets repeatedly.
+ * Without this short edge entry each request performs one or two R2 HEADs just
+ * to rediscover the same answer. Five minutes matches the existing redirect
+ * and mirror TTLs, while owner edits explicitly evict this key below.
+ */
+export async function resolveMetadataArtLocation(
+  bucket: R2Bucket,
+  cache: Cache | null,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  asset: string,
+): Promise<MetadataArtLocation | null> {
+  const normalized = asset.toUpperCase();
+  const cacheKey = metadataArtLocationCacheKey(normalized);
+  const cached = await cache?.match(cacheKey).catch(() => undefined);
+  if (cached) {
+    const kind = cached.headers.get(ART_LOCATION_KIND);
+    if (kind === "none") return null;
+    if (kind === "original" || kind === "mirror") {
+      const etag = cached.headers.get(ART_LOCATION_ETAG) ?? undefined;
+      return {
+        kind,
+        key: `${kind === "original" ? "i" : "m"}/${normalized}`,
+        ...(etag ? { etag } : {}),
+      };
+    }
+  }
+
+  const original = await bucket.head(`i/${normalized}`);
+  const mirror = original ? null : await bucket.head(`m/${normalized}`);
+  const stored = original ?? mirror;
+  const kind = original ? "original" : mirror ? "mirror" : "none";
+  if (cache) {
+    const headers = new Headers({
+      "cache-control": `public, max-age=${ART_LOCATION_TTL}`,
+      [ART_LOCATION_KIND]: kind,
+    });
+    if (stored?.etag) headers.set(ART_LOCATION_ETAG, stored.etag);
+    ctx.waitUntil(
+      cache
+        .put(cacheKey, new Response(null, { headers }))
+        .catch(() => undefined),
+    );
+  }
+  if (!stored || kind === "none") return null;
+  return {
+    kind,
+    key: `${kind === "original" ? "i" : "m"}/${normalized}`,
+    ...(stored.etag ? { etag: stored.etag } : {}),
+  };
+}
+
 /**
  * Evict the edge-cached copies of a launch's metadata after an owner edits
  * it. Without this, "Saved. Cached pages may take a minute to refresh" was a
@@ -102,9 +170,18 @@ export function metadataCacheKey(pathname: string): Request {
 export async function purgeMetadataCache(pathnames: string[]): Promise<void> {
   const cache = getMetadataEdgeCache();
   if (!cache) return;
+  const keys = pathnames.flatMap((pathname) => {
+    const art = pathname.match(/^\/i\/([^/?]+)/);
+    return art?.[1]
+      ? [
+          metadataCacheKey(pathname),
+          metadataArtLocationCacheKey(decodeURIComponent(art[1])),
+        ]
+      : [metadataCacheKey(pathname)];
+  });
   await Promise.all(
-    pathnames.map((pathname) =>
-      cache.delete(metadataCacheKey(pathname)).catch(() => false),
+    keys.map((key) =>
+      cache.delete(key).catch(() => false),
     ),
   );
 }
