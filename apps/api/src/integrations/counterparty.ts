@@ -404,9 +404,15 @@ export async function fetchPool(asset: string): Promise<PoolLookup> {
 }
 
 export interface CpDispenser {
+  tx_hash: string;
   give_quantity: number | string;
   give_remaining: number | string;
   satoshirate: number | string;
+}
+
+export interface CpPendingXcpDispense {
+  dispenser_tx_hash: string;
+  dispense_quantity: number | string;
 }
 
 /**
@@ -427,6 +433,25 @@ export async function fetchXcpDispensers(): Promise<CpDispenser[]> {
     // may have come through parseJsonLossless as a string, and coercing money
     // to a double to compare it is the one thing this repo does not do.
     return (data.result ?? []).filter((d) => rawEquals(d.give_quantity, SATS_PER_UNIT));
+  } catch {
+    return [];
+  }
+}
+
+/** Pending XCP fills used to project dispenser escrow through the mempool. */
+export async function fetchPendingXcpDispenses(): Promise<CpPendingXcpDispense[]> {
+  try {
+    const data: { result: { params?: Partial<CpPendingXcpDispense> }[] } = await get(
+      `/mempool/events/DISPENSE?limit=500`,
+    );
+    return (data.result ?? [])
+      .map((event) => event.params)
+      .filter(
+        (params): params is CpPendingXcpDispense =>
+          typeof params?.dispenser_tx_hash === "string" &&
+          (typeof params.dispense_quantity === "number" ||
+            typeof params.dispense_quantity === "string"),
+      );
   } catch {
     return [];
   }

@@ -28,6 +28,9 @@ export default defineConfig({
       "@launchpad/xcp69/numeric": here("./packages/xcp69/src/numeric.ts"),
       "@launchpad/xcp69/candles": here("./packages/xcp69/src/candles.ts"),
       "@launchpad/xcp69/mempool": here("./packages/xcp69/src/mempool.ts"),
+      "@launchpad/xcp69/dispenser-price": here(
+        "./packages/xcp69/src/dispenser-price.ts",
+      ),
     },
   },
   test: {

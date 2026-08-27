@@ -25,6 +25,33 @@ export interface DispenserAsk {
   give_quantity: RawLike;
   give_remaining: RawLike;
   satoshirate: RawLike;
+  /** Identifies the escrow a mempool DISPENSE is consuming. Older callers
+   *  that only need the confirmed book may omit it. */
+  tx_hash?: string;
+}
+
+/** The part of a mempool DISPENSE needed to project the confirmed book
+ * forward. One trigger can consume several whole vends. */
+export interface PendingDispense {
+  dispenser_tx_hash?: string | null;
+  dispense_quantity: RawLike;
+}
+
+/** Remaining escrow after subtracting every pending trigger for this exact
+ * dispenser. Pending activity is not subtracted by address: one address can
+ * own several dispensers and each has independent escrow and pricing. */
+export function remainingAfterPending(
+  row: DispenserAsk,
+  pending: readonly PendingDispense[] = [],
+): bigint {
+  let remaining = big(row.give_remaining);
+  if (!row.tx_hash || remaining <= 0n) return remaining > 0n ? remaining : 0n;
+  for (const event of pending) {
+    if (event.dispenser_tx_hash === row.tx_hash) {
+      remaining -= big(event.dispense_quantity);
+    }
+  }
+  return remaining > 0n ? remaining : 0n;
 }
 
 /**
@@ -50,9 +77,9 @@ export function perXcpSats(r: DispenserAsk): bigint {
  * matters most at the head of the book, which is exactly where both the mark
  * and the undercut target are read from.
  */
-function vendable(r: DispenserAsk): boolean {
+function vendable(r: DispenserAsk, pending: readonly PendingDispense[]): boolean {
   const give = big(r.give_quantity);
-  return give > 0n && big(r.give_remaining) >= give && perXcpSats(r) > 0n;
+  return give > 0n && remainingAfterPending(r, pending) >= give && perXcpSats(r) > 0n;
 }
 
 /**
@@ -67,8 +94,11 @@ function vendable(r: DispenserAsk): boolean {
  * there is no floor, and every caller hides its comparison or falls back
  * rather than inventing one.
  */
-export function bestAskSats(rows: DispenserAsk[]): number | null {
-  const live = rows.filter(vendable);
+export function bestAskSats(
+  rows: DispenserAsk[],
+  pending: readonly PendingDispense[] = [],
+): number | null {
+  const live = rows.filter((row) => vendable(row, pending));
   if (live.length === 0) return null;
   const cheapest = live.reduce((lo, r) => minRaw(lo, perXcpSats(r)), perXcpSats(live[0]));
   return approx(cheapest);
@@ -79,9 +109,13 @@ export function bestAskSats(rows: DispenserAsk[]): number | null {
  * and nothing on the Counterparty side of the trade is denominated in fiat —
  * the dollar figure is a conversion of a BTC price, not a price of its own.
  */
-export function bestAskUsd(rows: DispenserAsk[], btcUsd: number | null): number | null {
+export function bestAskUsd(
+  rows: DispenserAsk[],
+  btcUsd: number | null,
+  pending: readonly PendingDispense[] = [],
+): number | null {
   if (!btcUsd || btcUsd <= 0) return null;
-  const sats = bestAskSats(rows);
+  const sats = bestAskSats(rows, pending);
   if (sats === null || sats <= 0) return null;
   const usd = (sats / SATS) * btcUsd;
   return usd > 0 ? usd : null;

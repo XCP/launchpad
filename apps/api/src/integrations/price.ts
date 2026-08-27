@@ -1,5 +1,8 @@
 import { bestAskUsd } from "@launchpad/xcp69/dispenser-price";
-import { fetchXcpDispensers } from "#api/integrations/counterparty";
+import {
+  fetchPendingXcpDispenses,
+  fetchXcpDispensers,
+} from "#api/integrations/counterparty";
 
 const PRICE_URL = "https://api.xcp.io/v2/price";
 
@@ -41,6 +44,10 @@ async function fetchTicker(): Promise<{ xcp: number | null; btc: number | null }
  * both legs swallow their own errors and null just drops the dollar figure.
  */
 export async function fetchXcpUsd(): Promise<number | null> {
-  const [ticker, dispensers] = await Promise.all([fetchTicker(), fetchXcpDispensers()]);
-  return bestAskUsd(dispensers, ticker.btc) ?? ticker.xcp;
+  const [ticker, dispensers, pending] = await Promise.all([
+    fetchTicker(),
+    fetchXcpDispensers(),
+    fetchPendingXcpDispenses(),
+  ]);
+  return bestAskUsd(dispensers, ticker.btc, pending) ?? ticker.xcp;
 }

@@ -432,6 +432,28 @@ export interface Dispenser {
   price: number;
 }
 
+export interface PendingXcpDispense {
+  dispenser_tx_hash: string;
+  dispense_quantity: number;
+}
+
+/** Pending XCP dispenser fills. Their quantities are subtracted from the
+ * confirmed escrow anywhere the site needs a currently actionable book. */
+export async function fetchPendingXcpDispenses(): Promise<PendingXcpDispense[]> {
+  const data = await get<Paginated<{ params?: Partial<PendingXcpDispense> }>>(
+    `/mempool/events/DISPENSE?limit=500`,
+    10,
+  );
+  return (data.result ?? [])
+    .map((event) => event.params)
+    .filter(
+      (params): params is PendingXcpDispense =>
+        typeof params?.dispenser_tx_hash === "string" &&
+        typeof params.dispense_quantity === "number" &&
+        params.dispense_quantity > 0,
+    );
+}
+
 export async function fetchXcpDispensers(limit = 10): Promise<Dispenser[]> {
   const data = await get<Paginated<Dispenser>>(
     `/assets/XCP/dispensers?status=open&exclude_with_oracle=true&sort=price:asc&limit=100`,

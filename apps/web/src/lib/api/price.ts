@@ -1,4 +1,7 @@
-import { fetchXcpDispensers } from "@/lib/api/counterparty";
+import {
+  fetchPendingXcpDispenses,
+  fetchXcpDispensers,
+} from "@/lib/api/counterparty";
 import { XCP_API_BASE } from "@/lib/constants";
 import { bestAskUsd } from "@launchpad/xcp69/dispenser-price";
 
@@ -63,9 +66,10 @@ export async function fetchXcpUsdReference(): Promise<number | null> {
  * block is a worse answer than the ticker.
  */
 export async function fetchXcpUsd(): Promise<number | null> {
-  const [ticker, dispensers] = await Promise.all([
+  const [ticker, dispensers, pending] = await Promise.all([
     fetchTicker(),
     fetchXcpDispensers().catch(() => []),
+    fetchPendingXcpDispenses().catch(() => []),
   ]);
-  return bestAskUsd(dispensers, ticker.btc) ?? ticker.xcp;
+  return bestAskUsd(dispensers, ticker.btc, pending) ?? ticker.xcp;
 }

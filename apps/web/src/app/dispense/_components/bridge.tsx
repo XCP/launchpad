@@ -2,7 +2,11 @@
 
 import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
-import { bestAskSats, perXcpSats } from "@launchpad/xcp69/dispenser-price";
+import {
+  bestAskSats,
+  perXcpSats,
+  remainingAfterPending,
+} from "@launchpad/xcp69/dispenser-price";
 import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
 import { ConnectButton } from "@/components/connect-button";
@@ -12,7 +16,10 @@ import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
-import type { Dispenser } from "@/lib/api/counterparty";
+import {
+  fetchPendingXcpDispenses,
+  type Dispenser,
+} from "@/lib/api/counterparty";
 import { commas, commasRaw, satsPerVb, shortAddress, usd as usdFmt } from "@/lib/format";
 import {
   approx,
@@ -46,23 +53,6 @@ import {
 /** 1 XCP mints 100,000 tokens of any launch (lot size ÷ lot price). */
 
 /**
- * Dispenser addresses with a dispense already pending in the mempool: a
- * pending trigger can drain the escrow before yours confirms, and the BTC
- * is forfeit. Hidden from routing until the mempool clears.
- */
-async function fetchBusyDispensers(): Promise<Set<string>> {
-  const res = await fetch(
-    `${COUNTERPARTY_API_BASE}/mempool/events/DISPENSE?limit=500`,
-    { signal: AbortSignal.timeout(10_000) },
-  );
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const events: { params?: { source?: string } }[] = (await res.json()).result ?? [];
-  return new Set(
-    events.map((e) => e.params?.source).filter((s): s is string => Boolean(s)),
-  );
-}
-
-/**
  * The XCP bridge: dispensers aren't DEX orders — they're the on/off-ramp
  * between the Bitcoin side of your wallet and the Counterparty side. Load
  * sends BTC through the cheapest dispenser route and XCP lands next block;
@@ -78,6 +68,20 @@ export function XcpBridge({
   xcpUsd: number | null;
 }) {
   const [direction, setDirection] = useState<"load" | "unload">("load");
+  const { data: pendingDispenses } = useSWR(
+    "mempool-dispenses",
+    fetchPendingXcpDispenses,
+    { refreshInterval: 10_000, revalidateOnFocus: true },
+  );
+  // Project confirmed escrow through the mempool. A partially consumed
+  // dispenser remains usable for its real remaining depth; one whose final
+  // vend is already pending disappears from both the route and the floor.
+  const adjustedDispensers = dispensers.map((row) => ({
+    ...row,
+    // XCP's entire raw supply is safely below 2^53 (see Dispenser), and
+    // `approx` makes this deliberate boundary back to the UI's number shape.
+    give_remaining: approx(remainingAfterPending(row, pendingDispenses ?? [])),
+  }));
   const settings = useSyncExternalStore(
     subscribeSettings,
     readSettings,
@@ -114,7 +118,7 @@ export function XcpBridge({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         {direction === "load" ? (
           <LoadCard
-            dispensers={dispensers}
+            dispensers={adjustedDispensers}
             btcUsd={btcUsd}
             xcpUsd={xcpUsd}
             onFlip={flip}
@@ -123,7 +127,7 @@ export function XcpBridge({
           />
         ) : (
           <UnloadCard
-            dispensers={dispensers}
+            dispensers={adjustedDispensers}
             btcUsd={btcUsd}
             xcpUsd={xcpUsd}
             onFlip={flip}
@@ -239,11 +243,7 @@ function LoadCard({
   const [lastEdited, setLastEdited] = useState<"xcp" | "btc">("xcp");
   const [armed, setArmed] = useState(false);
 
-  const { data: pendingSources } = useSWR("mempool-dispenses", fetchBusyDispensers, {
-    refreshInterval: 10_000,
-    revalidateOnFocus: true,
-  });
-  const open = dispensers.filter((disp) => !pendingSources?.has(disp.source));
+  const open = dispensers.filter((disp) => disp.give_remaining >= disp.give_quantity);
   const hiddenCount = dispensers.length - open.length;
 
   const { data: xcpBalance } = useSWR(
