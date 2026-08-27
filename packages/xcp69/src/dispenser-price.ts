@@ -37,6 +37,22 @@ export interface PendingDispense {
   dispense_quantity: RawLike;
 }
 
+/** Safety signal for routing: unlike price projection, the buy flow treats
+ * any in-flight consumption of this dispenser as busy, even when confirmed
+ * escrow would still have another vend behind it. */
+export function hasPendingDispense(
+  row: DispenserAsk,
+  pending: readonly PendingDispense[] = [],
+): boolean {
+  return Boolean(
+    row.tx_hash &&
+      pending.some(
+        (event) =>
+          event.dispenser_tx_hash === row.tx_hash && big(event.dispense_quantity) > 0n,
+      ),
+  );
+}
+
 /** Remaining escrow after subtracting every pending trigger for this exact
  * dispenser. Pending activity is not subtracted by address: one address can
  * own several dispensers and each has independent escrow and pricing. */

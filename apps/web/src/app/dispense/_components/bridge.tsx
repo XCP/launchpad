@@ -4,8 +4,8 @@ import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import {
   bestAskSats,
+  hasPendingDispense,
   perXcpSats,
-  remainingAfterPending,
 } from "@launchpad/xcp69/dispenser-price";
 import { AmountInput } from "@/components/amount-input";
 import { BtcChip, XcpChip } from "@/components/asset-chip";
@@ -73,15 +73,15 @@ export function XcpBridge({
     fetchPendingXcpDispenses,
     { refreshInterval: 10_000, revalidateOnFocus: true },
   );
-  // Project confirmed escrow through the mempool. A partially consumed
-  // dispenser remains usable for its real remaining depth; one whose final
-  // vend is already pending disappears from both the route and the floor.
-  const adjustedDispensers = dispensers.map((row) => ({
-    ...row,
-    // XCP's entire raw supply is safely below 2^53 (see Dispenser), and
-    // `approx` makes this deliberate boundary back to the UI's number shape.
-    give_remaining: approx(remainingAfterPending(row, pendingDispenses ?? [])),
-  }));
+  // Routing is deliberately more conservative than valuation. Even when a
+  // dispenser has depth behind the pending purchase, another buyer would be
+  // racing that transaction and can forfeit BTC if the escrow disappears.
+  // Hide the whole route until its mempool activity clears. The sitewide XCP
+  // mark separately subtracts pending quantity and keeps any real remainder.
+  const safeDispensers = dispensers.filter(
+    (row) => !hasPendingDispense(row, pendingDispenses ?? []),
+  );
+  const hiddenCount = dispensers.length - safeDispensers.length;
   const settings = useSyncExternalStore(
     subscribeSettings,
     readSettings,
@@ -118,7 +118,8 @@ export function XcpBridge({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_15rem] lg:items-start">
         {direction === "load" ? (
           <LoadCard
-            dispensers={adjustedDispensers}
+            dispensers={safeDispensers}
+            hiddenCount={hiddenCount}
             btcUsd={btcUsd}
             xcpUsd={xcpUsd}
             onFlip={flip}
@@ -127,7 +128,7 @@ export function XcpBridge({
           />
         ) : (
           <UnloadCard
-            dispensers={adjustedDispensers}
+            dispensers={dispensers}
             btcUsd={btcUsd}
             xcpUsd={xcpUsd}
             onFlip={flip}
@@ -218,6 +219,7 @@ function LoadCard({
   onFlip,
   flips,
   customFee,
+  hiddenCount,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
@@ -225,6 +227,7 @@ function LoadCard({
   onFlip: () => void;
   flips: number;
   customFee: number;
+  hiddenCount: number;
 }) {
   const { address, status: walletStatus } = useWallet();
   const { data: btcBalanceSats } = useSWR(
@@ -244,7 +247,6 @@ function LoadCard({
   const [armed, setArmed] = useState(false);
 
   const open = dispensers.filter((disp) => disp.give_remaining >= disp.give_quantity);
-  const hiddenCount = dispensers.length - open.length;
 
   const { data: xcpBalance } = useSWR(
     address ? [address, "XCP", "bridge-balance"] : null,

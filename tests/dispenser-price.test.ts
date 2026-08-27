@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   bestAskSats,
+  hasPendingDispense,
   remainingAfterPending,
 } from "@launchpad/xcp69/dispenser-price";
 
@@ -29,6 +30,10 @@ describe("mempool-adjusted dispenser price", () => {
 
     expect(remainingAfterPending(row, pending)).toBe(200_000_000n);
     expect(bestAskSats([row, ask("next", 4_200, 4)], pending)).toBe(3_650);
+    // Pricing keeps the two remaining vends, while routing can independently
+    // hide this busy dispenser for safety.
+    expect(hasPendingDispense(row, pending)).toBe(true);
+    expect(hasPendingDispense(ask("next", 4_200, 4), pending)).toBe(false);
   });
 
   it("aggregates several pending fills against the exact dispenser", () => {
