@@ -112,6 +112,7 @@ export default async function StatsPage() {
           label="Market cap"
           value={`${formatXcp(marketCapXcp)} XCP`}
           hint={xcpUsd ? `≈ ${usd(marketCapXcp * xcpUsd)} · graduated coins` : "graduated coins"}
+          mobileHint={xcpUsd ? `≈ ${usd(marketCapXcp * xcpUsd)} · graduated` : "graduated"}
         />
         <Stat
           className="order-2 sm:order-none"
@@ -158,6 +159,7 @@ export default async function StatsPage() {
               ? `≈ ${usd(activeXcp * xcpUsd)} committed to open mints`
               : "committed to open mints"
           }
+          mobileHint={xcpUsd ? `≈ ${usd(activeXcp * xcpUsd)} committed` : "committed"}
         />
       </section>
 
@@ -284,11 +286,13 @@ function Stat({
   label,
   value,
   hint,
+  mobileHint,
   className = "",
 }: {
   label: string;
   value: string;
   hint: string;
+  mobileHint?: string;
   /** Ordering only. Two columns read as three rows of pairs, and the pairs
    *  that belong together are not the ones source order produces. */
   className?: string;
@@ -297,7 +301,10 @@ function Stat({
     <div className={`rounded-xl border border-gray-200 bg-white p-4 ${className}`}>
       <div className={LABEL}>{label}</div>
       <div className="mt-0.5 truncate text-xl font-bold text-gray-900 tabular-nums">{value}</div>
-      <div className="mt-1 text-[11px] leading-snug text-gray-400">{hint}</div>
+      <div className="mt-1 text-[11px] leading-snug text-gray-400">
+        <span className={mobileHint ? "hidden sm:inline" : undefined}>{hint}</span>
+        {mobileHint ? <span className="sm:hidden">{mobileHint}</span> : null}
+      </div>
     </div>
   );
 }
