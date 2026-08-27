@@ -7,6 +7,8 @@ import { shortAddress } from "@/lib/format";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
 import { fetchPriorityFeeRate } from "@/lib/wallet/useCompose";
+import { parseTxInputs } from "@/lib/wallet/raw-tx";
+import { recentlySpentUtxos, registerSpentUtxos } from "@/lib/wallet/spent-utxos";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
@@ -18,9 +20,10 @@ import { COUNTERPARTY_API_BASE } from "@/lib/constants";
  * The composer would double-spend by default — UTXOs are sorted largest-
  * first and selection is deterministic, and its in-process lock lives only
  * 3 seconds, far shorter than a human approval. So each leg is composed
- * with an explicit disjoint UTXO via inputs_set. When the wallet lacks
- * enough disjoint UTXOs, legs chain instead: each later leg excludes the
- * spent inputs and spends mempool change via allow_unconfirmed_inputs.
+ * with an explicit disjoint UTXO via inputs_set when that is possible. When
+ * the wallet is fragmented, Core selects as many inputs as the first leg
+ * needs; we parse the composed transaction, exclude its exact inputs from
+ * every later leg, and allow those legs to spend its unconfirmed change.
  *
  * The extension rate-limits sign+broadcast to 10/origin/minute — 3 legs =
  * 6 calls, the ceiling that motivates MAX_LEGS = 3. A re-sign of the SAME
@@ -180,10 +183,21 @@ export function useDispenseRouter(btcUsd?: number | null) {
                 chainModeRef.current && !leg.utxoAssigned
                   ? usedInputsRef.current
                   : undefined,
-              allowUnconfirmed: chainModeRef.current && !leg.utxoAssigned,
+              // Leg zero deliberately starts from confirmed coins. Once it
+              // broadcasts, later legs may chain from its mempool change.
+              allowUnconfirmed:
+                chainModeRef.current && !leg.utxoAssigned && i > 0,
             });
             patch(i, { rawHex });
           }
+
+          const inputs = parseTxInputs(rawHex);
+          usedInputsRef.current = [
+            ...new Set([
+              ...usedInputsRef.current,
+              ...inputs.map((input) => `${input.txid}:${input.vout}`),
+            ]),
+          ];
 
           patch(i, { status: "signing", error: null });
           const signedHex = await signTransaction(rawHex);
@@ -191,6 +205,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
           patch(i, { status: "broadcasting" });
           const txid = await broadcastTransaction(signedHex);
           patch(i, { status: "done", txid });
+          registerSpentUtxos(inputs);
           registerPending({
             txid,
             kind: "dispense",
@@ -237,7 +252,10 @@ export function useDispenseRouter(btcUsd?: number | null) {
 
     try {
       feeRateRef.current = feeRateOverride ?? (await fetchPriorityFeeRate());
-      const utxos = await fetchConfirmedUtxos(address);
+      const knownSpent = new Set(recentlySpentUtxos());
+      const utxos = (await fetchConfirmedUtxos(address)).filter(
+        (utxo) => !knownSpent.has(`${utxo.txid}:${utxo.vout}`),
+      );
       const reserve = feeRateRef.current * FEE_VBYTES;
       const totalNeeded = planned.reduce((s, l) => s + l.btcSats + reserve, 0);
       const totalHave = utxos.reduce((s, u) => s + u.value, 0);
@@ -273,13 +291,15 @@ export function useDispenseRouter(btcUsd?: number | null) {
 
       chainModeRef.current = !partitioned;
       if (!partitioned) {
-        // Chain mode: leg 0 pins the largest UTXO; later legs exclude it
-        // and spend mempool change via allow_unconfirmed_inputs.
-        legsRef.current = legsRef.current.map((l, i) => ({
+        // Do not pin leg zero to one coin: fragmentation is precisely the
+        // case where no individual UTXO covers it. Core combines confirmed
+        // inputs, then run() records the actual selection so subsequent legs
+        // can safely spend either untouched coins or unconfirmed change.
+        legsRef.current = legsRef.current.map((l) => ({
           ...l,
-          utxoAssigned: i === 0 ? `${utxos[0].txid}:${utxos[0].vout}` : undefined,
+          utxoAssigned: undefined,
         }));
-        usedInputsRef.current = [`${utxos[0].txid}:${utxos[0].vout}`];
+        usedInputsRef.current = [...knownSpent];
       } else {
         usedInputsRef.current = legsRef.current
           .map((l) => l.utxoAssigned)
