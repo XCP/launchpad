@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { mergePairTrades } from "@launchpad/xcp69/trades";
+import {
+  mergePairTrades,
+  tradeRoleForAddress,
+} from "@launchpad/xcp69/trades";
 import { toIndexedRows } from "#api/indexer/events";
 
 const tx = "e7a3380dbd45ac3e7a142389ae16ce334344837143b9d2854ea28d5ee2818897";
@@ -118,5 +121,33 @@ describe("pair trade chronology", () => {
 
     expect(trades.map((trade) => trade.txHash)).toEqual(["newer", "older"]);
     expect(fetchEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe("connected-wallet trade attribution", () => {
+  const pool = {
+    address: "pool-trader",
+    counterpartyAddress: "",
+    venue: "pool" as const,
+  };
+  const book = {
+    address: "book-taker",
+    counterpartyAddress: "book-maker",
+    venue: "book" as const,
+  };
+
+  it("recognizes the pool trader and order-book taker as the primary participant", () => {
+    expect(tradeRoleForAddress(pool, "pool-trader")).toBe("primary");
+    expect(tradeRoleForAddress(book, "book-taker")).toBe("primary");
+  });
+
+  it("recognizes the resting maker without inventing a pool counterparty", () => {
+    expect(tradeRoleForAddress(book, "book-maker")).toBe("counterparty");
+    expect(tradeRoleForAddress(pool, "book-maker")).toBeNull();
+  });
+
+  it("does not highlight disconnected or unrelated addresses", () => {
+    expect(tradeRoleForAddress(book, null)).toBeNull();
+    expect(tradeRoleForAddress(book, "someone-else")).toBeNull();
   });
 });
