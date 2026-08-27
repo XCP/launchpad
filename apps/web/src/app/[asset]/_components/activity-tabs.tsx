@@ -33,6 +33,7 @@ import {
   LaunchpadAddressHoverCard,
 } from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
+import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import { mergePairTrades } from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
@@ -43,6 +44,14 @@ import {
 } from "@/lib/holders";
 
 const PER_PAGE = 25;
+
+/**
+ * Column layout shared by the Trades and Orders tables, which render the same
+ * six columns. The 41.5rem floor matches the minters grid above and stays
+ * under the card's 42rem width, so the table scrolls only on viewports
+ * narrower than the card itself.
+ */
+const PAIR_TABLE = "w-full min-w-[41.5rem] text-sm";
 
 interface TradeRow {
   key: string;
@@ -125,13 +134,19 @@ export function ActivityTabs({
     setPage(p);
   };
 
-  // Relative trade ages should keep moving even when the room has no new
-  // fills to trigger a render. Minute precision is all the label exposes.
+  // The tape re-renders only when the trade data itself changes, so the
+  // relative ages need their own timer. The interval matches the minute
+  // resolution of the label.
+  const showsAges = tab === "trades";
   useEffect(() => {
-    if (tab !== "trades") return;
+    if (!showsAges) return;
     const timer = window.setInterval(() => setTimeTick((tick) => tick + 1), 60_000);
     return () => window.clearInterval(timer);
-  }, [tab]);
+  }, [showsAges]);
+
+  // Coarse pointers cannot hover, so the trade tape renders the block height
+  // inline instead of only in the title attribute.
+  const coarse = useCoarsePointer();
 
   // One subscription for the whole card: the mempool tape, the trade tape,
   // and the status the page watches for a transition all arrive on it.
@@ -666,7 +681,7 @@ export function ActivityTabs({
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[41rem] text-sm">
+              <table className={PAIR_TABLE}>
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
                     <th className="px-4 py-2">Side</th>
@@ -680,10 +695,11 @@ export function ActivityTabs({
                 <tbody className="divide-y divide-gray-100">
                   {trades.slice(from, from + PER_PAGE).map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
+                    // block_time is missing only if a node responded without
+                    // it; fall back to the block height rather than to a
+                    // placeholder string.
                     const hasTime = t.time > 0;
-                    const exactTime = hasTime
-                      ? new Date(t.time * 1000).toUTCString()
-                      : null;
+                    const at = hasTime ? new Date(t.time * 1000) : null;
                     return (
                       <tr key={t.key}>
                         <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}>
@@ -723,10 +739,27 @@ export function ActivityTabs({
                             href={`https://xcp.io/tx/${t.txHash}`}
                             target="_blank"
                             rel="noreferrer"
-                            title={exactTime ? `${exactTime} · block ${commas(t.block)}` : `Block ${commas(t.block)}`}
+                            title={
+                              at
+                                ? `${at.toUTCString()} · block ${commas(t.block)}`
+                                : `Block ${commas(t.block)}`
+                            }
                             className="hover:text-purple-700 hover:underline"
                           >
-                            {t.via} · {hasTime ? timeAgo(t.time) : "time unavailable"}
+                            {t.via} ·{" "}
+                            {at ? (
+                              <time dateTime={at.toISOString()}>
+                                {timeAgo(t.time)}
+                              </time>
+                            ) : (
+                              commas(t.block)
+                            )}
+                            {at && coarse && (
+                              <span className="text-gray-400">
+                                {" "}
+                                · {commas(t.block)}
+                              </span>
+                            )}
                           </a>
                         </td>
                       </tr>
@@ -884,7 +917,7 @@ export function ActivityTabs({
               {/* Same shape as Trades above it: a book and a tape are the same
                   columns at different moments, so reading one should teach you
                   to read the other. */}
-              <table className="w-full min-w-[43rem] text-sm">
+              <table className={PAIR_TABLE}>
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
                     <th className="px-4 py-2">Side</th>
