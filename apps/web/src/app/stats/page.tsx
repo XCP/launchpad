@@ -133,7 +133,7 @@ export default async function StatsPage() {
           value={`${formatXcp(tradeXcp)} XCP`}
           hint={
             historicalTradeUsd > 0
-              ? `≈ ${usd(historicalTradeUsd)} at historical prices`
+              ? `≈ ${usd(historicalTradeUsd)} traded, all time`
               : "traded, all time"
           }
         />
