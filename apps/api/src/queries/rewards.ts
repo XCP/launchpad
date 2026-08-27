@@ -193,28 +193,33 @@ export interface RewardBatch {
   transactions: RewardBatchTransaction[];
 }
 
-/** Public distribution history. A frozen manifest without a tx is omitted. */
+/** Public distribution history. A frozen manifest without a tx is omitted.
+ * `sent` is aggregated once per batch before transactions are expanded. A
+ * correlated aggregate here used to rescan every payout twice for every one
+ * of a batch's Bitcoin transactions (71k rows for 233 recipients / 76 txs). */
 export async function listRewardBatches(db: D1Database): Promise<RewardBatch[]> {
   const rows = await q<BatchRow>(
     db,
-    `SELECT b.id, b.asset, b.first_mint_number, b.cutoff_mint_number,
+    `WITH sent AS (
+       SELECT p.batch_id,
+              COUNT(*) AS sent_recipient_count,
+              CAST(SUM(CAST(p.quantity AS INTEGER)) AS TEXT) AS sent_quantity
+         FROM reward_payouts p
+         JOIN reward_transactions pt ON pt.tx_hash = p.reward_tx_hash
+        WHERE pt.status IN ('broadcast', 'confirmed')
+        GROUP BY p.batch_id
+     )
+     SELECT b.id, b.asset, b.first_mint_number, b.cutoff_mint_number,
             b.cutoff_block, b.eligible_mints, b.recipient_count,
             b.total_quantity,
-            (SELECT COUNT(*)
-               FROM reward_payouts p
-               JOIN reward_transactions pt ON pt.tx_hash = p.reward_tx_hash
-              WHERE p.batch_id = b.id
-                AND pt.status IN ('broadcast', 'confirmed')) AS sent_recipient_count,
-            COALESCE((SELECT CAST(SUM(CAST(p.quantity AS INTEGER)) AS TEXT)
-               FROM reward_payouts p
-               JOIN reward_transactions pt ON pt.tx_hash = p.reward_tx_hash
-              WHERE p.batch_id = b.id
-                AND pt.status IN ('broadcast', 'confirmed')), '0') AS sent_quantity,
+            COALESCE(s.sent_recipient_count, 0) AS sent_recipient_count,
+            COALESCE(s.sent_quantity, '0') AS sent_quantity,
             b.status, b.created_at, b.broadcast_at,
             b.confirmed_at, t.tx_hash, t.method, t.status AS tx_status,
             t.btc_fee_sats, t.recoverable_sats, t.confirmed_block
        FROM reward_batches b
        JOIN reward_transactions t ON t.batch_id = b.id
+       LEFT JOIN sent s ON s.batch_id = b.id
       WHERE t.status IN ('broadcast', 'confirmed')
       ORDER BY b.cutoff_mint_number DESC, t.tx_hash`,
   );
