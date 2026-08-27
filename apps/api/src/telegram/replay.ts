@@ -36,6 +36,10 @@ export interface BacklogItem {
   /** Orders events inside one block: a launch is announced before it opens,
    *  and opens before anything is minted from it. */
   rank: number;
+  /** Position within the block, for items of equal rank: tx_index for mints,
+   *  the earliest event index for trades. Zero where the chain gives us
+   *  nothing to order by, which the key tiebreak below then settles. */
+  order: number;
   a: Announcement;
   /**
    * Set only on mints, and only so the queue can collapse a run of them into
@@ -67,6 +71,7 @@ interface MintRow {
   launch_tx: string;
   asset: string;
   block_index: number;
+  tx_index: number | null;
   source: string;
   earn_quantity: string;
   paid_quantity: string;
@@ -94,6 +99,9 @@ interface TradeGroup {
   tokenRaw: bigint;
   xcpRaw: bigint;
   fills: number;
+  /** Where the group's earliest fill sits in the block, so a transaction is
+   *  announced at the point its first fill happened. */
+  firstEventIndex: number;
   lastTokenRaw: bigint;
   lastXcpRaw: bigint;
   lastEventIndex: number;
@@ -146,7 +154,7 @@ export async function buildBacklog(
     ),
     q<MintRow>(
       db,
-      `SELECT m.tx_hash, m.launch_tx, l.asset, m.block_index, m.source,
+      `SELECT m.tx_hash, m.launch_tx, l.asset, m.block_index, m.tx_index, m.source,
               m.earn_quantity, m.paid_quantity, l.soft_cap
          FROM ${mintSource}
          JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
@@ -180,6 +188,7 @@ export async function buildBacklog(
         key: launchKey,
         block: announced,
         rank: RANK.launch,
+        order: 0,
         mint: null,
         a: newLaunch({
           asset: l.asset,
@@ -204,6 +213,7 @@ export async function buildBacklog(
         key: openKey,
         block: l.start_block,
         rank: RANK.open,
+        order: 0,
         mint: null,
         a: mintOpen(l.asset),
       });
@@ -220,6 +230,7 @@ export async function buildBacklog(
         key: closedKey,
         block: lastBlockFor(mints, l.tx_hash, l.last_mint_block ?? l.start_block),
         rank: RANK.closed,
+        order: 0,
         mint: null,
         a: mintClosed({
           asset: l.asset,
@@ -260,7 +271,17 @@ export async function buildBacklog(
     const before = BigInt(l.earned_quantity ?? "0") - (batched.get(l.tx_hash) ?? 0n);
     if (before > 0n) running.set(l.tx_hash, before);
   }
-  for (const m of [...mints].sort((a, b) => a.block_index - b.block_index)) {
+  // Sorted by position in the chain, not just by block. Mints sharing a block
+  // are routine — roughly half of all mints indexed so far are in one — and
+  // the running total below is accumulated in this order, so getting it wrong
+  // prints each mint with its neighbour's percentage.
+  const inChainOrder = [...mints].sort(
+    (a, b) =>
+      a.block_index - b.block_index ||
+      (a.tx_index ?? 0) - (b.tx_index ?? 0) ||
+      (a.tx_hash < b.tx_hash ? -1 : 1),
+  );
+  for (const m of inChainOrder) {
     const earned = BigInt(m.earn_quantity);
     const soFar = (running.get(m.launch_tx) ?? 0n) + earned;
     running.set(m.launch_tx, soFar);
@@ -270,6 +291,7 @@ export async function buildBacklog(
       key: `mint:${m.tx_hash}`,
       block: m.block_index,
       rank: RANK.mint,
+      order: m.tx_index ?? 0,
       mint: { asset: m.asset, earned: earned.toString(), paid: m.paid_quantity },
       a: mint({
         asset: m.asset,
@@ -298,6 +320,7 @@ export async function buildBacklog(
         tokenRaw,
         xcpRaw,
         fills: 1,
+        firstEventIndex: eventIndex,
         lastTokenRaw: tokenRaw,
         lastXcpRaw: xcpRaw,
         lastEventIndex: eventIndex,
@@ -308,6 +331,7 @@ export async function buildBacklog(
     current.tokenRaw += tokenRaw;
     current.xcpRaw += xcpRaw;
     current.fills += 1;
+    current.firstEventIndex = Math.min(current.firstEventIndex, eventIndex);
     if (eventIndex >= current.lastEventIndex) {
       current.lastTokenRaw = tokenRaw;
       current.lastXcpRaw = xcpRaw;
@@ -330,6 +354,7 @@ export async function buildBacklog(
       key: `trade-tx:${t.txHash}:${t.asset}`,
       block: t.block,
       rank: RANK.trade,
+      order: t.firstEventIndex,
       mint: null,
       a: trade({
         asset: t.asset,
@@ -347,7 +372,13 @@ export async function buildBacklog(
     });
   }
 
-  return items.sort((a, b) => a.block - b.block || a.rank - b.rank);
+  return items.sort(
+    (a, b) =>
+      a.block - b.block ||
+      a.rank - b.rank ||
+      a.order - b.order ||
+      (a.key < b.key ? -1 : 1),
+  );
 }
 
 const abs = (v: bigint) => (v < 0n ? -v : v);
