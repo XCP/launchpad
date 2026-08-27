@@ -64,6 +64,7 @@ interface LaunchRow {
   mints: number;
   minters: number;
   last_mint_block: number | null;
+  launch_xcp_usd: number | null;
 }
 
 interface MintRow {
@@ -149,7 +150,8 @@ export async function buildBacklog(
     q<LaunchRow>(
       db,
       `SELECT tx_hash, asset, announce_block, start_block, phase, soft_cap,
-              hard_cap, earned_quantity, mints, minters, last_mint_block
+              hard_cap, earned_quantity, mints, minters, last_mint_block,
+              launch_xcp_usd
          FROM launches WHERE conforming = 1`,
     ),
     q<MintRow>(
@@ -247,6 +249,7 @@ export async function buildBacklog(
   // fairminter, and a progress bar that silently pooled two launches' mints
   // would be wrong in a way that still looked plausible.
   const softCapOf = new Map(launches.map((l) => [l.tx_hash, BigInt(l.soft_cap)]));
+  const launchXcpUsdOf = new Map(launches.map((l) => [l.asset, l.launch_xcp_usd]));
   // Running total per launch, so each replayed mint shows the progress it
   // showed at the time rather than the launch's final number.
   //
@@ -365,6 +368,7 @@ export async function buildBacklog(
         marketTokenRaw: t.lastTokenRaw,
         marketXcpRaw: t.lastXcpRaw,
         xcpUsd,
+        launchXcpUsd: launchXcpUsdOf.get(t.asset) ?? null,
         txHash: t.txHash,
         address: t.address,
         venue: t.venue,

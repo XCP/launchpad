@@ -379,6 +379,8 @@ export interface TradeFacts {
   venue: "pool" | "book";
   /** Current decorative conversion, never part of the on-chain trade math. */
   xcpUsd?: number | null;
+  /** XCP/USD when this asset graduated, used for the same USD return shown on site. */
+  launchXcpUsd?: number | null;
   /** Causal Bitcoin transaction, when the indexed match exposes one. */
   txHash?: string | null;
   /** Trader whose indexed balance leg this alert represents. */
@@ -435,14 +437,46 @@ export function trade(f: TradeFacts): Announcement {
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP${(f.fills ?? 1) > 1 ? ` filled · ${f.fills} fills` : ""}`,
       `${(f.fills ?? 1) > 1 ? "Avg " : ""}${price} XCP/token${usdTotal}`,
       `MCap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
-      `Performance: ${performance(marketPriceRaw, launchPriceRaw)}`,
+      `Performance: ${performance(
+        marketPriceRaw,
+        launchPriceRaw,
+        f.xcpUsd,
+        f.launchXcpUsd,
+      )}`,
       links,
     ].join("\n"),
   );
 }
 
-function performance(priceRaw: bigint, launchPriceRaw: bigint): string {
+function performance(
+  priceRaw: bigint,
+  launchPriceRaw: bigint,
+  currentXcpUsd?: number | null,
+  launchXcpUsd?: number | null,
+): string {
   if (launchPriceRaw <= 0n) return "—";
+  // With both quotes available, match the site's dollar return: the token's
+  // move against XCP plus XCP's own move against USD since graduation. Older
+  // launches without a stored quote retain the prior XCP-only calculation.
+  if (
+    currentXcpUsd !== null &&
+    currentXcpUsd !== undefined &&
+    launchXcpUsd !== null &&
+    launchXcpUsd !== undefined &&
+    Number.isFinite(currentXcpUsd) &&
+    Number.isFinite(launchXcpUsd) &&
+    currentXcpUsd > 0 &&
+    launchXcpUsd > 0
+  ) {
+    const percent =
+      (Number(priceRaw) * currentXcpUsd) /
+        (Number(launchPriceRaw) * launchXcpUsd) -
+      1;
+    const tenths = Math.round(Math.abs(percent) * 1_000);
+    const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
+    return `${sign}${Math.floor(tenths / 10)}.${tenths % 10}%`;
+  }
+
   const delta = priceRaw - launchPriceRaw;
   const magnitude = delta < 0n ? -delta : delta;
   // Tenths of a percent, rounded rather than truncated. Kept in bigint so a

@@ -120,11 +120,13 @@ describe("messages", () => {
       xcpRaw: raw(20n),
       venue: "pool",
       xcpUsd: 2.5,
+      launchXcpUsd: 1.25,
       txHash: "ab".repeat(32),
       address: "1KacrYMuQW5eqLbrYUotQ1mdsVpxin6hC9",
     });
     expect(m.text).toContain("0.00004000 XCP/token · $50.00");
     expect(m.text).toContain("MCap: 4,000 XCP · $10,000.00");
+    expect(m.text).toContain("Performance: +700.0%");
     expect(m.text).toContain(`https://xcp.io/tx/${"ab".repeat(32)}`);
     expect(m.text).toContain("1KacrY…6hC9");
     expect(m.text).toContain("https://xcp.fun/profile/1KacrYMuQW5eqLbrYUotQ1mdsVpxin6hC9");
@@ -318,6 +320,34 @@ describe("multi-fill trade messages", () => {
     expect(m.text).toContain("Avg 0.00004044 XCP/token");
     expect(m.text).toContain("MCap: 4,533.34 XCP");
     expect(m.text).toContain("Performance: +353.3%");
+  });
+});
+
+describe("trade performance", () => {
+  it("includes XCP's USD move since graduation when both quotes are available", () => {
+    const m = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      venue: "pool",
+      xcpUsd: 1.5,
+      launchXcpUsd: 3,
+    });
+    // Token/XCP is +300%, while XCP/USD halved: dollar performance is +100%.
+    expect(m.text).toContain("Performance: +100.0%");
+  });
+
+  it("keeps XCP-only performance when an old launch has no USD baseline", () => {
+    const m = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      venue: "pool",
+      xcpUsd: 1.5,
+    });
+    expect(m.text).toContain("Performance: +300.0%");
   });
 });
 
