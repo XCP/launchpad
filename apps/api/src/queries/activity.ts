@@ -97,7 +97,7 @@ export function listRecentTrades(
        FROM asset_events e
        LEFT JOIN launches l ON l.asset = e.asset
       WHERE e.primary_actor = 1
-      ORDER BY e.block_index DESC, e.event_index DESC, e.id DESC
+      ORDER BY e.block_index DESC, e.tx_index DESC, e.event_index DESC, e.id DESC
       LIMIT ?1 OFFSET ?2`,
     limit,
     offset,

@@ -37,9 +37,12 @@ export interface BacklogItem {
    *  and opens before anything is minted from it. */
   rank: number;
   /** Position within the block, for items of equal rank: tx_index for mints,
-   *  the earliest event index for trades. Zero where the chain gives us
-   *  nothing to order by, which the key tiebreak below then settles. */
+   *  and tx_index for trades. Zero only on legacy rows which predate the
+   *  stored trade transaction index. */
   order: number;
+  /** Position inside one transaction. Trades can cross several price levels,
+   *  while every other announcement is already one transaction. */
+  suborder: number;
   a: Announcement;
   /**
    * Set only on mints, and only so the queue can collapse a run of them into
@@ -82,6 +85,7 @@ interface MintRow {
 interface TradeRow {
   event: string;
   tx_hash: string;
+  tx_index: number | null;
   event_index: number | null;
   address: string;
   asset: string;
@@ -97,6 +101,7 @@ interface TradeGroup {
   asset: string;
   block: number;
   kind: string;
+  txIndex: number;
   tokenRaw: bigint;
   xcpRaw: bigint;
   fills: number;
@@ -164,7 +169,7 @@ export async function buildBacklog(
     ),
     q<TradeRow>(
       db,
-      `SELECT e.event, e.tx_hash, e.event_index, e.address, e.asset, e.block_index,
+      `SELECT e.event, e.tx_hash, e.tx_index, e.event_index, e.address, e.asset, e.block_index,
               e.token_delta, e.xcp_delta, e.kind
          FROM ${tradeSource}
         WHERE e.primary_actor = 1 AND e.tx_hash IS NOT NULL`,
@@ -191,6 +196,7 @@ export async function buildBacklog(
         block: announced,
         rank: RANK.launch,
         order: 0,
+        suborder: 0,
         mint: null,
         a: newLaunch({
           asset: l.asset,
@@ -216,6 +222,7 @@ export async function buildBacklog(
         block: l.start_block,
         rank: RANK.open,
         order: 0,
+        suborder: 0,
         mint: null,
         a: mintOpen(l.asset),
       });
@@ -233,6 +240,7 @@ export async function buildBacklog(
         block: lastBlockFor(mints, l.tx_hash, l.last_mint_block ?? l.start_block),
         rank: RANK.closed,
         order: 0,
+        suborder: 0,
         mint: null,
         a: mintClosed({
           asset: l.asset,
@@ -295,6 +303,7 @@ export async function buildBacklog(
       block: m.block_index,
       rank: RANK.mint,
       order: m.tx_index ?? 0,
+      suborder: 0,
       mint: { asset: m.asset, earned: earned.toString(), paid: m.paid_quantity },
       a: mint({
         asset: m.asset,
@@ -311,6 +320,7 @@ export async function buildBacklog(
     const tokenRaw = abs(BigInt(t.token_delta));
     const xcpRaw = abs(BigInt(t.xcp_delta));
     const key = `${t.tx_hash}:${t.asset}:${t.address}:${t.kind}`;
+    const txIndex = t.tx_index ?? 0;
     const eventIndex = t.event_index ?? 0;
     const current = groupedTrades.get(key);
     if (!current) {
@@ -320,6 +330,7 @@ export async function buildBacklog(
         asset: t.asset,
         block: t.block_index,
         kind: t.kind,
+        txIndex,
         tokenRaw,
         xcpRaw,
         fills: 1,
@@ -334,6 +345,7 @@ export async function buildBacklog(
     current.tokenRaw += tokenRaw;
     current.xcpRaw += xcpRaw;
     current.fills += 1;
+    if (current.txIndex === 0 && txIndex > 0) current.txIndex = txIndex;
     current.firstEventIndex = Math.min(current.firstEventIndex, eventIndex);
     if (eventIndex >= current.lastEventIndex) {
       current.lastTokenRaw = tokenRaw;
@@ -357,7 +369,12 @@ export async function buildBacklog(
       key: `trade-tx:${t.txHash}:${t.asset}`,
       block: t.block,
       rank: RANK.trade,
-      order: t.firstEventIndex,
+      // Ordinary one-fill trades have no event enrichment, so event_index is
+      // zero for almost every row. tx_index is present on every match and is
+      // the actual transaction order; sorting those zeroes by hash was the
+      // source of the Telegram feed's apparently random price path.
+      order: t.txIndex || t.firstEventIndex,
+      suborder: t.firstEventIndex,
       mint: null,
       a: trade({
         asset: t.asset,
@@ -381,6 +398,7 @@ export async function buildBacklog(
       a.block - b.block ||
       a.rank - b.rank ||
       a.order - b.order ||
+      a.suborder - b.suborder ||
       (a.key < b.key ? -1 : 1),
   );
 }

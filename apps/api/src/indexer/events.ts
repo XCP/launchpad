@@ -52,6 +52,8 @@ interface EventRow {
   kind: "buy" | "sell";
   /** Causal transaction, shared by every venue/level the taker crossed. */
   txHash: string;
+  /** Counterparty's global transaction order within the block. */
+  txIndex: number;
   /** Exact Counterparty message order; zero only on legacy/fallback rows. */
   eventIndex: number;
   /** Telegram announces the taker, not a second alert for the resting maker. */
@@ -99,6 +101,7 @@ function receives(
   xcpQty: bigint,
   gainsToken: boolean,
   txHash: string,
+  txIndex: number,
   eventIndex: number,
   primaryActor: boolean,
 ): EventRow {
@@ -115,6 +118,7 @@ function receives(
     xcpDelta: gainsToken ? -xcpQty : xcpQty,
     kind: gainsToken ? "buy" : "sell",
     txHash,
+    txIndex,
     eventIndex,
     primaryActor,
   };
@@ -137,6 +141,7 @@ export function toPoolRows(asset: string, m: CpMatch): EventRow[] {
       l.xcpQty,
       l.forwardIsToken,
       m.tx_hash ?? event,
+      Number(m.tx_index ?? 0),
       0,
       true,
     ),
@@ -168,6 +173,7 @@ export function toOrderRows(asset: string, m: CpMatch): EventRow[] {
         l.xcpQty,
         l.forwardIsToken,
         txHash,
+        Number(m.tx1_index ?? 0),
         0,
         true,
       ),
@@ -184,6 +190,7 @@ export function toOrderRows(asset: string, m: CpMatch): EventRow[] {
         l.xcpQty,
         !l.forwardIsToken,
         txHash,
+        Number(m.tx1_index ?? 0),
         0,
         false,
       ),
@@ -232,6 +239,7 @@ export function toIndexedRows(asset: string, trades: PairTrade[]): EventRow[] {
         xcpQty,
         trade.buy,
         trade.txHash,
+        trade.txIndex,
         trade.eventIndex,
         true,
       ),
@@ -251,6 +259,7 @@ export function toIndexedRows(asset: string, trades: PairTrade[]): EventRow[] {
           xcpQty,
           !trade.buy,
           trade.txHash,
+          trade.txIndex,
           trade.eventIndex,
           false,
         ),
@@ -394,8 +403,8 @@ export async function syncAssetEvents(
       const stmt = db.prepare(
         `INSERT OR IGNORE INTO asset_events
            (id, event, address, asset, block_index, token_delta, xcp_delta, kind,
-            tx_hash, event_index, primary_actor)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)`,
+            tx_hash, tx_index, event_index, primary_actor)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
       );
       const results = await db.batch(
         chunk.map((r) =>
@@ -409,6 +418,7 @@ export async function syncAssetEvents(
             r.xcpDelta.toString(),
             r.kind,
             r.txHash,
+            r.txIndex,
             r.eventIndex || null,
             r.primaryActor ? 1 : 0,
           ),

@@ -7,8 +7,12 @@
  * cosmetic — the running "% to soft cap" is accumulated in exactly this order,
  * so two mints in the wrong order print each other's progress.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { buildBacklog } from "#api/telegram/replay";
+
+vi.mock("#api/integrations/price", () => ({
+  fetchXcpUsd: vi.fn(async () => null),
+}));
 
 const raw = (whole: bigint) => (whole * 100_000_000n).toString();
 
@@ -108,5 +112,46 @@ describe("mints sharing a block", () => {
     const forward = await mintItems([...mintsOutOfOrder].reverse());
     const reversed = await mintItems(mintsOutOfOrder);
     expect(forward.map((i) => i.a.text)).toEqual(reversed.map((i) => i.a.text));
+  });
+});
+
+const trade = (txHash: string, txIndex: number) => ({
+  event: txHash,
+  tx_hash: txHash,
+  tx_index: txIndex,
+  // A normal one-fill transaction is not enriched from its event list.
+  event_index: 0,
+  address: `address-${txHash}`,
+  asset: "TESTCOIN",
+  block_index: 960,
+  token_delta: raw(100_000n),
+  xcp_delta: raw(-1n),
+  kind: "buy",
+});
+
+const tradeItems = async (trades: Record<string, unknown>[]) => {
+  const items = await buildBacklog(
+    fakeDb({ launches: [LAUNCH], mints: [], trades }),
+    1_000,
+  );
+  return items.filter((i) => i.key.startsWith("trade-tx:"));
+};
+
+describe("trades sharing a block", () => {
+  it("uses transaction order when ordinary fills have no event index", async () => {
+    // Hash order says the opposite of chain order. Falling through to the key
+    // would therefore reproduce the apparently random Telegram price path.
+    const items = await tradeItems([trade("aaa-newer", 102), trade("zzz-older", 101)]);
+    expect(items.map((i) => i.key)).toEqual([
+      "trade-tx:zzz-older:TESTCOIN",
+      "trade-tx:aaa-newer:TESTCOIN",
+    ]);
+  });
+
+  it("does not depend on the order SQLite returns trade rows", async () => {
+    const rows = [trade("aaa-newer", 102), trade("zzz-older", 101)];
+    const forward = await tradeItems(rows);
+    const reversed = await tradeItems([...rows].reverse());
+    expect(forward.map((i) => i.key)).toEqual(reversed.map((i) => i.key));
   });
 });
