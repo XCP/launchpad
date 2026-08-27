@@ -281,6 +281,7 @@ export default async function LaunchPage({
       pool={pool}
       candles={candles}
       xcpUsd={xcpUsd}
+      launchXcpUsd={indexed?.launchXcpUsd ?? null}
       btcUsd={btcUsd}
       feeSats={feeSats}
       devTrades={devTrades}

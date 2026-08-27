@@ -2,8 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchLaunchStats } from "@/lib/api/launchpad-api";
-import { fetchXcpUsd } from "@/lib/api/price";
+import { fetchXcpUsd, fetchXcpUsdHistory } from "@/lib/api/price";
 import { commas, fromSats, usd } from "@/lib/format";
+import { historicalUsdAt } from "@/lib/market";
 import { LABEL } from "@/components/ui/tokens";
 
 export const metadata: Metadata = {
@@ -37,9 +38,10 @@ const formatXcp = (value: number) =>
  */
 export default async function StatsPage() {
   const height = await fetchBlockHeight();
-  const [stats, xcpUsd] = await Promise.all([
+  const [stats, xcpUsd, xcpUsdHistory] = await Promise.all([
     fetchLaunchStats(height),
     fetchXcpUsd(),
+    fetchXcpUsdHistory(),
   ]);
 
   if (!stats) {
@@ -56,6 +58,13 @@ export default async function StatsPage() {
   const poolXcp = fromSats(stats.markets?.pool_xcp ?? 0);
   const marketCapXcp = fromSats(stats.markets?.market_cap_xcp ?? 0);
   const tradeXcp = fromSats(stats.markets?.trade_xcp ?? 0);
+  const historicalTradeUsd = (stats.markets?.trade_daily ?? []).reduce(
+    (sum, day) => {
+      const rate = historicalUsdAt(xcpUsdHistory, day.time);
+      return rate === null ? sum : sum + fromSats(day.xcp) * rate;
+    },
+    0,
+  );
 
   // Fill the window so quiet days read as quiet rather than as missing. The
   // bucket is `block / 144`, so the newest bucket is the one the tip is in.
@@ -122,7 +131,11 @@ export default async function StatsPage() {
           // This is XCP that actually changed hands, which is the harder
           // number to produce and the one worth showing on its own.
           value={`${formatXcp(tradeXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(tradeXcp * xcpUsd)} traded, all time` : "traded, all time"}
+          hint={
+            historicalTradeUsd > 0
+              ? `≈ ${usd(historicalTradeUsd)} at historical prices`
+              : "traded, all time"
+          }
         />
         <Stat
           className="order-3 sm:order-none"

@@ -22,7 +22,7 @@ import {
   listMinters,
   listSearchIndex,
   sumFees,
-  tradeVolumeXcp,
+  tradeVolumeByDay,
 } from "#api/queries/launches";
 import { J, router } from "#api/read/respond";
 import { getRewardAccount, listRewardBatches } from "#api/queries/rewards";
@@ -132,7 +132,7 @@ launchesRoute.get("/v2/stats", async (c) => {
     // Whole buckets, so the window is expressed in the unit the rollup stores.
     listMintBuckets(c.env.DB, sinceBucket),
     refundsByBucket(c.env.DB, sinceBucket),
-    tradeVolumeXcp(c.env.DB),
+    tradeVolumeByDay(c.env.DB),
   ]);
   const counts: Record<string, number> = {
     scheduled: 0,
@@ -144,10 +144,12 @@ launchesRoute.get("/v2/stats", async (c) => {
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   const activeXcp = rows.find((r) => r.phase === "minting")?.paid_xcp ?? 0;
   const graduated = rows.find((r) => r.phase === "graduated");
+  const tradeXcp = tradeVolume.reduce((sum, day) => sum + day.xcp, 0);
   const markets = {
     pool_xcp: graduated?.pool_xcp ?? 0,
     market_cap_xcp: graduated?.market_cap_xcp ?? 0,
-    trade_xcp: tradeVolume[0]?.trade_xcp ?? 0,
+    trade_xcp: tradeXcp,
+    trade_daily: tradeVolume,
   };
   const activity = totals
     ? { ...totals, active_xcp: activeXcp }

@@ -43,6 +43,10 @@ export interface LaunchRow {
   /** Block of this launch's most recent mint; null if it has never minted.
    *  See migration 0012 — derived from launch_mints, never counted. */
   last_mint_block: number | null;
+  /** Write-once graduation timestamp and XCP/USD mark. Together they define
+   *  the token's fixed dollar launch baseline. */
+  launch_time: number | null;
+  launch_xcp_usd: number | null;
   /** Creator prose mirrored from hosted metadata. Empty means checked with no
    *  safe prose; null means the metadata worklist has not reached it yet. */
   display_description: string | null;
@@ -56,7 +60,7 @@ const BASE_COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisibl
   conforming, conformance_version, status, phase, earned_quantity,
   paid_quantity, current_deadline_block, mints, minters, pool_xcp_reserve,
   pool_token_reserve, pool_xcp_sats, seen_at_block, updated_at,
-  last_mint_block`;
+  last_mint_block, launch_time, launch_xcp_usd`;
 
 /** Detail reads get the full creator prose. */
 const COLUMNS = `${BASE_COLUMNS}, display_description`;
@@ -644,30 +648,32 @@ export function activityTotals(db: D1Database): Promise<ActivityTotals[]> {
 /**
  * XCP that has actually changed hands on XCP-69 assets, in raw satoshi.
  *
- * `primary_actor = 1` is load-bearing. An order match writes TWO rows -- one
- * per side -- because the table exists to reconstruct both addresses'
- * histories. Summing all of them would report every book trade twice. The
- * taker's row is the one flagged as primary, and it is also the one that
- * caused the fill, so counting only those counts each trade exactly once. A
- * taker crossing the pool and then the book produces several primary rows,
- * which is correct: that is several fills.
+ * Daily candles are folded from the matches themselves, not the per-address
+ * event rows: an order match has two actors but exactly one execution price.
+ * That makes each candle's volume a once-only fill total across pool and book,
+ * and preserves the day needed to mark the XCP at historical USD prices.
  *
- * Absolute value because a delta is signed by direction. A buy and a sell of
- * the same size are the same volume, and netting them to zero would report a
- * busy market as a dead one.
- *
- * A full pass over asset_events, which has one index and not this one. That is
- * affordable at the current scale -- a few hundred rows -- and this sits
- * behind the same cache as the rest of /v2/stats. If the table reaches the
- * size where getMintTotals needed a rollup (see migration 0010), this needs
- * the same treatment rather than a bigger scan.
+ * This scans only the daily half of a compact OHLCV table and sits behind the
+ * same five-minute cache as the rest of /v2/stats. If that table eventually
+ * reaches the size where mint totals needed a rollup (migration 0010), this
+ * can be materialised by the same write-time pattern.
  */
-export function tradeVolumeXcp(db: D1Database): Promise<{ trade_xcp: number }[]> {
-  return q<{ trade_xcp: number }>(
+export interface TradeVolumeBucket {
+  /** UTC day start from the daily price candle. */
+  time: number;
+  /** Raw XCP satoshi traded during that day. */
+  xcp: number;
+}
+
+export function tradeVolumeByDay(db: D1Database): Promise<TradeVolumeBucket[]> {
+  return q<TradeVolumeBucket>(
     db,
-    `SELECT CAST(COALESCE(SUM(ABS(CAST(xcp_delta AS INTEGER))), 0) AS INTEGER) AS trade_xcp
-       FROM asset_events
-      WHERE primary_actor = 1`,
+    `SELECT bucket_start AS time,
+            CAST(SUM(CAST(volume_xcp AS INTEGER)) AS INTEGER) AS xcp
+       FROM price_candles
+      WHERE resolution = '1d'
+      GROUP BY bucket_start
+      ORDER BY bucket_start`,
   );
 }
 

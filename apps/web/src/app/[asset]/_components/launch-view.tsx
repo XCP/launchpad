@@ -24,7 +24,7 @@ import {
   usd,
 } from "@/lib/format";
 import { big, rawEquals } from "@/lib/numeric";
-import { priceChangePercent } from "@/lib/market";
+import { usdPriceChangePercent } from "@/lib/market";
 import {
   type Fairminter,
   XCP69_EXACT,
@@ -59,6 +59,7 @@ export function LaunchView({
   pool,
   candles,
   xcpUsd,
+  launchXcpUsd,
   btcUsd,
   feeSats,
   holderCount,
@@ -76,6 +77,7 @@ export function LaunchView({
   pool: Pool | null;
   candles: Record<ChartResolution, ChartCandle[]>;
   xcpUsd: number | null;
+  launchXcpUsd: number | null;
   btcUsd: number | null;
   feeSats: FeeSummary | null;
   holderCount: number | null;
@@ -114,15 +116,20 @@ export function LaunchView({
     .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
     .map(([source]) => source);
 
-  // "How's it doing" numbers (graduated): spot from the pool and change from
-  // what this launch actually charged minters. The first candle is the first
-  // completed trade, already above or below the pool's opening state, so using
-  // it as an unlabeled baseline understates the launch return.
+  // "How's it doing" numbers (graduated): spot from the pool and dollar return
+  // from what this launch charged minters, valued at XCP/USD when the market
+  // opened. The first candle is already a completed trade, so using it as the
+  // baseline would understate the launch return.
   const spot = poolTokens > 0 ? poolXcp / poolTokens : 0;
   const history = candles["1d"];
   const quantityByPrice = fromSats(fm.quantity_by_price);
   const mintPrice = quantityByPrice > 0 ? fromSats(fm.price) / quantityByPrice : 0;
-  const change = priceChangePercent(spot, mintPrice);
+  const change = usdPriceChangePercent(
+    spot,
+    xcpUsd,
+    mintPrice,
+    launchXcpUsd,
+  );
   // The highest price the pool ever printed, and where spot sits against it.
   // Free — the same history the chart already renders.
   // The high wick, not the close: a peak a candle traded at and gave back is
@@ -723,6 +730,7 @@ export function LaunchView({
             asset={asset}
             candles={candles}
             xcpUsd={xcpUsd}
+            launchXcpUsd={launchXcpUsd}
             devTrades={devTrades}
           />
         </div>

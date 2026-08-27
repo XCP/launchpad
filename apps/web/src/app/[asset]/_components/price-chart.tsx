@@ -106,12 +106,17 @@ export function PriceChart({
   asset,
   candles,
   xcpUsd = null,
+  launchXcpUsd = null,
   devTrades = [],
 }: {
   asset: string;
   /** Both resolutions, so the range selector needs no round trip. */
   candles: Record<ChartResolution, ChartCandle[]>;
   xcpUsd?: number | null;
+  /** XCP/USD stamped when the final mint opened this market. In USD mode the
+   *  mint baseline stays fixed at that launch value while trade candles use
+   *  their own historical daily rates. */
+  launchXcpUsd?: number | null;
   devTrades?: DevTrade[];
 }) {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -141,6 +146,7 @@ export function PriceChart({
   const [inUsd, setInUsd] = useState(false);
 
   const hasAny = candles["1h"].length > 0 || candles["1d"].length > 0;
+  const usdHistoryReady = Boolean(rates?.length);
 
   /** Rate on a given day, falling back to the most recent earlier day. Never
    *  to today's rate: that is the error this exists to avoid. */
@@ -182,29 +188,38 @@ export function PriceChart({
       //
       // In XCP mode the rate is exactly 1, so one code path draws both.
       const valued = visible.map((candle) => {
-        const rate = inUsd ? (rateAt(candle.time) ?? xcpUsd ?? 1) : 1;
+        // USD mode cannot be selected until the calendar exists. Keeping the
+        // final guard at 1 makes this render total without ever substituting
+        // today's rate for a historical candle.
+        const rate = inUsd ? (rateAt(candle.time) ?? 1) : 1;
         return {
           candle,
           open: candle.open * rate,
           high: candle.high * rate,
           low: candle.low * rate,
           close: candle.close * rate,
-          // Fixed in XCP and therefore MOVING in dollars: every minter paid the
-          // same XCP on a different day. A flat dollar line is the one claim this
-          // reference must not make.
-          mint: MINT_PRICE * rate,
+          // One fixed launch baseline. Candles move with TOKEN/XCP and with
+          // XCP/USD on their own day; the reference answers what the standard's
+          // mint price was worth when the token market opened.
+          mint:
+            inUsd
+              ? launchXcpUsd
+                ? MINT_PRICE * launchXcpUsd
+                : null
+              : MINT_PRICE,
         };
       });
 
       // Wicks, not closes, set the extent — a high that isn't on the axis is a
       // high the chart is hiding.
+      const mint = valued[0]!.mint;
       const lo = Math.min(
         ...valued.map((v) => v.low),
-        ...valued.map((v) => v.mint),
+        ...(mint === null ? [] : [mint]),
       );
       const hi = Math.max(
         ...valued.map((v) => v.high),
-        ...valued.map((v) => v.mint),
+        ...(mint === null ? [] : [mint]),
       );
 
       // Log scaling compresses a 100× move into something readable; these prices
@@ -250,20 +265,23 @@ export function PriceChart({
       return {
         points: plotted,
         yTicks: ticks,
-        mintPath: valued
-          .map(
-            (v, i) =>
-              `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(v.mint).toFixed(1)}`,
-          )
-          .join(""),
+        mintPath:
+          mint === null
+            ? ""
+            : valued
+                .map(
+                  (_v, i) =>
+                    `${i === 0 ? "M" : "L"}${xOf(i).toFixed(1)},${yOf(mint).toFixed(1)}`,
+                )
+                .join(""),
         // The caption sits at the left edge, so it tracks the leftmost value.
-        mintLabelY: yOf(valued[0]!.mint),
+        mintLabelY: mint === null ? 0 : yOf(mint),
         maxVol: peak,
         // Bodies never touch: a candle keeps a gap even when hundreds are shown,
         // and never grows so wide that a handful of them read as a bar chart.
         bodyW: Math.max(1.5, Math.min(18, slot - 2)),
       };
-    }, [candles, range, log, inUsd, rateAt, xcpUsd]);
+    }, [candles, range, log, inUsd, rateAt, launchXcpUsd]);
 
   if (!hasAny) {
     return (
@@ -374,8 +392,14 @@ export function PriceChart({
           {xcpUsd !== null && (
             <button
               type="button"
-              onClick={() => setInUsd((v) => !v)}
-              className={`${control} ${inUsd ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+              onClick={() => {
+                if (usdHistoryReady) setInUsd((v) => !v);
+              }}
+              disabled={!usdHistoryReady}
+              title={
+                usdHistoryReady ? undefined : "Loading historical XCP/USD"
+              }
+              className={`${control} disabled:cursor-wait disabled:text-gray-300 ${inUsd ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}
             >
               {inUsd ? "USD" : "XCP"}
             </button>
@@ -426,21 +450,25 @@ export function PriceChart({
             </g>
           ))}
 
-          <path
-            d={mintPath}
-            fill="none"
-            stroke="#d1d5db"
-            strokeWidth={1}
-            strokeDasharray="4 3"
-          />
-          <text
-            x={PAD.left + 2}
-            y={mintLabelY - 4}
-            fontSize={10}
-            fill="#6b7280"
-          >
-            mint price
-          </text>
+          {mintPath && (
+            <>
+              <path
+                d={mintPath}
+                fill="none"
+                stroke="#d1d5db"
+                strokeWidth={1}
+                strokeDasharray="4 3"
+              />
+              <text
+                x={PAD.left + 2}
+                y={mintLabelY - 4}
+                fontSize={10}
+                fill="#6b7280"
+              >
+                mint price
+              </text>
+            </>
+          )}
 
           {mode === "line" ? (
             <>

@@ -20,6 +20,7 @@ import {
 } from "@/lib/launch-row";
 import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xcp69";
 import { ratio } from "@/lib/numeric";
+import { usdPriceChangePercent } from "@/lib/market";
 import { useWallet } from "@/lib/wallet/wallet-context";
 
 type View = "grid" | "table";
@@ -963,8 +964,13 @@ function Card({
   const deadline = fm.soft_cap_deadline_block || fm.end_block;
   const launchPriceXcp = ratio(fm.price, fm.quantity_by_price);
   const performance =
-    phase === "graduated" && row.priceXcp > 0 && launchPriceXcp > 0
-      ? ((row.priceXcp / launchPriceXcp) - 1) * 100
+    phase === "graduated"
+      ? usdPriceChangePercent(
+          row.priceXcp,
+          xcpUsd,
+          launchPriceXcp,
+          row.launchXcpUsd,
+        )
       : null;
   const performanceLabel =
     performance !== null && Number.isFinite(performance)
@@ -1112,7 +1118,9 @@ function Card({
         {performanceLabel && (
           <div className="absolute right-2 top-2">
             <Chip tone={performance !== null && performance >= 0 ? "green" : "dark"}>
-              <span title="Percent change">{performanceLabel}</span>
+              <span title="USD return from the mint price at launch">
+                {performanceLabel}
+              </span>
             </Chip>
           </div>
         )}

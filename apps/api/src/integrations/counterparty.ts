@@ -323,6 +323,20 @@ export async function fetchBlockHeight(): Promise<number> {
   return data.result.counterparty_height;
 }
 
+/** Unix time for one confirmed block. Used only by write-once historical
+ * facts, never by a read route. A missing block is retryable, not time zero. */
+export async function fetchBlockTime(blockIndex: number): Promise<number | null> {
+  try {
+    const data: { result: { block_time?: number } | null } = await get(
+      `/blocks/${blockIndex}`,
+    );
+    const value = data.result?.block_time;
+    return typeof value === "number" && value > 0 ? value : null;
+  } catch {
+    return null;
+  }
+}
+
 /** The append-only creation event. Its own block_index is when the
  *  announcement confirmed — the one fact the /fairminters row stops being
  *  able to answer once a launch has opened. */

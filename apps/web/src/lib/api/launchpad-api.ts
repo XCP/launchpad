@@ -64,6 +64,9 @@ interface ApiLaunchRow {
   minters: number;
   /** Optional because a worker older than migration 0012 does not send it. */
   last_mint_block?: number | null;
+  /** Optional during the migration/API/web rolling deploy. */
+  launch_time?: number | null;
+  launch_xcp_usd?: number | null;
   /** Optional during the API/web rolling deploy. */
   display_description?: string | null;
 }
@@ -86,6 +89,10 @@ export interface IndexedLaunch {
   /** Block of this launch's most recent mint; null if it has never minted.
    *  What the crown is ordered by, and what the badge counts back from. */
   lastMintBlock: number | null;
+  /** Fixed at graduation; current USD performance compares against this
+   *  historical XCP/USD mark instead of cancelling XCP's own move. */
+  launchTime: number | null;
+  launchXcpUsd: number | null;
   /** Creator prose from D1; null until the bounded metadata worklist resolves it. */
   displayDescription: string | null;
 }
@@ -422,6 +429,8 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
     announceBlock: row.announce_block,
     minters: row.minters,
     lastMintBlock: row.last_mint_block ?? null,
+    launchTime: row.launch_time ?? null,
+    launchXcpUsd: row.launch_xcp_usd ?? null,
     displayDescription: row.display_description?.trim() || null,
   };
 }
@@ -679,6 +688,8 @@ export interface LaunchStats {
     market_cap_xcp: number;
     /** XCP satoshi that has changed hands trading XCP-69 assets, ever. */
     trade_xcp?: number;
+    /** Same volume split by UTC trade day for historical USD marking. */
+    trade_daily?: { time: number; xcp: number }[];
   };
   /** Mints per ~144-block bucket; `bucket` is `block_index / 144`. */
   daily: { bucket: number; n: number; minters: number }[];

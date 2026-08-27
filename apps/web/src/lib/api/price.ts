@@ -10,6 +10,11 @@ interface Ticker {
   btc: number | null;
 }
 
+export interface DailyXcpUsd {
+  day: string;
+  usd: number;
+}
+
 /**
  * The explorer's aggregate feed (daily CMC aggregate; carries both legs).
  * One fetch for both — Next dedupes by URL, so the two exported readers below
@@ -48,6 +53,34 @@ export async function fetchBtcUsd(): Promise<number | null> {
  */
 export async function fetchXcpUsdReference(): Promise<number | null> {
   return (await fetchTicker()).xcp;
+}
+
+/** Daily XCP/USD calendar used when an all-time XCP sum is marked to the
+ * prices that actually applied. Same cached upstream as the ticker above;
+ * Next can reuse the response inside a render instead of making a new market
+ * data request for every trade day. */
+export async function fetchXcpUsdHistory(): Promise<DailyXcpUsd[]> {
+  try {
+    const res = await fetch(`${XCP_API_BASE}/price`, {
+      signal: AbortSignal.timeout(6_000),
+      next: { revalidate: 900 },
+    });
+    if (!res.ok) return [];
+    const result = (await res.json())?.result as
+      | { history?: { day?: unknown; usd?: unknown }[] }
+      | undefined;
+    return (result?.history ?? [])
+      .filter(
+        (row): row is { day: string; usd: number } =>
+          typeof row.day === "string" &&
+          typeof row.usd === "number" &&
+          Number.isFinite(row.usd) &&
+          row.usd > 0,
+      )
+      .map((row) => ({ day: row.day, usd: row.usd }));
+  } catch {
+    return [];
+  }
 }
 
 /**

@@ -6,6 +6,11 @@ import {
 
 const PRICE_URL = "https://api.xcp.io/v2/price";
 
+export interface DailyXcpUsd {
+  day: string;
+  usd: number;
+}
+
 /**
  * The explorer's aggregate feed. One request for both legs: BTC/USD is what
  * converts a dispenser's sats into dollars, and the explorer's own XCP mark is
@@ -50,4 +55,49 @@ export async function fetchXcpUsd(): Promise<number | null> {
     fetchPendingXcpDispenses(),
   ]);
   return bestAskUsd(dispensers, ticker.btc, pending) ?? ticker.xcp;
+}
+
+/** Historical XCP/USD calendar for the one-time graduation-price backfill.
+ * This is deliberately not part of the normal index loop: callers first
+ * prove at least one launch is missing its baseline, so an empty worklist
+ * performs no HTTP request and no JSON parse. */
+export async function fetchXcpUsdHistory(): Promise<DailyXcpUsd[]> {
+  try {
+    const res = await fetch(PRICE_URL, {
+      signal: AbortSignal.timeout(6_000),
+      cf: { cacheTtl: 900, cacheEverything: true },
+    });
+    if (!res.ok) return [];
+    const body = (await res.json()) as {
+      result?: { history?: { day?: unknown; usd?: unknown }[] };
+    };
+    return (body.result?.history ?? [])
+      .filter(
+        (row): row is { day: string; usd: number } =>
+          typeof row.day === "string" &&
+          typeof row.usd === "number" &&
+          Number.isFinite(row.usd) &&
+          row.usd > 0,
+      )
+      .map((row) => ({ day: row.day, usd: row.usd }));
+  } catch {
+    return [];
+  }
+}
+
+/** Last known daily rate at or before a Unix timestamp. The explorer's
+ * calendar is chronological, but choosing explicitly makes the result stable
+ * if a day is absent rather than borrowing a future price. */
+export function historicalXcpUsdAt(
+  history: DailyXcpUsd[],
+  unixSeconds: number,
+): number | null {
+  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return null;
+  const day = new Date(unixSeconds * 1000).toISOString().slice(0, 10);
+  let found: number | null = null;
+  for (const row of history) {
+    if (row.day <= day) found = row.usd;
+    else break;
+  }
+  return found;
 }

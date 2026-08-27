@@ -5,9 +5,15 @@ import {
   fetchAllFairminters,
   fetchAnnounceFacts,
   fetchBlockHeight,
+  fetchBlockTime,
   fetchFairmints,
   fetchPool,
 } from "#api/integrations/counterparty";
+import {
+  fetchXcpUsd,
+  fetchXcpUsdHistory,
+  historicalXcpUsdAt,
+} from "#api/integrations/price";
 import { syncAssetEvents, type GraduatedTarget } from "#api/indexer/events";
 import { refreshRollup, rollupIsStale } from "#api/indexer/rollup";
 import { fetchTxFee } from "#api/integrations/mempool";
@@ -82,6 +88,8 @@ export interface SyncResult {
   announce_backfilled: number;
   fees_backfilled: number;
   descriptions_backfilled: number;
+  /** Write-once launch/USD baselines filled this tick. */
+  launch_prices_backfilled: number;
   /** Rows the /v2/stats rollup rewrote. 0 on a tick where nothing that feeds
    *  it moved — which should be most of them. */
   rollup_written: number;
@@ -110,6 +118,7 @@ export async function syncLaunches(
   let written = 0;
   let mintsIngested = 0;
   const eventTargets: GraduatedTarget[] = [];
+  const newGraduations = new Set<string>();
   const now = Math.floor(Date.now() / 1000);
   // Collected through the loop and sent together below. Awaiting each upsert
   // inside the loop made the tick one sequential D1 round trip PER LAUNCH —
@@ -188,6 +197,9 @@ export async function syncLaunches(
       poolXcpReserve = priorLaunch!.pool_xcp_reserve ?? null;
       poolTokenReserve = priorLaunch!.pool_token_reserve ?? null;
       poolXcpSats = priorLaunch!.pool_xcp_sats ?? 0;
+    }
+    if (phase === "graduated" && priorLaunch?.phase !== "graduated") {
+      newGraduations.add(fm.tx_hash);
     }
 
     // earned_quantity moves only when a new mint lands, and it's already in
@@ -476,6 +488,7 @@ export async function syncLaunches(
   const announceBackfilled = await backfillAnnounceBlocks(db);
   const feesBackfilled = await backfillMissingFees(db);
   const descriptionsBackfilled = await backfillDisplayDescriptions(db, metadata);
+  const launchPricesBackfilled = await backfillLaunchPrices(db, newGraduations);
 
   // Last, because it summarises everything above — and only when something
   // above could have changed the summary. On a quiet tick this is skipped
@@ -493,10 +506,82 @@ export async function syncLaunches(
     announce_backfilled: announceBackfilled,
     fees_backfilled: feesBackfilled,
     descriptions_backfilled: descriptionsBackfilled,
+    launch_prices_backfilled: launchPricesBackfilled,
     rollup_written: rollup
       ? rollup.totals_written + rollup.buckets_written
       : 0,
   };
+}
+
+interface MissingLaunchPrice {
+  tx_hash: string;
+  last_mint_block: number | null;
+  seen_at_block: number;
+}
+
+/**
+ * Stamp the dollar baseline once, when the token's market launches.
+ *
+ * Graduation is the launch moment: the final mint closes the fairminter and
+ * opens its pool. For a graduation observed on this tick, the live xcp.fun
+ * XCP mark is the closest available point-in-time quote. Older rows use the
+ * explorer's historical daily calendar on that exact block's UTC day.
+ *
+ * The worklist is intentionally self-draining. A normal tick does one indexed
+ * empty lookup and no subrequests; only a missing row fetches price history
+ * and its block timestamp. Failed sources leave NULL and retry later.
+ */
+async function backfillLaunchPrices(
+  db: D1Database,
+  newGraduations: Set<string>,
+): Promise<number> {
+  const missing = await q<MissingLaunchPrice>(
+    db,
+    `SELECT tx_hash, last_mint_block, seen_at_block
+       FROM launches
+      WHERE conforming = 1
+        AND phase = 'graduated'
+        AND launch_xcp_usd IS NULL
+      ORDER BY tx_index
+      LIMIT ?1`,
+    WORKLIST_LIMIT,
+  );
+  if (missing.length === 0) return 0;
+
+  const needsLive = missing.some((row) => newGraduations.has(row.tx_hash));
+  const [history, liveXcpUsd, timed] = await Promise.all([
+    fetchXcpUsdHistory(),
+    needsLive ? fetchXcpUsd() : Promise.resolve(null),
+    Promise.all(
+      missing.map(async (row) => ({
+        row,
+        time: await fetchBlockTime(row.last_mint_block ?? row.seen_at_block),
+      })),
+    ),
+  ]);
+
+  const statements: D1PreparedStatement[] = [];
+  for (const { row, time } of timed) {
+    if (!time) continue;
+    const historical = historicalXcpUsdAt(history, time);
+    const xcpUsd =
+      newGraduations.has(row.tx_hash) && liveXcpUsd
+        ? liveXcpUsd
+        : historical;
+    if (!xcpUsd) continue;
+    statements.push(
+      db
+        .prepare(
+          `UPDATE launches
+              SET launch_time = ?1, launch_xcp_usd = ?2
+            WHERE tx_hash = ?3 AND launch_xcp_usd IS NULL`,
+        )
+        .bind(time, xcpUsd, row.tx_hash),
+    );
+  }
+  if (statements.length === 0) return 0;
+  const results = await db.batch(statements);
+  return results.filter((result) => (result.meta.rows_written ?? 0) > 0).length;
 }
 
 /** Flatten prose before it enters a list response. The metadata writer already
