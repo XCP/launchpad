@@ -396,19 +396,26 @@ export async function fetchOriginalDeadline(txHash: string): Promise<number | nu
 export async function fetchOriginalRecord(
   txHash: string,
 ): Promise<{ deadline: number | null; announceBlock: number | null }> {
-  const data = await get<{
-    result: {
-      block_index: number;
-      params: { soft_cap_deadline_block: number };
-    }[];
-    // Append-only: a launch's creation event never changes, so this is
-    // asked once per launch rather than once an hour per launch.
-  }>(`/transactions/${txHash}/events/NEW_FAIRMINTER`, 31_536_000);
-  const event = data.result?.[0];
-  return {
-    deadline: event?.params?.soft_cap_deadline_block ?? null,
-    announceBlock: event?.block_index ?? null,
-  };
+  try {
+    const data = await get<{
+      result: {
+        block_index: number;
+        params: { soft_cap_deadline_block: number };
+      }[];
+      // Append-only: a launch's creation event never changes, so this is
+      // asked once per launch rather than once an hour per launch.
+    }>(`/transactions/${txHash}/events/NEW_FAIRMINTER`, 31_536_000);
+    const event = data.result?.[0];
+    return {
+      deadline: event?.params?.soft_cap_deadline_block ?? null,
+      announceBlock: event?.block_index ?? null,
+    };
+  } catch {
+    // Creation timing is conformance evidence, not a reason to fail an entire
+    // page or static regeneration when Counterparty briefly throttles. A null
+    // record keeps that launch unverified until the next successful refresh.
+    return { deadline: null, announceBlock: null };
+  }
 }
 
 /**
