@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import type { Env } from "#api/env";
 import { MIRRORS, refreshMirrors } from "#api/indexer/mirrors";
 import { syncOrders } from "#api/indexer/orders";
+import { syncBehaviorBalances } from "#api/indexer/behavior-balances";
 import { syncLaunches } from "#api/indexer/sync";
 import { activityRoute } from "#api/read/activity";
 import { listMarketAssets } from "#api/queries/activity";
@@ -296,6 +297,9 @@ export default {
           const markets = await listMarketAssets(env.DB, 100);
           return syncOrders(env.DB, markets.map((m) => m.asset));
         });
+        await runScheduledJob("sync_behavior_balances", () =>
+          syncBehaviorBalances(env.DB),
+        );
         // After the indexer, never inside it. The feed reads committed state
         // rather than the tick's own deltas, so an announcement can only
         // describe something D1 already believes — and a tick that dies

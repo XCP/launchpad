@@ -383,16 +383,35 @@ export function listSearchIndex(db: D1Database): Promise<SearchIndexRow[]> {
   );
 }
 
-/** Every conforming launch's ticker — the membership test /v2/mempool needs
- *  to decide which unconfirmed mints this site has an opinion about. A single
- *  column off the partial index, not the full rows the client used to download
- *  to answer the same question. */
-export async function listConformingAssets(db: D1Database): Promise<string[]> {
-  const rows = await q<{ asset: string }>(
-    db,
-    `SELECT asset FROM launches WHERE conforming = 1`,
-  );
-  return rows.map((r) => r.asset);
+/** Conforming membership for a supplied candidate set.
+ *
+ * The mempool normally contains zero or a handful of launch assets. Reading
+ * the whole conforming index every 15-second cache miss to classify one hot
+ * ticker makes the D1 cost grow with site history instead of with the pending
+ * work. These indexed point lookups keep that read bounded by the mempool.
+ */
+export async function listConformingAssetsAmong(
+  db: D1Database,
+  candidates: string[],
+): Promise<string[]> {
+  const unique = [...new Set(candidates)];
+  if (unique.length === 0) return [];
+
+  const found: string[] = [];
+  const chunkSize = 100;
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize);
+    const places = chunk.map((_, index) => `?${index + 1}`).join(",");
+    const rows = await q<{ asset: string }>(
+      db,
+      `SELECT DISTINCT asset
+         FROM launches
+        WHERE conforming = 1 AND asset IN (${places})`,
+      ...chunk,
+    );
+    found.push(...rows.map((row) => row.asset));
+  }
+  return found;
 }
 
 export interface PhaseCount {

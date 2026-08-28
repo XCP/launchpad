@@ -16,6 +16,10 @@ import {
 } from "#api/integrations/price";
 import { syncAssetEvents, type GraduatedTarget } from "#api/indexer/events";
 import { refreshRollup, rollupIsStale } from "#api/indexer/rollup";
+import {
+  behaviorRollupIsStale,
+  refreshBehaviorRollup,
+} from "#api/indexer/behavior-rollup";
 import { fetchTxFee } from "#api/integrations/mempool";
 import {
   isXcp69,
@@ -93,6 +97,9 @@ export interface SyncResult {
   /** Rows the /v2/stats rollup rewrote. 0 on a tick where nothing that feeds
    *  it moved — which should be most of them. */
   rollup_written: number;
+  /** Materialized address/cohort rows changed this tick. The historical fold
+   *  is skipped entirely when no mint, trade, graduation, or verdict moved. */
+  behavior_written: number;
 }
 
 const FEE_BACKFILL_LIMIT = 15;
@@ -496,6 +503,13 @@ export async function syncLaunches(
   // itself rather than just moving the cost from read time to write time.
   const stale = rollupIsStale({ mintsIngested, feesBackfilled, resolved });
   const rollup = stale ? await refreshRollup(db) : null;
+  const behaviorStale = behaviorRollupIsStale({
+    mintsIngested,
+    eventsIngested,
+    resolved,
+    graduations: newGraduations.size,
+  });
+  const behaviorRollup = behaviorStale ? await refreshBehaviorRollup(db) : null;
 
   return {
     candidates: candidates.length,
@@ -509,6 +523,9 @@ export async function syncLaunches(
     launch_prices_backfilled: launchPricesBackfilled,
     rollup_written: rollup
       ? rollup.totals_written + rollup.buckets_written
+      : 0,
+    behavior_written: behaviorRollup
+      ? behaviorRollup.wallets_written + behaviorRollup.totals_written
       : 0,
   };
 }

@@ -176,6 +176,235 @@ export interface MempoolSnapshot {
   fetchedAt: number;
 }
 
+export interface ResearchLaunchBehavior {
+  asset: string;
+  phase: "graduated" | "minting";
+  minters: number;
+  earnedQuantity: string | null;
+  softCap: string;
+  hardCap: string;
+  poolXcpReserve: string | null;
+  poolTokenReserve: string | null;
+  behavior: {
+    trackedMinters: number;
+    holdingSignal: number;
+    minterTraders: number;
+    immediateDumpers: number;
+    laterDumpers: number;
+    dumpersExited: number;
+    dumpersRemaining: number;
+    dumperOverhang: string;
+    fastDumpersExited: number;
+    fastDumpersRemaining: number;
+    fastDumperOverhang: string;
+    knownFastMinters: number;
+    knownFastInventory: string;
+    repeatDumpMinters: number;
+    repeatDumpInventory: string;
+    heldWithoutSale: number;
+    movedWithoutSale: number;
+    sellersHolding: number;
+    sellerBalance: string;
+    dumpersHolding: number;
+    dumperBalance: string;
+    dispenserSellers: number;
+    buyers: number;
+    buyerOnly: number;
+    boughtXcp: string;
+    soldXcp: string;
+  };
+}
+
+export interface RepeatFastExit {
+  address: string;
+  mintedLaunches: number;
+  holdingLaunches: number;
+  tradedLaunches: number;
+  immediateDumpLaunches: number;
+  laterDumpLaunches: number;
+  exitedLaunches: number;
+  graduatedNoSaleLaunches: number;
+}
+
+export interface ResearchBehaviorSnapshot {
+  launches: ResearchLaunchBehavior[];
+  cohorts: {
+    minterAddresses: number;
+    mintAndHolding: number;
+    mintAndTrading: number;
+    immediateDumpers: number;
+    laterDumpers: number;
+    buyers: number;
+    graduatedMinterAddresses: number;
+    graduatedNeverSold: number;
+    sellerAddresses: number;
+    redeployAndHold: number;
+    redeployAndExit: number;
+    holdWithoutRedeploy: number;
+    exitWithoutRedeploy: number;
+    redeployedPaid: string;
+    repeatFast: RepeatFastExit[];
+  };
+  fastExitBlocks: number;
+}
+
+interface ApiResearchBehavior {
+  asset: string;
+  phase: "graduated" | "minting";
+  minters: number;
+  earned_quantity: string | null;
+  soft_cap: string;
+  hard_cap: string;
+  pool_xcp_reserve: string | null;
+  pool_token_reserve: string | null;
+  behavior: {
+    tracked_minters: number;
+    holding_signal: number;
+    minter_traders: number;
+    immediate_dumpers: number;
+    later_dumpers: number;
+    dumpers_exited: number;
+    dumpers_remaining: number;
+    dumper_overhang: string;
+    fast_dumpers_exited: number;
+    fast_dumpers_remaining: number;
+    fast_dumper_overhang: string;
+    known_fast_minters: number;
+    known_fast_inventory: string;
+    repeat_dump_minters: number;
+    repeat_dump_inventory: string;
+    held_without_sale: number;
+    moved_without_sale: number;
+    sellers_holding: number;
+    seller_balance_raw: string;
+    fast_sellers_holding: number;
+    fast_seller_balance_raw: string;
+    dispenser_sellers: number;
+    buyers: number;
+    buyer_only: number;
+    bought_xcp: string;
+    sold_xcp: string;
+  };
+}
+
+interface ApiRepeatFastExit {
+  address: string;
+  minted_launches: number;
+  holding_launches: number;
+  traded_launches: number;
+  immediate_dump_launches: number;
+  later_dump_launches: number;
+  exited_launches: number;
+  graduated_no_sale_launches: number;
+}
+
+/** Confirmed address behavior for the research dashboard. The 15-second
+ * mempool snapshot is merged by the component instead of being cached here. */
+export async function fetchResearchBehavior(): Promise<ResearchBehaviorSnapshot | null> {
+  try {
+    const res = await fetch(`${API_BASE}/v2/research/behavior`, {
+      signal: AbortSignal.timeout(8_000),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: ApiResearchBehavior[];
+      cohorts?: {
+        minter_addresses: number;
+        mint_and_holding: number;
+        mint_and_trading: number;
+        immediate_dumpers: number;
+        later_dumpers: number;
+        buyers: number;
+        graduated_minter_addresses: number;
+        graduated_never_sold: number;
+        seller_addresses: number;
+        redeploy_and_hold: number;
+        redeploy_and_exit: number;
+        hold_without_redeploy: number;
+        exit_without_redeploy: number;
+        redeployed_paid_raw: string;
+        repeat_fast: ApiRepeatFastExit[];
+      };
+      fast_exit_blocks?: number;
+    };
+    if (
+      !Array.isArray(data.result) ||
+      !data.cohorts ||
+      typeof data.fast_exit_blocks !== "number"
+    ) return null;
+    return {
+      launches: data.result.map((row) => ({
+        asset: row.asset,
+        phase: row.phase,
+        minters: row.minters,
+        earnedQuantity: row.earned_quantity,
+        softCap: row.soft_cap,
+        hardCap: row.hard_cap,
+        poolXcpReserve: row.pool_xcp_reserve,
+        poolTokenReserve: row.pool_token_reserve,
+        behavior: {
+          trackedMinters: row.behavior.tracked_minters,
+          holdingSignal: row.behavior.holding_signal,
+          minterTraders: row.behavior.minter_traders,
+          immediateDumpers: row.behavior.immediate_dumpers,
+          laterDumpers: row.behavior.later_dumpers,
+          dumpersExited: row.behavior.dumpers_exited,
+          dumpersRemaining: row.behavior.dumpers_remaining,
+          dumperOverhang: row.behavior.dumper_overhang,
+          fastDumpersExited: row.behavior.fast_dumpers_exited,
+          fastDumpersRemaining: row.behavior.fast_dumpers_remaining,
+          fastDumperOverhang: row.behavior.fast_dumper_overhang,
+          knownFastMinters: row.behavior.known_fast_minters,
+          knownFastInventory: row.behavior.known_fast_inventory,
+          repeatDumpMinters: row.behavior.repeat_dump_minters,
+          repeatDumpInventory: row.behavior.repeat_dump_inventory,
+          heldWithoutSale: row.behavior.held_without_sale,
+          movedWithoutSale: row.behavior.moved_without_sale,
+          sellersHolding: row.behavior.sellers_holding,
+          sellerBalance: row.behavior.seller_balance_raw,
+          dumpersHolding: row.behavior.fast_sellers_holding,
+          dumperBalance: row.behavior.fast_seller_balance_raw,
+          dispenserSellers: row.behavior.dispenser_sellers,
+          buyers: row.behavior.buyers,
+          buyerOnly: row.behavior.buyer_only,
+          boughtXcp: row.behavior.bought_xcp,
+          soldXcp: row.behavior.sold_xcp,
+        },
+      })),
+      cohorts: {
+        minterAddresses: data.cohorts.minter_addresses,
+        mintAndHolding: data.cohorts.mint_and_holding,
+        mintAndTrading: data.cohorts.mint_and_trading,
+        immediateDumpers: data.cohorts.immediate_dumpers,
+        laterDumpers: data.cohorts.later_dumpers,
+        buyers: data.cohorts.buyers,
+        graduatedMinterAddresses: data.cohorts.graduated_minter_addresses,
+        graduatedNeverSold: data.cohorts.graduated_never_sold,
+        sellerAddresses: data.cohorts.seller_addresses,
+        redeployAndHold: data.cohorts.redeploy_and_hold,
+        redeployAndExit: data.cohorts.redeploy_and_exit,
+        holdWithoutRedeploy: data.cohorts.hold_without_redeploy,
+        exitWithoutRedeploy: data.cohorts.exit_without_redeploy,
+        redeployedPaid: data.cohorts.redeployed_paid_raw,
+        repeatFast: (data.cohorts.repeat_fast ?? []).map((row) => ({
+          address: row.address,
+          mintedLaunches: row.minted_launches,
+          holdingLaunches: row.holding_launches,
+          tradedLaunches: row.traded_launches,
+          immediateDumpLaunches: row.immediate_dump_launches,
+          laterDumpLaunches: row.later_dump_launches,
+          exitedLaunches: row.exited_launches,
+          graduatedNoSaleLaunches: row.graduated_no_sale_launches,
+        })),
+      },
+      fastExitBlocks: data.fast_exit_blocks,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
  * The mempool, already filtered to XCP-69.
  *

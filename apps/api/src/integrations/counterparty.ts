@@ -323,6 +323,56 @@ export async function fetchBlockHeight(): Promise<number> {
   return data.result.counterparty_height;
 }
 
+export interface CpAssetBalance {
+  address: string | null;
+  utxo_address?: string | null;
+  quantity: number | string;
+}
+
+export interface CpAssetDispenser {
+  source: string;
+  origin?: string | null;
+  status: number;
+  dispense_count: number;
+}
+
+/** Full current holder list for one selected launch. This is cron-only: the
+ * public dashboard reads the aggregate D1 row produced from it. */
+export async function fetchAssetBalances(asset: string): Promise<CpAssetBalance[]> {
+  const rows: CpAssetBalance[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < 20; page++) {
+    const qs: string = cursor === null ? "" : `&cursor=${cursor}`;
+    const data: {
+      result: CpAssetBalance[];
+      next_cursor: number | null;
+    } = await get(`/assets/${encodeURIComponent(asset)}/balances?limit=1000${qs}`);
+    rows.push(...data.result);
+    cursor = data.next_cursor;
+    if (cursor === null) break;
+  }
+  return rows;
+}
+
+/** Dispensers are a separate sale route from pools and orders. The launch
+ * worklist is at most ten assets, so reading by asset is bounded and avoids
+ * the six-figure global dispenser event stream. */
+export async function fetchAssetDispensers(asset: string): Promise<CpAssetDispenser[]> {
+  const rows: CpAssetDispenser[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < 20; page++) {
+    const qs: string = cursor === null ? "" : `&cursor=${cursor}`;
+    const data: {
+      result: CpAssetDispenser[];
+      next_cursor: number | null;
+    } = await get(`/assets/${encodeURIComponent(asset)}/dispensers?limit=1000&verbose=true${qs}`);
+    rows.push(...data.result);
+    cursor = data.next_cursor;
+    if (cursor === null) break;
+  }
+  return rows;
+}
+
 /** Unix time for one confirmed block. Used only by write-once historical
  * facts, never by a read route. A missing block is retryable, not time zero. */
 export async function fetchBlockTime(blockIndex: number): Promise<number | null> {

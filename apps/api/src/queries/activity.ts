@@ -211,8 +211,8 @@ export interface ConformingAsset {
 }
 
 /** The covered set, with the columns a caller needs to interpret a row it got
- *  from somewhere other than D1. listConformingAssets answers the membership
- *  question alone and stays the cheaper read for callers that only ask that. */
+ *  from somewhere other than D1. Mempool membership has its own candidate-
+ *  bounded lookup; this full set is for callers that truly need every row. */
 export function listConformingAssetInfo(db: D1Database): Promise<ConformingAsset[]> {
   return q<ConformingAsset>(
     db,

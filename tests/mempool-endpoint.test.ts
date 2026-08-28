@@ -14,6 +14,7 @@ import {
   fetchMempoolFairmints,
   fetchMempoolFairminters,
 } from "#api/integrations/counterparty";
+import { fetchBlockHeight } from "@/lib/api/counterparty";
 
 const mintEvent = (over: Record<string, unknown> = {}) => ({
   tx_hash: "aa".repeat(32),
@@ -43,6 +44,28 @@ const mockFetch = (body: unknown, ok = true) =>
   mockFetchRaw(JSON.stringify(body), ok);
 
 afterEach(() => vi.unstubAllGlobals());
+
+describe("fetchBlockHeight", () => {
+  it("falls back to the existing xcp.io tip when Counterparty is throttled", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 429,
+        text: async () => "rate limited",
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => '{"result":{"tip":964330,"indexed_block":"964330"}}',
+      });
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await fetchBlockHeight()).toBe(964330);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.xcp.io/v2/");
+  });
+});
 
 describe("fetchMempoolFairmints", () => {
   it("maps to the camelCase shape the browser consumes verbatim", async () => {

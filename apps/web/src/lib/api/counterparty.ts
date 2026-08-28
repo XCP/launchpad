@@ -1,5 +1,5 @@
 import type { MempoolMint } from "@launchpad/xcp69/mempool";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_API_BASE, XCP_API_BASE } from "@/lib/constants";
 import {
   coalesceHolderBalances,
   currentHolderCount,
@@ -880,6 +880,28 @@ export async function fetchBlockTime(blockIndex: number): Promise<number | null>
 }
 
 export async function fetchBlockHeight(): Promise<number> {
-  const data = await get<{ result: { counterparty_height: number } }>("/", 30);
-  return data.result.counterparty_height;
+  try {
+    const data = await get<{ result: { counterparty_height: number } }>("/", 30);
+    return data.result.counterparty_height;
+  } catch {
+    // Static generation runs pages in parallel, so several otherwise harmless
+    // tip reads can reach Counterparty together and trip its 429 limit. The
+    // xcp.io API is already a dependency throughout this app and exposes the
+    // same indexed tip. Falling back here keeps a transient throttle from
+    // failing the whole build (or every page that needs a countdown) without
+    // retrying the throttled origin in a loop.
+    const res = await fetch(`${XCP_API_BASE}/`, {
+      signal: AbortSignal.timeout(8_000),
+      next: { revalidate: 30 },
+    });
+    if (!res.ok) throw new Error(`XCP API ${res.status}: /`);
+    const data = parseJsonLossless<{
+      result?: { tip?: number | string; indexed_block?: number | string };
+    }>(await res.text());
+    const height = Number(data.result?.tip ?? data.result?.indexed_block);
+    if (!Number.isSafeInteger(height) || height <= 0) {
+      throw new Error("XCP API returned an invalid block height");
+    }
+    return height;
+  }
 }

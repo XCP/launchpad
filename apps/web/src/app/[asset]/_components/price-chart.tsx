@@ -143,7 +143,9 @@ export function PriceChart({
   // several fills, so they stay one click away rather than being the default.
   const [mode, setMode] = useState<"line" | "candles">("line");
   const [log, setLog] = useState(false);
-  const [inUsd, setInUsd] = useState(false);
+  // Lead with the denomination most readers use to judge value. If the live
+  // XCP/USD quote is unavailable, keep the chart in its native XCP units.
+  const [inUsd, setInUsd] = useState(xcpUsd !== null);
 
   const hasAny = candles["1h"].length > 0 || candles["1d"].length > 0;
   const usdHistoryReady = Boolean(rates?.length);

@@ -425,6 +425,28 @@ export async function syncAssetEvents(
         ),
       );
       inserted += results.reduce((sum, res) => sum + (res.meta.rows_written ?? 0), 0);
+
+      // Buyer membership is append-only and materialized for the behavior
+      // totals. Feed it only rows that were genuinely new in this batch: an
+      // INSERT OR IGNORE over the full historical tape would touch every old
+      // buy again on each active tick, which is precisely the D1 cost shape
+      // the rollup exists to remove.
+      const newBuyers = [
+        ...new Set(
+          chunk
+            .filter(
+              (row, index) =>
+                row.kind === "buy" && (results[index]!.meta.rows_written ?? 0) > 0,
+            )
+            .map((row) => row.address),
+        ),
+      ];
+      if (newBuyers.length > 0) {
+        const buyerStatement = db.prepare(
+          `INSERT OR IGNORE INTO behavior_buyers (address) VALUES (?1)`,
+        );
+        await db.batch(newBuyers.map((address) => buyerStatement.bind(address)));
+      }
     }
 
     // Always advance the cursor, even when nothing was found. Without this an

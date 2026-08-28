@@ -6,7 +6,7 @@ import {
   fetchMempoolOrders,
 } from "#api/integrations/counterparty";
 import {
-  listConformingAssets,
+  listConformingAssetsAmong,
   countByPhase,
   getMintTotals,
   listMintBuckets,
@@ -27,6 +27,11 @@ import {
 import { J, router } from "#api/read/respond";
 import { getRewardAccount, listRewardBatches } from "#api/queries/rewards";
 import { getAddressLaunchpadSummary } from "#api/queries/address-summary";
+import {
+  getBehaviorCohorts,
+  listBehaviorTargets,
+  listLaunchBehavior,
+} from "#api/queries/behavior";
 
 export const launchesRoute = router();
 
@@ -121,6 +126,62 @@ const BLOCKS_PER_DAY = 144;
  *  else's public node, so its TTL is as much politeness as performance. */
 const STATS_TTL = 300;
 const MEMPOOL_TTL = 15;
+
+/**
+ * Live, address-level launch research. Confirmed behavior changes only when
+ * the indexer ingests a block, so it gets the same five-minute honesty window
+ * as the aggregate stats. Pending orders are deliberately not frozen into
+ * this response: the client merges the shared 15-second mempool snapshot so a
+ * queue of sells remains live without rerunning the heavier D1 rollup.
+ */
+launchesRoute.get("/v2/research/behavior", async (c) => {
+  const targets = await listBehaviorTargets(c.env.DB);
+  const [behavior, cohorts] = await Promise.all([
+    listLaunchBehavior(
+      c.env.DB,
+      targets.map((row) => row.asset),
+    ),
+    getBehaviorCohorts(c.env.DB),
+  ]);
+  const byAsset = new Map(behavior.map((row) => [row.asset, row]));
+  const result = targets.map((target) => ({
+    ...target,
+    behavior: byAsset.get(target.asset) ?? {
+      asset: target.asset,
+      tracked_minters: 0,
+      holding_signal: 0,
+      minter_traders: 0,
+      immediate_dumpers: 0,
+      later_dumpers: 0,
+      dumpers_exited: 0,
+      dumpers_remaining: 0,
+      dumper_overhang: "0",
+      fast_dumpers_exited: 0,
+      fast_dumpers_remaining: 0,
+      fast_dumper_overhang: "0",
+      known_fast_minters: 0,
+      known_fast_inventory: "0",
+      repeat_dump_minters: 0,
+      repeat_dump_inventory: "0",
+      held_without_sale: 0,
+      moved_without_sale: 0,
+      sellers_holding: 0,
+      seller_balance_raw: "0",
+      fast_sellers_holding: 0,
+      fast_seller_balance_raw: "0",
+      dispenser_sellers: 0,
+      buyers: 0,
+      buyer_only: 0,
+      bought_xcp: "0",
+      sold_xcp: "0",
+    },
+  }));
+  return J(
+    c,
+    { result, cohorts, fast_exit_blocks: cohorts.fast_exit_blocks },
+    STATS_TTL,
+  );
+});
 
 launchesRoute.get("/v2/stats", async (c) => {
   const height = Number(c.req.query("height") ?? 0) || 0;
@@ -355,7 +416,13 @@ launchesRoute.get("/v2/mempool", async (c) => {
   let mints = rawMints;
   let orders = rawOrders;
   if (rawMints.length > 0 || rawOrders.length > 0) {
-    const covered = new Set(await listConformingAssets(c.env.DB));
+    const candidates = [
+      ...rawMints.map((mint) => mint.asset),
+      ...rawOrders.map((order) => order.asset),
+    ];
+    const covered = new Set(
+      await listConformingAssetsAmong(c.env.DB, candidates),
+    );
     for (const fm of fairminters) covered.add(fm.asset);
     mints = rawMints.filter((m) => covered.has(m.asset));
     orders = rawOrders.filter(
