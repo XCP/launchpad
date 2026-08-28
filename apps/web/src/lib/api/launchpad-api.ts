@@ -12,10 +12,10 @@ import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import type { Raw } from "@/lib/numeric";
 
 /**
- * The custom domain, for the same reason next.config.ts 308s every
- * workers.dev URL to xcp.fun: one canonical origin. api.xcp.fun is the
- * documented public API and the host that appears in docs and examples, so it
- * should be the host the site itself calls.
+ * The custom domain remains the canonical browser API origin and the host in
+ * docs and examples. Deployed server renders use the direct Worker binding;
+ * local development, static generation, browsers, and WebSockets continue to
+ * use the public origin.
  *
  * NOT for a caching reason, despite the folklore. The Cache API is widely
  * described as a no-op on workers.dev subdomains; measured against this
@@ -28,6 +28,35 @@ import type { Raw } from "@/lib/numeric";
  * sockets still connect there, and a WebSocket has nothing to cache.
  */
 const API_BASE = process.env.NEXT_PUBLIC_LAUNCHPAD_API_BASE ?? "https://api.xcp.fun";
+
+type NextFetchInit = RequestInit & { next?: { revalidate?: number } };
+
+interface WorkerBinding {
+  fetch(request: Request): Promise<Response>;
+}
+
+/**
+ * Calls launchpad-api through a service binding during deployed server
+ * renders. This module is also used in Client Components, so the Cloudflare
+ * runtime import must stay behind the server branch.
+ */
+async function launchpadApiFetch(path: string, init: NextFetchInit = {}): Promise<Response> {
+  const url = `${API_BASE}${path}`;
+
+  if (typeof window === "undefined") {
+    try {
+      const { getCloudflareContext } = await import("@opennextjs/cloudflare");
+      const { env, cf } = await getCloudflareContext({ async: true });
+      const binding = (env as typeof env & { LAUNCHPAD_API?: WorkerBinding }).LAUNCHPAD_API;
+
+      if (cf && binding) return binding.fetch(new Request(url, init));
+    } catch {
+      // Next development and static generation use the configured public URL.
+    }
+  }
+
+  return fetch(url, init);
+}
 
 interface ApiLaunchRow {
   tx_hash: string;
@@ -149,7 +178,7 @@ interface ApiFeeSummary {
  *  here just hides the stat. */
 export async function fetchLaunchFees(asset: string): Promise<FeeSummary | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/launches/${asset}/fees`, {
+    const res = await launchpadApiFetch(`/v2/launches/${asset}/fees`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -302,7 +331,7 @@ interface ApiRepeatFastExit {
  * mempool snapshot is merged by the component instead of being cached here. */
 export async function fetchResearchBehavior(): Promise<ResearchBehaviorSnapshot | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/research/behavior`, {
+    const res = await launchpadApiFetch(`/v2/research/behavior`, {
       signal: AbortSignal.timeout(8_000),
       cache: "no-store",
     });
@@ -418,7 +447,7 @@ export async function fetchResearchBehavior(): Promise<ResearchBehaviorSnapshot 
  */
 export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/mempool`, {
+    const res = await launchpadApiFetch(`/v2/mempool`, {
       signal: AbortSignal.timeout(6_000),
       // A polled endpoint must never be answered by the browser's own cache:
       // the poll IS the freshness, and a cached reply makes it a timer that
@@ -479,7 +508,7 @@ interface ApiMyLaunchRow {
  *  since this is the creator's own view, not the public index. */
 export async function fetchLaunchesBySource(source: string): Promise<MyLaunch[] | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/launches/by/${encodeURIComponent(source)}`, {
+    const res = await launchpadApiFetch(`/v2/launches/by/${encodeURIComponent(source)}`, {
       signal: AbortSignal.timeout(3_000),
       cache: "no-store",
     });
@@ -526,8 +555,8 @@ export async function fetchMintsBySource(source: string): Promise<MintRecord[] |
     const rows: ApiMintRow[] = [];
     let offset = 0;
     do {
-      const res = await fetch(
-        `${API_BASE}/v2/mints/by/${encodeURIComponent(source)}?limit=1000&offset=${offset}`,
+      const res = await launchpadApiFetch(
+        `/v2/mints/by/${encodeURIComponent(source)}?limit=1000&offset=${offset}`,
         { signal: AbortSignal.timeout(3_000), cache: "no-store" },
       );
       if (!res.ok) return null;
@@ -576,8 +605,8 @@ export async function fetchEventsBySource(source: string): Promise<AssetEvent[] 
     const rows: ApiEventRow[] = [];
     let offset = 0;
     do {
-      const res = await fetch(
-        `${API_BASE}/v2/events/by/${encodeURIComponent(source)}?limit=2000&offset=${offset}`,
+      const res = await launchpadApiFetch(
+        `/v2/events/by/${encodeURIComponent(source)}?limit=2000&offset=${offset}`,
         { signal: AbortSignal.timeout(3_000), cache: "no-store" },
       );
       if (!res.ok) return null;
@@ -635,8 +664,8 @@ export async function fetchLaunchpadAddressSummary(
   asset: string,
 ): Promise<LaunchpadAddressSummary | null> {
   try {
-    const res = await fetch(
-      `${API_BASE}/v2/addresses/${encodeURIComponent(source)}/summary?asset=${encodeURIComponent(asset)}`,
+    const res = await launchpadApiFetch(
+      `/v2/addresses/${encodeURIComponent(source)}/summary?asset=${encodeURIComponent(asset)}`,
       { signal: AbortSignal.timeout(3_000) },
     );
     if (!res.ok) return null;
@@ -667,7 +696,7 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
 /** One indexed launch, including its full mirrored creator description. */
 export async function fetchIndexedLaunch(asset: string): Promise<IndexedLaunch | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/launches/${encodeURIComponent(asset)}`, {
+    const res = await launchpadApiFetch(`/v2/launches/${encodeURIComponent(asset)}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -687,7 +716,7 @@ export async function fetchIndexedLaunches(
   perPhase: number,
 ): Promise<IndexedLaunch[] | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/launches?per_phase=${perPhase}`, {
+    const res = await launchpadApiFetch(`/v2/launches?per_phase=${perPhase}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -751,7 +780,7 @@ export async function fetchLaunchPage(
       `phase=${phase}&limit=${limit}&offset=${offset}` +
       (sort ? `&sort=${encodeURIComponent(sort)}` : "") +
       (unmintedBy ? `&unminted_by=${encodeURIComponent(unmintedBy)}` : "");
-    const res = await fetch(`${API_BASE}/v2/launches?${qs}`, {
+    const res = await launchpadApiFetch(`/v2/launches?${qs}`, {
       signal: AbortSignal.timeout(6_000),
       // See fetchMempoolSnapshot: this is the other polled route, and the
       // section refresh is only a refresh if the browser actually asks.
@@ -814,7 +843,7 @@ export interface SearchIndexEntry {
  */
 export async function fetchSearchIndex(): Promise<SearchIndexEntry[] | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/launches/index`, {
+    const res = await launchpadApiFetch(`/v2/launches/index`, {
       signal: AbortSignal.timeout(6_000),
     });
     if (!res.ok) return null;
@@ -866,8 +895,8 @@ export async function fetchCandles(
   limit = 500,
 ): Promise<ChartCandle[] | null> {
   try {
-    const res = await fetch(
-      `${API_BASE}/v2/candles/${encodeURIComponent(asset)}?resolution=${resolution}&limit=${limit}`,
+    const res = await launchpadApiFetch(
+      `/v2/candles/${encodeURIComponent(asset)}?resolution=${resolution}&limit=${limit}`,
       { signal: AbortSignal.timeout(3_000), next: { revalidate: 60 } },
     );
     if (!res.ok) return null;
@@ -932,7 +961,7 @@ export interface LaunchStats {
  *  it doesn't, rather than rendering a confident zero. */
 export async function fetchLaunchStats(height = 0): Promise<LaunchStats | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/stats?height=${height}`, {
+    const res = await launchpadApiFetch(`/v2/stats?height=${height}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -968,7 +997,7 @@ export async function fetchMinterEarnings(
 ): Promise<MinterEarning[]> {
   try {
     const qs = `limit=${limit}${offset > 0 ? `&offset=${offset}` : ""}${source ? `&source=${encodeURIComponent(source)}` : ""}`;
-    const res = await fetch(`${API_BASE}/v2/minters?${qs}`, {
+    const res = await launchpadApiFetch(`/v2/minters?${qs}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -1053,7 +1082,7 @@ interface ApiRewardAccount {
 /** One address's programme ledger. Null means it has no eligible mints. */
 export async function fetchRewardAccount(source: string): Promise<RewardAccount | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/rewards/by/${encodeURIComponent(source)}`, {
+    const res = await launchpadApiFetch(`/v2/rewards/by/${encodeURIComponent(source)}`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -1144,7 +1173,7 @@ interface ApiRewardBatch {
 /** Public distributions; frozen batches without a tx never appear here. */
 export async function fetchRewardBatches(): Promise<RewardBatch[]> {
   try {
-    const res = await fetch(`${API_BASE}/v2/rewards/batches`, {
+    const res = await launchpadApiFetch(`/v2/rewards/batches`, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });
@@ -1273,7 +1302,7 @@ async function activity<Row, T>(
   params = "",
 ): Promise<T[] | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/activity/${path}?limit=${limit}${params}`, {
+    const res = await launchpadApiFetch(`/v2/activity/${path}?limit=${limit}${params}`, {
       // The poll IS the freshness. Cloudflare rewrites max-age on anything it
       // serves from its own cache to the zone's Browser Cache TTL, so without
       // this the tab would be told to hold a 30-second answer for hours. The
@@ -1374,7 +1403,7 @@ export interface ActivityTotals {
  *  book is Counterparty's, and fetchActivityOrders reports its own total. */
 export async function fetchActivityTotals(): Promise<ActivityTotals | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/activity/totals`, {
+    const res = await launchpadApiFetch(`/v2/activity/totals`, {
       cache: "no-store",
       signal: AbortSignal.timeout(6_000),
     });
@@ -1404,8 +1433,8 @@ export async function fetchActivityOrders(
   liveOnly = false,
 ): Promise<{ rows: ActivityOrder[]; total: number } | null> {
   try {
-    const res = await fetch(
-      `${API_BASE}/v2/activity/orders?limit=${limit}${liveOnly ? "&live=1" : ""}`,
+    const res = await launchpadApiFetch(
+      `/v2/activity/orders?limit=${limit}${liveOnly ? "&live=1" : ""}`,
       { cache: "no-store", signal: AbortSignal.timeout(12_000) },
     );
     if (!res.ok) return null;
@@ -1489,7 +1518,7 @@ export async function fetchActivityPools(
   limit = 50,
 ): Promise<{ rows: ActivityPoolEvent[]; total: number } | null> {
   try {
-    const res = await fetch(`${API_BASE}/v2/activity/pools?limit=${limit}`, {
+    const res = await launchpadApiFetch(`/v2/activity/pools?limit=${limit}`, {
       cache: "no-store",
       signal: AbortSignal.timeout(12_000),
     });

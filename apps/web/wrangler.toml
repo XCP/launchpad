@@ -32,6 +32,12 @@ head_sampling_rate = 1
 directory = ".open-next/assets"
 binding = "ASSETS"
 
+# Server-rendered launch reads call the API Worker directly. Browser requests
+# and WebSockets continue to use its public domains.
+[[services]]
+binding = "LAUNCHPAD_API"
+service = "launchpad-api"
+
 # Hosted token metadata: enhanced-asset-info JSON at /j/<ASSET>.json and the
 # uploaded image at /i/<ASSET>. Write-once — descriptions lock on-chain, so
 # what they point at must not drift.
