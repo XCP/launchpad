@@ -456,12 +456,12 @@ export function ActivityTabs({
   );
 
   const pager = totalPages > 1 && (
-    <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 text-xs text-gray-500">
+    <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
       <button
         type="button"
         disabled={page <= 1}
         onClick={() => setParams(tab, page - 1)}
-        className="rounded-md border border-gray-200 px-3 py-2 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-md border border-gray-200 dark:border-gray-800 px-3 py-2 font-medium text-gray-600 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
       >
         ← Prev
       </button>
@@ -472,7 +472,7 @@ export function ActivityTabs({
         type="button"
         disabled={page >= totalPages}
         onClick={() => setParams(tab, page + 1)}
-        className="rounded-md border border-gray-200 px-3 py-2 font-medium text-gray-600 transition-colors hover:border-gray-300 disabled:cursor-not-allowed disabled:opacity-40"
+        className="rounded-md border border-gray-200 dark:border-gray-800 px-3 py-2 font-medium text-gray-600 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Next →
       </button>
@@ -480,12 +480,12 @@ export function ActivityTabs({
   );
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white">
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* A tab strip with one destination is chrome, not navigation — just
           say what the list below is. */}
       {tabs.length > 1 ? (
         <Tabs value={tab} onValueChange={(v) => setParams(v as typeof tab, 1)}>
-          <div className="border-b border-gray-200 p-2">
+          <div className="border-b border-gray-200 dark:border-gray-800 p-2">
             <SegmentedList variant="card">
               {tabs.map((t) => (
                 <SegmentedTrigger key={t} value={t} variant="card" grow={false}>
@@ -496,14 +496,14 @@ export function ActivityTabs({
           </div>
         </Tabs>
       ) : (
-        <div className="border-b border-gray-100 px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-gray-500">
+        <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-2.5 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
           {tabLabel(tabs[0]!)}
         </div>
       )}
 
       {tab === "minters" &&
         (minters.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">
+          <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
             No mints yet — be the first.
           </p>
         ) : (
@@ -521,14 +521,14 @@ export function ActivityTabs({
                 the fill, not the columns themselves. */}
             <div className="overflow-x-auto">
               <div className="min-w-[41.5rem]">
-                <div className="grid grid-cols-[2rem_minmax(16.5rem,1fr)_6rem_6.5rem_4.5rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                <div className="grid grid-cols-[2rem_minmax(16.5rem,1fr)_6rem_6.5rem_4.5rem] gap-x-4 px-4 pb-1 pt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                   <span />
                   <span>Address</span>
                   <span className="text-right">Amount</span>
                   <span className="text-right">Paid</span>
                   <span className="text-right">Mints</span>
                 </div>
-                <ul className="divide-y divide-gray-100">
+                <ul className="divide-y divide-gray-100 dark:divide-gray-800">
                   {minters.slice(from, from + PER_PAGE).map((r, i) => {
                     const pct = ratio(r.earned, mintersTotal) * 100;
                     return (
@@ -538,16 +538,16 @@ export function ActivityTabs({
                       >
                         <span
                           aria-hidden
-                          className="absolute inset-y-0 left-0 bg-purple-50/70"
+                          className="absolute inset-y-0 left-0 bg-purple-50/70 dark:bg-purple-950/40"
                           style={{ width: `${Math.min(100, pct)}%` }}
                         />
-                        <span className="relative z-10 text-left text-xs text-gray-400 tabular-nums">
+                        <span className="relative z-10 text-left text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                           {from + i + 1}
                         </span>
                         <span className="relative z-10 flex items-center gap-2">
                           <AddressHoverCard
                             source={r.source}
-                            className="flex items-center gap-2 font-mono text-gray-600 hover:text-purple-700"
+                            className="flex items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
                           >
                             <Identicon address={r.source} />
                             <span className="whitespace-nowrap">{shortAddress(r.source)}</span>
@@ -557,23 +557,23 @@ export function ActivityTabs({
                               descendant's own text-decoration, so the only way
                               to keep the chip clean is to not be inside the <a>. */}
                           {issuerSource === r.source && (
-                            <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                            <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                               dev
                             </span>
                           )}
                           {freshness?.newAddresses.has(r.source) && (
-                            <span className="shrink-0 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-px text-[10px] font-medium text-amber-700">
+                            <span className="shrink-0 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400">
                               no history
                             </span>
                           )}
                         </span>
-                        <span className="relative z-10 text-right tabular-nums text-gray-900">
+                        <span className="relative z-10 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {commas(tokenQty(r.earned, divisible))}
                         </span>
-                        <span className="relative z-10 text-right tabular-nums text-gray-500">
+                        <span className="relative z-10 text-right tabular-nums text-gray-500 dark:text-gray-400">
                           {commasRaw(r.paid)} XCP
                         </span>
-                        <span className="relative z-10 text-right tabular-nums text-gray-500">
+                        <span className="relative z-10 text-right tabular-nums text-gray-500 dark:text-gray-400">
                           {r.mints} TX{r.mints === 1 ? "" : "s"}
                         </span>
                       </li>
@@ -588,21 +588,21 @@ export function ActivityTabs({
 
       {tab === "mempool" && minting &&
         (!roomState ? (
-          <p className="p-6 text-center text-sm text-gray-400">
+          <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
             Loading mempool…
           </p>
         ) : pending.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">
+          <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
             Nothing queued — every mint so far has confirmed.
           </p>
         ) : (
           <>
-            <p className="border-b border-gray-100 bg-amber-50/50 px-4 py-2 text-xs text-amber-800">
+            <p className="border-b border-gray-100 dark:border-gray-800 bg-amber-50/50 dark:bg-amber-950/40 px-4 py-2 text-xs text-amber-800 dark:text-amber-300">
               Unconfirmed and provisional — mempool mints can exceed what&apos;s
               left, get replaced, or never confirm. Only what lands on-chain
               counts.
             </p>
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {pending.slice(from, from + PER_PAGE).map((p, i) => {
                 const pct = ratio(p.quantity, pendingTotal) * 100;
                 return (
@@ -612,14 +612,14 @@ export function ActivityTabs({
                   >
                     <span
                       aria-hidden
-                      className="absolute inset-y-0 left-0 bg-amber-50"
+                      className="absolute inset-y-0 left-0 bg-amber-50 dark:bg-amber-950/40"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
                     <Link
                       href={`/profile/${p.source}`}
-                      className="relative z-10 flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline"
+                      className="relative z-10 flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                     >
-                      <span className="w-8 shrink-0 text-right text-xs text-gray-400 tabular-nums">
+                      <span className="w-8 shrink-0 text-right text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                         {from + i + 1}
                       </span>
                       <Identicon address={p.source} />
@@ -629,10 +629,10 @@ export function ActivityTabs({
                       href={`https://xcp.io/tx/${p.txHash}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="relative z-10 shrink-0 text-right text-gray-900 hover:text-purple-700 hover:underline"
+                      className="relative z-10 shrink-0 text-right text-gray-900 dark:text-gray-100 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                     >
                       {compact(tokenQty(p.quantity, divisible))}{" "}
-                      <span className="text-gray-400">pending</span>
+                      <span className="text-gray-400 dark:text-gray-500">pending</span>
                     </a>
                   </li>
                 );
@@ -644,25 +644,25 @@ export function ActivityTabs({
 
       {tab === "mempool" && !minting &&
         (pendingOrders.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">
+          <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
             No orders for {asset} are waiting in the mempool.
           </p>
         ) : (
           <>
-            <p className="border-b border-gray-100 bg-amber-50/50 px-4 py-2 text-xs text-amber-800">
+            <p className="border-b border-gray-100 dark:border-gray-800 bg-amber-50/50 dark:bg-amber-950/40 px-4 py-2 text-xs text-amber-800 dark:text-amber-300">
               Unconfirmed and provisional — these orders join the book only after confirmation.
             </p>
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {pendingOrders.slice(from, from + PER_PAGE).map((o, i) => {
                 const buy = o.getAsset === asset;
                 return (
                   <li key={o.txHash} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                    <Link href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700 hover:underline">
-                      <span className="w-8 shrink-0 text-right text-xs text-gray-400 tabular-nums">{from + i + 1}</span>
+                    <Link href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
+                      <span className="w-8 shrink-0 text-right text-xs text-gray-400 dark:text-gray-500 tabular-nums">{from + i + 1}</span>
                       <Identicon address={o.source} />
                       <span className="truncate">{shortAddress(o.source)}</span>
                     </Link>
-                    <a href={`https://xcp.io/tx/${o.txHash}`} target="_blank" rel="noreferrer" className={`shrink-0 font-medium hover:underline ${buy ? "text-green-700" : "text-red-600"}`}>
+                    <a href={`https://xcp.io/tx/${o.txHash}`} target="_blank" rel="noreferrer" className={`shrink-0 font-medium hover:underline ${buy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                       {buy ? "Buy" : "Sell"} pending
                     </a>
                   </li>
@@ -675,15 +675,15 @@ export function ActivityTabs({
 
       {tab === "trades" &&
         (!trades ? (
-          <p className="p-6 text-center text-sm text-gray-400">Loading trades…</p>
+          <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading trades…</p>
         ) : trades.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">No trades yet.</p>
+          <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No trades yet.</p>
         ) : (
           <>
             <div className="overflow-x-auto">
               <table className={PAIR_TABLE}>
                 <thead>
-                  <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                  <tr className="border-b border-gray-100 dark:border-gray-800 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     <th className="px-4 py-2">Side</th>
                     <th className="px-3 py-2 text-right">Price</th>
                     <th className="px-3 py-2 text-right">Amount</th>
@@ -692,7 +692,7 @@ export function ActivityTabs({
                     <th className="px-4 py-2 text-right">Venue / time</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {trades.slice(from, from + PER_PAGE).map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
                     // block_time is missing only if a node responded without
@@ -702,16 +702,16 @@ export function ActivityTabs({
                     const at = hasTime ? new Date(t.time * 1000) : null;
                     return (
                       <tr key={t.key}>
-                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700" : "text-red-600"}`}>
+                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                           {t.buy ? "↗ Buy" : "↘ Sell"}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
                           {(ratio(t.xcpRaw, t.tokenRaw) / (divisible ? 1 : 1e8)).toFixed(8)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {compact(tokens)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {fixedRaw(t.xcpRaw)}
                         </td>
                         <td className="px-3 py-2">
@@ -722,19 +722,19 @@ export function ActivityTabs({
                               balanceRaw={holderBalance.get(t.addr)}
                               poolXcpRaw={poolXcpRaw}
                               poolTokenRaw={poolTokensRaw}
-                              className="flex items-center gap-1.5 font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline"
+                              className="flex items-center gap-1.5 font-mono text-xs text-gray-500 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                             >
                               <Identicon address={t.addr} />
                               {shortAddress(t.addr)}
                             </LaunchpadAddressHoverCard>
                             {issuerSource === t.addr && (
-                              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                              <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                                 dev
                               </span>
                             )}
                           </span>
                         </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-400">
                           <a
                             href={`https://xcp.io/tx/${t.txHash}`}
                             target="_blank"
@@ -744,7 +744,7 @@ export function ActivityTabs({
                                 ? `${at.toUTCString()} · block ${commas(t.block)}`
                                 : `Block ${commas(t.block)}`
                             }
-                            className="hover:text-purple-700 hover:underline"
+                            className="hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                           >
                             {t.via} ·{" "}
                             {at ? (
@@ -755,7 +755,7 @@ export function ActivityTabs({
                               commas(t.block)
                             )}
                             {at && coarse && (
-                              <span className="text-gray-400">
+                              <span className="text-gray-400 dark:text-gray-500">
                                 {" "}
                                 · {commas(t.block)}
                               </span>
@@ -774,9 +774,9 @@ export function ActivityTabs({
 
       {tab === "holders" &&
         (!holders ? (
-          <p className="p-6 text-center text-sm text-gray-400">Loading holders…</p>
+          <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading holders…</p>
         ) : holderRows.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">No holders found.</p>
+          <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">No holders found.</p>
         ) : (
           <>
             {/* Scrolls sideways on a phone rather than compressing. The row
@@ -787,7 +787,7 @@ export function ActivityTabs({
                 it entirely, which is the worst of both. Given a floor width
                 the row keeps its shape and the reader moves instead. */}
             <div className="overflow-x-auto">
-            <ul className="min-w-[30rem] divide-y divide-gray-100">
+            <ul className="min-w-[30rem] divide-y divide-gray-100 dark:divide-gray-800">
               {holderRows.slice(from, from + PER_PAGE).map((h, i) => {
                 const pct = ratio(h.quantity, holderTotal) * 100;
                 const isPool = h.address === POOL_ROW;
@@ -805,11 +805,11 @@ export function ActivityTabs({
                   >
                     <span
                       aria-hidden
-                      className="absolute inset-y-0 left-0 bg-purple-50/70"
+                      className="absolute inset-y-0 left-0 bg-purple-50/70 dark:bg-purple-950/40"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
-                    <span className="relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-gray-600">
-                      <span className="w-8 text-right text-xs text-gray-400">
+                    <span className="relative z-10 flex shrink-0 items-center gap-2 whitespace-nowrap font-mono text-gray-600 dark:text-gray-400">
+                      <span className="w-8 text-right text-xs text-gray-400 dark:text-gray-500">
                         {from + i + 1}
                       </span>
                       {isPool ? (
@@ -833,21 +833,21 @@ export function ActivityTabs({
                               href={`https://xcpdex.com/${lpAsset}`}
                               target="_blank"
                               rel="noreferrer"
-                              className="font-sans font-medium text-gray-900 hover:text-purple-700 hover:underline"
+                              className="font-sans font-medium text-gray-900 dark:text-gray-100 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                               title={`LP token ${lpAsset}`}
                             >
                               Pool
                             </a>
                           ) : (
-                            <span className="font-sans font-medium text-gray-900">
+                            <span className="font-sans font-medium text-gray-900 dark:text-gray-100">
                               Pool
                             </span>
                           )}
                           <span
                             className={`shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${
                               poolLock.fullyLocked
-                                ? "border-green-200 bg-green-50 text-green-700"
-                                : "border-amber-200 bg-amber-50 text-amber-700"
+                                ? "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400"
+                                : "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400"
                             }`}
                             title={
                               poolLock.fullyLocked
@@ -866,7 +866,7 @@ export function ActivityTabs({
                           ) : (
                             <AddressHoverCard
                               source={h.address}
-                              className="hover:text-purple-700 hover:underline"
+                              className="hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                             >
                               {shortAddress(h.address)}
                             </AddressHoverCard>
@@ -878,18 +878,18 @@ export function ActivityTabs({
                           on the market; only the issuer's own row is a
                           fact worth flagging post-graduation. */}
                       {issuerSource === h.address && (
-                        <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                        <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                           dev
                         </span>
                       )}
                     </span>
-                    <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900">
+                    <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900 dark:text-gray-100">
                       {soldOut ? (
-                        <span className="text-gray-400">0 · sold out</span>
+                        <span className="text-gray-400 dark:text-gray-500">0 · sold out</span>
                       ) : (
                         <>
                           {quantityText}{" "}
-                          <span className="text-gray-400">
+                          <span className="text-gray-400 dark:text-gray-500">
                             ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
                           </span>
                         </>
@@ -906,9 +906,9 @@ export function ActivityTabs({
 
       {tab === "orders" &&
         (!orders ? (
-          <p className="p-6 text-center text-sm text-gray-400">Loading order book…</p>
+          <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading order book…</p>
         ) : book.length === 0 ? (
-          <p className="p-6 text-center text-sm text-gray-500">
+          <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
             No open orders on this pair — every trade here is going through the pool.
           </p>
         ) : (
@@ -919,7 +919,7 @@ export function ActivityTabs({
                   to read the other. */}
               <table className={PAIR_TABLE}>
                 <thead>
-                  <tr className="border-b border-gray-100 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                  <tr className="border-b border-gray-100 dark:border-gray-800 text-left text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     <th className="px-4 py-2">Side</th>
                     <th className="px-3 py-2 text-right">Price</th>
                     <th className="px-3 py-2 text-right">Amount</th>
@@ -928,7 +928,7 @@ export function ActivityTabs({
                     <th className="px-4 py-2 text-right">Filled / expires</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {ordered.slice(from, from + PER_PAGE).map((row, i) => {
                     const { isBuy, price, amountText, xcpText } = row;
                     const pool = "isPool" in row;
@@ -943,44 +943,44 @@ export function ActivityTabs({
                     return (
                       <Fragment key={o ? o.tx_hash : `pool-${isBuy ? "bid" : "ask"}`}>
                       {boundary && (
-                        <tr className="bg-gray-50/80">
-                          <td colSpan={6} className="px-4 py-1.5 text-center text-[11px] text-gray-500">
+                        <tr className="bg-gray-50/80 dark:bg-gray-800/60">
+                          <td colSpan={6} className="px-4 py-1.5 text-center text-[11px] text-gray-500 dark:text-gray-400">
                             spread{" "}
-                            <span className="tabular-nums text-gray-700">
+                            <span className="tabular-nums text-gray-700 dark:text-gray-300">
                               {(bestBid / (divisible ? 1 : 1e8)).toFixed(8)}
                             </span>{" "}
                             →{" "}
-                            <span className="tabular-nums text-gray-700">
+                            <span className="tabular-nums text-gray-700 dark:text-gray-300">
                               {(bestAsk / (divisible ? 1 : 1e8)).toFixed(8)}
                             </span>
                             {bestBid > 0 && (
-                              <span className="ml-1.5 text-gray-400">
+                              <span className="ml-1.5 text-gray-400 dark:text-gray-500">
                                 ({(bestAsk / bestBid).toFixed(2)}× apart)
                               </span>
                             )}
                           </td>
                         </tr>
                       )}
-                      <tr className={mine ? "bg-purple-50/60" : pool ? "bg-blue-50/40" : undefined}>
+                      <tr className={mine ? "bg-purple-50/60 dark:bg-purple-950/40" : pool ? "bg-blue-50/40 dark:bg-blue-950/40" : undefined}>
                         {/* Bid and Ask, not Buy and Sell: a trade is a buy or a
                             sell because it happened, a resting order is only an
                             intent. The pool is neither side's intent — it is a
                             standing counterparty to both — so it says so. */}
-                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${pool ? "text-blue-700" : isBuy ? "text-green-700" : "text-red-600"}`}>
+                        <td className={`whitespace-nowrap px-4 py-2 font-medium ${pool ? "text-blue-700 dark:text-blue-300" : isBuy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                           {pool ? "◆ Pool" : isBuy ? "↗ Bid" : "↘ Ask"}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
                           {(price / (divisible ? 1 : 1e8)).toFixed(8)}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {amountText}
                         </td>
-                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900">
+                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {xcpText}
                         </td>
                         <td className="px-3 py-2">
                           {pool ? (
-                            <span className="whitespace-nowrap text-xs text-gray-500">
+                            <span className="whitespace-nowrap text-xs text-gray-500 dark:text-gray-400">
                               constant-product pool · 0.5% fee
                             </span>
                           ) : (
@@ -991,25 +991,25 @@ export function ActivityTabs({
                               balanceRaw={holderBalance.get(o!.source)}
                               poolXcpRaw={poolXcpRaw}
                               poolTokenRaw={poolTokensRaw}
-                              className="flex items-center gap-1.5 font-mono text-xs text-gray-500 hover:text-purple-700 hover:underline"
+                              className="flex items-center gap-1.5 font-mono text-xs text-gray-500 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                             >
                               <Identicon address={o!.source} />
                               {shortAddress(o!.source)}
                             </LaunchpadAddressHoverCard>
                             {issuerSource === o!.source && (
-                              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                              <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                                 dev
                               </span>
                             )}
                             {mine && (
-                              <span className="shrink-0 rounded-full border border-purple-200 bg-purple-50 px-1.5 py-px text-[10px] font-medium text-purple-700">
+                              <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                                 you
                               </span>
                             )}
                           </span>
                           )}
                         </td>
-                        <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500">
+                        <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-400">
                           {pool ? (
                             <span title="A pool never runs out, it only gets worse. This is what it can absorb before its price moves 1%.">
                               within 1%
@@ -1019,7 +1019,7 @@ export function ActivityTabs({
                               type="button"
                               disabled={busy}
                               onClick={() => compose.composeCancel({ offer_hash: o!.tx_hash })}
-                              className="rounded-md border border-gray-300 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                              className="rounded-md border border-gray-300 dark:border-gray-700 px-2.5 py-1 text-xs text-gray-600 dark:text-gray-400 transition-colors hover:border-red-400 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                             >
                               {busy ? "…" : "Cancel"}
                             </button>
@@ -1039,7 +1039,7 @@ export function ActivityTabs({
             </div>
             {pager}
             {compose.status === "confirmed" && (
-              <p className="border-t border-gray-100 px-4 py-2 text-xs text-green-700">
+              <p className="border-t border-gray-100 dark:border-gray-800 px-4 py-2 text-xs text-green-700 dark:text-green-400">
                 Cancel broadcast — the remainder refunds when it confirms.{" "}
                 <button
                   type="button"

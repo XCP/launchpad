@@ -19,13 +19,13 @@ const LABEL: Record<ActivityKind, string> = {
 };
 
 const TONE: Record<ActivityKind, string> = {
-  mint: "bg-purple-100 text-purple-700",
-  mint_pending: "bg-amber-100 text-amber-700",
-  refund: "bg-gray-100 text-gray-600",
-  buy: "bg-green-100 text-green-700",
-  sell: "bg-red-100 text-red-700",
-  movement_in: "bg-blue-100 text-blue-700",
-  movement_out: "bg-gray-100 text-gray-600",
+  mint: "bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300",
+  mint_pending: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400",
+  refund: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
+  buy: "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400",
+  sell: "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-400",
+  movement_in: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
+  movement_out: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
 };
 
 /** Blocks land about every ten minutes, so distance from the tip is a decent
@@ -62,12 +62,12 @@ export function ActivityTab({ address }: { address: string }) {
     { refreshInterval: 600_000, revalidateOnFocus: false },
   );
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Loading activity…</p>;
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading activity…</p>;
 
   const rows = data?.rows ?? [];
   if (rows.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+      <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
         No mints, trades, or transfers on xcp.fun launches yet.
       </p>
     );
@@ -80,14 +80,14 @@ export function ActivityTab({ address }: { address: string }) {
           by however wide each status label happens to be. */}
       <div className="overflow-x-auto">
         <div className="min-w-[34rem]">
-          <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_7rem_5rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+          <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_7rem_5rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
             <span>Token</span>
             <span>Type</span>
             <span className="text-right">Amount</span>
             <span className="text-right">XCP</span>
             <span className="text-right">When</span>
           </div>
-          <ul className="divide-y divide-gray-100">
+          <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {rows.map((r) => {
               const tokensIn = r.tokenDelta >= 0n;
               const tokens = tokenQty((tokensIn ? r.tokenDelta : -r.tokenDelta).toString(), r.divisible);
@@ -98,7 +98,7 @@ export function ActivityTab({ address }: { address: string }) {
                   key={r.key}
                   className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_7rem_5rem] items-center gap-x-4 py-2.5 text-sm"
                 >
-                  <Link href={`/${r.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600">
+                  <Link href={`/${r.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
                     <TokenImage asset={r.asset} className="size-6 shrink-0 rounded" />
                     <span className="truncate font-medium">{r.asset}</span>
                   </Link>
@@ -107,10 +107,10 @@ export function ActivityTab({ address }: { address: string }) {
                       {LABEL[r.kind]}
                     </span>
                   </span>
-                  <span className="text-right tabular-nums text-gray-900">
+                  <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
                     {/* A refund moves XCP and no tokens; "+0" is noise. */}
                     {r.tokenDelta === 0n ? (
-                      <span className="text-gray-300">—</span>
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
                     ) : (
                       <>
                         {tokensIn ? "+" : "−"}
@@ -118,9 +118,9 @@ export function ActivityTab({ address }: { address: string }) {
                       </>
                     )}
                   </span>
-                  <span className="text-right tabular-nums text-gray-500">
+                  <span className="text-right tabular-nums text-gray-500 dark:text-gray-400">
                     {r.xcpDelta === 0n ? (
-                      <span className="text-gray-300">—</span>
+                      <span className="text-gray-300 dark:text-gray-600">—</span>
                     ) : (
                       <>
                         {xcpOut ? "−" : "+"}
@@ -128,7 +128,7 @@ export function ActivityTab({ address }: { address: string }) {
                       </>
                     )}
                   </span>
-                  <span className="text-right text-xs text-gray-400">
+                  <span className="text-right text-xs text-gray-400 dark:text-gray-500">
                     {r.block === null
                       ? "other"
                       : data?.height
@@ -141,7 +141,7 @@ export function ActivityTab({ address }: { address: string }) {
           </ul>
         </div>
       </div>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other”
         reconciles those events to the live balance and can represent a send,
         receive, burn, or liquidity movement. An open

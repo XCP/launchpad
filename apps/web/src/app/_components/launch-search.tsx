@@ -154,7 +154,7 @@ export function LaunchSearch({
 
   const chip = (active: boolean) =>
     `rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-      active ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+      active ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
     }`;
 
   return (
@@ -168,14 +168,14 @@ export function LaunchSearch({
       <D.Trigger asChild>
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border border-gray-200 bg-white py-2 pl-3.5 pr-2 text-left text-sm text-gray-400 transition-colors hover:border-gray-300"
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2 pl-3.5 pr-2 text-left text-sm text-gray-400 dark:text-gray-500 transition-colors hover:border-gray-300 dark:hover:border-gray-700"
         >
           <svg aria-hidden viewBox="0 0 16 16" fill="none" className="size-4 shrink-0">
             <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
             <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
           </svg>
           <span className="min-w-0 flex-1 truncate">Search launches</span>
-          <kbd className="hidden shrink-0 rounded border border-gray-200 px-1.5 py-0.5 font-sans text-[10px] text-gray-400 sm:block">
+          <kbd className="hidden shrink-0 rounded border border-gray-200 dark:border-gray-800 px-1.5 py-0.5 font-sans text-[10px] text-gray-400 dark:text-gray-500 sm:block">
             ⌘K
           </kbd>
         </button>
@@ -183,14 +183,14 @@ export function LaunchSearch({
 
       <D.Portal>
         <D.Overlay className="backdrop-fade fixed inset-0 z-50 bg-black/40" />
-        <D.Content className="modal-pop fixed left-1/2 top-[8vh] z-50 flex max-h-[80vh] w-[min(94vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+        <D.Content className="modal-pop fixed left-1/2 top-[8vh] z-50 flex max-h-[80vh] w-[min(94vw,40rem)] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-2xl">
           <D.Title className="sr-only">Search launches</D.Title>
           <D.Description className="sr-only">
             Find a launch by asset name, and sort or filter the results.
           </D.Description>
 
-          <div className="flex items-center gap-3 border-b border-gray-100 px-4 py-3.5">
-            <svg aria-hidden viewBox="0 0 16 16" fill="none" className="size-5 shrink-0 text-gray-400">
+          <div className="flex items-center gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3.5">
+            <svg aria-hidden viewBox="0 0 16 16" fill="none" className="size-5 shrink-0 text-gray-400 dark:text-gray-500">
               <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
               <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -205,11 +205,11 @@ export function LaunchSearch({
               }}
               placeholder="Search asset name"
               aria-label="Search asset name"
-              className="min-w-0 flex-1 bg-transparent text-base text-gray-900 outline-none placeholder:text-gray-400"
+              className="min-w-0 flex-1 bg-transparent text-base text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
             />
           </div>
 
-          <div className="flex items-center gap-1 border-b border-gray-100 px-4 py-2.5">
+          <div className="flex items-center gap-1 border-b border-gray-100 dark:border-gray-800 px-4 py-2.5">
             {PHASES.map((p) => (
               <button
                 key={p.id}
@@ -225,7 +225,7 @@ export function LaunchSearch({
 
           <ul className="min-h-0 flex-1 overflow-y-auto p-2">
             {results.length === 0 ? (
-              <li className="px-3 py-8 text-center text-sm text-gray-500">
+              <li className="px-3 py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                 {/* "Nothing matches" is a claim about the index, so it must
                     not be made before the index has arrived. */}
                 {rows === null
@@ -244,14 +244,14 @@ export function LaunchSearch({
                   <button
                     type="button"
                     onClick={() => go(r.asset)}
-                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-gray-50"
+                    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800/60"
                   >
                     <TokenImage
                       asset={r.asset}
-                      className="size-9 shrink-0 rounded-lg bg-gray-100 object-cover"
+                      className="size-9 shrink-0 rounded-lg bg-gray-100 dark:bg-gray-800 object-cover"
                     />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-gray-900">
+                      <span className="block truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                         {r.name ?? r.asset}
                       </span>
                       {/* The asset name is the identity — Counterparty has no
@@ -264,7 +264,7 @@ export function LaunchSearch({
                           goes to age instead. A launch whose announcement
                           block hasn't been resolved yet simply omits it rather
                           than inventing one. */}
-                      <span className="block truncate text-xs text-gray-500">
+                      <span className="block truncate text-xs text-gray-500 dark:text-gray-400">
                         by {shortAddress(r.source)}
                         {phase === "all"
                           ? ` · ${r.phase}`
@@ -273,7 +273,7 @@ export function LaunchSearch({
                             : ""}
                       </span>
                     </span>
-                    <span className="shrink-0 text-xs font-medium tabular-nums text-gray-600">
+                    <span className="shrink-0 text-xs font-medium tabular-nums text-gray-600 dark:text-gray-400">
                       {metric(r, phase, height, xcpUsd)}
                     </span>
                   </button>
@@ -282,7 +282,7 @@ export function LaunchSearch({
             )}
           </ul>
 
-          <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2.5 text-xs text-gray-400">
+          <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500">
             <span>
               {results.length} of {rows?.length ?? 0}
               {hiddenRefunded > 0 && ` · ${hiddenRefunded} refunded hidden`}

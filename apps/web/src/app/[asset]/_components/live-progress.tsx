@@ -52,13 +52,13 @@ export function LiveProgress({
     <>
       <div className="mb-2 flex items-baseline justify-between">
         <span className="text-lg font-bold">{confirmedPct.toFixed(1)}%</span>
-        <span className="text-sm text-gray-500">
+        <span className="text-sm text-gray-500 dark:text-gray-400">
           {compact(tokenQty(earned, divisible))} /{" "}
           {big(target) > 0n ? compact(tokenQty(target, divisible)) : "∞"}
           {allOrNothing ? " · to launch" : ""}
         </span>
       </div>
-      <div className="h-3 overflow-hidden rounded-full bg-gray-100">
+      <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
         <div className="flex h-full">
           <div
             className="h-full bg-purple-600 transition-[width] duration-700"
@@ -67,7 +67,7 @@ export function LiveProgress({
           {pendingPct > 0 && (
             <>
               {/* 2px surface gap so the segments read as two quantities */}
-              <div className="h-full w-0.5 shrink-0 bg-white" />
+              <div className="h-full w-0.5 shrink-0 bg-white dark:bg-gray-900" />
               <div
                 className="h-full animate-pulse bg-purple-400 transition-[width] duration-700"
                 style={{ width: `${pendingPct}%` }}

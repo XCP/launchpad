@@ -28,34 +28,34 @@ export function RewardsCard({
   if (!account || account.earnedMints === 0) return null;
 
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5">
+    <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
       <div className="flex items-baseline justify-between gap-3">
         <span className={LABEL}>{isSelf ? "Your lifetime earnings" : "Lifetime earned"}</span>
         <div className="flex items-center gap-3 text-xs">
           {onOpenHistory && (
-            <button type="button" onClick={onOpenHistory} className="text-purple-600 hover:underline">
+            <button type="button" onClick={onOpenHistory} className="text-purple-600 dark:text-purple-400 hover:underline">
               Payouts
             </button>
           )}
-          <Link href="/rewards" className="text-purple-600 hover:underline">
+          <Link href="/rewards" className="text-purple-600 dark:text-purple-400 hover:underline">
             Program
           </Link>
         </div>
       </div>
 
       <div className="mt-1 flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-gray-900 tabular-nums">
+        <span className="text-2xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
           {commasRaw(account.lifetimeEarnedQuantity)}
         </span>
-        <span className="text-sm font-medium text-gray-500">MINTS</span>
+        <span className="text-sm font-medium text-gray-500 dark:text-gray-400">MINTS</span>
       </div>
 
-      <p className="mt-1.5 text-xs text-gray-500 tabular-nums">
+      <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
         {commas(account.earnedMints)} mint{account.earnedMints === 1 ? "" : "s"} across{" "}
         {commas(account.launches)} launch{account.launches === 1 ? "" : "es"} ·{" "}
         {commasRaw(account.committedXcp)} XCP committed
       </p>
-      <p className="mt-1 text-[11px] text-gray-400">
+      <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
         {commas(MINTS_PER_MINT)} MINTS per mint · all-time program total, not
         your wallet balance.
       </p>

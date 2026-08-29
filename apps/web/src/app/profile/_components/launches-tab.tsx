@@ -16,26 +16,26 @@ const PHASE_LABEL: Record<LaunchPhase, string> = {
 };
 
 const PHASE_TONE: Record<LaunchPhase, string> = {
-  scheduled: "bg-gray-100 text-gray-600",
-  minting: "bg-blue-100 text-blue-700",
-  graduated: "bg-green-100 text-green-700",
-  refunded: "bg-amber-100 text-amber-700",
+  scheduled: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
+  minting: "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300",
+  graduated: "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400",
+  refunded: "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400",
 };
 
 function ConformingBadge({ conforming }: { conforming: boolean | null }) {
   if (conforming === null) {
-    return <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">Verdict pending</span>;
+    return <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">Verdict pending</span>;
   }
   return conforming ? (
-    <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-medium text-purple-700">XCP-69</span>
+    <span className="rounded-full bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">XCP-69</span>
   ) : (
-    <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Non-conforming</span>
+    <span className="rounded-full bg-red-100 dark:bg-red-900/50 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">Non-conforming</span>
   );
 }
 
 function LaunchCard({ launch }: { launch: MyLaunch }) {
   return (
-    <div className="flex gap-4 rounded-lg border border-gray-200 bg-white p-4">
+    <div className="flex gap-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
       <Link href={`/${launch.asset}`} className="shrink-0">
         <TokenImage asset={launch.asset} className="size-16 rounded-lg object-cover" />
       </Link>
@@ -43,7 +43,7 @@ function LaunchCard({ launch }: { launch: MyLaunch }) {
         <div className="flex items-center justify-between gap-3">
           <Link
             href={`/${launch.asset}`}
-            className="truncate font-semibold text-gray-900 hover:text-purple-600"
+            className="truncate font-semibold text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400"
           >
             {launch.asset}
           </Link>
@@ -90,22 +90,22 @@ export function LaunchesTab({ address }: { address: string }) {
 
   return (
     <div className="space-y-4">
-      {isLoading && <p className="text-sm text-gray-500">Loading…</p>}
+      {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>}
 
       {unconfirmed.map((fm) => (
         <div
           key={fm.tx_hash}
-          className="flex gap-4 rounded-lg border border-amber-200 bg-amber-50/40 p-4"
+          className="flex gap-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/40 p-4"
         >
           <TokenImage asset={fm.asset} className="size-16 shrink-0 rounded-lg object-cover" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-3">
-              <span className="truncate font-semibold text-gray-900">{fm.asset}</span>
-              <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+              <span className="truncate font-semibold text-gray-900 dark:text-gray-100">{fm.asset}</span>
+              <span className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
                 In mempool
               </span>
             </div>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               Broadcast, waiting to confirm. Its page and editing open up once
               it lands in a block.
             </p>
@@ -113,12 +113,12 @@ export function LaunchesTab({ address }: { address: string }) {
         </div>
       ))}
       {launches !== null && launches !== undefined && launches.length === 0 && unconfirmed.length === 0 && (
-        <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+        <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
           This wallet hasn&apos;t launched anything yet.
         </p>
       )}
       {launches === null && (
-        <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+        <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
           Couldn&apos;t reach the launch index — try again shortly.
         </p>
       )}

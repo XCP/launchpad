@@ -163,7 +163,7 @@ export function SwapSettingsGear() {
       }
       label="Swap settings"
     >
-      <div className="text-xs font-medium text-gray-500">Max slippage</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Max slippage</div>
       <div className="mt-2 flex items-center gap-1.5">
         <button
           type="button"
@@ -173,8 +173,8 @@ export function SwapSettingsGear() {
           }}
           className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
             s.slippageAuto
-              ? "border-purple-600 bg-purple-50 text-purple-700"
-              : "border-gray-200 text-gray-600 hover:border-gray-300"
+              ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300"
+              : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
           }`}
         >
           Auto
@@ -190,18 +190,18 @@ export function SwapSettingsGear() {
             }}
             className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
               !s.slippageAuto && s.slippage === p && s.customSlip === 0
-                ? "border-purple-600 bg-purple-50 text-purple-700"
-                : "border-gray-200 text-gray-600 hover:border-gray-300"
+                ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300"
+                : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
             {p}%
           </button>
         ))}
         <div
-          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             !s.slippageAuto && s.customSlip > 0
-              ? "border-purple-600 bg-purple-50"
-              : "border-gray-200"
+              ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40"
+              : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -214,39 +214,39 @@ export function SwapSettingsGear() {
             ariaLabel="Custom slippage percent"
             className="w-8 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">%</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
         </div>
       </div>
       {s.slippageAuto ? (
-        <p className="mt-2 text-[11px] text-gray-400">
+        <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
           Auto sizes slippage to the trade: what this quote needs, currently ~
           {s.autoValue}%.
         </p>
       ) : s.slippage >= 20 ? (
-        <p className="mt-2 text-[11px] font-medium text-red-600">
+        <p className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
           {s.slippage}% slippage authorizes a very unfavorable fill. The
           button will warn before swapping.
         </p>
       ) : s.slippage > 5 ? (
-        <p className="mt-2 text-[11px] text-red-600">
+        <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
           High slippage authorizes up to {s.slippage}% price impact.
         </p>
       ) : s.slippage < 0.5 ? (
-        <p className="mt-2 text-[11px] text-amber-600">
+        <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
           Below 0.5% the order may not fill.
         </p>
       ) : s.slippage > s.autoValue ? (
-        <p className="mt-2 text-[11px] text-amber-600">
+        <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
           Higher than this trade needs (~{s.autoValue}%).
         </p>
       ) : null}
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">Expiration</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Expiration</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.expiration !== MARKET_EXPIRATION
-              ? "border-purple-600 bg-purple-50"
-              : "border-gray-200"
+              ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40"
+              : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -256,18 +256,18 @@ export function SwapSettingsGear() {
             ariaLabel="Order expiration in blocks"
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">blocks</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">blocks</span>
         </span>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         How long an unfilled remainder rests before auto-refund.{" "}
         {MARKET_EXPIRATION} = fill at confirmation or refund next block.
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-            s.customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+            s.customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -277,10 +277,10 @@ export function SwapSettingsGear() {
             ariaLabel="Bitcoin fee rate in sats per vbyte"
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">sat/vB</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         The Bitcoin miner fee. Default tracks the next-block median.
       </p>
     </GearPopover>
@@ -295,7 +295,7 @@ export function LimitSettingsGear() {
       active={s.limitExpiration !== 1000 || s.customFee > 0}
       label="Limit order settings"
     >
-      <div className="text-xs font-medium text-gray-500">Expiration</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Expiration</div>
       <div className="mt-2 flex items-center gap-1.5">
         {LIMIT_EXPIRATIONS.map((x) => (
           <button
@@ -304,22 +304,22 @@ export function LimitSettingsGear() {
             onClick={() => s.setLimitExpiration(x.blocks)}
             className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
               s.limitExpiration === x.blocks
-                ? "border-purple-600 bg-purple-50 text-purple-700"
-                : "border-gray-200 text-gray-600 hover:border-gray-300"
+                ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300"
+                : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
             {x.label}
           </button>
         ))}
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         How long the order rests unfilled before the remainder auto-refunds.
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-            s.customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+            s.customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -329,13 +329,13 @@ export function LimitSettingsGear() {
             ariaLabel="Bitcoin fee rate in sats per vbyte"
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">sat/vB</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         The Bitcoin miner fee. Default tracks the next-block median.
       </p>
-      <div className="mt-3 border-t border-gray-100 pt-2 text-[11px] leading-relaxed text-gray-400">
+      <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         A resting order refunds in full at expiry — the price you set is
         enforced by the order itself.
       </div>
@@ -351,7 +351,7 @@ export function LiquiditySettingsGear() {
       active={s.lqCustomSlip > 0 || s.customFee > 0}
       label="Liquidity settings"
     >
-      <div className="text-xs font-medium text-gray-500">Max slippage</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Max slippage</div>
       <div className="mt-2 flex items-center gap-1.5">
         {LQ_SLIPPAGE_PRESETS.map((p) => (
           <button
@@ -363,18 +363,18 @@ export function LiquiditySettingsGear() {
             }}
             className={`flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-colors ${
               s.lqSlippage === p && s.lqCustomSlip === 0
-                ? "border-purple-600 bg-purple-50 text-purple-700"
-                : "border-gray-200 text-gray-600 hover:border-gray-300"
+                ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300"
+                : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
             {p}%
           </button>
         ))}
         <div
-          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
+          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.lqCustomSlip > 0
-              ? "border-purple-600 bg-purple-50"
-              : "border-gray-200"
+              ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40"
+              : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -384,19 +384,19 @@ export function LiquiditySettingsGear() {
             ariaLabel="Custom liquidity slippage percent"
             className="w-8 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">%</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
         </div>
       </div>
-      <p className="mt-2 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         If the pool moves past this before confirmation, the whole
         transaction is void — nothing is debited; only the miner fee is
         spent.
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-            s.customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+            s.customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -406,10 +406,10 @@ export function LiquiditySettingsGear() {
             ariaLabel="Bitcoin fee rate in sats per vbyte"
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">sat/vB</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         The Bitcoin miner fee. Default tracks the next-block median.
       </p>
     </GearPopover>

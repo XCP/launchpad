@@ -46,7 +46,7 @@ export function LiveBehaviorDashboard() {
 
   if (isLoading && !data) {
     return (
-      <section className="rounded-xl border border-gray-200 bg-white p-5 text-sm text-gray-500">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 text-sm text-gray-500 dark:text-gray-400">
         Loading launch dynamics…
       </section>
     );
@@ -54,7 +54,7 @@ export function LiveBehaviorDashboard() {
 
   if (!data) {
     return (
-      <section className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900">
+      <section className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 text-sm text-amber-900 dark:text-amber-200">
         Launch dynamics are temporarily unavailable.
       </section>
     );
@@ -82,7 +82,7 @@ export function LiveBehaviorDashboard() {
         pending={pending}
       />
 
-      <p className="text-xs leading-relaxed text-gray-400">
+      <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
         Each number counts unique addresses. A sale is a pool or order-book sale captured by xcp.fun.
         Dump means the address sold within {data.fastExitBlocks} blocks of graduation. A meaningful
         balance is more than one token and more than 1% of the address&apos;s acquired amount.
@@ -99,28 +99,28 @@ export function SellerSummary({
   const redeployed = cohorts.redeployAndHold + cohorts.redeployAndExit;
 
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="border-b border-gray-100 px-4 py-4 sm:px-5">
+    <section className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-4 sm:px-5">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
             <h2 className="font-semibold">What sellers did next</h2>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {cohorts.sellerAddresses} unique minter addresses made a sale. Each appears once below.
             </p>
           </div>
-          <p className="text-xs text-gray-500 sm:text-right">
-            <strong className="text-gray-900">{redeployed}</strong> minted again ·{" "}
-            <strong className="text-gray-900">{compact(fromSats(cohorts.redeployedPaid))} XCP</strong> redeployed
+          <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-right">
+            <strong className="text-gray-900 dark:text-gray-100">{redeployed}</strong> minted again ·{" "}
+            <strong className="text-gray-900 dark:text-gray-100">{compact(fromSats(cohorts.redeployedPaid))} XCP</strong> redeployed
           </p>
         </div>
       </div>
 
       <div className="grid grid-cols-[minmax(7.5rem,1fr)_1fr_1fr] text-sm">
-        <div className="border-b border-r border-gray-100 bg-gray-50 p-3" />
-        <div className="border-b border-r border-gray-100 bg-gray-50 p-3 text-center text-xs font-semibold text-gray-500">
+        <div className="border-b border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3" />
+        <div className="border-b border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
           Still holds
         </div>
-        <div className="border-b border-gray-100 bg-gray-50 p-3 text-center text-xs font-semibold text-gray-500">
+        <div className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
           No meaningful balance
         </div>
 
@@ -138,7 +138,7 @@ export function SellerSummary({
 
 function MatrixLabel({ label, last = false }: { label: string; last?: boolean }) {
   return (
-    <div className={`${last ? "" : "border-b"} border-r border-gray-100 p-3 text-xs font-semibold text-gray-600 sm:p-4`}>
+    <div className={`${last ? "" : "border-b"} border-r border-gray-100 dark:border-gray-800 p-3 text-xs font-semibold text-gray-600 dark:text-gray-400 sm:p-4`}>
       {label}
     </div>
   );
@@ -155,10 +155,10 @@ function MatrixValue({
 }) {
   return (
     <div
-      className={`${last ? "" : "border-b"} ${lastColumn ? "" : "border-r"} border-gray-100 p-3 text-center sm:p-4`}
+      className={`${last ? "" : "border-b"} ${lastColumn ? "" : "border-r"} border-gray-100 dark:border-gray-800 p-3 text-center sm:p-4`}
     >
-      <strong className="text-xl tabular-nums text-gray-900">{value}</strong>
-      <div className="text-[11px] text-gray-400">addresses</div>
+      <strong className="text-xl tabular-nums text-gray-900 dark:text-gray-100">{value}</strong>
+      <div className="text-[11px] text-gray-400 dark:text-gray-500">addresses</div>
     </div>
   );
 }
@@ -169,7 +169,7 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
 
   if (rows.length === 0) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-4 py-3 text-xs text-gray-500">
+      <div className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
         <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
         No sells waiting in the mempool.
       </div>
@@ -177,10 +177,10 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
   }
 
   return (
-    <div className="rounded-xl border border-red-200 bg-red-50 p-4">
+    <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-red-950">Dumping now</h2>
-        <span className="text-xs font-semibold text-red-700">
+        <h2 className="text-sm font-semibold text-red-950 dark:text-red-200">Dumping now</h2>
+        <span className="text-xs font-semibold text-red-700 dark:text-red-400">
           {transactions} pending {transactions === 1 ? "transaction" : "transactions"} · {wallets} {wallets === 1 ? "wallet" : "wallets"}
         </span>
       </div>
@@ -189,11 +189,11 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
           <Link
             key={asset}
             href={`/${asset}`}
-            className="rounded-lg border border-red-200 bg-white px-3 py-2 text-xs hover:border-red-400"
+            className="rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-2 text-xs hover:border-red-400 dark:hover:border-red-500"
           >
-            <strong className="text-gray-900">{asset}</strong>
-            <span className="ml-2 font-semibold text-red-700">{compact(fromSats(row.sellQuantity))} tokens</span>
-            <span className="ml-1 text-gray-500">· {row.sellWallets} wallets · {row.sellTransactions} txs</span>
+            <strong className="text-gray-900 dark:text-gray-100">{asset}</strong>
+            <span className="ml-2 font-semibold text-red-700 dark:text-red-400">{compact(fromSats(row.sellQuantity))} tokens</span>
+            <span className="ml-1 text-gray-500 dark:text-gray-400">· {row.sellWallets} wallets · {row.sellTransactions} txs</span>
           </Link>
         ))}
       </div>
@@ -218,17 +218,17 @@ export function LaunchTable({
   const visibleRows = showAll ? rows : rows.slice(0, 5);
 
   return (
-    <section className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 px-4 py-3 sm:px-5">
+    <section className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-gray-100 dark:border-gray-800 px-4 py-3 sm:px-5">
         <h2 className="font-semibold">{title}</h2>
-        <span className="text-xs text-gray-400">{subtitle}</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">{subtitle}</span>
       </div>
 
       {rows.length === 0 ? (
-        <p className="px-4 py-5 text-sm text-gray-500">No launches in this phase.</p>
+        <p className="px-4 py-5 text-sm text-gray-500 dark:text-gray-400">No launches in this phase.</p>
       ) : (
         <>
-          <div className="divide-y divide-gray-100 md:hidden">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800 md:hidden">
             {visibleRows.map((row, index) => (
               <LaunchCard
                 key={row.asset}
@@ -242,7 +242,7 @@ export function LaunchTable({
 
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-gray-100 text-xs text-gray-400">
+              <thead className="border-b border-gray-100 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500">
                 {mode === "minting" ? (
                   <tr>
                     <th className="px-5 py-2 font-medium">Launch</th>
@@ -259,7 +259,7 @@ export function LaunchTable({
                   </tr>
                 )}
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                 {visibleRows.map((row, index) => (
                   <LaunchRow
                     key={row.asset}
@@ -277,7 +277,7 @@ export function LaunchTable({
             <button
               type="button"
               onClick={() => setShowAll((current) => !current)}
-              className="w-full border-t border-gray-100 px-4 py-2.5 text-xs font-semibold text-purple-600 hover:bg-purple-50"
+              className="w-full border-t border-gray-100 dark:border-gray-800 px-4 py-2.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40"
             >
               {showAll ? "Show top 5" : `Show all ${rows.length}`}
             </button>
@@ -302,7 +302,7 @@ function LaunchRow({
   const behavior = row.behavior;
 
   return (
-    <tr className={pending.sellTransactions > 0 ? "bg-red-50/40" : ""}>
+    <tr className={pending.sellTransactions > 0 ? "bg-red-50/40 dark:bg-red-950/40" : ""}>
       <td className="px-5 py-3 align-top">
         <LaunchName row={row} rank={rank} pending={pending} />
       </td>
@@ -310,7 +310,7 @@ function LaunchRow({
         <>
           <td className="px-3 py-3 align-top">
             <strong className="tabular-nums">{behavior.trackedMinters}</strong>
-            <div className="text-xs text-gray-400">unique addresses</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">unique addresses</div>
           </td>
           <td className="px-3 py-3 align-top">
             <Allocation count={behavior.knownFastMinters} quantity={behavior.knownFastInventory} total={row.earnedQuantity} />
@@ -329,7 +329,7 @@ function LaunchRow({
           </td>
           <td className="px-5 py-3 align-top">
             <strong className="tabular-nums">{behavior.buyerOnly}</strong>
-            <div className="text-xs text-gray-400">bought without minting</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">bought without minting</div>
           </td>
         </>
       )}
@@ -351,7 +351,7 @@ function LaunchCard({
   const behavior = row.behavior;
 
   return (
-    <article className={pending.sellTransactions > 0 ? "bg-red-50/40 p-4" : "p-4"}>
+    <article className={pending.sellTransactions > 0 ? "bg-red-50/40 dark:bg-red-950/40 p-4" : "p-4"}>
       <LaunchName row={row} rank={rank} pending={pending} />
       {mode === "minting" ? (
         <div className="mt-4 grid grid-cols-3 gap-2">
@@ -370,12 +370,12 @@ function LaunchCard({
       ) : (
         <div className="mt-4 space-y-3">
           <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400">Minter outcomes</div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Minter outcomes</div>
             <OutcomeLine row={row} />
           </div>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-lg bg-gray-50 p-3">
-              <div className="text-[11px] font-semibold text-gray-400">Seller inventory</div>
+            <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-3">
+              <div className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">Seller inventory</div>
               <Inventory row={row} />
             </div>
             <MobileStat label="New buyers" value={String(behavior.buyerOnly)} detail="bought without minting" />
@@ -398,14 +398,14 @@ function LaunchName({
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-2">
-        <span className="text-xs tabular-nums text-gray-400">#{rank}</span>
-        <Link href={`/${row.asset}`} className="font-bold text-purple-600 hover:underline">
+        <span className="text-xs tabular-nums text-gray-400 dark:text-gray-500">#{rank}</span>
+        <Link href={`/${row.asset}`} className="font-bold text-purple-600 dark:text-purple-400 hover:underline">
           {row.asset}
         </Link>
       </div>
-      <div className="mt-1 text-xs text-gray-500">{rankSignal(row)}</div>
+      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{rankSignal(row)}</div>
       {pending.sellTransactions > 0 && (
-        <div className="mt-1 text-xs font-semibold text-red-700">
+        <div className="mt-1 text-xs font-semibold text-red-700 dark:text-red-400">
           {pending.sellTransactions} pending sells · {pending.sellWallets} wallets · {compact(fromSats(pending.sellQuantity))} tokens
         </div>
       )}
@@ -416,9 +416,9 @@ function LaunchName({
 function Allocation({ count, quantity, total }: { count: number; quantity: string; total: string | null }) {
   return (
     <div>
-      <strong className="tabular-nums text-red-600">{allocationShare(quantity, total)}</strong>
-      <div className="text-xs text-gray-500">{count} unique addresses</div>
-      <div className="text-xs text-gray-400">{compact(fromSats(quantity))} tokens</div>
+      <strong className="tabular-nums text-red-600 dark:text-red-400">{allocationShare(quantity, total)}</strong>
+      <div className="text-xs text-gray-500 dark:text-gray-400">{count} unique addresses</div>
+      <div className="text-xs text-gray-400 dark:text-gray-500">{compact(fromSats(quantity))} tokens</div>
     </div>
   );
 }
@@ -429,12 +429,12 @@ function OutcomeLine({ row }: { row: ResearchLaunchBehavior }) {
 
   return (
     <div className="text-xs leading-relaxed">
-      <strong className="text-green-700">{behavior.heldWithoutSale} held</strong>
-      <span className="text-gray-300"> · </span>
-      <strong className="text-amber-700">{behavior.movedWithoutSale} moved</strong>
-      <span className="text-gray-300"> · </span>
-      <strong className="text-red-600">{sold} sold</strong>
-      <div className="text-gray-400">{behavior.trackedMinters} unique minters · exclusive outcomes</div>
+      <strong className="text-green-700 dark:text-green-400">{behavior.heldWithoutSale} held</strong>
+      <span className="text-gray-300 dark:text-gray-600"> · </span>
+      <strong className="text-amber-700 dark:text-amber-400">{behavior.movedWithoutSale} moved</strong>
+      <span className="text-gray-300 dark:text-gray-600"> · </span>
+      <strong className="text-red-600 dark:text-red-400">{sold} sold</strong>
+      <div className="text-gray-400 dark:text-gray-500">{behavior.trackedMinters} unique minters · exclusive outcomes</div>
     </div>
   );
 }
@@ -442,18 +442,18 @@ function OutcomeLine({ row }: { row: ResearchLaunchBehavior }) {
 function Inventory({ row }: { row: ResearchLaunchBehavior }) {
   const behavior = row.behavior;
   if (big(behavior.sellerBalance) <= 0n) {
-    return <div className="mt-1 text-xs font-semibold text-green-700">Seller inventory cleared</div>;
+    return <div className="mt-1 text-xs font-semibold text-green-700 dark:text-green-400">Seller inventory cleared</div>;
   }
 
   return (
     <div className="mt-1 text-xs leading-relaxed">
-      <strong className="text-amber-700">{allocationShare(behavior.sellerBalance, row.hardCap)} of supply</strong>
-      <div className="text-gray-500">held by {behavior.sellersHolding} sellers</div>
+      <strong className="text-amber-700 dark:text-amber-400">{allocationShare(behavior.sellerBalance, row.hardCap)} of supply</strong>
+      <div className="text-gray-500 dark:text-gray-400">held by {behavior.sellersHolding} sellers</div>
       {big(behavior.dumperBalance) > 0n && (
-        <div className="text-gray-400">{allocationShare(behavior.dumperBalance, row.hardCap)} held by dumpers</div>
+        <div className="text-gray-400 dark:text-gray-500">{allocationShare(behavior.dumperBalance, row.hardCap)} held by dumpers</div>
       )}
       {behavior.dispenserSellers > 0 && (
-        <div className="text-gray-400">{behavior.dispenserSellers} also used a dispenser</div>
+        <div className="text-gray-400 dark:text-gray-500">{behavior.dispenserSellers} also used a dispenser</div>
       )}
     </div>
   );
@@ -461,10 +461,10 @@ function Inventory({ row }: { row: ResearchLaunchBehavior }) {
 
 function MobileStat({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <div className="rounded-lg bg-gray-50 p-3">
-      <div className="text-[11px] font-semibold text-gray-400">{label}</div>
-      <div className="mt-1 font-bold tabular-nums text-gray-900">{value}</div>
-      <div className="text-[11px] text-gray-400">{detail}</div>
+    <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-3">
+      <div className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">{label}</div>
+      <div className="mt-1 font-bold tabular-nums text-gray-900 dark:text-gray-100">{value}</div>
+      <div className="text-[11px] text-gray-400 dark:text-gray-500">{detail}</div>
     </div>
   );
 }

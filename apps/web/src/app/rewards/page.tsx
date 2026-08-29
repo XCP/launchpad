@@ -85,7 +85,7 @@ export default async function RewardsPage() {
       {/* ---------------- the bounty ---------------- */}
       <section>
         <h2 className="text-lg font-bold">The graduation bounty</h2>
-        <p className="mt-2 text-sm leading-relaxed text-gray-600">
+        <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
           {graduated === 0
             ? "No XCP-69 launch has graduated yet. The first three to do it earn a bounty."
             : graduated === 1
@@ -97,12 +97,12 @@ export default async function RewardsPage() {
 
         <Podium graduated={graduated} winners={graduates?.rows.map((r) => r.fm.asset) ?? []} />
 
-        <p className="mt-4 text-xs leading-relaxed text-gray-500">
+        <p className="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
           Graduating means selling out: {commas(raiseXcp)} XCP raised from at
           least {XCP69_MIN_PARTICIPANTS} different addresses, at which point
           the pool is created and its liquidity is burned. A launch that misses
           its target refunds every satoshi by consensus and does not count.{" "}
-          <Link href="/faq" className="text-purple-600 hover:underline">
+          <Link href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
             How that works
           </Link>
         </p>
@@ -119,7 +119,7 @@ export default async function RewardsPage() {
             {commas(MINTS_PER_MINT)} MINTS for every mint
           </h2>
         </div>
-        <p className="mt-2 text-sm leading-relaxed text-gray-600">
+        <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
           Mint any XCP-69 launch and earn {commas(MINTS_PER_MINT)} MINTS. It
           doesn&apos;t matter which launch, and it doesn&apos;t matter how much
           you mint — one transaction, one reward (valid for the first{" "}
@@ -145,20 +145,20 @@ export default async function RewardsPage() {
           />
         </div>
 
-        <div className="mt-4 rounded-xl border border-gray-200 bg-white p-5">
+        <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
           <div className="flex items-baseline justify-between gap-3">
             <span className={LABEL}>Mints so far</span>
-            <span className="text-xs text-gray-400 tabular-nums">
+            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
               {commas(mintsSoFar)} of {commas(MINT_CAP)}
             </span>
           </div>
-          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-gray-100">
+          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
             <div
               className="h-full rounded-full bg-purple-500"
               style={{ width: `${Math.min(100, (mintsSoFar / MINT_CAP) * 100)}%` }}
             />
           </div>
-          <p className="mt-2 text-xs text-gray-500 tabular-nums">
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
             {commas(remaining)} still to claim
           </p>
         </div>
@@ -167,7 +167,7 @@ export default async function RewardsPage() {
       {rewardBatches.length > 0 && (
         <section>
           <h2 className="text-lg font-bold">Distributions</h2>
-          <p className="mt-2 text-sm leading-relaxed text-gray-600">
+          <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
             Completed and confirming reward batches, linked to the transactions
             that sent them.
           </p>
@@ -178,27 +178,27 @@ export default async function RewardsPage() {
                 fullyLinked && batch.transactions.every((tx) => tx.status === "confirmed");
               const state = confirmed ? "Confirmed" : fullyLinked ? "Confirming" : "Partially sent";
               return (
-                <div key={batch.id} className="rounded-xl border border-gray-200 bg-white p-4">
+                <div key={batch.id} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-medium text-gray-900">
+                      <p className="font-medium text-gray-900 dark:text-gray-100">
                         Mints {commas(batch.firstMintNumber)}–{commas(batch.cutoffMintNumber)}
                       </p>
-                      <p className="mt-0.5 text-xs text-gray-400">
+                      <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
                         {commas(batch.recipientCount)} recipients · {commas(batch.eligibleMints)} mint transactions
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold tabular-nums text-gray-900">
+                      <p className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                         {commasRaw(batch.sentQuantity)} {batch.asset}
                       </p>
                       {!fullyLinked && (
-                        <p className="text-[11px] tabular-nums text-gray-400">
+                        <p className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
                           of {commasRaw(batch.totalQuantity)} in the batch
                         </p>
                       )}
                       <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                        confirmed ? "bg-green-100 text-green-700" : "bg-amber-100 text-amber-700"
+                        confirmed ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400" : "bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-400"
                       }`}>
                         {state}
                       </span>
@@ -211,7 +211,7 @@ export default async function RewardsPage() {
                         href={`https://xcp.io/tx/${tx.txHash}`}
                         target="_blank"
                         rel="noreferrer"
-                        className="font-mono text-purple-600 hover:underline"
+                        className="font-mono text-purple-600 dark:text-purple-400 hover:underline"
                         title={tx.txHash}
                       >
                         {tx.method === "mpma" ? "MPMA" : "Send"} {shortAddress(tx.txHash)} ↗
@@ -228,7 +228,7 @@ export default async function RewardsPage() {
       {/* ---------------- who has earned what ---------------- */}
       <section>
         <h2 className="text-lg font-bold">Earned so far</h2>
-        <p className="mt-2 text-sm leading-relaxed text-gray-600">
+        <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
           Every mint on a conforming launch, counted. Ranked by mints, because
           that is the unit the reward is paid in.
         </p>
@@ -239,7 +239,7 @@ export default async function RewardsPage() {
       {/* ---------------- the small print, in the site's FAQ grammar ---------------- */}
       <section>
         <h2 className="text-lg font-bold">FAQ</h2>
-        <div className="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200 bg-white">
+        <div className="mt-3 divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
           <Faq q="What is MINTS?" open>
             The first fairminter ever created on Counterparty — block 866,297,
             before any other, and it minted out free to 1,376 addresses. The
@@ -282,9 +282,9 @@ export default async function RewardsPage() {
 function Podium({ graduated, winners }: { graduated: number; winners: string[] }) {
   // Visual order, not rank order.
   const layout = [
-    { i: 1, height: "h-20", accent: "from-gray-300 to-gray-200", ring: "ring-gray-300" },
-    { i: 0, height: "h-28", accent: "from-amber-300 to-amber-200", ring: "ring-amber-400" },
-    { i: 2, height: "h-14", accent: "from-orange-300/70 to-orange-200/70", ring: "ring-orange-300" },
+    { i: 1, height: "h-20", accent: "from-gray-300 dark:from-gray-700 to-gray-200 dark:to-gray-800", ring: "ring-gray-300 dark:ring-gray-700" },
+    { i: 0, height: "h-28", accent: "from-amber-300 dark:from-amber-700 to-amber-200 dark:to-amber-800", ring: "ring-amber-400" },
+    { i: 2, height: "h-14", accent: "from-orange-300/70 dark:from-orange-700/70 to-orange-200/70 dark:to-orange-800/70", ring: "ring-orange-300" },
   ];
 
   return (
@@ -296,13 +296,13 @@ function Podium({ graduated, winners }: { graduated: number; winners: string[] }
         return (
           <div key={b.place} className="flex flex-col items-center">
             <div
-              className={`mb-2 flex size-9 items-center justify-center rounded-full bg-white text-sm font-bold text-gray-700 ring-2 ${ring}`}
+              className={`mb-2 flex size-9 items-center justify-center rounded-full bg-white dark:bg-gray-900 text-sm font-bold text-gray-700 dark:text-gray-300 ring-2 ${ring}`}
             >
               {i + 1}
             </div>
-            <div className="whitespace-nowrap text-center text-lg font-bold tabular-nums text-gray-900 sm:text-xl">
+            <div className="whitespace-nowrap text-center text-lg font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-xl">
               {commas(b.xcp)}{" "}
-              <span className="text-sm font-medium text-gray-500">XCP</span>
+              <span className="text-sm font-medium text-gray-500 dark:text-gray-400">XCP</span>
             </div>
             {/* The step. Height encodes the prize; the label sits inside it. */}
             <div
@@ -310,15 +310,15 @@ function Podium({ graduated, winners }: { graduated: number; winners: string[] }
             >
               {claimed ? (
                 winner ? (
-                  <Link href={`/${winner}`} className="flex max-w-full items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-green-700">
+                  <Link href={`/${winner}`} className="flex max-w-full items-center gap-1 rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-1 text-[10px] font-semibold text-green-700 dark:text-green-400">
                     <TokenImage asset={winner} className="size-4 rounded-full object-cover" />
                     <span className="truncate">{winner}</span>
                   </Link>
                 ) : (
-                  <span className="rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold text-green-700">claimed</span>
+                  <span className="rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:text-green-400">claimed</span>
                 )
               ) : (
-                <span className="rounded-full bg-white/70 px-2 py-0.5 text-[10px] font-medium text-gray-600">
+                <span className="rounded-full bg-white/70 dark:bg-gray-900/70 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-400">
                   open
                 </span>
               )}
@@ -332,10 +332,10 @@ function Podium({ graduated, winners }: { graduated: number; winners: string[] }
 
 function Stat({ label, value, hint }: { label: string; value: string; hint: string }) {
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-4">
+    <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
       <div className={LABEL}>{label}</div>
-      <div className="mt-0.5 truncate text-xl font-bold text-gray-900 tabular-nums">{value}</div>
-      <div className="mt-1 text-[11px] leading-snug text-gray-400">{hint}</div>
+      <div className="mt-0.5 truncate text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{value}</div>
+      <div className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">{hint}</div>
     </div>
   );
 }
@@ -351,8 +351,8 @@ function Faq({
 }) {
   return (
     <details className="p-4" open={open}>
-      <summary className="cursor-pointer text-sm font-medium text-gray-900">{q}</summary>
-      <p className="mt-2 text-sm leading-relaxed text-gray-600">{children}</p>
+      <summary className="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">{q}</summary>
+      <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">{children}</p>
     </details>
   );
 }

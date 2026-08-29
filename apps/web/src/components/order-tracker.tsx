@@ -46,7 +46,7 @@ export function OrderTracker({
 
   if (!order) {
     return (
-      <p className="mt-2 flex items-center gap-2 text-sm text-green-700">
+      <p className="mt-2 flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
         <span className="size-2 animate-pulse rounded-full bg-green-500" />
         In the mempool — matching runs the moment the block lands.
       </p>
@@ -60,23 +60,23 @@ export function OrderTracker({
 
   if (order.status === "filled") {
     return (
-      <p className="mt-2 text-sm font-medium text-green-700">✓ Filled</p>
+      <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">✓ Filled</p>
     );
   }
   if (order.status === "expired") {
     return (
-      <p className="mt-2 text-sm text-green-700">
+      <p className="mt-2 text-sm text-green-700 dark:text-green-400">
         Expired — the unfilled {commasRaw(order.give_remaining)}{" "}
         {order.give_asset} was refunded automatically.
       </p>
     );
   }
   if (order.status === "cancelled") {
-    return <p className="mt-2 text-sm text-green-700">Cancelled — funds refunded.</p>;
+    return <p className="mt-2 text-sm text-green-700 dark:text-green-400">Cancelled — funds refunded.</p>;
   }
 
   return (
-    <div className="mt-2 text-sm text-green-700">
+    <div className="mt-2 text-sm text-green-700 dark:text-green-400">
       <p>
         {filledPct > 0 ? `${filledPct.toFixed(0)}% filled — the rest is` : "Confirmed —"}{" "}
         resting on the book with {commasRaw(order.give_remaining)}{" "}
@@ -87,7 +87,7 @@ export function OrderTracker({
           type="button"
           disabled={busy}
           onClick={() => onCancel(txHash)}
-          className="mt-1.5 rounded-md border border-green-300 px-2.5 py-1 text-xs font-medium text-green-800 hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+          className="mt-1.5 rounded-md border border-green-300 dark:border-green-700 px-2.5 py-1 text-xs font-medium text-green-800 dark:text-green-300 hover:border-red-400 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
         >
           Cancel remainder
         </button>

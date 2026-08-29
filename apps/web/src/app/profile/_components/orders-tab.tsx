@@ -47,10 +47,10 @@ export function OrdersTab({
   );
   const busy = isBusy(compose.status);
 
-  if (!orders) return <p className="p-6 text-center text-sm text-gray-400">Loading orders…</p>;
+  if (!orders) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading orders…</p>;
   if (orders.length === 0) {
     return (
-      <p className="p-6 text-center text-sm text-gray-500">
+      <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
         No open orders. Limit orders you place rest on the book until they fill or expire.
       </p>
     );
@@ -58,7 +58,7 @@ export function OrdersTab({
 
   return (
     <div>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
         {orders.map((o) => {
           // XCP is the quote wherever it appears, so a price only means
           // something on those pairs. A token/token order is shown as the
@@ -74,21 +74,21 @@ export function OrdersTab({
               <div className="min-w-0">
                 {token ? (
                   <>
-                    <span className={buying ? "font-medium text-green-700" : "font-medium text-red-600"}>
+                    <span className={buying ? "font-medium text-green-700 dark:text-green-400" : "font-medium text-red-600 dark:text-red-400"}>
                       {buying ? "Buy" : "Sell"}
                     </span>{" "}
-                    <a href={`/${token}`} className="font-medium hover:text-purple-700 hover:underline">
+                    <a href={`/${token}`} className="font-medium hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
                       {token}
                     </a>{" "}
                     {commasRaw(tokens)} @ {formatPrice(ratio(xcp, tokens))}
                   </>
                 ) : (
                   <>
-                    <span className="font-medium text-gray-700">Swap</span>{" "}
+                    <span className="font-medium text-gray-700 dark:text-gray-300">Swap</span>{" "}
                     {commasRaw(o.give_quantity)} {o.give_asset} → {commasRaw(o.get_quantity)} {o.get_asset}
                   </>
                 )}
-                <span className="ml-2 text-xs text-gray-500">
+                <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                   {(filled * 100).toFixed(0)}% filled ·{" "}
                   {o.expire_index === null ? "GTC" : `expires block ${o.expire_index.toLocaleString()}`}
                 </span>
@@ -98,7 +98,7 @@ export function OrdersTab({
                   type="button"
                   disabled={busy}
                   onClick={() => compose.composeCancel({ offer_hash: o.tx_hash })}
-                  className="rounded-md border border-gray-300 px-2.5 py-1.5 text-xs text-gray-600 transition-colors hover:border-red-400 hover:text-red-600 disabled:opacity-50"
+                  className="rounded-md border border-gray-300 dark:border-gray-700 px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 transition-colors hover:border-red-400 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                 >
                   {busy ? "…" : "Cancel"}
                 </button>
@@ -108,7 +108,7 @@ export function OrdersTab({
         })}
       </ul>
       {compose.status === "confirmed" && (
-        <p className="border-t border-gray-100 px-4 py-2 text-xs text-green-700">
+        <p className="border-t border-gray-100 dark:border-gray-800 px-4 py-2 text-xs text-green-700 dark:text-green-400">
           Cancel broadcast — the remainder refunds when it confirms.{" "}
           <button
             type="button"

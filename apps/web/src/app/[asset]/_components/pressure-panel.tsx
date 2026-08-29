@@ -42,7 +42,7 @@ export function PressurePanel({
 
   if (volume.trades === 0) {
     return (
-      <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-5 text-center text-sm text-gray-500">
+      <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 text-center text-sm text-gray-500 dark:text-gray-400">
         No trades in this window.
       </div>
     );
@@ -70,14 +70,14 @@ export function PressurePanel({
   ];
 
   return (
-    <div className="mt-4 space-y-3 rounded-3xl border border-gray-200 bg-white p-5">
+    <div className="mt-4 space-y-3 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
       {/* Count on the left, window on the right — the same reading order the
           rest of the site uses, and the site's own segmented control rather
           than a second grammar invented for this one panel. */}
       <div className="flex items-center justify-between gap-3">
-        <span className="text-sm font-medium text-gray-900 tabular-nums">
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100 tabular-nums">
           {commas(volume.trades)}{" "}
-          <span className="font-normal text-gray-500">
+          <span className="font-normal text-gray-500 dark:text-gray-400">
             trade{volume.trades === 1 ? "" : "s"}
           </span>
         </span>
@@ -99,14 +99,14 @@ export function PressurePanel({
         return (
           <div key={r.left} className="space-y-1.5">
             <div className="flex items-baseline justify-between text-sm tabular-nums">
-              <span className="font-medium text-green-700">{r.left}</span>
-              <span className="font-medium text-red-600">{r.right}</span>
+              <span className="font-medium text-green-700 dark:text-green-400">{r.left}</span>
+              <span className="font-medium text-red-600 dark:text-red-400">{r.right}</span>
             </div>
             {/* Thinner and desaturated. Three full-width bars at full
                 strength stacked up read as decoration rather than data — the
                 ratio is the information, and a 1px rule carries a ratio just
                 as well as a 6px one. */}
-            <div className="flex h-1 overflow-hidden rounded-full bg-gray-100">
+            <div className="flex h-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
               <div className="bg-green-500/80" style={{ width: `${pct}%` }} />
               <div className="bg-red-400/80" style={{ width: `${100 - pct}%` }} />
             </div>

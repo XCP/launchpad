@@ -147,7 +147,7 @@ export function ActivityView() {
               <SegmentedTrigger key={t.id} value={t.id} grow={false}>
                 {t.label}
                 {n !== null && (
-                  <span className="ml-1.5 text-xs font-normal text-gray-400 tabular-nums">
+                  <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500 tabular-nums">
                     {commas(n)}
                   </span>
                 )}
@@ -163,7 +163,7 @@ export function ActivityView() {
           {tab === "orders" && (
             <label
               title="Show only orders still resting on the book"
-              className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 sm:flex"
+              className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 sm:flex"
             >
               <input
                 type="checkbox"
@@ -290,7 +290,7 @@ function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
   return (
     <Tape columns={["When", "Asset", "Event", "Price", "Amount", "XCP", "Minter", "Status"]}>
       {rows.map((r) => (
-        <tr key={r.txHash} className="transition-colors hover:bg-gray-50/70">
+        <tr key={r.txHash} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
           <When block={r.block} height={height} txHash={r.txHash} />
           <Asset asset={r.asset} />
           <Cell>
@@ -304,7 +304,7 @@ function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
           <Num strong>{fixedRaw(r.paid)}</Num>
           <Who address={r.source} />
           <Cell right>
-            <span className="text-xs text-gray-500">{MINT_STATUS[r.phase]}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{MINT_STATUS[r.phase]}</span>
           </Cell>
         </tr>
       ))}
@@ -331,7 +331,7 @@ function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number })
         const tokens = abs(r.tokenDelta);
         const xcp = abs(r.xcpDelta);
         return (
-          <tr key={r.key} className="transition-colors hover:bg-gray-50/70">
+          <tr key={r.key} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
             <When block={r.block} height={height} txHash={r.txHash} />
             <Asset asset={r.asset} />
             <Cell>
@@ -344,7 +344,7 @@ function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number })
             <Num strong>{fixedRaw(xcp)}</Num>
             <Who address={r.address} />
             <Cell right>
-              <span className="text-xs text-gray-500">{r.venue}</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{r.venue}</span>
             </Cell>
           </tr>
         );
@@ -385,14 +385,14 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
         return (
           <tr
             key={r.txHash}
-            className={`transition-colors hover:bg-gray-50/70 ${done ? "text-gray-400" : ""}`}
-            /* green-50. Anything taken is the same fact however the order
+            className={`transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60 ${done ? "text-gray-400 dark:text-gray-500" : ""}`}
+            /* --meter-fill (green-50, or its dark twin). Anything taken is the same fact however the order
                ended, so the meter does not change colour with the state — the
                pill beside it is what says how the story finished. */
             style={
               pct > 0
                 ? {
-                    backgroundImage: `linear-gradient(to right, rgb(240 253 244) ${pct}%, transparent ${pct}%)`,
+                    backgroundImage: `linear-gradient(to right, var(--meter-fill) ${pct}%, transparent ${pct}%)`,
                   }
                 : undefined
             }
@@ -418,7 +418,7 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
               </span>
               {/* One qualifying fact per state: how far a partial got, how long
                   a live order has left, or whether a dead one ever traded. */}
-              <span className="mt-0.5 block text-[11px] text-gray-400 tabular-nums">
+              <span className="mt-0.5 block text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
                 {r.state === "partial"
                   ? `${pct}% filled`
                   : r.state === "open"
@@ -483,7 +483,7 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
       {rows.map((r) => {
         const vsXcp = r.counterAsset === "XCP";
         return (
-          <tr key={r.key} className="transition-colors hover:bg-gray-50/70">
+          <tr key={r.key} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
             <When block={r.block} height={height} txHash={r.txHash} />
             <td className="whitespace-nowrap px-3 py-2">
               <span className="flex items-center gap-2">
@@ -493,11 +493,11 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
                 />
                 <Link
                   href={`/${r.asset}`}
-                  className={`font-medium text-gray-900 hover:text-purple-700 ${FOCUS}`}
+                  className={`font-medium text-gray-900 dark:text-gray-100 hover:text-purple-700 dark:hover:text-purple-300 ${FOCUS}`}
                 >
                   {r.asset}
                 </Link>
-                <span className="text-xs text-gray-400">/ {r.counterAsset}</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">/ {r.counterAsset}</span>
               </span>
             </td>
             <Cell>
@@ -512,14 +512,14 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
             <Cell right>
               {/* LP assets are divisible, like every numeric asset Counterparty
                   mints for a pool. */}
-              <span className="block text-xs text-gray-900 tabular-nums">
+              <span className="block text-xs text-gray-900 dark:text-gray-100 tabular-nums">
                 {r.lpQuantity === null
                   ? "—"
                   : `${r.kind === "withdraw" ? "−" : r.kind === "deposit" ? "+" : ""}${compact(
                       tokenQty(r.lpQuantity, true),
                     )}`}
               </span>
-              <span className="block text-[11px] text-gray-400">
+              <span className="block text-[11px] text-gray-400 dark:text-gray-500">
                 {r.graduation ? "locked forever" : r.kind === "created" ? "open LP" : ""}
               </span>
             </Cell>
@@ -549,7 +549,7 @@ function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number 
   return (
     <Tape columns={["When", "Asset", "Phase", "Price", "Hard cap", "Raised", "Creator", "Mints"]}>
       {rows.map((r) => (
-        <tr key={r.txHash} className="transition-colors hover:bg-gray-50/70">
+        <tr key={r.txHash} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
           <When block={r.block} height={height} txHash={r.txHash} />
           <Asset asset={r.asset} />
           <Cell>
@@ -564,8 +564,8 @@ function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number 
               column is named for, and the one that qualifies it. "3 · 3" under
               a single header reads as a ratio nobody asked for. */}
           <Cell right>
-            <span className="block text-xs text-gray-900 tabular-nums">{r.mints}</span>
-            <span className="block text-[11px] text-gray-400 tabular-nums">
+            <span className="block text-xs text-gray-900 dark:text-gray-100 tabular-nums">{r.mints}</span>
+            <span className="block text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
               {r.minters} {r.minters === 1 ? "minter" : "minters"}
             </span>
           </Cell>
@@ -601,14 +601,14 @@ const PHASE_TONE: Record<ActivityLaunch["phase"], Tone> = {
  */
 function Tape({ columns, children }: { columns: string[]; children: React.ReactNode }) {
   return (
-    <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-gray-200 bg-white">
+    <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       <table className="w-full min-w-[58rem] text-sm">
         <thead>
-          <tr className="border-b border-gray-200 bg-gray-50/80 text-left">
+          <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-800/60 text-left">
             {columns.map((c, i) => (
               <th
                 key={c}
-                className={`px-3 py-2.5 text-[10px] font-medium uppercase tracking-wider text-gray-500 ${
+                className={`px-3 py-2.5 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400 ${
                   // The three numeric columns sit in the middle of every tape,
                   // and the tail column closes it — both right-aligned so a
                   // column of figures reads as a column.
@@ -620,7 +620,7 @@ function Tape({ columns, children }: { columns: string[]; children: React.ReactN
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">{children}</tbody>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-800">{children}</tbody>
       </table>
     </div>
   );
@@ -655,10 +655,10 @@ function When({
         : "just now";
   const body = (
     <>
-      <span className={`block text-xs font-medium ${dim ? "text-gray-400" : "text-gray-900"}`}>
+      <span className={`block text-xs font-medium ${dim ? "text-gray-400 dark:text-gray-500" : "text-gray-900 dark:text-gray-100"}`}>
         {label}
       </span>
-      <span className="block text-[11px] text-gray-400 tabular-nums">
+      <span className="block text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
         {block === null ? "—" : `#${block.toLocaleString("en-US")}`}
       </span>
     </>
@@ -670,7 +670,7 @@ function When({
           href={`https://xcp.io/tx/${txHash}`}
           target="_blank"
           rel="noreferrer"
-          className={`block hover:text-purple-700 ${FOCUS}`}
+          className={`block hover:text-purple-700 dark:hover:text-purple-300 ${FOCUS}`}
         >
           {body}
         </a>
@@ -686,8 +686,8 @@ function Asset({ asset, dim = false }: { asset: string; dim?: boolean }) {
     <td className="whitespace-nowrap px-3 py-2">
       <Link
         href={`/${asset}`}
-        className={`flex items-center gap-2 font-medium hover:text-purple-700 ${
-          dim ? "text-gray-400" : "text-gray-900"
+        className={`flex items-center gap-2 font-medium hover:text-purple-700 dark:hover:text-purple-300 ${
+          dim ? "text-gray-400 dark:text-gray-500" : "text-gray-900 dark:text-gray-100"
         } ${FOCUS}`}
       >
         <TokenImage
@@ -705,8 +705,8 @@ function Who({ address, dim = false }: { address: string; dim?: boolean }) {
     <td className="whitespace-nowrap px-3 py-2">
       <Link
         href={`/profile/${address}`}
-        className={`font-mono text-xs hover:text-purple-700 hover:underline ${
-          dim ? "text-gray-400" : "text-gray-500"
+        className={`font-mono text-xs hover:text-purple-700 dark:hover:text-purple-300 hover:underline ${
+          dim ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"
         } ${FOCUS}`}
       >
         {shortAddress(address)}
@@ -733,7 +733,7 @@ function Num({
   return (
     <td
       className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${
-        dim ? "text-gray-400" : strong ? "text-gray-900" : "text-gray-500"
+        dim ? "text-gray-400 dark:text-gray-500" : strong ? "text-gray-900 dark:text-gray-100" : "text-gray-500 dark:text-gray-400"
       }`}
     >
       {children}
@@ -744,11 +744,11 @@ function Num({
 type Tone = "green" | "red" | "purple" | "amber" | "gray";
 
 const TONES: Record<Tone, string> = {
-  green: "border-green-200 bg-green-50 text-green-700",
-  red: "border-red-200 bg-red-50 text-red-600",
-  purple: "border-purple-200 bg-purple-50 text-purple-700",
-  amber: "border-amber-200 bg-amber-50 text-amber-700",
-  gray: "border-gray-200 bg-gray-50 text-gray-600",
+  green: "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400",
+  red: "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400",
+  purple: "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300",
+  amber: "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400",
+  gray: "border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400",
 };
 
 /** The event name, as a pill rather than coloured text. Four tapes name four
@@ -766,7 +766,7 @@ function Pill({ tone, children }: { tone: Tone; children: React.ReactNode }) {
 
 function Empty({ children }: { children: React.ReactNode }) {
   return (
-    <p className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+    <p className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
       {children}
     </p>
   );

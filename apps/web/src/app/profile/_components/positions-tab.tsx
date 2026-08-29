@@ -33,7 +33,7 @@ function Pnl({
   sats: bigint | null;
   format: (s: bigint) => string;
 }) {
-  if (sats === null) return <span className="text-gray-400">—</span>;
+  if (sats === null) return <span className="text-gray-400 dark:text-gray-500">—</span>;
   const up = sats >= 0n;
   // Magnitude taken in integer space, before any conversion to a double — the
   // sign is carried by the label, not by the arithmetic.
@@ -46,7 +46,7 @@ function Pnl({
   // glyphs to them, and this table has shown both, adjacent. One character
   // fixes that without putting the clutter back.
   return (
-    <span className={up ? "text-green-700" : "text-red-600"}>
+    <span className={up ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}>
       {up ? "" : "−"}
       {format(up ? sats : -sats)}
     </span>
@@ -71,11 +71,11 @@ function ValueOverWindow({ values, format }: { values: number[]; format: (v: num
   const from = values[0]!;
   const to = values[values.length - 1]!;
   return (
-    <p className="text-sm tabular-nums text-gray-500">
+    <p className="text-sm tabular-nums text-gray-500 dark:text-gray-400">
       {format(from)}
-      <span className="mx-1.5 text-gray-400">→</span>
-      <span className="text-gray-900">{format(to)}</span>
-      <span className="ml-1.5 text-gray-400">this window</span>
+      <span className="mx-1.5 text-gray-400 dark:text-gray-500">→</span>
+      <span className="text-gray-900 dark:text-gray-100">{format(to)}</span>
+      <span className="ml-1.5 text-gray-400 dark:text-gray-500">this window</span>
     </p>
   );
 }
@@ -90,7 +90,7 @@ export function PositionsTab({ address }: { address: string }) {
     return ((await res.json()) as { result?: DailyRate[] }).result ?? [];
   }, { revalidateOnFocus: false });
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Loading positions…</p>;
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading positions…</p>;
 
   const open = portfolio?.open ?? [];
   const xcpUsd = portfolio?.xcpUsd ?? null;
@@ -139,14 +139,14 @@ export function PositionsTab({ address }: { address: string }) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wider text-gray-500">Portfolio value</p>
-          <p className="text-3xl font-semibold text-gray-900">{money(totalXcpSats)}</p>
-          <p className="text-sm text-gray-500">
+          <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Portfolio value</p>
+          <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{money(totalXcpSats)}</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
             Across {open.length} open {open.length === 1 ? "position" : "positions"}
           </p>
         </div>
         {xcpUsd && (
-          <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-gray-200 p-0.5 text-xs font-medium">
+          <div className="flex shrink-0 items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-800 p-0.5 text-xs font-medium">
             {(["usd", "xcp"] as const).map((d) => (
               <button
                 key={d}
@@ -154,7 +154,7 @@ export function PositionsTab({ address }: { address: string }) {
                 onClick={() => setDenom(d)}
                 aria-pressed={showing === d}
                 className={`rounded-full px-2.5 py-1 ${
-                  showing === d ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+                  showing === d ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
                 {d === "usd" ? "USD" : "XCP"}
@@ -176,7 +176,7 @@ export function PositionsTab({ address }: { address: string }) {
         </div>
       )}
       {!chartComplete && open.length > 0 && (
-        <p className="rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-500">
+        <p className="rounded-lg bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
           No value chart{historyIssues.length > 0 ? ` for ${historyIssues.join(", ")}` : ""}:
           its recent transfer or liquidity history did not load completely, so
           we cannot know how many tokens this wallet held at each point. Current
@@ -185,8 +185,8 @@ export function PositionsTab({ address }: { address: string }) {
       )}
 
       {open.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 p-8 text-center">
-          <p className="mb-4 text-sm text-gray-500">No open positions in this wallet.</p>
+        <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">No open positions in this wallet.</p>
           <Link
             href="/"
             className="inline-block rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-purple-500"
@@ -197,13 +197,13 @@ export function PositionsTab({ address }: { address: string }) {
       ) : (
         <div className="overflow-x-auto">
           <div className="min-w-[36rem]">
-            <div className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+            <div className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
               <span>Token</span>
               <span className="text-right">Holding</span>
               <span className="text-right">Value</span>
               <span className="text-right">Total PnL</span>
             </div>
-            <ul className="divide-y divide-gray-100">
+            <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {open.map((p) => {
                 const div = portfolio?.divisible.get(p.asset) ?? true;
                 return (
@@ -211,14 +211,14 @@ export function PositionsTab({ address }: { address: string }) {
                     key={p.asset}
                     className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] items-center gap-x-4 py-2.5 text-sm"
                   >
-                    <Link href={`/${p.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600">
+                    <Link href={`/${p.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
                       <TokenImage asset={p.asset} className="size-7 shrink-0 rounded" />
                       <span className="truncate font-medium">{p.asset}</span>
                     </Link>
-                    <span className="text-right tabular-nums text-gray-600">
+                    <span className="text-right tabular-nums text-gray-600 dark:text-gray-400">
                       {holding(tokenQty(p.balance.toString(), div))}
                     </span>
-                    <span className="text-right tabular-nums text-gray-900">
+                    <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
                       {money(p.valueXcpSats)}
                     </span>
                     <span className="text-right tabular-nums">
@@ -228,7 +228,7 @@ export function PositionsTab({ address }: { address: string }) {
                           this table can print. */}
                       {p.withheld && (
                         <span
-                          className="mt-0.5 block text-[10px] leading-tight text-gray-400"
+                          className="mt-0.5 block text-[10px] leading-tight text-gray-400 dark:text-gray-500"
                           title={WITHHELD_COPY[p.withheld].full}
                         >
                           {WITHHELD_COPY[p.withheld].short}
@@ -247,7 +247,7 @@ export function PositionsTab({ address }: { address: string }) {
                           — which is exactly the question it kept prompting — so
                           it stays neutral and says "of which". */}
                       {p.realizedXcpSats !== 0n && p.unrealizedXcpSats !== null && (
-                        <span className="mt-0.5 block whitespace-nowrap text-[10px] text-gray-400">
+                        <span className="mt-0.5 block whitespace-nowrap text-[10px] text-gray-400 dark:text-gray-500">
                           of which {p.realizedXcpSats < 0n ? "−" : ""}
                           {money(p.realizedXcpSats < 0n ? -p.realizedXcpSats : p.realizedXcpSats)}{" "}
                           realized
@@ -262,7 +262,7 @@ export function PositionsTab({ address }: { address: string }) {
         </div>
       )}
 
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         Total PnL combines profit or loss already realized by partial sales
         with the unrealized result on tokens still held. It uses average-cost
         accounting over your indexed mint-and-trade history. Incoming sends

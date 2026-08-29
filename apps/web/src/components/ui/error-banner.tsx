@@ -17,7 +17,7 @@ export function ErrorBanner({
   if (!children) return null;
   return (
     <p
-      className={`flex items-start justify-between gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 ${className}`}
+      className={`flex items-start justify-between gap-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-400 ${className}`}
     >
       <span>{children}</span>
       {onDismiss && (
@@ -25,7 +25,7 @@ export function ErrorBanner({
           type="button"
           onClick={onDismiss}
           aria-label="Dismiss"
-          className="-m-1 shrink-0 rounded p-1 text-red-400 hover:text-red-600"
+          className="-m-1 shrink-0 rounded p-1 text-red-400 hover:text-red-600 dark:hover:text-red-400"
         >
           ×
         </button>

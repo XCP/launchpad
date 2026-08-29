@@ -99,14 +99,14 @@ function ModalBody({
         placeholder="Search name"
         autoComplete="off"
         spellCheck={false}
-        className="block w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-sm outline-none transition-colors focus:border-purple-400 focus:bg-white"
+        className="block w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5 text-sm outline-none transition-colors focus:border-purple-400 dark:focus:border-purple-500 focus:bg-white dark:focus:bg-gray-900"
         onKeyDown={(e) => {
           if (e.key === "Enter" && shown.length === 1) onPick(shown[0]);
         }}
       />
       <div className="mt-2 max-h-[45vh] overflow-y-auto">
         {shown.length === 0 ? (
-          <p className="p-4 text-center text-sm text-gray-400">No matches</p>
+          <p className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">No matches</p>
         ) : (
           shown.map((a) => {
             const bal = balances?.[a];
@@ -115,19 +115,19 @@ function ModalBody({
                 key={a}
                 type="button"
                 onClick={() => onPick(a)}
-                className={`flex h-14 w-full items-center gap-3 rounded-xl px-2 text-left transition-colors hover:bg-gray-50 ${
-                  a === selected ? "bg-purple-50/60" : ""
+                className={`flex h-14 w-full items-center gap-3 rounded-xl px-2 text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/60 ${
+                  a === selected ? "bg-purple-50/60 dark:bg-purple-950/40" : ""
                 }`}
               >
                 <TokenImage
                   asset={a}
-                  className="size-9 shrink-0 rounded-full bg-gray-100 object-cover"
+                  className="size-9 shrink-0 rounded-full bg-gray-100 dark:bg-gray-800 object-cover"
                 />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">
+                <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                   {rowLabel ? rowLabel(a) : a}
                 </span>
                 {bal !== undefined && bal > 0n && (
-                  <span className="shrink-0 text-sm text-gray-500">
+                  <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
                     {commasRaw(bal)}
                   </span>
                 )}

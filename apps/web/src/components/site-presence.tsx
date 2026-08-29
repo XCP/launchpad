@@ -112,7 +112,7 @@ export function SitePresenceBadge() {
       >
         <span
           tabIndex={0}
-          className="modal-pop inline-flex cursor-default items-center gap-1.5 rounded-full border border-gray-200 bg-white/95 px-3 py-2 text-xs font-medium text-gray-500 shadow-lg backdrop-blur focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+          className="modal-pop inline-flex cursor-default items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 shadow-lg backdrop-blur focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
         >
           <span aria-hidden className="size-2 rounded-full bg-green-500" />
           {count} online

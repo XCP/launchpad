@@ -22,7 +22,7 @@ export function WindowPicker({
   onChange: (w: Window) => void;
 }) {
   return (
-    <div className="flex items-center gap-0.5 rounded-full border border-gray-200 p-0.5 text-xs font-medium">
+    <div className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-800 p-0.5 text-xs font-medium">
       {WINDOWS.map((w) => (
         <button
           key={w}
@@ -30,7 +30,7 @@ export function WindowPicker({
           onClick={() => onChange(w)}
           aria-pressed={value === w}
           className={`rounded-full px-2.5 py-1 ${
-            value === w ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"
+            value === w ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
           }`}
         >
           {w}
@@ -69,7 +69,7 @@ export function PortfolioChart({
     return (
       <div
         style={{ height }}
-        className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 text-xs text-gray-400"
+        className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
       >
         Not enough history to chart yet.
       </div>
@@ -128,7 +128,7 @@ export function PortfolioChart({
         />
       </svg>
       {hover !== null && (
-        <div className="pointer-events-none absolute right-0 top-0 rounded bg-gray-900/90 px-2 py-1 text-xs text-white tabular-nums">
+        <div className="pointer-events-none absolute right-0 top-0 rounded bg-gray-900/90 dark:bg-gray-100/90 px-2 py-1 text-xs text-white dark:text-gray-900 tabular-nums">
           {format(values[hover]!)}
         </div>
       )}

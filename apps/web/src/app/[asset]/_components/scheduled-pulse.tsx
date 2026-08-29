@@ -166,26 +166,26 @@ export function ScheduledPulse({
         <div className={`mb-2.5 ${LABEL}`}>
           {open ? "now minting" : "upcoming launch"}
         </div>
-        <div className="text-5xl font-extrabold leading-none tracking-tight text-gray-900 tabular-nums">
+        <div className="text-5xl font-extrabold leading-none tracking-tight text-gray-900 dark:text-gray-100 tabular-nums">
           {open ? (
             "open"
           ) : remaining <= 12 ? (
             <>
               {remaining}{" "}
-              <span className="text-lg font-semibold text-gray-400">
+              <span className="text-lg font-semibold text-gray-400 dark:text-gray-500">
                 block{remaining === 1 ? "" : "s"}
               </span>
             </>
           ) : (
             <>
               {blocksEta(remaining)}{" "}
-              <span className="text-lg font-semibold text-gray-400">
+              <span className="text-lg font-semibold text-gray-400 dark:text-gray-500">
                 · {commas(remaining)} blocks
               </span>
             </>
           )}
         </div>
-        <div className="mt-2.5 text-sm text-gray-500 tabular-nums">
+        <div className="mt-2.5 text-sm text-gray-500 dark:text-gray-400 tabular-nums">
           {open
             ? "minting is live — refresh the page"
             : remaining <= 12
@@ -231,14 +231,14 @@ export function ScheduledPulse({
         </div>
       </div>
 
-      <p className="mt-5 text-center text-xs text-gray-500 tabular-nums">
+      <p className="mt-5 text-center text-xs text-gray-500 dark:text-gray-400 tabular-nums">
         {open ? (
           "minting is live"
         ) : (
           <>
             <span className="whitespace-nowrap">
               minting opens at{" "}
-              <span className="font-medium text-gray-700">
+              <span className="font-medium text-gray-700 dark:text-gray-300">
                 block {commas(startBlock)}
               </span>
             </span>
@@ -273,16 +273,16 @@ function BlockTile({
   const pulses = tone === "pending";
   const face = {
     tip: "bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-sm",
-    mined: "bg-purple-100 text-purple-500",
-    pending: "border border-dashed border-purple-200 bg-purple-50 text-purple-400",
+    mined: "bg-purple-100 dark:bg-purple-900/50 text-purple-500 dark:text-purple-400",
+    pending: "border border-dashed border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-400",
     target:
-      "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm ring-2 ring-purple-200",
+      "bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-sm ring-2 ring-purple-200 dark:ring-purple-800",
   }[tone];
   return (
     <div className="shrink-0 text-center">
       <div
         className={`mb-1 text-[10px] font-semibold tabular-nums ${
-          tone === "pending" ? "text-purple-300" : "text-purple-500"
+          tone === "pending" ? "text-purple-300" : "text-purple-500 dark:text-purple-400"
         }`}
       >
         {height.toLocaleString()}

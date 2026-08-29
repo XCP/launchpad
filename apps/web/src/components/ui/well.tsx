@@ -38,11 +38,11 @@ export function Well({
     <div
       className={
         focusable
-          ? "group rounded-2xl border border-transparent bg-gray-50 p-4 transition-colors focus-within:border-purple-500 focus-within:bg-white"
-          : "rounded-2xl bg-gray-50 p-4"
+          ? "group rounded-2xl border border-transparent bg-gray-50 dark:bg-gray-800/60 p-4 transition-colors focus-within:border-purple-500 focus-within:bg-white dark:focus-within:bg-gray-900"
+          : "rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4"
       }
     >
-      <div className="flex h-5 items-center justify-between text-xs text-gray-500">
+      <div className="flex h-5 items-center justify-between text-xs text-gray-500 dark:text-gray-400">
         <span>{label}</span>
         {topRight}
       </div>
@@ -55,7 +55,7 @@ export function Well({
         <div className="mt-1">{children}</div>
       )}
       {footer !== undefined && (
-        <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400">
+        <div className="mt-1 flex h-4 items-center justify-between text-xs text-gray-400 dark:text-gray-500">
           {footer}
         </div>
       )}
@@ -63,7 +63,7 @@ export function Well({
         <div className="mt-2 flex items-center justify-between gap-3">
           {chip}
           {chipRight !== undefined && (
-            <div className="min-w-0 truncate text-right text-xs text-gray-500">
+            <div className="min-w-0 truncate text-right text-xs text-gray-500 dark:text-gray-400">
               {chipRight}
             </div>
           )}

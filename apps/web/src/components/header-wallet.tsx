@@ -34,7 +34,7 @@ export function HeaderWallet() {
    */
   const proof = {
     verified: { dot: "bg-green-500", note: null },
-    unverified: { dot: "bg-gray-400", note: null },
+    unverified: { dot: "bg-gray-400 dark:bg-gray-500", note: null },
     failed: {
       dot: "bg-red-500",
       note: "Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it.",
@@ -79,7 +79,7 @@ export function HeaderWallet() {
         </>
       ) : (
         <P.Root>
-          <P.Trigger className="flex items-center gap-1.5 rounded-md border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors hover:border-purple-300 hover:text-purple-600 data-[state=open]:border-purple-300 data-[state=open]:text-purple-600">
+          <P.Trigger className="flex items-center gap-1.5 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400 data-[state=open]:border-purple-300 dark:data-[state=open]:border-purple-700 data-[state=open]:text-purple-600 dark:data-[state=open]:text-purple-400">
             <span
               aria-hidden
               className={`size-1.5 shrink-0 rounded-full ${proof.dot}`}
@@ -90,10 +90,10 @@ export function HeaderWallet() {
             <P.Content
               align="end"
               sideOffset={8}
-              className="modal-pop z-50 w-56 rounded-2xl border border-gray-200 bg-white p-2 shadow-lg focus:outline-none"
+              className="modal-pop z-50 w-56 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2 shadow-lg focus:outline-none"
             >
               {proof.note && (
-                <p className="flex items-start gap-1.5 px-3 py-1.5 text-xs leading-relaxed text-gray-500">
+                <p className="flex items-start gap-1.5 px-3 py-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
                   <span
                     aria-hidden
                     className={`mt-1 size-1.5 shrink-0 rounded-full ${proof.dot}`}
@@ -103,11 +103,11 @@ export function HeaderWallet() {
               )}
               <Link
                 href="/profile"
-                className="block rounded-xl px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="block rounded-xl px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
                 Your profile
               </Link>
-              <div className="my-1 border-t border-gray-100" />
+              <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
               <button
                 type="button"
                 onClick={() => {
@@ -116,7 +116,7 @@ export function HeaderWallet() {
                     setTimeout(() => setCopied(false), 1500);
                   }, () => {});
                 }}
-                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 hover:bg-gray-50"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
                 {copied ? "Copied" : "Copy address"}
               </button>
@@ -124,15 +124,15 @@ export function HeaderWallet() {
                 href={`https://xcp.io/address/${address}`}
                 target="_blank"
                 rel="noreferrer"
-                className="block rounded-xl px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                className="block rounded-xl px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
                 View on explorer ↗
               </a>
-              <div className="my-1 border-t border-gray-100" />
+              <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
               <button
                 type="button"
                 onClick={() => disconnect()}
-                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
               >
                 Disconnect
               </button>

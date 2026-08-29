@@ -337,10 +337,10 @@ export function TradePanel({
           : `Place limit ${side}`;
 
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+    <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
       {/* Buy | Sell — internal pills, unless the page owns the tabs */}
       {sideProp === undefined && (
-        <div className="mb-2 flex items-center gap-1 rounded-xl bg-gray-100 p-1 text-sm font-medium">
+        <div className="mb-2 flex items-center gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 text-sm font-medium">
           {(["buy", "sell"] as const).map((s) => (
             <button
               key={s}
@@ -348,8 +348,8 @@ export function TradePanel({
               onClick={() => setSideState(s)}
               className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
                 side === s
-                  ? "bg-white text-gray-900 shadow-sm"
-                  : "text-gray-500 hover:text-gray-700"
+                  ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm"
+                  : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
               }`}
             >
               {s}
@@ -377,7 +377,7 @@ export function TradePanel({
                         ),
                       )
                     }
-                    className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                    className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                   >
                     {side === "buy" ? "−" : "+"}
                     {p}%
@@ -386,7 +386,7 @@ export function TradePanel({
                 <button
                   type="button"
                   onClick={() => setLimitPrice(fmtPriceInput(spot))}
-                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
                   Market
                 </button>
@@ -399,7 +399,7 @@ export function TradePanel({
                 {priceDelta !== null && Math.abs(priceDelta) >= 0.1 ? (
                   <span
                     className={
-                      limitFillsNow ? "text-green-700" : "text-gray-500"
+                      limitFillsNow ? "text-green-700 dark:text-green-400" : "text-gray-500 dark:text-gray-400"
                     }
                   >
                     {priceDelta > 0 ? "+" : ""}
@@ -413,7 +413,7 @@ export function TradePanel({
                 {spot !== null && (
                   <button
                     type="button"
-                    className="text-gray-500 hover:text-purple-600"
+                    className="text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
                     onClick={() => setLimitPrice(fmtPriceInput(spot))}
                   >
                     Pool: {formatPrice(spot)}
@@ -422,7 +422,7 @@ export function TradePanel({
                 {bookRef !== null && (
                   <button
                     type="button"
-                    className="text-gray-500 hover:text-purple-600"
+                    className="text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
                     onClick={() => setLimitPrice(fmtPriceInput(bookRef))}
                   >
                     {side === "buy" ? "Ask" : "Bid"}: {formatPrice(bookRef)}
@@ -437,7 +437,7 @@ export function TradePanel({
             onChange={setLimitPrice}
             placeholder={spot ? formatPrice(spot) : "0"}
             ariaLabel={`Limit price in XCP per ${asset}`}
-            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           />
         </Well>
       </div>
@@ -476,7 +476,7 @@ export function TradePanel({
                               ),
                             );
                           }}
-                          className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                          className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                         >
                           {p === 100 ? "Max" : `${p}%`}
                         </button>
@@ -498,8 +498,8 @@ export function TradePanel({
                     {tokenBalance !== undefined && (
                       <button
                         type="button"
-                        className={`min-w-0 truncate hover:text-purple-600 ${
-                          insufficientToken ? "text-red-600" : "text-gray-500"
+                        className={`min-w-0 truncate hover:text-purple-600 dark:hover:text-purple-400 ${
+                          insufficientToken ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
                         }`}
                         onClick={() => {
                           setEditField("amount");
@@ -525,8 +525,8 @@ export function TradePanel({
                     setAmountStr(v);
                   }}
                   ariaLabel={`Amount of ${asset}`}
-                  className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-                    insufficientToken ? "text-red-600" : "text-gray-900"
+                  className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
+                    insufficientToken ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 />
               </Well>
@@ -549,8 +549,8 @@ export function TradePanel({
                     {xcpBalance !== undefined && (
                       <button
                         type="button"
-                        className={`min-w-0 truncate hover:text-purple-600 ${
-                          insufficientXcp ? "text-red-600" : "text-gray-500"
+                        className={`min-w-0 truncate hover:text-purple-600 dark:hover:text-purple-400 ${
+                          insufficientXcp ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
                         }`}
                         onClick={() => {
                           setEditField("total");
@@ -576,8 +576,8 @@ export function TradePanel({
                     setTotalStr(v);
                   }}
                   ariaLabel="Total in XCP"
-                  className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-                    insufficientXcp ? "text-red-600" : "text-gray-900"
+                  className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
+                    insufficientXcp ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
                   }`}
                 />
               </Well>
@@ -589,10 +589,10 @@ export function TradePanel({
       {/* Receipt — always open once price and amount exist */}
       {limitPriceNum > 0 && limitAmountRaw > 0 && (
         <div className="px-2 pt-2">
-          <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          <dl className="space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
               <dt>Min received</dt>
-              <dd className="font-medium tabular-nums text-gray-700">
+              <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                 {side === "buy"
                   ? `${commasRaw(limitAmountExact)} ${asset}`
                   : `${commasRaw(limitTotalExact)} XCP`}
@@ -602,7 +602,7 @@ export function TradePanel({
               <div className="flex justify-between">
                 <dt>Fills now</dt>
                 <dd
-                  className={limitFillsNow ? "font-medium text-green-700" : ""}
+                  className={limitFillsNow ? "font-medium text-green-700 dark:text-green-400" : ""}
                 >
                   {fillPct >= 100
                     ? "~100% at confirmation"
@@ -622,10 +622,10 @@ export function TradePanel({
             {feeRate !== null && (
               <div className="flex justify-between">
                 <dt>TX fee</dt>
-                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
-                    <span className="text-gray-400">
+                    <span className="text-gray-400 dark:text-gray-500">
                       {" "}
                       (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
                     </span>
@@ -649,15 +649,15 @@ export function TradePanel({
           </CTA>
         )}
         {compose.status === "confirmed" && (
-          <div className="mt-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
+          <div className="mt-2 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-green-800">
+              <span className="font-semibold text-green-800 dark:text-green-300">
                 Order broadcast — <TxLink txid={compose.txid} />
               </span>
               <button
                 type="button"
                 onClick={compose.reset}
-                className="text-xs text-green-800 underline"
+                className="text-xs text-green-800 dark:text-green-300 underline"
               >
                 Dismiss
               </button>

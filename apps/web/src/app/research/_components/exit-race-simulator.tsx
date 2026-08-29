@@ -50,7 +50,7 @@ export function ExitRaceSimulator({
     <section id="simulator" className="scroll-mt-6 space-y-5">
       <div>
         <h2 className="text-xl font-bold">Stress-test the exit race</h2>
-        <p className="mt-1 text-sm leading-relaxed text-gray-600">
+        <p className="mt-1 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
           “Coordinated first exit” is an optimistic upper bound. “Random order”
           is the expected result if all 69 full bags sell and these wallets are
           interleaved uniformly among them. Neither line asserts how many people
@@ -58,7 +58,7 @@ export function ExitRaceSimulator({
         </p>
       </div>
 
-      <div className="rounded-xl border border-gray-200 bg-white p-4 sm:p-5">
+      <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-5">
         <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
           <Slider
             label="Maximum-mint addresses controlled"
@@ -101,7 +101,7 @@ export function ExitRaceSimulator({
           />
         </div>
 
-        <p className="mt-4 text-xs leading-relaxed text-gray-400">
+        <p className="mt-4 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
           USD context: 1 XCP = {dollars(xcpUsd)} · 1 BTC = {dollars(btcUsd)} · {priceContext}.
           The 700-sat default is an illustrative low-fee lifecycle, not a
           measured all-in cost. Observed mint-only median: 232 sats; P90: 697.
@@ -109,13 +109,13 @@ export function ExitRaceSimulator({
 
         <div className="mt-5">
           <div className="flex items-baseline justify-between gap-3 text-xs">
-            <span className="font-medium text-gray-600">Public allocation captured</span>
-            <span className="font-semibold tabular-nums text-gray-900">
+            <span className="font-medium text-gray-600 dark:text-gray-400">Public allocation captured</span>
+            <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {addresses}M / 69M · {capturedPct.toFixed(1)}%
             </span>
           </div>
           <div
-            className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100"
+            className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
             role="progressbar"
             aria-label="Share of public mint captured"
             aria-valuenow={capturedPct}
@@ -124,7 +124,7 @@ export function ExitRaceSimulator({
           >
             <div className="h-full bg-purple-600" style={{ width: `${capturedPct}%` }} />
           </div>
-          <p className="mt-1.5 text-xs text-gray-400">
+          <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
             Up to {addresses} full-cap allocations displaced only if demand
             would otherwise exceed the 69M sale.
           </p>
@@ -149,7 +149,7 @@ export function ExitRaceSimulator({
           />
         </div>
 
-        <p className="mt-3 text-xs leading-relaxed text-gray-400">
+        <p className="mt-3 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
           Cash accounting values the {scenario.retainedMillions.toFixed(2)}M
           unsold tokens at zero. It is intentionally not a mark-to-market
           portfolio return.
@@ -183,10 +183,10 @@ function Slider({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="block text-sm font-medium text-gray-700">
+    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
       <span className="flex items-baseline justify-between gap-3">
         <span>{label}</span>
-        <strong className="shrink-0 tabular-nums text-gray-900">{valueLabel}</strong>
+        <strong className="shrink-0 tabular-nums text-gray-900 dark:text-gray-100">{valueLabel}</strong>
       </span>
       <input
         className="ui-slider mt-2 w-full"
@@ -213,14 +213,14 @@ function Metric({
   negative?: boolean;
 }) {
   return (
-    <div className="rounded-xl bg-gray-50 p-4">
-      <div className="text-xs text-gray-500">{label}</div>
+    <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4">
+      <div className="text-xs text-gray-500 dark:text-gray-400">{label}</div>
       <div
-        className={`mt-0.5 text-xl font-bold tabular-nums ${negative ? "text-red-600" : "text-gray-900"}`}
+        className={`mt-0.5 text-xl font-bold tabular-nums ${negative ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}`}
       >
         {value}
       </div>
-      <div className="mt-1 text-xs tabular-nums text-gray-400">{hint}</div>
+      <div className="mt-1 text-xs tabular-nums text-gray-400 dark:text-gray-500">{hint}</div>
     </div>
   );
 }
@@ -288,7 +288,7 @@ function ExitRaceChart({
 
   return (
     <div className="mt-6">
-      <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600">
+      <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-0.5 w-5 bg-purple-600" aria-hidden />
           Coordinated first exit
@@ -314,8 +314,7 @@ function ExitRaceChart({
             y={margin.top}
             width={frameWidth}
             height={frameHeight}
-            fill="white"
-            stroke="#e5e7eb"
+            className="fill-white stroke-gray-200 dark:fill-gray-900 dark:stroke-gray-700"
           />
           {yTicks.map((tick) => (
             <g key={tick}>
@@ -324,9 +323,9 @@ function ExitRaceChart({
                 x2={margin.left + frameWidth}
                 y1={y(tick)}
                 y2={y(tick)}
-                stroke="#e5e7eb"
+                className="stroke-gray-200 dark:stroke-gray-700"
               />
-              <text x={margin.left - 8} y={y(tick) + 4} textAnchor="end" fontSize="11" fill="#6b7280">
+              <text x={margin.left - 8} y={y(tick) + 4} textAnchor="end" fontSize="11" className="fill-gray-500 dark:fill-gray-400">
                 {Math.round(tick)}
               </text>
             </g>
@@ -337,7 +336,7 @@ function ExitRaceChart({
               x2={margin.left + frameWidth}
               y1={zeroY}
               y2={zeroY}
-              stroke="#6b7280"
+              className="stroke-gray-500 dark:stroke-gray-400"
             />
           )}
           {xTicks.map((tick) => (
@@ -347,14 +346,14 @@ function ExitRaceChart({
                 x2={x(tick)}
                 y1={margin.top + frameHeight}
                 y2={margin.top + frameHeight + 5}
-                stroke="#d1d5db"
+                className="stroke-gray-300 dark:stroke-gray-600"
               />
               <text
                 x={x(tick)}
                 y={margin.top + frameHeight + 20}
                 textAnchor={tick === 1 ? "start" : tick === 69 ? "end" : "middle"}
                 fontSize="11"
-                fill="#6b7280"
+                className="fill-gray-500 dark:fill-gray-400"
               >
                 {tick}
               </text>
@@ -383,7 +382,7 @@ function ExitRaceChart({
             textAnchor={labelAtEnd ? "end" : "start"}
             fontSize="11"
             fontWeight="600"
-            fill="#111827"
+            className="fill-gray-900 dark:fill-gray-100"
           >
             {money(selectedPnl, true)}
           </text>
@@ -393,7 +392,7 @@ function ExitRaceChart({
               y={y(0) - 8}
               fontSize="11"
               fontWeight="600"
-              fill="#111827"
+              className="fill-gray-900 dark:fill-gray-100"
             >
               coordinated break-even ≈ {thresholds.breakEven.toFixed(1)}
             </text>
@@ -403,7 +402,7 @@ function ExitRaceChart({
             y={height - 8}
             textAnchor="middle"
             fontSize="11"
-            fill="#374151"
+            className="fill-gray-700 dark:fill-gray-300"
           >
             maximum-mint addresses controlled
           </text>
@@ -413,7 +412,7 @@ function ExitRaceChart({
             textAnchor="middle"
             transform={`rotate(-90 14 ${margin.top + frameHeight / 2})`}
             fontSize="11"
-            fill="#374151"
+            className="fill-gray-700 dark:fill-gray-300"
           >
             cash P/L (XCP-equivalent)
           </text>

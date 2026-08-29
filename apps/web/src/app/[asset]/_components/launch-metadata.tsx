@@ -51,10 +51,10 @@ export function LaunchDescription({
     if (el) setOverflows(el.scrollHeight > el.clientHeight + 1);
   }, [text]);
   return (
-    <blockquote className={`${marginClassName} border-l-[3px] border-purple-100 pl-4`}>
+    <blockquote className={`${marginClassName} border-l-[3px] border-purple-100 dark:border-purple-900 pl-4`}>
       <p
         ref={ref}
-        className={`text-sm leading-relaxed text-gray-600 ${
+        className={`text-sm leading-relaxed text-gray-600 dark:text-gray-400 ${
           expanded ? "" : "line-clamp-3"
         }`}
       >
@@ -64,7 +64,7 @@ export function LaunchDescription({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className={`mt-1.5 rounded text-xs font-medium text-purple-600 hover:text-purple-500 ${FOCUS}`}
+          className={`mt-1.5 rounded text-xs font-medium text-purple-600 dark:text-purple-400 hover:text-purple-500 dark:hover:text-purple-400 ${FOCUS}`}
         >
           {expanded ? "Show less" : "Show more"}
         </button>
@@ -128,7 +128,7 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
           target="_blank"
           rel="noreferrer"
           aria-label={`${asset} on ${SOCIAL_ICONS[s.type]!.label}`}
-          className={`relative flex size-[26px] items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-gray-500 transition-colors after:absolute after:-inset-2 after:content-[''] hover:border-purple-300 hover:bg-white hover:text-purple-600 ${FOCUS}`}
+          className={`relative flex size-[26px] items-center justify-center rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 transition-colors after:absolute after:-inset-2 after:content-[''] hover:border-purple-300 dark:hover:border-purple-700 hover:bg-white dark:hover:bg-gray-900 hover:text-purple-600 dark:hover:text-purple-400 ${FOCUS}`}
         >
           <svg viewBox="0 0 24 24" className="size-[13px] fill-current">
             <path d={SOCIAL_ICONS[s.type]!.path} />
@@ -156,7 +156,7 @@ export function InscriptionChip({ txHash }: { txHash: string }) {
       href={inscriptionContentUrl(txHash)}
       target="_blank"
       rel="noreferrer"
-      className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums transition-colors hover:border-purple-300 hover:text-purple-600"
+      className="rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400"
     >
       inscription ↗
     </a>

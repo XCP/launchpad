@@ -4,7 +4,7 @@ import { HoverCard as H, Popover as P } from "radix-ui";
 import type { ReactNode } from "react";
 
 const CONTENT =
-  "hover-pop z-50 w-[19rem] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 bg-white p-4 shadow-xl focus:outline-none";
+  "hover-pop z-50 w-[19rem] max-w-[calc(100vw-1.5rem)] rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-xl focus:outline-none";
 
 /**
  * Rich preview attached to a small trigger. Radix handles what the CSS-only
@@ -46,7 +46,7 @@ export function HoverCard({
             className={CONTENT}
           >
             {children}
-            <P.Arrow className="fill-white" width={12} height={6} />
+            <P.Arrow className="fill-white dark:fill-gray-900" width={12} height={6} />
           </P.Content>
         </P.Portal>
       </P.Root>
@@ -65,7 +65,7 @@ export function HoverCard({
           className={CONTENT}
         >
           {children}
-          <H.Arrow className="fill-white" width={12} height={6} />
+          <H.Arrow className="fill-white dark:fill-gray-900" width={12} height={6} />
         </H.Content>
       </H.Portal>
     </H.Root>

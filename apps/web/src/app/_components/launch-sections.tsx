@@ -528,7 +528,7 @@ function Section({
         <h2 className="flex items-baseline gap-2 text-xl font-bold">
           {title}
           {total > 0 && (
-            <span className="text-sm font-medium text-gray-400 tabular-nums">
+            <span className="text-sm font-medium text-gray-400 dark:text-gray-500 tabular-nums">
               {commas(total)}
             </span>
           )}
@@ -537,7 +537,7 @@ function Section({
         {showControls && (
           <div className="flex shrink-0 items-center gap-2">
             {walletAddress && phase === "minting" && (
-              <label className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 sm:flex">
+              <label className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 sm:flex">
                 <input
                   type="checkbox"
                   checked={hideMinted}
@@ -567,7 +567,7 @@ function Section({
             />
 
             {canTabulate && (
-              <div className="flex items-center rounded-full border border-gray-200 bg-white p-0.5">
+              <div className="flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-0.5">
                 {(["grid", "table"] as const).map((v) => (
                   <button
                     key={v}
@@ -579,7 +579,7 @@ function Section({
                     // keeps your place instead of throwing you back to the top.
                     onClick={() => onView(v)}
                     className={`rounded-full p-1.5 transition-colors ${
-                      view === v ? "bg-gray-900 text-white" : "text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+                      view === v ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300"
                     }`}
                   >
                     <ViewIcon view={v} />
@@ -591,7 +591,7 @@ function Section({
         )}
       </div>
       {total === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+        <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
           {hideMinted ? "You’ve already minted every live launch." : empty}
         </p>
       ) : (
@@ -632,7 +632,7 @@ function Section({
           a page whose rows never arrived — the same class of quiet lie this
           whole change was about. */}
       {failed && (
-        <p role="status" className="mt-3 text-center text-xs text-gray-500">
+        <p role="status" className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
           Couldn&apos;t load page {current + 1}. Showing the last page that
           loaded.
         </p>
@@ -671,12 +671,12 @@ function SortMenu({
     <DM.Root>
       <DM.Trigger
         aria-label={label}
-        className="flex items-center gap-1 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+        className="flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
       >
-        <span className="text-gray-400">Sort:</span>
+        <span className="text-gray-400 dark:text-gray-500">Sort:</span>
         {active.label}
         {/* Chevron, drawn rather than shipped as an icon dependency. */}
-        <svg viewBox="0 0 16 16" className="size-3 text-gray-400" aria-hidden="true">
+        <svg viewBox="0 0 16 16" className="size-3 text-gray-400 dark:text-gray-500" aria-hidden="true">
           <path
             d="M4 6l4 4 4-4"
             fill="none"
@@ -691,19 +691,19 @@ function SortMenu({
         <DM.Content
           align="end"
           sideOffset={6}
-          className="modal-pop z-50 w-44 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg"
+          className="modal-pop z-50 w-44 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1.5 shadow-lg"
         >
           {options.map((o) => (
             <DM.Item
               key={o.id}
               onSelect={() => onChange(o.id)}
-              className={`flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm font-medium outline-none data-[highlighted]:bg-gray-100 ${
-                o.id === value ? "text-gray-900" : "text-gray-600"
+              className={`flex cursor-pointer items-center justify-between rounded-lg px-3 py-2 text-sm font-medium outline-none data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-800 ${
+                o.id === value ? "text-gray-900 dark:text-gray-100" : "text-gray-600 dark:text-gray-400"
               }`}
             >
               {o.label}
               {o.id === value && (
-                <svg viewBox="0 0 16 16" className="size-3.5 text-purple-600" aria-hidden="true">
+                <svg viewBox="0 0 16 16" className="size-3.5 text-purple-600 dark:text-purple-400" aria-hidden="true">
                   <path
                     d="M3 8.5l3.5 3.5L13 5"
                     fill="none"
@@ -747,19 +747,19 @@ function Pager({
         type="button"
         onClick={() => onGo(page - 1)}
         disabled={page === 0}
-        className={`${btn} text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent`}
+        className={`${btn} text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:hover:bg-transparent`}
       >
         ‹
       </button>
       {list.map((n, i) => (
         <span key={n} className="flex items-center gap-1">
-          {i > 0 && n - list[i - 1]! > 1 && <span className="px-1 text-xs text-gray-300">…</span>}
+          {i > 0 && n - list[i - 1]! > 1 && <span className="px-1 text-xs text-gray-300 dark:text-gray-600">…</span>}
           <button
             type="button"
             onClick={() => onGo(n)}
             aria-current={n === page ? "page" : undefined}
             className={`${btn} tabular-nums ${
-              n === page ? "bg-gray-900 text-white" : "text-gray-600 hover:bg-gray-100"
+              n === page ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
             }`}
           >
             {n + 1}
@@ -770,7 +770,7 @@ function Pager({
         type="button"
         onClick={() => onGo(page + 1)}
         disabled={page >= pages - 1}
-        className={`${btn} text-gray-500 hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent`}
+        className={`${btn} text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 disabled:opacity-30 disabled:hover:bg-transparent`}
       >
         ›
       </button>
@@ -819,10 +819,10 @@ function LaunchTable({
 
   return (
     // Its own scroller: a wide table must never make the page scroll sideways.
-    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       <table className="w-full min-w-[38rem] text-sm">
         <thead>
-          <tr className="border-b border-gray-100">
+          <tr className="border-b border-gray-100 dark:border-gray-800">
             <th scope="col" className={`px-3 py-2.5 text-left ${LABEL}`}>
               Token
             </th>
@@ -837,21 +837,21 @@ function LaunchTable({
           {rows.map((r, i) => {
             const deadline = r.fm.soft_cap_deadline_block || r.fm.end_block;
             return (
-              <tr key={r.fm.tx_hash} className="border-b border-gray-50 last:border-0 hover:bg-gray-50">
+              <tr key={r.fm.tx_hash} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60">
                 <td className="px-3 py-2.5">
                   <Link href={`/${r.fm.asset}`} className="flex min-w-0 items-center gap-2.5">
-                    <span className="w-5 shrink-0 text-xs text-gray-400 tabular-nums">
+                    <span className="w-5 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                       {offset + i + 1}
                     </span>
                     <TokenImage
                       asset={r.fm.asset}
-                      className="size-7 shrink-0 rounded-lg bg-gray-100 object-cover"
+                      className="size-7 shrink-0 rounded-lg bg-gray-100 dark:bg-gray-800 object-cover"
                     />
                     <span className="min-w-0">
-                      <span className="block truncate font-semibold text-gray-900">
+                      <span className="block truncate font-semibold text-gray-900 dark:text-gray-100">
                         {r.fm.asset}
                       </span>
-                      <span className="block truncate text-[11px] text-gray-400">
+                      <span className="block truncate text-[11px] text-gray-400 dark:text-gray-500">
                         by {shortAddress(r.fm.source)}
                       </span>
                     </span>
@@ -925,7 +925,7 @@ function ViewIcon({ view }: { view: View }) {
 
 function Cell({ children }: { children: React.ReactNode }) {
   return (
-    <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-gray-700">
+    <td className="whitespace-nowrap px-3 py-2.5 text-right tabular-nums text-gray-700 dark:text-gray-300">
       {children}
     </td>
   );
@@ -1098,17 +1098,17 @@ function Card({
       // Rings rather than thicker borders. A border that changes WIDTH changes
       // the card's box, so one card growing a pixel would nudge every card in
       // its grid row. A ring is painted outside the box and moves nothing.
-      className={`group block overflow-hidden rounded-xl bg-white shadow-sm transition-shadow hover:shadow-md ${
+      className={`group block overflow-hidden rounded-xl bg-white dark:bg-gray-900 shadow-sm transition-shadow hover:shadow-md ${
         conforming && phase === "graduated"
           ? "holo-border"
           : fresh
-            ? "border border-green-500 ring-2 ring-green-100"
+            ? "border border-green-500 ring-2 ring-green-100 dark:ring-green-900"
             : pending > 0
-              ? "border border-amber-400 ring-2 ring-amber-100"
-              : "border border-gray-200"
+              ? "border border-amber-400 ring-2 ring-amber-100 dark:ring-amber-900"
+              : "border border-gray-200 dark:border-gray-800"
       }`}
     >
-      <div className="relative aspect-square w-full overflow-hidden bg-gray-100">
+      <div className="relative aspect-square w-full overflow-hidden bg-gray-100 dark:bg-gray-800">
         <TokenImage
           asset={fm.asset}
           large
@@ -1176,7 +1176,7 @@ function Card({
           </div>
         </div>
         {phase === "minting" && (
-          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/25">
+          <div className="absolute inset-x-0 bottom-0 h-1.5 bg-white/25 dark:bg-gray-900/25">
             <div
               // Matches the ring, so the card reads as one object rather than
               // a purple bar with an unrelated coloured edge. Purple is the
@@ -1192,7 +1192,7 @@ function Card({
         )}
       </div>
 
-      <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500">
+      <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center justify-between gap-2">
           <span
             className="min-w-0 truncate tabular-nums"
@@ -1223,13 +1223,13 @@ function Card({
             answers "where is everything going", and they are not the same
             question. */}
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate font-mono text-[10px] text-gray-400">
+          <span className="truncate font-mono text-[10px] text-gray-400 dark:text-gray-500">
             {shortAddress(fm.source)}
           </span>
           {pending > 0 && (
             <span
               title={`${pending} unconfirmed transaction${pending === 1 ? "" : "s"} in the mempool`}
-              className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-amber-700"
+              className="flex shrink-0 items-center gap-1 text-[10px] font-medium text-amber-700 dark:text-amber-400"
             >
               <PendingDot />
               <span className="tabular-nums">

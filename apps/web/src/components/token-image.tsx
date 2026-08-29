@@ -27,7 +27,7 @@ function Monogram({ asset, large, className }: { asset: string; large: boolean; 
   return (
     <div
       aria-hidden
-      className={`flex items-center justify-center bg-gray-200 font-bold text-gray-500 ${
+      className={`flex items-center justify-center bg-gray-200 dark:bg-gray-700 font-bold text-gray-500 dark:text-gray-400 ${
         large ? "text-5xl" : ""
       } ${className}`}
     >

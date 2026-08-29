@@ -19,7 +19,7 @@ export default async function SwapPage() {
   return (
     <div className="mx-auto max-w-lg space-y-6">
       {assets.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+        <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
           No launches have graduated yet. The first sell-out seeds the first
           pool — and it becomes tradeable here in the same block.
         </p>

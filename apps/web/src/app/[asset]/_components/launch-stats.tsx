@@ -58,7 +58,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
       ];
 
   return (
-    <div className="mt-5 border-t border-gray-100 pb-4 pt-2">
+    <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pb-4 pt-2">
       {/* Four columns only once the card is wide enough for them: at the sm
           breakpoint the card is still 640px and the last value wraps. */}
       <dl className="grid grid-cols-2 gap-3 md:grid-cols-4">
@@ -77,7 +77,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
                   type="button"
                   onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
                   aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
-                  className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS} ${
+                  className={`relative shrink-0 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95 ${FOCUS} ${
                     i === 1 ? "md:hidden" : "hidden md:block"
                   }`}
                 >
@@ -85,7 +85,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
                 </button>
               )}
             </div>
-            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+            <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {value}
             </dd>
           </div>
@@ -148,7 +148,7 @@ export function ParticipantsStat({ participants }: { participants: number }) {
   return (
     <div>
       <div className={LABEL}>Holders</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
         {participants} addresses
       </div>
     </div>
@@ -169,7 +169,7 @@ export function DenomToggle({ visibleOn }: { visibleOn: "mobile" | "desktop" }) 
       type="button"
       onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
       aria-label={`Show amounts in ${usdMode ? "XCP" : "US dollars"}`}
-      className={`relative shrink-0 rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 hover:text-purple-600 active:scale-95 ${FOCUS} ${
+      className={`relative shrink-0 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95 ${FOCUS} ${
         visibleOn === "mobile" ? "sm:hidden" : "hidden sm:block"
       }`}
     >
@@ -196,7 +196,7 @@ export function RaisedStat({
   return (
     <div>
       <div className={LABEL}>Raised</div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
         {usdMode
           ? usd(fromSats(paidQuantity) * (xcpUsd as number))
           : `${commasRaw(paidQuantity)} XCP`}
@@ -225,7 +225,7 @@ export function TxFeesStat({
         <div className={LABEL}>TX fees</div>
         {btcUsd !== null && <DenomToggle visibleOn="mobile" />}
       </div>
-      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
         {usdMode
           ? usd(fromSats(totalFeeSats) * (btcUsd as number))
           : `${commas(totalFeeSats)} sats`}

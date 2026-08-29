@@ -287,7 +287,7 @@ export function PriceChart({
 
   if (!hasAny) {
     return (
-      <p className="rounded-md bg-gray-50 p-4 text-center text-sm text-gray-500">
+      <p className="rounded-md bg-gray-50 dark:bg-gray-800/60 p-4 text-center text-sm text-gray-500 dark:text-gray-400">
         No trades yet — nothing has changed hands since the pool opened.
       </p>
     );
@@ -355,7 +355,7 @@ export function PriceChart({
           here too, but the Price factoid is directly above the chart and said
           the same thing — so the row is all controls now. */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-0.5 rounded-full border border-gray-200 p-0.5">
+        <div className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-800 p-0.5">
           {RANGES.map((r) => (
             <button
               key={r.id}
@@ -364,8 +364,8 @@ export function PriceChart({
               aria-pressed={range === r.id}
               className={`${control} ${
                 range === r.id
-                  ? "bg-gray-900 text-white"
-                  : "text-gray-500 hover:bg-gray-100"
+                  ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                  : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
               }`}
             >
               {r.label}
@@ -374,7 +374,7 @@ export function PriceChart({
         </div>
 
         <div className="flex items-center gap-1">
-          <div className="flex items-center gap-0.5 rounded-full border border-gray-200 p-0.5">
+          <div className="flex items-center gap-0.5 rounded-full border border-gray-200 dark:border-gray-800 p-0.5">
             {(["line", "candles"] as const).map((m) => (
               <button
                 key={m}
@@ -383,8 +383,8 @@ export function PriceChart({
                 aria-pressed={mode === m}
                 className={`${control} ${
                   mode === m
-                    ? "bg-gray-900 text-white"
-                    : "text-gray-500 hover:bg-gray-100"
+                    ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
                 {m === "line" ? "Line" : "Candles"}
@@ -401,7 +401,7 @@ export function PriceChart({
               title={
                 usdHistoryReady ? undefined : "Loading historical XCP/USD"
               }
-              className={`${control} disabled:cursor-wait disabled:text-gray-300 ${inUsd ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+              className={`${control} disabled:cursor-wait disabled:text-gray-300 dark:disabled:text-gray-600 ${inUsd ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
             >
               {inUsd ? "USD" : "XCP"}
             </button>
@@ -410,7 +410,7 @@ export function PriceChart({
             type="button"
             onClick={() => setLog((v) => !v)}
             aria-pressed={log}
-            className={`${control} ${log ? "bg-gray-900 text-white" : "text-gray-500 hover:bg-gray-100"}`}
+            className={`${control} ${log ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
           >
             log
           </button>
@@ -418,7 +418,7 @@ export function PriceChart({
       </div>
 
       {points.length === 0 ? (
-        <p className="rounded-md bg-gray-50 p-6 text-center text-sm text-gray-500">
+        <p className="rounded-md bg-gray-50 dark:bg-gray-800/60 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
           No trades in this range.
         </p>
       ) : (
@@ -438,14 +438,14 @@ export function PriceChart({
                 x2={W - PAD.right}
                 y1={t.y}
                 y2={t.y}
-                stroke="#f3f4f6"
+                className="stroke-gray-100 dark:stroke-gray-800"
                 strokeWidth={1}
               />
               <text
                 x={W - PAD.right + 6}
                 y={t.y + 3}
                 fontSize={9}
-                fill="#6b7280"
+                className="fill-gray-500 dark:fill-gray-400"
               >
                 {inUsd ? usd(t.v) : xcp(t.v)}
               </text>
@@ -457,7 +457,7 @@ export function PriceChart({
               <path
                 d={mintPath}
                 fill="none"
-                stroke="#d1d5db"
+                className="stroke-gray-300 dark:stroke-gray-600"
                 strokeWidth={1}
                 strokeDasharray="4 3"
               />
@@ -465,7 +465,7 @@ export function PriceChart({
                 x={PAD.left + 2}
                 y={mintLabelY - 4}
                 fontSize={10}
-                fill="#6b7280"
+                className="fill-gray-500 dark:fill-gray-400"
               >
                 mint price
               </text>
@@ -548,7 +548,7 @@ export function PriceChart({
                 cy={m.y}
                 r={7}
                 fill={m.kind === "buy" ? UP : DOWN}
-                stroke="#fff"
+                className="stroke-white dark:stroke-gray-900"
                 strokeWidth={2}
               />
               <text
@@ -556,7 +556,7 @@ export function PriceChart({
                 y={m.y + 3.2}
                 fontSize={8.5}
                 fontWeight={700}
-                fill="#fff"
+                className="fill-white dark:fill-gray-900"
                 textAnchor="middle"
               >
                 {m.kind === "buy" ? "B" : "S"}
@@ -570,7 +570,7 @@ export function PriceChart({
               cy={hover.yClose}
               r={4}
               fill="#9333ea"
-              stroke="#fff"
+              className="stroke-white dark:stroke-gray-900"
               strokeWidth={2}
             />
           )}
@@ -581,13 +581,13 @@ export function PriceChart({
               x2={hover.x}
               y1={PAD.top}
               y2={PAD.top + PLOT_H + VOL_H}
-              stroke="#9ca3af"
+              className="stroke-gray-400 dark:stroke-gray-500"
               strokeWidth={1}
               strokeDasharray="2 2"
             />
           )}
 
-          <text x={PAD.left} y={H - 6} fontSize={10} fill="#6b7280">
+          <text x={PAD.left} y={H - 6} fontSize={10} className="fill-gray-500 dark:fill-gray-400">
             {points[0]
               ? new Date(points[0].candle.time * 1000).toLocaleDateString(
                   "en-US",
@@ -602,7 +602,7 @@ export function PriceChart({
             x={W - PAD.right}
             y={H - 6}
             fontSize={10}
-            fill="#6b7280"
+            className="fill-gray-500 dark:fill-gray-400"
             textAnchor="end"
           >
             now
@@ -612,7 +612,7 @@ export function PriceChart({
 
       {hover && (
         <div
-          className="pointer-events-none absolute z-10 w-max rounded-lg bg-gray-900/95 px-2.5 py-2 text-[11px] leading-relaxed text-white shadow-lg"
+          className="pointer-events-none absolute z-10 w-max rounded-lg bg-gray-900/95 dark:bg-gray-100/95 px-2.5 py-2 text-[11px] leading-relaxed text-white dark:text-gray-900 shadow-lg"
           style={{
             // Follows the crosshair, flipping side near the right edge so it
             // never runs off the card.
@@ -634,18 +634,18 @@ export function PriceChart({
               ] as const
             ).map(([k, v]) => (
               <span key={k} className="contents">
-                <span className="text-gray-400">{k}</span>
+                <span className="text-gray-400 dark:text-gray-500">{k}</span>
                 <span className={k === "C" ? "font-semibold" : ""}>
                   {priceLabel(v, hover.candle.time)}
                 </span>
               </span>
             ))}
           </div>
-          <div className="mt-1 tabular-nums text-gray-300">
+          <div className="mt-1 tabular-nums text-gray-300 dark:text-gray-600">
             {commas(fromSats(hover.candle.volumeXcpRaw))} XCP ·{" "}
             {hover.candle.trades} trade{hover.candle.trades === 1 ? "" : "s"}
           </div>
-          <div className="text-gray-400">
+          <div className="text-gray-400 dark:text-gray-500">
             {new Date(hover.candle.time * 1000).toLocaleString("en-US", {
               month: "short",
               day: "numeric",
@@ -657,7 +657,7 @@ export function PriceChart({
         </div>
       )}
       {points.length > 0 && (
-        <p className="mt-1 text-[11px] text-gray-400">
+        <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
           {bucketLabel === "hour" ? "Hourly" : "Daily"}{" "}
           {mode === "line" ? "closes" : "candles"} from every fill on the pair —
           pool and order book. Volume beneath in XCP;{" "}

@@ -20,7 +20,7 @@ export function CopyDocsButton({ markdown }: { markdown: string }) {
     <button
       type="button"
       onClick={copy}
-      className="shrink-0 rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-600 hover:border-gray-400 hover:text-gray-900"
+      className="shrink-0 rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-600 hover:text-gray-900 dark:hover:text-gray-100"
     >
       {state === "copied"
         ? "Copied ✓"

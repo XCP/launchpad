@@ -260,12 +260,12 @@ export function LaunchView({
       ) : descriptionKind === "url" ? (
         // Someone else's host: link it rather than fetch it, so viewing a
         // launch never reports the visitor to the issuer's server.
-        <p className={`${marginClassName} text-sm text-gray-500`}>
+        <p className={`${marginClassName} text-sm text-gray-500 dark:text-gray-400`}>
           <a
             href={fm.description}
             target="_blank"
             rel="noreferrer nofollow"
-            className="break-all text-purple-600 hover:underline"
+            className="break-all text-purple-600 dark:text-purple-400 hover:underline"
           >
             {fm.description}
           </a>
@@ -279,7 +279,7 @@ export function LaunchView({
         {/* Identity, on its own — separate from the countdown/mint-form
             card below it, the same way every other phase keeps its header
             apart from its content. */}
-        <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+        <div className="relative rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
           {/* Art leads on a phone at full width, then steps aside into the
               identity square once there's a column to sit beside. */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
@@ -290,7 +290,7 @@ export function LaunchView({
                   {asset}
                   <StatusPill phase={phase} hasPool={pool !== null} />
                   {!conforming && (
-                    <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                    <span className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                       not XCP-69
                     </span>
                   )}
@@ -349,7 +349,7 @@ export function LaunchView({
             </div>
           )}
           {minting && mints.length > 0 && (
-            <div className="mt-5 border-t border-gray-100 pb-2 pt-2">
+            <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pb-2 pt-2">
               <LiveProgress
                 initialEarned={fm.earned_quantity ?? 0}
                 target={saleTarget(fm)}
@@ -370,7 +370,7 @@ export function LaunchView({
             {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
           </div>
         ) : (
-          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+          <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
             <ScheduledPulse
               asset={asset}
               startBlock={fm.start_block}
@@ -400,7 +400,7 @@ export function LaunchView({
             the rest of it: still live, still not a repeat of the fixed
             terms that ran once on the scheduled poster. */}
         {minting && mints.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 sm:grid-cols-4">
             <RaisedStat paidQuantity={fm.paid_quantity} xcpUsd={xcpUsd} progress={progress} />
             {feeSats && feeSats.mints > 0 && (
               <TxFeesStat totalFeeSats={feeSats.totalFeeSats} btcUsd={btcUsd} />
@@ -413,7 +413,7 @@ export function LaunchView({
                 </div>
                 {xcpUsd !== null && <DenomToggle visibleOn="desktop" />}
               </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                 {fm.soft_cap_deadline_block - blockHeight > 0
                   ? `Block ${commas(fm.soft_cap_deadline_block)}`
                   : "closing"}
@@ -452,7 +452,7 @@ export function LaunchView({
     const extraMinters = minterAddresses.length - topMinters.length;
     return (
       <div className="mx-auto max-w-2xl">
-        <div className="rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+        <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
           {/* Same header shape as every other phase — compact art beside
               identity, issuer chips and all. The pill alone says this one's
               over; nothing else about the chrome needs to look different. */}
@@ -463,7 +463,7 @@ export function LaunchView({
                 {asset}
                 <StatusPill phase={phase} hasPool={false} />
                 {!conforming && (
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                  <span className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                     not XCP-69
                   </span>
                 )}
@@ -481,33 +481,33 @@ export function LaunchView({
 
           {/* Two facts, same weight — when, and what came back. Neither
               is the headline; they're just what happened. */}
-          <div className="mt-6 grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 pt-5 text-center">
+          <div className="mt-6 grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800 border-t border-gray-100 dark:border-gray-800 pt-5 text-center">
             <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Failed on
               </div>
-              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
                 <BlockMonthYear blockIndex={fm.soft_cap_deadline_block} />
               </div>
             </div>
             <div>
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Refunded
               </div>
-              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900">
+              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
                 {commasRaw(fm.paid_quantity)}{" "}
-                <span className="text-base font-semibold text-gray-400">XCP</span>
+                <span className="text-base font-semibold text-gray-400 dark:text-gray-500">XCP</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 bg-white p-5 sm:grid-cols-4">
+        <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 sm:grid-cols-4">
           <div>
             <div className={LABEL}>
               Holders
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {participants}
             </div>
           </div>
@@ -515,7 +515,7 @@ export function LaunchView({
             <div className={LABEL}>
               Mints
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {mints.length}
             </div>
           </div>
@@ -523,7 +523,7 @@ export function LaunchView({
             <div className={LABEL}>
               Reached
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {(progress * 100).toFixed(1)}%
             </div>
           </div>
@@ -531,36 +531,36 @@ export function LaunchView({
             <div className={LABEL}>
               Closed
             </div>
-            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
             </div>
           </div>
         </div>
 
         {topMinters.length > 0 && (
-          <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-5">
+          <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
             <div className={LABEL}>
               Who was here
             </div>
-            <ul className="mt-3 divide-y divide-gray-100">
+            <ul className="mt-3 divide-y divide-gray-100 dark:divide-gray-800">
               {topMinters.map((source, i) => (
                 <li
                   key={source}
                   className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0"
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="w-4 shrink-0 text-xs text-gray-400 tabular-nums">
+                    <span className="w-4 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                       {i + 1}
                     </span>
                     <AddressHoverCard
                       source={source}
-                      className="flex min-w-0 items-center gap-2 font-mono text-gray-600 hover:text-purple-700"
+                      className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
                     >
                       <Identicon address={source} />
                       <span className="truncate">{shortAddress(source)}</span>
                     </AddressHoverCard>
                   </span>
-                  <span className="shrink-0 tabular-nums text-gray-500">
+                  <span className="shrink-0 tabular-nums text-gray-500 dark:text-gray-400">
                     {commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))}{" "}
                     {asset}
                   </span>
@@ -572,7 +572,7 @@ export function LaunchView({
                 href={`https://xcp.io/asset/${asset}`}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-3 inline-block text-xs font-medium text-purple-600 hover:underline"
+                className="mt-3 inline-block text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline"
               >
                 +{extraMinters} more on the explorer ↗
               </a>
@@ -590,7 +590,7 @@ export function LaunchView({
           issuer chips, share button in the standard corner. Only the "one
           number worth reading from across the room" changes per phase —
           here it's spot price instead of a countdown or a refund total. */}
-      <div className="relative rounded-3xl border border-gray-200 bg-white p-6 sm:p-7">
+      <div className="relative rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
           <ArtLightbox asset={asset} />
           <div className="min-w-0 flex-1">
@@ -599,7 +599,7 @@ export function LaunchView({
                 {asset}
                 <StatusPill phase={phase} hasPool={pool !== null} />
                 {!conforming && (
-                  <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                  <span className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                     not XCP-69
                   </span>
                 )}
@@ -632,12 +632,12 @@ export function LaunchView({
                 replace them; the issuer stays named in the line above. */}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {pool && (
-                <span className="rounded-full border border-green-200 bg-green-50 px-2 py-0.5 text-[11px] font-medium text-green-700 tabular-nums">
+                <span className="rounded-full border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400 tabular-nums">
                   graduated <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
                 </span>
               )}
               {holderCount !== null && (
-                <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums">
+                <span className="rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums">
                   {commas(holderCount)} holder{holderCount === 1 ? "" : "s"}
                 </span>
               )}
@@ -656,7 +656,7 @@ export function LaunchView({
         {/* Two, either side — the same shape the refunded state uses. Volume
             is a real number but not one of the two people lead with, so it
             moved down to the rail beside the swap form. */}
-        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 pt-4 text-center">
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-gray-800 pt-4 text-center">
           {pool ? (
             <>
               <Factoid
@@ -678,7 +678,7 @@ export function LaunchView({
                     {xcpUsd && change !== null ? " · " : null}
                     {change !== null && (
                       <span
-                        className={change >= 0 ? "text-green-600" : "text-red-600"}
+                        className={change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
                       >
                         {change >= 0 ? "+" : ""}
                         {change.toFixed(1)}% since mint
@@ -690,10 +690,10 @@ export function LaunchView({
             </>
           ) : (
             <div className="col-span-2">
-              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                 Minted out
               </div>
-              <div className="mt-1 text-2xl font-bold text-gray-400">
+              <div className="mt-1 text-2xl font-bold text-gray-400 dark:text-gray-500">
                 reached {(progress * 100).toFixed(1)}%
               </div>
             </div>
@@ -702,7 +702,7 @@ export function LaunchView({
 
         {pool && athPrice > 0 && (
           <div className="mt-4 flex items-center gap-3">
-            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100">
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
               <div
                 className={`h-full rounded-full ${
                   athPct >= 99.5 ? "bg-green-500" : "bg-purple-500"
@@ -710,9 +710,9 @@ export function LaunchView({
                 style={{ width: `${athPct}%` }}
               />
             </div>
-            <span className="shrink-0 text-xs text-gray-500 tabular-nums">
+            <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
               {athPct >= 99.5 ? "at ATH" : `${athPct.toFixed(0)}% of ATH`}{" "}
-              <span className="text-gray-400">{xcpPriceLabel(athPrice)}</span>
+              <span className="text-gray-400 dark:text-gray-500">{xcpPriceLabel(athPrice)}</span>
             </span>
           </div>
         )}
@@ -725,7 +725,7 @@ export function LaunchView({
       <EditPanel asset={asset} />
 
       {phase === "graduated" && pool && (
-        <div className="mt-4 rounded-3xl border border-gray-200 bg-white p-4">
+        <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
           <PriceChart
             asset={asset}
             candles={candles}
@@ -748,17 +748,17 @@ export function LaunchView({
           asset={asset}
           xcpUsd={xcpUsd}
           aside={
-            <dl className="mt-4 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white sm:mt-0">
+            <dl className="mt-4 divide-y divide-gray-100 dark:divide-gray-800 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sm:mt-0">
               {strip.map(([label, value], i) => (
                 <div
                   key={label}
                   // Facts that still move, then those settled at launch.
                   className={`px-4 py-2.5 ${i === LIVE_FACTS ? "border-t-4 border-t-gray-100" : ""}`}
                 >
-                  <dt className="text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                  <dt className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
                     {label}
                   </dt>
-                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900">
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                     {value}
                   </dd>
                 </div>
@@ -770,9 +770,9 @@ export function LaunchView({
 
       {/* Classic (non-pool) fairminter that met its target — relaxed mode only */}
       {phase === "graduated" && !pool && (
-        <div className="rounded-2xl border border-gray-200 bg-white p-4">
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
           <h2 className="text-sm font-semibold">Minted out</h2>
-          <p className="mt-1.5 text-sm text-gray-600">
+          <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
             Reached {(progress * 100).toFixed(1)}% with {participants}{" "}
             participants. A classic fairminter — no pool, no locked liquidity;
             distribution only.
@@ -836,14 +836,14 @@ function Factoid({
 }) {
   return (
     <div className="min-w-0">
-      <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400">
+      <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
         {label}
       </div>
-      <div className="mt-1 break-words text-base font-bold leading-tight tabular-nums text-gray-900 sm:text-xl">
+      <div className="mt-1 break-words text-base font-bold leading-tight tabular-nums text-gray-900 dark:text-gray-100 sm:text-xl">
         {value}
         {accent}
       </div>
-      {sub && <div className="mt-0.5 truncate text-xs text-gray-500">{sub}</div>}
+      {sub && <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{sub}</div>}
     </div>
   );
 }

@@ -31,7 +31,7 @@ export function QuoteRing({
       className={`size-[18px] -rotate-90 ${fetching ? "animate-pulse" : ""}`}
       aria-label="Quote refresh countdown"
     >
-      <circle cx="10" cy="10" r="8" fill="none" strokeWidth="2" className="stroke-gray-200" />
+      <circle cx="10" cy="10" r="8" fill="none" strokeWidth="2" className="stroke-gray-200 dark:stroke-gray-700" />
       <circle
         cx="10"
         cy="10"

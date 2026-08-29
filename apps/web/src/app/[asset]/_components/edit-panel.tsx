@@ -50,7 +50,7 @@ export function EditPanel({ asset }: { asset: string }) {
 
   if (proofStatus === "failed") {
     return (
-      <div className="mt-4 rounded-3xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+      <div className="mt-4 rounded-3xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4 text-sm text-red-800 dark:text-red-300">
         <p className="font-semibold">Editing is locked for this session</p>
         <p className="mt-1 text-xs">
           Your wallet supplied a connection signature that didn&apos;t verify, so we
@@ -162,18 +162,18 @@ export function EditPanel({ asset }: { asset: string }) {
   };
 
   return (
-    <details className="mt-4 rounded-3xl border border-gray-200 bg-white" onToggle={prefill}>
-      <summary className="cursor-pointer p-4 text-sm font-semibold text-gray-700">
-        Edit token info <span className="font-normal text-gray-400">(you own this asset)</span>
+    <details className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900" onToggle={prefill}>
+      <summary className="cursor-pointer p-4 text-sm font-semibold text-gray-700 dark:text-gray-300">
+        Edit token info <span className="font-normal text-gray-400 dark:text-gray-500">(you own this asset)</span>
       </summary>
-      <div className="space-y-4 border-t border-gray-100 p-4">
-        <p className="text-xs text-gray-500">
+      <div className="space-y-4 border-t border-gray-100 dark:border-gray-800 p-4">
+        <p className="text-xs text-gray-500 dark:text-gray-400">
           What xcp.fun shows for this launch, and what the hosted metadata says
           if your on-chain description points here. The on-chain field itself is
           locked forever; everything behind it is yours to curate.
         </p>
         <div>
-          <label htmlFor="edit-description" className="text-sm font-medium text-gray-700">
+          <label htmlFor="edit-description" className="text-sm font-medium text-gray-700 dark:text-gray-300">
             Description
           </label>
           <textarea
@@ -182,12 +182,12 @@ export function EditPanel({ asset }: { asset: string }) {
             onChange={(e) => setDescription(e.target.value)}
             rows={3}
             maxLength={2000}
-            className="mt-1 block w-full rounded-md border border-gray-300 bg-white p-2.5 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+            className="mt-1 block w-full rounded-md border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-2.5 text-sm outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
           />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="edit-x" className="text-sm font-medium text-gray-700">
+            <label htmlFor="edit-x" className="text-sm font-medium text-gray-700 dark:text-gray-300">
               X profile
             </label>
             <input
@@ -196,13 +196,13 @@ export function EditPanel({ asset }: { asset: string }) {
               value={x}
               onChange={(e) => setX(e.target.value)}
               placeholder="https://x.com/yourtoken"
-              className={`mt-1 block w-full rounded-md border bg-white p-2.5 text-sm outline-none ${
-                isValidX(x) ? "border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500" : "border-red-400"
+              className={`mt-1 block w-full rounded-md border bg-white dark:bg-gray-900 p-2.5 text-sm outline-none ${
+                isValidX(x) ? "border-gray-300 dark:border-gray-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500" : "border-red-400 dark:border-red-500"
               }`}
             />
           </div>
           <div>
-            <label htmlFor="edit-telegram" className="text-sm font-medium text-gray-700">
+            <label htmlFor="edit-telegram" className="text-sm font-medium text-gray-700 dark:text-gray-300">
               Telegram
             </label>
             <input
@@ -211,17 +211,17 @@ export function EditPanel({ asset }: { asset: string }) {
               value={telegram}
               onChange={(e) => setTelegram(e.target.value)}
               placeholder="https://t.me/yourtoken"
-              className={`mt-1 block w-full rounded-md border bg-white p-2.5 text-sm outline-none ${
+              className={`mt-1 block w-full rounded-md border bg-white dark:bg-gray-900 p-2.5 text-sm outline-none ${
                 isValidTelegram(telegram)
-                  ? "border-gray-300 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
-                  : "border-red-400"
+                  ? "border-gray-300 dark:border-gray-700 focus:border-purple-500 focus:ring-2 focus:ring-purple-500"
+                  : "border-red-400 dark:border-red-500"
               }`}
             />
           </div>
         </div>
         <div>
-          <label htmlFor="edit-image" className="text-sm font-medium text-gray-700">
-            Replace image <span className="font-normal text-gray-400">(optional)</span>
+          <label htmlFor="edit-image" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Replace image <span className="font-normal text-gray-400 dark:text-gray-500">(optional)</span>
           </label>
           <input
             id="edit-image"
@@ -232,22 +232,22 @@ export function EditPanel({ asset }: { asset: string }) {
               setImage(file);
               setAnimatedWebp(file ? await fileIsAnimatedWebp(file) : false);
             }}
-            className="mt-1 block w-full text-sm text-gray-600 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-1.5 file:text-sm file:font-medium"
+            className="mt-1 block w-full text-sm text-gray-600 dark:text-gray-400 file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 dark:file:bg-gray-800 file:px-3 file:py-1.5 file:text-sm file:font-medium"
           />
           {animatedWebp && (
-            <p className="mt-2 text-xs text-amber-700">
+            <p className="mt-2 text-xs text-amber-700 dark:text-amber-400">
               Animated WEBP shows as a still frame in the announce channel — Telegram
               cannot play one. A GIF moves there too.
             </p>
           )}
         </div>
         {state.status === "error" && (
-          <p className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+          <p className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2 text-sm text-red-700 dark:text-red-400">
             {state.error}
           </p>
         )}
         {state.status === "saved" && (
-          <p className="rounded-md border border-green-200 bg-green-50 p-2 text-sm text-green-700">
+          <p className="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-2 text-sm text-green-700 dark:text-green-400">
             Saved. Cached pages may take a minute to refresh.
           </p>
         )}
@@ -255,7 +255,7 @@ export function EditPanel({ asset }: { asset: string }) {
           type="button"
           onClick={save}
           disabled={!canSave}
-          className="rounded-md bg-gray-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-md bg-gray-900 dark:bg-gray-100 px-5 py-2.5 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {state.status === "signing"
             ? "Confirm in wallet…"

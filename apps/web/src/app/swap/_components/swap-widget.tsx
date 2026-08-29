@@ -354,7 +354,7 @@ export function SwapWidget({
           onClick={() =>
             setAmount(fmtAmount(approx(percentOf(effBalance, p)) / SATS))
           }
-          className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+          className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
         >
           {p === 100 ? "Max" : `${p}%`}
         </button>
@@ -378,12 +378,12 @@ export function SwapWidget({
   const balanceLabel = effBalance !== undefined && (
     <button
       type="button"
-      className="min-w-0 truncate text-gray-500 hover:text-purple-600"
+      className="min-w-0 truncate text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
       onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
     >
       Balance: {commasRaw(effBalance)}
       {pendingOutgoing > 0n && (
-        <span className="text-gray-400">
+        <span className="text-gray-400 dark:text-gray-500">
           {" "}
           · {commasRaw(pendingOutgoing)} pending
         </span>
@@ -431,17 +431,17 @@ export function SwapWidget({
     <span
       className={
         !slippageAuto && customSlip > 0
-          ? "font-medium text-purple-600"
-          : "text-gray-500"
+          ? "font-medium text-purple-600 dark:text-purple-400"
+          : "text-gray-500 dark:text-gray-400"
       }
     >
       Slippage: {slippage}%
-      {slippageAuto && <span className="text-gray-400"> · auto</span>}
+      {slippageAuto && <span className="text-gray-400 dark:text-gray-500"> · auto</span>}
     </span>
   );
 
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+    <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
       {/* In compact rails, balance/slippage sit with the asset chip. That keeps
           the footer about value only and matches the wide form's right edge. */}
       <Well
@@ -473,8 +473,8 @@ export function SwapWidget({
             setPriceMoved(false);
           }}
           ariaLabel={`Amount of ${giveAsset} to sell`}
-          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-            insufficient ? "text-red-600" : "text-gray-900"
+          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
+            insufficient ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
           }`}
         />
       </Well>
@@ -505,7 +505,7 @@ export function SwapWidget({
       >
         <div
           className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-            out > 0 ? "text-gray-900" : "text-gray-300"
+            out > 0 ? "text-gray-900 dark:text-gray-100" : "text-gray-300 dark:text-gray-600"
           }`}
           style={{
             filter: staleQuote && out > 0 ? "grayscale(1)" : "none",
@@ -528,11 +528,11 @@ export function SwapWidget({
             type="button"
             onClick={() => setRateInverted((v) => !v)}
             aria-label="Invert rate"
-            className="text-gray-600 hover:text-gray-900"
+            className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
             {rateText}
             {rateBaseUsd !== null && (
-              <span className="text-gray-400"> ({usdFmt(rateBaseUsd)})</span>
+              <span className="text-gray-400 dark:text-gray-500"> ({usdFmt(rateBaseUsd)})</span>
             )}
           </button>
           <span className="flex items-center gap-2">
@@ -540,10 +540,10 @@ export function SwapWidget({
               <span
                 className={
                   impact >= 5
-                    ? "font-medium text-red-600"
+                    ? "font-medium text-red-600 dark:text-red-400"
                     : impact >= 3
-                      ? "font-medium text-amber-600"
-                      : "text-gray-400"
+                      ? "font-medium text-amber-600 dark:text-amber-400"
+                      : "text-gray-400 dark:text-gray-500"
                 }
               >
                 Price impact {impact.toFixed(1)}%
@@ -559,10 +559,10 @@ export function SwapWidget({
           </span>
         </div>
         {quote && approx(outRaw) > 0 && (
-          <dl className="mt-1 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          <dl className="mt-1 space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
               <dt>Min received</dt>
-              <dd className="font-medium tabular-nums text-gray-700">
+              <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                 {commasRaw(minReceivedRaw)} {getAsset}
               </dd>
             </div>
@@ -585,10 +585,10 @@ export function SwapWidget({
             {feeRate !== null && (
               <div className="flex justify-between">
                 <dt>TX fee</dt>
-                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
-                    <span className="text-gray-400">
+                    <span className="text-gray-400 dark:text-gray-500">
                       {" "}
                       (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
                     </span>
@@ -603,21 +603,21 @@ export function SwapWidget({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {poolInfo !== undefined && !poolHasLiquidity && !poolError && (
-          <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="mb-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             No active {giveAsset}/{getAsset} pool liquidity. A resting order
             can still fill through the order book.
           </p>
         )}
 
         {poolError && (
-          <p className="mb-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+          <p className="mb-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
             Couldn&apos;t check the {giveAsset}/{getAsset} pool. Quotes may still
             use the order book.
           </p>
         )}
 
         {priceMoved && (
-          <p className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+          <p className="mb-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
             Quote moved — the numbers above are updated. Press again to swap
             at the new price.
           </p>
@@ -639,15 +639,15 @@ export function SwapWidget({
           </CTA>
         )}
         {compose.status === "confirmed" && (
-          <div className="mt-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
+          <div className="mt-2 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-green-800">
+              <span className="font-semibold text-green-800 dark:text-green-300">
                 Swap broadcast — <TxLink txid={compose.txid} />
               </span>
               <button
                 type="button"
                 onClick={compose.reset}
-                className="text-xs text-green-800 underline"
+                className="text-xs text-green-800 dark:text-green-300 underline"
               >
                 Dismiss
               </button>

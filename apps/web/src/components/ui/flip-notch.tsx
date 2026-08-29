@@ -26,7 +26,7 @@ export function FlipNotch({
         type="button"
         onClick={onFlip}
         aria-label={label}
-        className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-gray-50 text-gray-500 shadow-[0_0_0_4px_white] hover:bg-gray-100 hover:text-purple-600 active:scale-95"
+        className="absolute left-1/2 top-1/2 flex size-10 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-2xl bg-gray-50 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 shadow-[0_0_0_4px_white] hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
       >
         <span
           className="inline-flex transition-transform duration-300"

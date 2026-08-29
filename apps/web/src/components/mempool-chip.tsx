@@ -50,7 +50,7 @@ export function MempoolChip({ className = "" }: { className?: string }) {
   return (
     <Link
       href="/mempool"
-      className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 transition-colors hover:border-amber-300 ${FOCUS} ${className}`}
+      className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300 transition-colors hover:border-amber-300 dark:hover:border-amber-700 ${FOCUS} ${className}`}
     >
       <PendingDot />
       {/* Same count grammar as the tabs on /mempool — "Mints (3)" — so the

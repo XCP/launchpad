@@ -30,7 +30,7 @@ export function ShareButton({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`flex h-8 items-center gap-1.5 rounded-full border border-purple-200 bg-purple-50 px-3 text-[11px] font-medium text-purple-600 transition-colors hover:border-purple-600 hover:bg-purple-600 hover:text-white ${FOCUS}`}
+        className={`flex h-8 items-center gap-1.5 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-3 text-[11px] font-medium text-purple-600 dark:text-purple-400 transition-colors hover:border-purple-600 hover:bg-purple-600 hover:text-white ${FOCUS}`}
       >
         <svg viewBox="0 0 24 24" className="size-3 fill-current">
           <path d="M18 16.08a2.9 2.9 0 0 0-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.5.47 1.17.77 1.91.77a2.8 2.8 0 1 0-2.8-2.8c0 .24.04.47.09.7L8.11 9.97A2.8 2.8 0 0 0 3.4 12a2.8 2.8 0 0 0 4.71 2.03l7.12 4.16c-.05.21-.08.43-.08.65a2.73 2.73 0 1 0 2.85-2.76Z" />
@@ -40,26 +40,26 @@ export function ShareButton({
 
       <Dialog open={open} onOpenChange={setOpen} title="Share this launch">
         <div className="px-2 pb-2">
-          <p className="mb-3 text-xs text-gray-500">
+          <p className="mb-3 text-xs text-gray-500 dark:text-gray-400">
             Copy the link, or post it straight to X.
           </p>
 
           {/* What the link looks like when it unfurls. */}
-          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 bg-gray-50 p-3">
+          <div className="flex items-center gap-3 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3">
             <TokenImage
               asset={asset}
               large
-              className="size-16 shrink-0 rounded-xl bg-gray-100 object-cover"
+              className="size-16 shrink-0 rounded-xl bg-gray-100 dark:bg-gray-800 object-cover"
             />
             <div className="min-w-0">
-              <div className="truncate text-sm font-semibold text-gray-900">
+              <div className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {asset}
               </div>
-              <div className="truncate text-xs text-gray-600">{headline}</div>
-              <div className="mt-0.5 truncate text-[11px] text-gray-400">
+              <div className="truncate text-xs text-gray-600 dark:text-gray-400">{headline}</div>
+              <div className="mt-0.5 truncate text-[11px] text-gray-400 dark:text-gray-500">
                 {subline}
               </div>
-              <div className="mt-0.5 truncate text-[10px] text-gray-400">
+              <div className="mt-0.5 truncate text-[10px] text-gray-400 dark:text-gray-500">
                 xcp.fun/{asset}
               </div>
             </div>
@@ -84,7 +84,7 @@ export function ShareButton({
             href={`https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`}
             target="_blank"
             rel="noreferrer"
-            className={`mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 px-5 py-3.5 font-medium text-white transition-all hover:bg-gray-700 active:scale-[0.99] ${FOCUS}`}
+            className={`mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-gray-900 dark:bg-gray-100 px-5 py-3.5 font-medium text-white dark:text-gray-900 transition-all hover:bg-gray-700 dark:hover:bg-gray-300 active:scale-[0.99] ${FOCUS}`}
           >
             <svg viewBox="0 0 24 24" className="size-3.5 fill-current">
               <path d={SOCIAL_ICONS.twitter!.path} />
@@ -102,27 +102,27 @@ export function ShareButton({
 const STATUS_STYLES: Record<string, { label: string; className: string }> = {
   scheduled: {
     label: "Scheduled",
-    className: "border-blue-200 bg-blue-50 text-blue-700",
+    className: "border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300",
   },
   minting: {
     label: "Minting",
-    className: "border-green-200 bg-green-50 text-green-700",
+    className: "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400",
   },
   graduated: {
     label: "Graduated",
-    className: "border-purple-200 bg-purple-50 text-purple-700",
+    className: "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300",
   },
   // Gray, not amber or red: this one isn't a warning or a loss to flag,
   // it's just over — every participant got their XCP back.
   refunded: {
     label: "\u{1F480} RIP",
-    className: "border-gray-200 bg-gray-100 text-gray-500",
+    className: "border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400",
   },
 };
 
 const MINTED_OUT = {
   label: "Minted out",
-  className: "border-gray-200 bg-gray-100 text-gray-600",
+  className: "border-gray-200 dark:border-gray-800 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400",
 };
 
 /** Lifecycle pill beside the asset name - the first thing a visitor needs:
@@ -188,7 +188,7 @@ export function AnnouncedAgo({
       href={`https://xcp.io/tx/${txHash}`}
       target="_blank"
       rel="noreferrer"
-      className="ml-2 text-[13px] text-gray-400 underline-offset-2 hover:underline"
+      className="ml-2 text-[13px] text-gray-400 dark:text-gray-500 underline-offset-2 hover:underline"
     >
       {unconfirmed ? "unconfirmed" : timeAgo(at!)}
     </a>
@@ -258,7 +258,7 @@ export function ArtLightbox({ asset }: { asset: string }) {
       >
         <HeroTokenImage
           asset={asset}
-          className={`aspect-square w-full rounded-t-3xl bg-gray-100 object-cover transition-transform sm:aspect-auto sm:size-[5.5rem] sm:w-auto sm:rounded-2xl sm:shadow-sm sm:group-hover:scale-[1.03]`}
+          className={`aspect-square w-full rounded-t-3xl bg-gray-100 dark:bg-gray-800 object-cover transition-transform sm:aspect-auto sm:size-[5.5rem] sm:w-auto sm:rounded-2xl sm:shadow-sm sm:group-hover:scale-[1.03]`}
         />
       </button>
       <Dialog open={open} onOpenChange={setOpen} title={asset} variant="lightbox">

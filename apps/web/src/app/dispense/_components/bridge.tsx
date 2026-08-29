@@ -150,7 +150,7 @@ function ExplorerLink({ txHash }: { txHash: string }) {
       rel="noreferrer"
       aria-label="View dispenser on xcp.io"
       onClick={(e) => e.stopPropagation()}
-      className="relative z-10 shrink-0 text-gray-300 transition-colors hover:text-purple-600"
+      className="relative z-10 shrink-0 text-gray-300 dark:text-gray-600 transition-colors hover:text-purple-600 dark:hover:text-purple-400"
     >
       <svg
         viewBox="0 0 12 12"
@@ -184,10 +184,10 @@ function DispenseSettingsGear() {
   return (
     <GearPopover active={customFee > 0} label="Dispense settings">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 ${
-            customFee > 0 ? "border-purple-600 bg-purple-50" : "border-gray-200"
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+            customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
@@ -197,10 +197,10 @@ function DispenseSettingsGear() {
             ariaLabel="Bitcoin fee rate in sats per vbyte"
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400">sat/vB</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
-      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400">
+      <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         The Bitcoin miner fee. Default tracks the next-block priority rate —
         dispense purchases should confirm promptly.
       </p>
@@ -418,8 +418,8 @@ function LoadCard({
     );
     const allDone = router.phase === "done";
     return (
-      <div className="rounded-3xl border border-gray-200 bg-white p-4">
-        <div className="text-sm font-semibold text-gray-900">
+      <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+        <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {allDone
             ? `${commas(totalXcp)} XCP incoming`
             : `Buying ${commas(totalXcp)} XCP · ${router.legs.length} route${
@@ -430,13 +430,13 @@ function LoadCard({
           {router.legs.map((leg, i) => (
             <li
               key={`${leg.dispenser.source}-${i}`}
-              className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 px-3 py-2 text-xs"
+              className="flex items-center justify-between gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs"
             >
               <span className="min-w-0 truncate">
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-gray-900 dark:text-gray-100">
                   {commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
                 </span>
-                <span className="text-gray-400">
+                <span className="text-gray-400 dark:text-gray-500">
                   {" "}
                   · {shortAddress(leg.dispenser.source)}
                 </span>
@@ -447,14 +447,14 @@ function LoadCard({
                     href={`https://xcp.io/tx/${leg.txid}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="font-medium text-green-700 underline"
+                    className="font-medium text-green-700 dark:text-green-400 underline"
                   >
                     ✓ broadcast
                   </a>
                 ) : leg.status === "error" ? (
                   <>
                     <span
-                      className="max-w-40 truncate text-red-600"
+                      className="max-w-40 truncate text-red-600 dark:text-red-400"
                       title={leg.error ?? undefined}
                     >
                       {leg.error}
@@ -462,15 +462,15 @@ function LoadCard({
                     <button
                       type="button"
                       onClick={() => router.retry(i)}
-                      className="rounded-md border border-gray-300 px-2 py-0.5 font-medium text-gray-700 hover:border-purple-400 hover:text-purple-600"
+                      className="rounded-md border border-gray-300 dark:border-gray-700 px-2 py-0.5 font-medium text-gray-700 dark:text-gray-300 hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400"
                     >
                       Retry
                     </button>
                   </>
                 ) : leg.status === "pending" ? (
-                  <span className="text-gray-400">waiting</span>
+                  <span className="text-gray-400 dark:text-gray-500">waiting</span>
                 ) : (
-                  <span className="flex items-center gap-1.5 text-purple-600">
+                  <span className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400">
                     <span className="size-1.5 animate-pulse rounded-full bg-purple-500" />
                     {leg.status === "signing"
                       ? `confirm in wallet (${i + 1} of ${router.legs.length})`
@@ -486,7 +486,7 @@ function LoadCard({
         )}
         {allDone ? (
           <>
-            <p className="mt-3 text-xs text-gray-500">
+            <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
               {commas(doneXcp)} XCP lands on your Counterparty balance as each
               payment confirms — ready to mint with.
             </p>
@@ -497,17 +497,17 @@ function LoadCard({
                 setXcpAmount("");
                 setBtcAmount("");
               }}
-              className="mt-2 text-sm font-medium text-purple-700 underline"
+              className="mt-2 text-sm font-medium text-purple-700 dark:text-purple-300 underline"
             >
               Load more
             </button>
           </>
         ) : busy ? (
-          <p className="mt-3 text-xs text-gray-400">
+          <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
             One wallet confirmation per route — keep this tab open.
           </p>
         ) : (
-          <p className="mt-3 text-xs text-gray-500">
+          <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
             Broadcast legs are final — each is its own transaction. Failed
             legs can be retried.
           </p>
@@ -518,8 +518,8 @@ function LoadCard({
 
   if (!d) {
     return (
-      <div className="rounded-3xl border border-gray-200 bg-white p-6">
-        <p className="rounded-2xl border border-dashed border-gray-300 p-6 text-center text-sm text-gray-500">
+      <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
+        <p className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
           {dispensers.length > 0
             ? "Every route has a purchase pending in the mempool — check back in a few minutes."
             : "No open XCP dispensers right now — check the DEX or try again later."}
@@ -537,7 +537,7 @@ function LoadCard({
 
   return (
     <div className="contents">
-    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+    <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
       {/* You receive · Counterparty — XCP always first */}
       <Well
         focusable
@@ -556,10 +556,10 @@ function LoadCard({
                 }}
                 className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
                   !p.available
-                    ? "cursor-not-allowed border-gray-100 text-gray-300"
+                    ? "cursor-not-allowed border-gray-100 dark:border-gray-800 text-gray-300 dark:text-gray-600"
                     : n === p.k && (typedXcpRaw > 0n || typedBtcSatsRaw > 0n)
-                      ? "border-purple-400 bg-white text-purple-600"
-                      : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
+                      ? "border-purple-400 dark:border-purple-500 bg-white dark:bg-gray-900 text-purple-600 dark:text-purple-400"
+                      : "border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400"
                 }`}
               >
                 {p.label}
@@ -575,14 +575,14 @@ function LoadCard({
               {lastEdited === "xcp" &&
                 typedXcpRaw > 0n &&
                 snappedRaw !== typedXcpRaw && (
-                  <span className="text-amber-600">
+                  <span className="text-amber-600 dark:text-amber-400">
                     {" "}
                     · adjusts to {commas(snapped)}
                   </span>
                 )}
             </span>
             {xcpBalance !== undefined && (
-              <span className="text-gray-500">
+              <span className="text-gray-500 dark:text-gray-400">
                 Balance: {commasRaw(xcpBalance)}
               </span>
             )}
@@ -599,7 +599,7 @@ function LoadCard({
             setArmed(false);
           }}
           ariaLabel="XCP to receive"
-          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
         />
       </Well>
 
@@ -617,11 +617,11 @@ function LoadCard({
               {lastEdited === "btc" &&
                 typedBtcSatsRaw > 0n &&
                 typedBtcSatsRaw !== big(btcSats) && (
-                  <span className="text-amber-600"> · exact cost {fmtBtc(btcSats)}</span>
+                  <span className="text-amber-600 dark:text-amber-400"> · exact cost {fmtBtc(btcSats)}</span>
                 )}
             </span>
             {btcBalanceSats !== undefined && (
-              <span className="text-gray-500">
+              <span className="text-gray-500 dark:text-gray-400">
                 Balance: {fmtBtc(btcBalanceSats)}
               </span>
             )}
@@ -636,18 +636,18 @@ function LoadCard({
             setArmed(false);
           }}
           ariaLabel="BTC to send"
-          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
         />
       </Well>
 
       {/* Rate line + always-open receipt (the house grammar) */}
       <div className="px-2 pt-2">
         <div className="flex items-center justify-between text-xs">
-          <span className="text-gray-600">
+          <span className="text-gray-600 dark:text-gray-400">
             1 XCP = {commasRaw(blendedRaw, 0)} sats
-            {perXcpUsd && <span className="text-gray-400"> ({usdFmt(perXcpUsd)})</span>}
+            {perXcpUsd && <span className="text-gray-400 dark:text-gray-500"> ({usdFmt(perXcpUsd)})</span>}
             {vsFloor !== null && vsFloor >= 1 && (
-              <span className="font-medium text-amber-600">
+              <span className="font-medium text-amber-600 dark:text-amber-400">
                 {" "}
                 · {vsFloor.toFixed(0)}% over floor
               </span>
@@ -655,7 +655,7 @@ function LoadCard({
           </span>
         </div>
         {plan.length > 0 && snapped > 0 && (
-          <dl className="mt-2 space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          <dl className="mt-2 space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
               <dt>Routes</dt>
               <dd>
@@ -700,7 +700,7 @@ function LoadCard({
         ) : (
           <>
             {armed && plan.length > 1 && (
-              <div className="mb-2 rounded-xl border border-purple-200 bg-purple-50 px-3 py-2.5 text-xs text-purple-900">
+              <div className="mb-2 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-3 py-2.5 text-xs text-purple-900 dark:text-purple-200">
                 <div className="font-semibold">
                   {plan.length} routes → {plan.length} wallet signatures
                 </div>
@@ -713,7 +713,7 @@ function LoadCard({
                     </li>
                   ))}
                 </ul>
-                <div className="mt-1 text-purple-700">
+                <div className="mt-1 text-purple-700 dark:text-purple-300">
                   Your wallet will ask once per route, in order — each popup is
                   one route, nothing more.
                 </div>
@@ -734,7 +734,7 @@ function LoadCard({
             </CTA>
           </>
         )}
-        <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400">
+        <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400 dark:text-gray-500">
           XCP arrives automatically when your BTC confirms. Purchases are
           final.
         </p>
@@ -890,7 +890,7 @@ function UnloadCard({
         }}
         resetLabel="Done"
       >
-        <p className="mt-1 text-green-700">
+        <p className="mt-1 text-green-700 dark:text-green-400">
           Takes effect when it confirms. <TxLink txid={compose.txid} />
         </p>
       </ConfirmCard>
@@ -899,7 +899,7 @@ function UnloadCard({
 
   if (existing?.status === 11) {
     return (
-      <div className="rounded-3xl border border-amber-200 bg-white p-6 text-sm text-gray-700">
+      <div className="rounded-3xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 p-6 text-sm text-gray-700 dark:text-gray-300">
         <p className="flex items-center gap-2">
           <span className="size-2 animate-pulse rounded-full bg-amber-500" />
           <span className="font-semibold">Sale closing</span>
@@ -921,7 +921,7 @@ function UnloadCard({
 
   if (existing) {
     return (
-      <div className="rounded-3xl border border-gray-200 bg-white p-6 text-sm text-gray-700">
+      <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 text-sm text-gray-700 dark:text-gray-300">
         <p>
           <span className="font-semibold">Currently unloading:</span>{" "}
           {commas(existing.give_remaining / SATS)} XCP left at{" "}
@@ -938,7 +938,7 @@ function UnloadCard({
           type="button"
           disabled={busy}
           onClick={close}
-          className="mt-3 w-full rounded-2xl border border-gray-300 px-5 py-2.5 font-medium text-gray-700 transition-all hover:border-red-400 hover:text-red-600 active:scale-[0.99] disabled:opacity-50"
+          className="mt-3 w-full rounded-2xl border border-gray-300 dark:border-gray-700 px-5 py-2.5 font-medium text-gray-700 dark:text-gray-300 transition-all hover:border-red-400 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 active:scale-[0.99] disabled:opacity-50"
         >
           {busy ? "Working…" : "Stop unloading & reclaim"}
         </button>
@@ -964,7 +964,7 @@ function UnloadCard({
 
   return (
     <div className="contents">
-    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+    <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
       {/* Price well — same grammar as the limit form's price */}
       <div>
         <Well
@@ -987,7 +987,7 @@ function UnloadCard({
                   type="button"
                   onClick={() => setPrice(String(percentOf(floorSats, 110)))}
                   title="Ten percent above the cheapest open dispenser"
-                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
                   +10%
                 </button>
@@ -995,7 +995,7 @@ function UnloadCard({
                   type="button"
                   onClick={() => setPrice(String(undercutSats))}
                   title="One satoshi under the cheapest open dispenser"
-                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
                   Floor
                 </button>
@@ -1017,8 +1017,8 @@ function UnloadCard({
                   <span
                     className={
                       vsFloor > 0
-                        ? "font-medium text-amber-600"
-                        : "font-medium text-green-600"
+                        ? "font-medium text-amber-600 dark:text-amber-400"
+                        : "font-medium text-green-600 dark:text-green-400"
                     }
                   >
                     {vsFloor > 0
@@ -1034,7 +1034,7 @@ function UnloadCard({
               {floorSats !== null && undercutSats !== null && (
                 <button
                   type="button"
-                  className="text-gray-500 hover:text-purple-600"
+                  className="text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
                   onClick={() => setPrice(String(undercutSats))}
                 >
                   {/* Shows where the competition is; sets one satoshi under
@@ -1052,7 +1052,7 @@ function UnloadCard({
             onChange={setPrice}
             placeholder={undercutSats !== null ? String(undercutSats) : "0"}
             ariaLabel="Price in sats per XCP"
-            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+            className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           />
         </Well>
       </div>
@@ -1071,7 +1071,7 @@ function UnloadCard({
                   onClick={() =>
                     setEscrow(String(Math.floor((approx(balance) / SATS) * (p / 100))))
                   }
-                  className="rounded-md border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-medium text-gray-500 transition-colors hover:border-purple-400 hover:text-purple-600 active:scale-95"
+                  className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
                   {p === 100 ? "Max" : `${p}%`}
                 </button>
@@ -1087,7 +1087,7 @@ function UnloadCard({
               {/* "Has a fraction" is now an exact question: the raw amount is
                   not a whole number of XCP if truncating it changed it. */}
               {typedEscrowRaw > 0n && escrowRawBig !== typedEscrowRaw && wholeEscrow >= 1 && (
-                <span className="text-amber-600">
+                <span className="text-amber-600 dark:text-amber-400">
                   {" "}
                   · adjusts to {wholeEscrow} (sells whole XCP)
                 </span>
@@ -1096,8 +1096,8 @@ function UnloadCard({
             {balance !== undefined && (
               <button
                 type="button"
-                className={`min-w-0 truncate hover:text-purple-600 ${
-                  insufficient ? "text-red-600" : "text-gray-500"
+                className={`min-w-0 truncate hover:text-purple-600 dark:hover:text-purple-400 ${
+                  insufficient ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
                 }`}
                 onClick={() => setEscrow(String(Math.floor(approx(balance) / SATS)))}
               >
@@ -1111,8 +1111,8 @@ function UnloadCard({
           value={escrow}
           onChange={setEscrow}
           ariaLabel="XCP to unload"
-          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 ${
-            insufficient ? "text-red-600" : "text-gray-900"
+          className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
+            insufficient ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
           }`}
         />
       </Well>
@@ -1132,7 +1132,7 @@ function UnloadCard({
       >
         <div
           className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
-            btcIfSold > 0 ? "text-gray-900" : "text-gray-300"
+            btcIfSold > 0 ? "text-gray-900 dark:text-gray-100" : "text-gray-300 dark:text-gray-600"
           }`}
         >
           {btcIfSold > 0
@@ -1144,10 +1144,10 @@ function UnloadCard({
       {/* Always-open receipt — the house grammar */}
       {escrowRaw >= SATS && priceSats > 0 && (
         <div className="px-2 pt-2">
-          <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          <dl className="space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
               <dt>Queue</dt>
-              <dd className="font-medium tabular-nums text-gray-700">
+              <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                 {queueAheadXcp > 0
                   ? `${queueAheadXcp.toLocaleString()} XCP ahead of you`
                   : "first at this price"}
@@ -1160,10 +1160,10 @@ function UnloadCard({
             {sellFeeRate !== null && (
               <div className="flex justify-between">
                 <dt>TX fee</dt>
-                <dd className={customFee > 0 ? "font-medium text-purple-600" : ""}>
+                <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {satsPerVb(sellFeeRate)} sat/vB
                   {btcUsd !== null && (
-                    <span className="text-gray-400">
+                    <span className="text-gray-400 dark:text-gray-500">
                       {" "}
                       (~{usdFmt(((sellFeeRate * 250) / SATS) * btcUsd)})
                     </span>
@@ -1218,8 +1218,8 @@ function RouteBook({
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
   const taken = new Map(plan.map((l) => [l.dispenser.source, l.units]));
   return (
-    <aside className="rounded-2xl border border-gray-200 bg-white p-3">
-      <div className="px-1 pb-2 text-xs font-medium text-gray-500">
+    <aside className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
+      <div className="px-1 pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
         Dispensers · cheapest first
       </div>
       <ul className="space-y-1">
@@ -1229,27 +1229,27 @@ function RouteBook({
             <li
               key={r.source}
               className={`relative overflow-hidden rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-                t ? "border-purple-200 bg-purple-50" : "border-transparent"
+                t ? "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40" : "border-transparent"
               }`}
             >
               <span
                 aria-hidden
                 className={`absolute inset-y-0 left-0 ${
-                  t ? "bg-purple-100/70" : "bg-gray-100/80"
+                  t ? "bg-purple-100/70 dark:bg-purple-900/50" : "bg-gray-100/80 dark:bg-gray-800/80"
                 }`}
                 style={{
                   width: `${Math.max(6, (r.give_remaining / maxDepth) * 100)}%`,
                 }}
               />
               <span className="relative z-10 flex items-center justify-between gap-2">
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-gray-900 dark:text-gray-100">
                   {commasRaw(perXcpSats(r), 0)}{" "}
-                  <span className="font-normal text-gray-400">sats</span>
+                  <span className="font-normal text-gray-400 dark:text-gray-500">sats</span>
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="text-gray-500">
+                  <span className="text-gray-500 dark:text-gray-400">
                     {t ? (
-                      <span className="font-semibold text-purple-700">
+                      <span className="font-semibold text-purple-700 dark:text-purple-300">
                         {commas(t * (r.give_quantity / SATS))} of{" "}
                       </span>
                     ) : null}
@@ -1263,11 +1263,11 @@ function RouteBook({
         })}
       </ul>
       {hiddenCount > 0 && (
-        <p className="px-1 pt-2 text-[11px] text-gray-400">
+        <p className="px-1 pt-2 text-[11px] text-gray-400 dark:text-gray-500">
           +{hiddenCount} hidden — purchase pending in mempool
         </p>
       )}
-      <p className="px-1 pt-2 text-[11px] leading-relaxed text-gray-400">
+      <p className="px-1 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         Routing includes miner fees — a deep route can beat a cheaper,
         shallower one.
       </p>
@@ -1302,22 +1302,22 @@ function SellBook({
   const youRow = active && yourPriceSats > 0 && (
     <li
       key="you"
-      className="relative overflow-hidden rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs"
+      className="relative overflow-hidden rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1.5 text-xs"
     >
       <span className="relative z-10 flex items-center justify-between gap-2">
-        <span className="font-semibold text-amber-800">
+        <span className="font-semibold text-amber-800 dark:text-amber-300">
           {yourPriceSats.toLocaleString()}{" "}
-          <span className="font-normal text-amber-600">sats</span>
+          <span className="font-normal text-amber-600 dark:text-amber-400">sats</span>
         </span>
-        <span className="font-medium text-amber-700">
+        <span className="font-medium text-amber-700 dark:text-amber-400">
           {yourEscrowXcp > 0 ? `you · ${commas(yourEscrowXcp)} XCP` : "you"}
         </span>
       </span>
     </li>
   );
   return (
-    <aside className="rounded-2xl border border-gray-200 bg-white p-3">
-      <div className="px-1 pb-2 text-xs font-medium text-gray-500">
+    <aside className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
+      <div className="px-1 pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
         The competition · cheapest first
       </div>
       <ul className="space-y-1">
@@ -1329,7 +1329,7 @@ function SellBook({
           <SellRow key={r.source} r={r} maxDepth={maxDepth} onPick={onPick} />
         ))}
       </ul>
-      <p className="px-1 pt-2 text-[11px] leading-relaxed text-gray-400">
+      <p className="px-1 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         Buyers fill cheapest first — the closer to the top, the faster you
         sell. Tap a row to match its price.
       </p>
@@ -1351,19 +1351,19 @@ function SellRow({
       <button
         type="button"
         onClick={() => onPick(approx(perXcpSats(r)))}
-        className="relative w-full overflow-hidden rounded-lg border border-transparent py-1.5 pl-2.5 pr-8 text-left text-xs transition-colors hover:border-amber-300 hover:bg-amber-50/50 active:scale-[0.99]"
+        className="relative w-full overflow-hidden rounded-lg border border-transparent py-1.5 pl-2.5 pr-8 text-left text-xs transition-colors hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50/50 dark:hover:bg-amber-950/40 active:scale-[0.99]"
       >
         <span
           aria-hidden
-          className="absolute inset-y-0 left-0 bg-gray-100/80"
+          className="absolute inset-y-0 left-0 bg-gray-100/80 dark:bg-gray-800/80"
           style={{ width: `${Math.max(6, (r.give_remaining / maxDepth) * 100)}%` }}
         />
         <span className="relative z-10 flex items-center justify-between gap-2">
-          <span className="font-medium text-gray-900">
+          <span className="font-medium text-gray-900 dark:text-gray-100">
             {commasRaw(perXcpSats(r), 0)}{" "}
-            <span className="font-normal text-gray-400">sats</span>
+            <span className="font-normal text-gray-400 dark:text-gray-500">sats</span>
           </span>
-          <span className="text-gray-500">{commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP</span>
+          <span className="text-gray-500 dark:text-gray-400">{commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP</span>
         </span>
       </button>
       <span className="absolute inset-y-0 right-2 flex items-center">

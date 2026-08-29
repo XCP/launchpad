@@ -185,7 +185,7 @@ export function MintPanel({
         : `Mint ${commas(mintTokens)} ${asset}`;
 
   return (
-    <div className="rounded-3xl border border-gray-200 bg-white p-2">
+    <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
       {/* You receive — tokens, in whole lots */}
       <Well
         focusable
@@ -199,8 +199,8 @@ export function MintPanel({
                 onClick={() => setTokens(String(p))}
                 className={`rounded-md border px-1.5 py-0.5 text-[10px] font-medium transition-colors active:scale-95 ${
                   mintTokens === p && typedTokens > 0
-                    ? "border-purple-400 bg-white text-purple-600"
-                    : "border-gray-200 bg-white text-gray-500 hover:border-purple-400 hover:text-purple-600"
+                    ? "border-purple-400 dark:border-purple-500 bg-white dark:bg-gray-900 text-purple-600 dark:text-purple-400"
+                    : "border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400"
                 }`}
               >
                 {p === 1_000_000 ? "Max" : `${p / 1000}k`}
@@ -214,7 +214,7 @@ export function MintPanel({
             <span>
               ≈ {usdFmt(xcpUsd && costXcp > 0 ? costXcp * xcpUsd : 0)}
               {adjusted && lots > 0 && (
-                <span className="text-amber-600">
+                <span className="text-amber-600 dark:text-amber-400">
                   {" "}
                   · adjusts to {commas(mintTokens)}
                 </span>
@@ -224,7 +224,7 @@ export function MintPanel({
                   later with nothing to explain why. Counts pending mints, so
                   it reads the same before and after a mint confirms. */}
               {addressCapped && (
-                <span className="text-amber-600"> · you have minted this launch&rsquo;s max</span>
+                <span className="text-amber-600 dark:text-amber-400"> · you have minted this launch&rsquo;s max</span>
               )}
             </span>
             <span>
@@ -246,7 +246,7 @@ export function MintPanel({
           onChange={(e) => setTokens(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="0"
           aria-label={`${asset} to mint`}
-          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 outline-none placeholder:text-gray-300"
+          className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
         />
       </Well>
 
@@ -262,8 +262,8 @@ export function MintPanel({
               {xcpBalance !== undefined && (
                 <button
                   type="button"
-                  className={`min-w-0 truncate hover:text-purple-600 ${
-                    insufficient ? "text-red-600" : "text-gray-500"
+                  className={`min-w-0 truncate hover:text-purple-600 dark:hover:text-purple-400 ${
+                    insufficient ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
                   }`}
                   onClick={() =>
                     setTokens(
@@ -286,9 +286,9 @@ export function MintPanel({
             className={`w-full min-w-0 truncate text-[2rem] font-semibold leading-tight ${
               costXcp > 0
                 ? insufficient
-                  ? "text-red-600"
-                  : "text-gray-900"
-                : "text-gray-300"
+                  ? "text-red-600 dark:text-red-400"
+                  : "text-gray-900 dark:text-gray-100"
+                : "text-gray-300 dark:text-gray-600"
             }`}
           >
             {costXcp > 0 ? costXcp.toFixed(2) : "0"}
@@ -299,10 +299,10 @@ export function MintPanel({
       {/* Receipt — the refund guarantee is the signature row */}
       {lots > 0 && (
         <div className="px-2 pt-2">
-          <dl className="space-y-1.5 border-t border-gray-100 pt-2 text-xs text-gray-500">
+          <dl className="space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
               <dt>If it fails to launch</dt>
-              <dd className="font-medium text-gray-700">
+              <dd className="font-medium text-gray-700 dark:text-gray-300">
                 full XCP refund, automatic
               </dd>
             </div>
@@ -318,7 +318,7 @@ export function MintPanel({
                 <dd>
                   {satsPerVb(medianFeeRate)} sat/vB
                   {btcUsd != null && (
-                    <span className="text-gray-500">
+                    <span className="text-gray-500 dark:text-gray-400">
                       {" "}
                       (~{usdFmt(((medianFeeRate * MINT_VBYTES) / SATS) * btcUsd)})
                     </span>
@@ -350,29 +350,29 @@ export function MintPanel({
           </CTA>
         )}
         {insufficient && (
-          <p className="mt-2 text-center text-[11px] text-gray-500">
+          <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">
             Need XCP?{" "}
-            <Link href="/dispense" className="text-purple-600 underline">
+            <Link href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
               Buy some with BTC
             </Link>
             .
           </p>
         )}
         {compose.status === "confirmed" && (
-          <div className="mt-2 rounded-2xl border border-green-200 bg-green-50 p-4 text-sm">
+          <div className="mt-2 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm">
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-green-800">
+              <span className="font-semibold text-green-800 dark:text-green-300">
                 Mint broadcast — <TxLink txid={compose.txid} />
               </span>
               <button
                 type="button"
                 onClick={compose.reset}
-                className="text-xs text-green-800 underline"
+                className="text-xs text-green-800 dark:text-green-300 underline"
               >
                 Dismiss
               </button>
             </div>
-            <p className="mt-1 text-xs text-green-700">
+            <p className="mt-1 text-xs text-green-700 dark:text-green-400">
               Escrowed until the launch resolves: tokens if it sells out, full
               XCP refund if it doesn&apos;t.
             </p>

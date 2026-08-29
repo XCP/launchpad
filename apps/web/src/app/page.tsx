@@ -205,7 +205,7 @@ function FirstLaunchHero() {
   return (
     <div className="holo-border rounded-xl p-8 text-center">
       <h1 className="text-2xl font-bold">Fairmint pools are live.</h1>
-      <p className="mx-auto mt-3 max-w-xl text-gray-600">
+      <p className="mx-auto mt-3 max-w-xl text-gray-600 dark:text-gray-400">
         The first XCP-69 launch in history hasn&apos;t happened yet. All-or-nothing
         mints, at least {XCP69_MIN_PARTICIPANTS} participants required, every
         raised XCP locked into the pool forever — enforced by consensus, not by
@@ -213,7 +213,7 @@ function FirstLaunchHero() {
       </p>
       <Link
         href="/create"
-        className="mt-6 inline-block rounded-md bg-gray-900 px-5 py-2.5 font-medium text-white hover:bg-gray-700"
+        className="mt-6 inline-block rounded-md bg-gray-900 dark:bg-gray-100 px-5 py-2.5 font-medium text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300"
       >
         Launch the first
       </Link>

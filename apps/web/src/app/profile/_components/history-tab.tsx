@@ -9,14 +9,14 @@ import { WITHHELD_COPY } from "@/lib/withheld-copy";
 export function HistoryTab({ address }: { address: string }) {
   const { portfolio, isLoading } = usePortfolio(address);
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400">Loading history…</p>;
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading history…</p>;
 
   const closed = portfolio?.closed ?? [];
   const xcpUsd = portfolio?.xcpUsd ?? null;
 
   if (closed.length === 0) {
     return (
-      <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+      <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
         No closed positions yet.
       </p>
     );
@@ -28,18 +28,18 @@ export function HistoryTab({ address }: { address: string }) {
   return (
     <div className="space-y-4">
       <div>
-        <p className="text-xs uppercase tracking-wider text-gray-500">
+        <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
           {incomplete ? "Known realized PnL" : "Realized PnL"}
         </p>
         <Realized sats={total} xcpUsd={xcpUsd} large />
-        <p className="text-sm text-gray-500">
+        <p className="text-sm text-gray-500 dark:text-gray-400">
           Across {closed.length} fully exited {closed.length === 1 ? "position" : "positions"}
         </p>
       </div>
-      <ul className="divide-y divide-gray-100">
+      <ul className="divide-y divide-gray-100 dark:divide-gray-800">
         {closed.map((c) => (
           <li key={c.asset} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-            <Link href={`/${c.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600">
+            <Link href={`/${c.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
               <TokenImage asset={c.asset} className="size-7 shrink-0 rounded" />
               <span className="truncate font-medium">{c.asset}</span>
             </Link>
@@ -49,7 +49,7 @@ export function HistoryTab({ address }: { address: string }) {
                   then never passed, so a dash here explained nothing at all. */}
               {c.withheld && (
                 <span
-                  className="mt-0.5 block text-[10px] leading-tight text-gray-400"
+                  className="mt-0.5 block text-[10px] leading-tight text-gray-400 dark:text-gray-500"
                   title={WITHHELD_COPY[c.withheld].full}
                 >
                   {WITHHELD_COPY[c.withheld].short}
@@ -59,7 +59,7 @@ export function HistoryTab({ address }: { address: string }) {
           </li>
         ))}
       </ul>
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-400 dark:text-gray-500">
         Positions you fully exited, with the profit or loss actually taken.
         A dash means the focused mint-and-trade history does not explain the
         live zero balance, so no P&amp;L is claimed.
@@ -79,14 +79,14 @@ function Realized({
   xcpUsd: number | null;
   large?: boolean;
 }) {
-  if (sats === null) return <span className="text-gray-400" title="Unexplained balance movement">—</span>;
+  if (sats === null) return <span className="text-gray-400 dark:text-gray-500" title="Unexplained balance movement">—</span>;
   const up = sats >= 0n;
   // Magnitude in integer space; the sign is carried by the label.
   const xcp = fromSats((up ? sats : -sats).toString());
   return (
     <span
       className={`${large ? "text-3xl font-semibold" : "tabular-nums"} ${
-        up ? "text-green-700" : "text-red-600"
+        up ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"
       }`}
     >
       {up ? "+" : "−"}

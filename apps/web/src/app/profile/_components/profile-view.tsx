@@ -70,8 +70,8 @@ export function ProfileView({ viewing }: { viewing?: string }) {
 
   if (!address || (!viewing && status !== "connected")) {
     return (
-      <div className="rounded-2xl border border-dashed border-gray-300 p-10 text-center">
-        <p className="mb-4 text-sm text-gray-500">
+      <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center">
+        <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
           Connect your wallet to see your positions and launches.
         </p>
         <ConnectButton size="md" />
@@ -81,15 +81,15 @@ export function ProfileView({ viewing }: { viewing?: string }) {
 
   return (
     <div className="space-y-6">
-      <div className="rounded-2xl border border-gray-200 bg-white p-5">
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
             <Identicon address={address} />
             <div className="min-w-0">
-              <p className="truncate font-mono text-sm font-semibold text-gray-900">
+              <p className="truncate font-mono text-sm font-semibold text-gray-900 dark:text-gray-100">
                 {shortAddress(address)}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {isSelf ? "Your xcp.fun profile" : "xcp.fun profile"}
               </p>
             </div>
@@ -106,7 +106,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
                   () => {},
                 );
               }}
-              className="rounded-full border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:border-gray-300"
+              className="rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
             >
               {copied ? "Copied" : "Copy address"}
             </button>
@@ -114,7 +114,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
               href={`https://xcp.io/address/${address}`}
               target="_blank"
               rel="noreferrer"
-              className="rounded-full border border-gray-200 px-3 py-1.5 text-sm text-gray-700 hover:border-gray-300"
+              className="rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
             >
               Explorer ↗
             </a>
@@ -122,7 +122,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
               <button
                 type="button"
                 onClick={() => disconnect()}
-                className="rounded-full border border-gray-200 px-3 py-1.5 text-sm text-red-600 hover:border-red-300"
+                className="rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:border-red-300 dark:hover:border-red-700"
               >
                 Disconnect
               </button>
@@ -132,7 +132,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
       </div>
 
       {isSelf && proofStatus === "failed" && (
-        <p className="rounded-md border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
+        <p className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2.5 text-xs text-red-800 dark:text-red-300">
           Your wallet supplied a connection signature that didn&apos;t verify, so
           editing is locked for this session. Disconnect and reconnect to try
           again.
@@ -145,9 +145,9 @@ export function ProfileView({ viewing }: { viewing?: string }) {
         onOpenHistory={rewardAccount?.hasRewardTx ? () => setTab("rewards") : undefined}
       />
 
-      <div className="rounded-2xl border border-gray-200 bg-white">
+      <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
-          <div className="border-b border-gray-200 p-2">
+          <div className="border-b border-gray-200 dark:border-gray-800 p-2">
             <SegmentedList
               variant="card"
               className="!flex-nowrap overflow-x-auto text-xs sm:text-sm [&_[role=tab]]:!px-2"

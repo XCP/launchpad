@@ -167,7 +167,7 @@ export function IssuerChips({
   if (!data) return trailing ? <div className="mt-2">{trailing}</div> : null;
 
   const chip =
-    "rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums";
+    "rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums";
 
   // Ordered by how much each says about the creator, because on a phone only
   // the first two survive. A third and fourth chip wrapped onto their own
@@ -178,7 +178,7 @@ export function IssuerChips({
   const chips: ReactNode[] = [
     <span
       key="ordinal"
-      className="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[11px] font-medium text-purple-700"
+      className="rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300"
     >
       {data.prior === 0
         ? "first launch"
@@ -201,7 +201,7 @@ export function IssuerChips({
       <Link
         key="latest"
         href={`/${data.latest.asset}`}
-        className={`${chip} transition-colors hover:border-purple-300 hover:text-purple-600`}
+        className={`${chip} transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400`}
       >
         latest launch {timeAgo(data.latest.at)}
         {/* The ticker is the widest part of this chip and the least of what
@@ -316,7 +316,7 @@ function CopyButton({ value }: { value: string }) {
         );
       }}
       aria-label="Copy issuer address"
-      className={`relative ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 transition-colors after:absolute after:-inset-3 after:content-[''] hover:bg-gray-100 hover:text-purple-600 ${FOCUS}`}
+      className={`relative ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 dark:text-gray-500 transition-colors after:absolute after:-inset-3 after:content-[''] hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-purple-600 dark:hover:text-purple-400 ${FOCUS}`}
     >
       {copied ? (
         <svg viewBox="0 0 24 24" className="size-3 fill-green-600">
@@ -397,30 +397,30 @@ export function AddressHoverCard({
       }
     >
       <div className="grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-gray-50 p-3">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
           <div className={LABEL}>XCP balance</div>
-          <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
+          <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
             {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
           </div>
         </div>
-        <div className="rounded-xl bg-gray-50 p-3">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
           <div className={LABEL}>First seen</div>
-          <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
+          <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
             {firstSeen ? monthYear(firstSeen) : "—"}
           </div>
         </div>
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
-        <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
           Holds{" "}
-          <span className="font-semibold text-gray-900 tabular-nums">
+          <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
             {typeof held === "number" ? commas(held) : "—"}
           </span>{" "}
           {held === 1 ? "token" : "tokens"}
         </div>
-        <div className="rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
+        <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
           Issued{" "}
-          <span className="font-semibold text-gray-900 tabular-nums">
+          <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
             {issued
               ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
               : "—"}
@@ -429,20 +429,20 @@ export function AddressHoverCard({
         </div>
       </div>
       {typeof score === "number" && tier && (
-        <p className="mt-3 border-t border-gray-100 pt-2 text-[10px] text-gray-400">
+        <p className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2 text-[10px] text-gray-400 dark:text-gray-500">
           Track record {Math.round(score)}/100 ({tier}) — observed on-chain
           reputation from the XCP.io explorer, not an endorsement.
         </p>
       )}
       <div className="mt-2 flex items-center gap-3 text-xs font-medium">
-        <Link href={`/profile/${source}`} className="text-purple-600 hover:underline">
+        <Link href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
           View profile
         </Link>
         <a
           href={`https://xcp.io/address/${source}`}
           target="_blank"
           rel="noreferrer"
-          className="text-gray-500 hover:underline"
+          className="text-gray-500 dark:text-gray-400 hover:underline"
         >
           Explorer ↗
         </a>
@@ -528,43 +528,43 @@ export function LaunchpadAddressHoverCard({
       }
     >
       {isLoading || !data ? (
-        <p className="py-3 text-center text-sm text-gray-400">
+        <p className="py-3 text-center text-sm text-gray-400 dark:text-gray-500">
           {isLoading ? "Loading xcp.fun activity…" : "Activity unavailable."}
         </p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-xl bg-gray-50 p-3">
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
               <div className={LABEL}>Balance</div>
-              <div className="mt-0.5 text-lg font-bold text-gray-900 tabular-nums">
+              <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                 {balance === null ? "—" : compact(tokenQty(balance, true))}
               </div>
             </div>
-            <div className="rounded-xl bg-gray-50 p-3">
+            <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
               <div className={LABEL}>Total PnL</div>
               <div
                 className={`mt-0.5 text-lg font-bold tabular-nums ${
                   pnl === null
-                    ? "text-gray-400"
+                    ? "text-gray-400 dark:text-gray-500"
                     : pnl >= 0n
-                      ? "text-green-700"
-                      : "text-red-600"
+                      ? "text-green-700 dark:text-green-400"
+                      : "text-red-600 dark:text-red-400"
                 }`}
               >
                 {pnl === null ? "—" : signedXcp(pnl)}
               </div>
             </div>
           </div>
-          <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            <span className="font-medium text-gray-900">Mint </span>
+          <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+            <span className="font-medium text-gray-900 dark:text-gray-100">Mint </span>
             <span className="tabular-nums">{xcp(data.asset.minted_xcp ?? "0")}</span>
             {" · Buy "}
             <span className="tabular-nums">{xcp(data.asset.bought_xcp)}</span>
             {" · Sell "}
             <span className="tabular-nums">{xcp(data.asset.sold_xcp)} XCP</span>
           </div>
-          <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 px-3 py-2 text-xs text-gray-600">
-            <span className="font-medium text-gray-900">XCP-69</span>
+          <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
+            <span className="font-medium text-gray-900 dark:text-gray-100">XCP-69</span>
             {` · ${commas(data.mints.transactions)} mint${data.mints.transactions === 1 ? "" : "s"}`}
             {` · ${commas(data.mints.launches)} launch${data.mints.launches === 1 ? "" : "es"}`}
             {data.market.fills > 0
@@ -573,14 +573,14 @@ export function LaunchpadAddressHoverCard({
           </div>
           {pnl === null &&
             (data.asset.mints > 0 || data.asset.buys > 0 || data.asset.sells > 0) && (
-              <p className="mt-2 text-[10px] text-gray-400">
+              <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
                 PnL is withheld because the live balance includes activity outside indexed mints and trades.
               </p>
             )}
         </>
       )}
       <div className="mt-2 text-xs font-medium">
-        <Link href={`/profile/${source}`} className="text-purple-600 hover:underline">
+        <Link href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
           View profile
         </Link>
       </div>
@@ -594,7 +594,7 @@ export function LaunchpadAddressHoverCard({
  */
 export function IssuerLine({ source }: { source: string }) {
   return (
-    <span className="mt-1 inline-block text-[13px] text-gray-500 tabular-nums">
+    <span className="mt-1 inline-block text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">
       by{" "}
       <AddressHoverCard source={source}>{shortAddress(source)}</AddressHoverCard>
       <CopyButton value={source} />

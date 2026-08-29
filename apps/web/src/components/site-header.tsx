@@ -76,7 +76,7 @@ export function SiteHeader() {
   const queued = useMempoolCount() > 0;
 
   return (
-    <header className="border-b border-gray-200 bg-white">
+    <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       {/* `relative` so the mempool chip can be centred on the HEADER rather
           than on whatever gap the two nav groups happen to leave — those
           change width with the wallet's state, and a "centre" that drifts
@@ -95,12 +95,12 @@ export function SiteHeader() {
                 its own anonymous flex item, so the row's gap was landing
                 between XCP and .FUN — it reads as a domain, so it can't. */}
             <span>
-              XCP<span className="text-purple-600">.FUN</span>
+              XCP<span className="text-purple-600 dark:text-purple-400">.FUN</span>
             </span>
           </Link>
-          <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 nav:flex">
+          <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 dark:text-gray-400 nav:flex">
             {LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className="hover:text-gray-900">
+              <Link key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
                 {l.label}
               </Link>
             ))}
@@ -135,7 +135,7 @@ export function SiteHeader() {
           <TelegramChip />
         </div>
 
-        <div className="flex shrink-0 items-center gap-4 text-sm font-medium text-gray-600">
+        <div className="flex shrink-0 items-center gap-4 text-sm font-medium text-gray-600 dark:text-gray-400">
           {/* Beside the burger on a phone, and beside the links in the band
               between — the same chips, just not pretending to be centred, and
               never both at once. */}
@@ -150,7 +150,7 @@ export function SiteHeader() {
           </span>
           <nav className="hidden items-center gap-4 nav:flex">
             {SECONDARY.map((l) => (
-              <Link key={l.href} href={l.href} className="hover:text-gray-900">
+              <Link key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
                 {l.label}
               </Link>
             ))}
@@ -173,13 +173,13 @@ export function SiteHeader() {
  */
 function MobileMenu() {
   const item =
-    "block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 outline-none data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
+    "block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 outline-none data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-800 data-[highlighted]:text-gray-900 dark:data-[highlighted]:text-gray-100";
 
   return (
     <DM.Root>
       <DM.Trigger
         aria-label="Open menu"
-        className="flex size-9 items-center justify-center rounded-lg border border-gray-200 text-gray-600 hover:border-gray-300 hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 nav:hidden"
+        className="flex size-9 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 nav:hidden"
       >
         {/* Three bars, drawn rather than shipped as an icon dependency. */}
         <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden fill="none">
@@ -195,7 +195,7 @@ function MobileMenu() {
         <DM.Content
           align="end"
           sideOffset={8}
-          className="modal-pop z-50 w-48 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg"
+          className="modal-pop z-50 w-48 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1.5 shadow-lg"
         >
           {LINKS.map((l) => (
             <DM.Item key={l.href} asChild>
@@ -204,7 +204,7 @@ function MobileMenu() {
               </Link>
             </DM.Item>
           ))}
-          <DM.Separator className="my-1.5 h-px bg-gray-100" />
+          <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
           {[...MENU_EXTRA, ...SECONDARY].map((l) => (
             <DM.Item key={l.href} asChild>
               <Link href={l.href} className={item}>
@@ -212,7 +212,7 @@ function MobileMenu() {
               </Link>
             </DM.Item>
           ))}
-          <DM.Separator className="my-1.5 h-px bg-gray-100" />
+          <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
           {/* An external destination, so it says so — the menu is the index of
               the site and this is the one row that leaves it. */}
           <DM.Item asChild>

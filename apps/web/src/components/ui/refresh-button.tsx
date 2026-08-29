@@ -42,8 +42,8 @@ export function RefreshButton({ onRefresh }: { onRefresh: () => void }) {
       aria-label="Refresh"
       className={`flex size-7 items-center justify-center rounded-full transition-colors ${FOCUS} ${
         cooling
-          ? "cursor-default text-gray-300"
-          : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+          ? "cursor-default text-gray-300 dark:text-gray-600"
+          : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
       }`}
     >
       <svg viewBox="0 0 20 20" fill="currentColor" className="size-4">

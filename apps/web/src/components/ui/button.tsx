@@ -8,7 +8,7 @@ const VARIANTS = {
   // nothing typed into it looked dead rather than merely not-yet-ready.
   primary:
     "bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-40 disabled:hover:bg-purple-600",
-  dark: "bg-gray-900 text-white hover:bg-gray-700",
+  dark: "bg-gray-900 text-white hover:bg-gray-700 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-gray-300",
   danger: "bg-red-600 text-white hover:bg-red-500",
 } as const;
 

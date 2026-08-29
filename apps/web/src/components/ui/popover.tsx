@@ -25,12 +25,12 @@ export function GearPopover({
     <P.Root>
       <P.Trigger
         aria-label={label}
-        className={`group flex items-center justify-center rounded-full transition-colors data-[state=open]:bg-purple-50 data-[state=open]:text-purple-600 ${
+        className={`group flex items-center justify-center rounded-full transition-colors data-[state=open]:bg-purple-50 dark:data-[state=open]:bg-purple-950/40 data-[state=open]:text-purple-600 dark:data-[state=open]:text-purple-400 ${
           small ? "size-5" : "size-7"
         } ${
           active
-            ? "bg-purple-50 text-purple-600"
-            : "text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            ? "bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400"
+            : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
         }`}
       >
         <svg
@@ -49,7 +49,7 @@ export function GearPopover({
         <P.Content
           align="end"
           sideOffset={8}
-          className="modal-pop z-50 w-64 rounded-2xl border border-gray-200 bg-white p-4 shadow-lg focus:outline-none"
+          className="modal-pop z-50 w-64 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-lg focus:outline-none"
         >
           {children}
         </P.Content>

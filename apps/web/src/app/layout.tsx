@@ -33,7 +33,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="preconnect" href="https://api.counterparty.io:4000" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://cdn.xcp.io" />
       </head>
-      <body className="min-h-dvh bg-gray-50 text-gray-900 antialiased">
+      <body className="min-h-dvh bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">
         <SwrProvider>
         <WalletProvider>
         <SessionProvider>

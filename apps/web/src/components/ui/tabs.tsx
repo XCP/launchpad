@@ -25,7 +25,7 @@ export function SegmentedList({
     <T.List
       className={
         variant === "pill"
-          ? `flex items-center gap-1 rounded-lg bg-gray-100 p-1 text-sm font-medium ${className}`
+          ? `flex items-center gap-1 rounded-lg bg-gray-100 dark:bg-gray-800 p-1 text-sm font-medium ${className}`
           : `flex flex-wrap items-center gap-1 text-sm font-medium ${className}`
       }
     >
@@ -50,8 +50,8 @@ export function SegmentedTrigger({
       value={value}
       className={
         variant === "pill"
-          ? `${grow ? "flex-1 " : ""}rounded-md px-3 py-1.5 capitalize text-gray-500 transition-colors hover:text-gray-700 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm`
-          : `rounded-md px-3 py-1.5 capitalize text-gray-500 transition-colors hover:text-gray-700 data-[state=active]:bg-gray-100 data-[state=active]:text-gray-900`
+          ? `${grow ? "flex-1 " : ""}rounded-md px-3 py-1.5 capitalize text-gray-500 dark:text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-300 data-[state=active]:bg-white dark:data-[state=active]:bg-gray-900 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100 data-[state=active]:shadow-sm`
+          : `rounded-md px-3 py-1.5 capitalize text-gray-500 dark:text-gray-400 transition-colors hover:text-gray-700 dark:hover:text-gray-300 data-[state=active]:bg-gray-100 dark:data-[state=active]:bg-gray-800 data-[state=active]:text-gray-900 dark:data-[state=active]:text-gray-100`
       }
     >
       {children}

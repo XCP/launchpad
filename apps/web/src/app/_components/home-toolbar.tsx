@@ -22,7 +22,7 @@ export function HomeToolbar({
       <LaunchSearch height={height} xcpUsd={xcpUsd} />
       <Link
         href="/create"
-        className="shrink-0 rounded-full bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-700"
+        className="shrink-0 rounded-full bg-gray-900 dark:bg-gray-100 px-4 py-2 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-700 dark:hover:bg-gray-300"
       >
         Create
       </Link>

@@ -79,7 +79,7 @@ export function StandardPlayground({
           {children}
         </>
       ) : (
-        <div className="rounded-lg border-2 border-dashed border-gray-200 p-6 text-center text-sm text-gray-400">
+        <div className="rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-800 p-6 text-center text-sm text-gray-400 dark:text-gray-500">
           Sell out the launch above — the pool only exists on the other side
           of the line.
         </div>
@@ -110,14 +110,14 @@ function LaunchMeter({
   const committed = minted * MINT_PRICE; // XCP escrowed so far
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
         <h3 className="font-semibold">1 · The launch is binary</h3>
         <div className="text-right">
-          <span className={`text-3xl font-bold ${soldOut ? "text-green-600" : "text-gray-900"}`}>
+          <span className={`text-3xl font-bold ${soldOut ? "text-green-600 dark:text-green-400" : "text-gray-900 dark:text-gray-100"}`}>
             {compact(minted)}
           </span>
-          <span className="text-sm text-gray-400"> of {compact(SUPPLY)} supply minted</span>
+          <span className="text-sm text-gray-400 dark:text-gray-500"> of {compact(SUPPLY)} supply minted</span>
         </div>
       </div>
 
@@ -139,7 +139,7 @@ function LaunchMeter({
 
       {/* The whole 100M supply as one bar: the sale fills toward the 69%
           line; the pool's 31% only exists if the line is crossed. */}
-      <div className="relative mt-2 h-7 overflow-hidden rounded-lg bg-gray-100">
+      <div className="relative mt-2 h-7 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
         <div
           className={`h-full transition-all duration-300 ${
             soldOut ? "bg-green-500" : "bg-amber-400"
@@ -151,32 +151,32 @@ function LaunchMeter({
             sale fill, so the two segments read apart). */}
         <div
           className={`absolute inset-y-0 transition-colors duration-300 ${
-            soldOut ? "bg-cyan-500" : "bg-gray-200"
+            soldOut ? "bg-cyan-500" : "bg-gray-200 dark:bg-gray-700"
           }`}
           style={{ left: `${salePct}%`, right: 0 }}
         />
         <div
-          className="absolute inset-y-0 w-0.5 bg-gray-800"
+          className="absolute inset-y-0 w-0.5 bg-gray-800 dark:bg-gray-200"
           style={{ left: `${salePct}%` }}
         />
       </div>
-      <div className="mt-1 flex text-xs text-gray-400">
+      <div className="mt-1 flex text-xs text-gray-400 dark:text-gray-500">
         <span style={{ width: `${salePct}%` }}>public sale · 69M</span>
         <span>pool · 31M</span>
       </div>
 
       <p className="mt-2 text-sm">
         {soldOut ? (
-          <span className="font-medium text-green-700">
+          <span className="font-medium text-green-700 dark:text-green-400">
             ✓ Graduated — pool created with {commas(RAISE)} XCP
             {withUsd(RAISE, xcpUsd)} + 31M tokens, LP burned.
           </span>
         ) : pos === 0 ? (
-          <span className="font-medium text-blue-700">
+          <span className="font-medium text-blue-700 dark:text-blue-300">
             ⏳ Scheduled — announced on-chain, nothing minted yet.
           </span>
         ) : (
-          <span className="font-medium text-amber-700">
+          <span className="font-medium text-amber-700 dark:text-amber-400">
             ↩ Minting — {commas(Math.round(committed))} XCP
             {withUsd(committed, xcpUsd)} raised so far, all of it returned
             automatically if the launch doesn&apos;t sell out.
@@ -184,8 +184,8 @@ function LaunchMeter({
         )}
       </p>
 
-      <details className="mt-2 text-xs text-gray-500">
-        <summary className="cursor-pointer text-gray-400 hover:text-gray-600">
+      <details className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <summary className="cursor-pointer text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
           how it works
         </summary>
         <p className="mt-2">
@@ -247,10 +247,10 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
   const multiple = price / MINT_PRICE;
   const multipleColor =
     multiple >= OPEN_PRICE / MINT_PRICE - 0.005
-      ? "text-green-600"
+      ? "text-green-600 dark:text-green-400"
       : multiple >= 1
-        ? "text-amber-600"
-        : "text-red-600";
+        ? "text-amber-600 dark:text-amber-400"
+        : "text-red-600 dark:text-red-400";
 
   // Piecewise scale anchored at the opening tick (dead center): reserves
   // below opening map 0→50%, above opening 50→100% of that direction's
@@ -266,18 +266,18 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
   const tokenPct = barPct(tokenReserve, POOL_TOKENS, TOKEN_MAX);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white p-5">
+    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
         <h3 className="font-semibold">2 · The liquidity is locked</h3>
         <div className="text-right">
           <span className={`text-3xl font-bold ${multipleColor}`}>
             {multiple >= 99.5 ? Math.round(multiple) : multiple.toFixed(2)}×
           </span>
-          <span className="text-sm text-gray-400"> mint price</span>
+          <span className="text-sm text-gray-400 dark:text-gray-500"> mint price</span>
         </div>
       </div>
 
-      <div className="mt-2 flex justify-between text-xs text-gray-400">
+      <div className="mt-2 flex justify-between text-xs text-gray-400 dark:text-gray-500">
         <span>everyone dumps</span>
         <span>open</span>
         <span>whale buys</span>
@@ -295,65 +295,65 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
       <div className="mt-3 space-y-3">
         <div>
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-purple-700">XCP in the pool</span>
-            <span className="font-semibold text-gray-900">
+            <span className="text-xs font-medium text-purple-700 dark:text-purple-300">XCP in the pool</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">
               {commas(Math.round(xcpReserve))}
-              <span className="text-xs font-normal text-gray-400">
+              <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
                 {withUsd(xcpReserve, xcpUsd)}
               </span>
             </span>
           </div>
-          <div className="relative mt-1 h-5 overflow-hidden rounded-md bg-gray-100">
+          <div className="relative mt-1 h-5 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
             <div
               className="h-full bg-purple-600 transition-all duration-300"
               style={{ width: `${xcpPct}%` }}
             />
-            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-400" />
+            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-400 dark:bg-gray-500" />
           </div>
         </div>
         <div>
           <div className="flex items-baseline justify-between">
-            <span className="text-xs font-medium text-cyan-700">Tokens in the pool</span>
-            <span className="font-semibold text-gray-900">{compact(tokenReserve)}</span>
+            <span className="text-xs font-medium text-cyan-700 dark:text-cyan-300">Tokens in the pool</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{compact(tokenReserve)}</span>
           </div>
-          <div className="relative mt-1 h-5 overflow-hidden rounded-md bg-gray-100">
+          <div className="relative mt-1 h-5 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
             <div
               className="h-full bg-cyan-500 transition-all duration-300"
               style={{ width: `${tokenPct}%` }}
             />
-            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-400" />
+            <div className="absolute inset-y-0 left-1/2 w-px bg-gray-400 dark:bg-gray-500" />
           </div>
         </div>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-        <div className="rounded-md bg-gray-50 p-2">
-          <div className="text-xs text-gray-500">Token price</div>
-          <div className="mt-0.5 text-lg font-semibold text-gray-900">
-            {priceFmt(price)} <span className="text-xs font-normal text-gray-400">XCP</span>
+        <div className="rounded-md bg-gray-50 dark:bg-gray-800/60 p-2">
+          <div className="text-xs text-gray-500 dark:text-gray-400">Token price</div>
+          <div className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
+            {priceFmt(price)} <span className="text-xs font-normal text-gray-400 dark:text-gray-500">XCP</span>
           </div>
           {xcpUsd && (
-            <div className="text-xs text-gray-400">≈{usdFmt(price * xcpUsd)}</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">≈{usdFmt(price * xcpUsd)}</div>
           )}
         </div>
-        <div className="rounded-md bg-gray-50 p-2">
-          <div className="text-xs text-gray-500">Market cap</div>
-          <div className="mt-0.5 text-lg font-semibold text-gray-900">
+        <div className="rounded-md bg-gray-50 dark:bg-gray-800/60 p-2">
+          <div className="text-xs text-gray-500 dark:text-gray-400">Market cap</div>
+          <div className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {compact(price * SUPPLY)}{" "}
-            <span className="text-xs font-normal text-gray-400">XCP</span>
+            <span className="text-xs font-normal text-gray-400 dark:text-gray-500">XCP</span>
           </div>
           {xcpUsd && (
-            <div className="text-xs text-gray-400">
+            <div className="text-xs text-gray-400 dark:text-gray-500">
               ≈{usdFmt(price * SUPPLY * xcpUsd)}
             </div>
           )}
         </div>
       </div>
 
-      {line && <p className="mt-3 text-sm font-medium text-gray-700">{line}</p>}
+      {line && <p className="mt-3 text-sm font-medium text-gray-700 dark:text-gray-300">{line}</p>}
 
-      <details className="mt-2 text-xs text-gray-500">
-        <summary className="cursor-pointer text-gray-400 hover:text-gray-600">
+      <details className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+        <summary className="cursor-pointer text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
           how it works
         </summary>
         <p className="mt-2">

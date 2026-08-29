@@ -46,7 +46,7 @@ export default async function StatsPage() {
 
   if (!stats) {
     return (
-      <p className="rounded-lg border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500">
+      <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
         Stats are unavailable right now.
       </p>
     );
@@ -94,7 +94,7 @@ export default async function StatsPage() {
     <div className="mx-auto max-w-3xl space-y-8">
       <div>
         <h1 className="text-2xl font-bold">Stats</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
           Every launch that conforms to XCP-69, and what has actually been minted.
         </p>
       </div>
@@ -163,16 +163,16 @@ export default async function StatsPage() {
         />
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
         <div className="flex items-baseline justify-between gap-3">
-          <h2 className="text-sm font-semibold text-gray-900">Minting activity</h2>
-          <span className="text-xs text-gray-400 tabular-nums">
+          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Minting activity</h2>
+          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
             {commas(windowTotal)} in the last {WINDOW_DAYS} days
           </span>
         </div>
 
         {peak === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">No mints in this window.</p>
+          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">No mints in this window.</p>
         ) : (
           <>
             <div className="mt-4 flex h-24 items-end gap-[3px]">
@@ -182,20 +182,20 @@ export default async function StatsPage() {
                   title={`${d.n} mint${d.n === 1 ? "" : "s"} · about ${
                     d.daysAgo === 0 ? "today" : `${d.daysAgo}d ago`
                   }`}
-                  className="flex-1 rounded-t-sm bg-purple-200 transition-colors hover:bg-purple-400"
+                  className="flex-1 rounded-t-sm bg-purple-200 dark:bg-purple-800/60 transition-colors hover:bg-purple-400"
                   // A zero day keeps a hairline so the axis stays readable as
                   // an axis rather than becoming a row of gaps.
                   style={{ height: `${Math.max(2, (d.n / peak) * 100)}%` }}
                 />
               ))}
             </div>
-            <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
+            <div className="mt-1.5 flex justify-between text-[11px] text-gray-400 dark:text-gray-500">
               <span>{WINDOW_DAYS}d ago</span>
               <span>now</span>
             </div>
           </>
         )}
-        <p className="mt-3 text-[11px] leading-relaxed text-gray-400">
+        <p className="mt-3 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
           Grouped by 144 blocks — a Bitcoin day. Exact against the chain, and
           approximate against a wall clock, which is the right way round for a
           chain this page is describing.
@@ -212,47 +212,47 @@ export default async function StatsPage() {
         </div>
       </section>
 
-      <section className="rounded-xl border border-gray-200 bg-white p-5">
-        <h2 className="text-sm font-semibold text-gray-900">Of the launches that finished</h2>
+      <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+        <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Of the launches that finished</h2>
         {settled === 0 ? (
-          <p className="mt-2 text-sm text-gray-500">None have finished yet — nothing to score.</p>
+          <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">None have finished yet — nothing to score.</p>
         ) : (
           <>
             {/* Both shares of one bar: the bar is every SETTLED launch, so the
                 widths compare against each other rather than against a total
                 that includes launches still in flight. */}
-            <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-gray-100">
+            <div className="mt-3 flex h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
               <div className="bg-green-500" style={{ width: `${(counts.graduated / settled) * 100}%` }} />
-              <div className="bg-gray-400" style={{ width: `${(counts.refunded / settled) * 100}%` }} />
+              <div className="bg-gray-400 dark:bg-gray-500" style={{ width: `${(counts.refunded / settled) * 100}%` }} />
             </div>
             <div className="mt-2 flex justify-between text-xs tabular-nums">
-              <span className="font-medium text-green-700">
+              <span className="font-medium text-green-700 dark:text-green-400">
                 {counts.graduated} graduated · {((counts.graduated / settled) * 100).toFixed(0)}%
               </span>
-              <span className="font-medium text-gray-500">
+              <span className="font-medium text-gray-500 dark:text-gray-400">
                 {counts.refunded} refunded · {((counts.refunded / settled) * 100).toFixed(0)}%
               </span>
             </div>
           </>
         )}
-        <p className="mt-4 text-xs leading-relaxed text-gray-500">
+        <p className="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
           A refunded launch is not money lost. XCP-69 is all-or-nothing: one
           that misses its soft cap returns every satoshi by consensus, with no
           decision by us and no way for anyone to keep it.{" "}
-          <Link href="/faq" className="text-purple-600 hover:underline">
+          <Link href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
             How that works
           </Link>
         </p>
 
-        <div className="mt-5 border-t border-gray-100 pt-4">
+        <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pt-4">
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="text-sm font-semibold text-gray-900">Refund activity</h3>
-            <span className="text-xs text-gray-400 tabular-nums">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Refund activity</h3>
+            <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
               {commas(refundTotal)} in the last {WINDOW_DAYS} days
             </span>
           </div>
           {refundPeak === 0 ? (
-            <p className="mt-3 text-sm text-gray-500">No launches refunded in this window.</p>
+            <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">No launches refunded in this window.</p>
           ) : (
             <>
               <div className="mt-4 flex h-20 items-end gap-[3px]">
@@ -260,12 +260,12 @@ export default async function StatsPage() {
                   <div
                     key={d.bucket}
                     title={`${d.n} refund${d.n === 1 ? "" : "s"} · ${formatXcp(d.xcp)} XCP returned · about ${d.daysAgo === 0 ? "today" : `${d.daysAgo}d ago`}`}
-                    className="flex-1 rounded-t-sm bg-gray-300 transition-colors hover:bg-gray-500"
+                    className="flex-1 rounded-t-sm bg-gray-300 dark:bg-gray-600 transition-colors hover:bg-gray-500"
                     style={{ height: `${Math.max(2, (d.n / refundPeak) * 100)}%` }}
                   />
                 ))}
               </div>
-              <div className="mt-1.5 flex justify-between text-[11px] text-gray-400">
+              <div className="mt-1.5 flex justify-between text-[11px] text-gray-400 dark:text-gray-500">
                 <span>{WINDOW_DAYS}d ago</span>
                 <span>now</span>
               </div>
@@ -274,7 +274,7 @@ export default async function StatsPage() {
         </div>
       </section>
 
-      <p className="text-xs text-gray-400 tabular-nums">
+      <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
         {commas(total)} conforming {total === 1 ? "launch" : "launches"} · chain tip{" "}
         {commas(height)}
       </p>
@@ -298,10 +298,10 @@ function Stat({
   className?: string;
 }) {
   return (
-    <div className={`rounded-xl border border-gray-200 bg-white p-4 ${className}`}>
+    <div className={`rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 ${className}`}>
       <div className={LABEL}>{label}</div>
-      <div className="mt-0.5 truncate text-xl font-bold text-gray-900 tabular-nums">{value}</div>
-      <div className="mt-1 text-[11px] leading-snug text-gray-400">
+      <div className="mt-0.5 truncate text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{value}</div>
+      <div className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
         <span className={mobileHint ? "hidden sm:inline" : undefined}>{hint}</span>
         {mobileHint ? <span className="sm:hidden">{mobileHint}</span> : null}
       </div>

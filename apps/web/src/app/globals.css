@@ -18,6 +18,29 @@
   --breakpoint-nav: 880px;
 }
 
+/* Dark mode follows the OS/browser preference — Tailwind v4's `dark:` variant
+ * is `prefers-color-scheme: dark` out of the box, so there is no toggle and no
+ * class to flip. The few colours that live in plain CSS (below) or in inline
+ * styles read these tokens instead of hardcoding a light value. */
+:root {
+  color-scheme: light;
+  --holo-surface: #fff;            /* card face behind the holographic border */
+  --meter-fill: rgb(240 253 244);  /* green-50: the "taken" share of an order row */
+  --slider-track: #e5e7eb;         /* gray-200 */
+  --slider-thumb: #fff;
+  --slider-thumb-border: #d1d5db;  /* gray-300 */
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --holo-surface: #101828;       /* gray-900 */
+    --meter-fill: rgb(5 46 22 / 0.4); /* green-950/40 */
+    --slider-track: #364153;       /* gray-700 */
+    --slider-thumb: #e5e7eb;       /* gray-200 */
+    --slider-thumb-border: #4a5565; /* gray-600 */
+  }
+}
+
 /* XCP-69 signature: the holographic conformance border, carried over from xcp.fun */
 @keyframes holographic {
   0% { background-position: 0% 50%; }
@@ -28,7 +51,7 @@
 .holo-border {
   position: relative;
   background:
-    linear-gradient(white, white) padding-box,
+    linear-gradient(var(--holo-surface), var(--holo-surface)) padding-box,
     linear-gradient(45deg, #22c55e, #3b82f6, #a855f7, #ec4899, #22c55e) border-box;
   background-size: 100% 100%, 300% 300%;
   border: 2px solid transparent;
@@ -81,7 +104,7 @@ input[type="range"] {
   appearance: none;
   height: 6px;
   border-radius: 9999px;
-  background: #e5e7eb; /* gray-200 */
+  background: var(--slider-track);
   cursor: pointer;
 }
 .ui-slider::-webkit-slider-thumb {
@@ -90,8 +113,8 @@ input[type="range"] {
   width: 22px;
   height: 22px;
   border-radius: 9999px;
-  background: #fff;
-  border: 1px solid #d1d5db; /* gray-300 */
+  background: var(--slider-thumb);
+  border: 1px solid var(--slider-thumb-border);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
   cursor: pointer;
   transition: border-color 0.15s ease;
@@ -100,8 +123,8 @@ input[type="range"] {
   width: 22px;
   height: 22px;
   border-radius: 9999px;
-  background: #fff;
-  border: 1px solid #d1d5db;
+  background: var(--slider-thumb);
+  border: 1px solid var(--slider-thumb-border);
   box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
   cursor: pointer;
   transition: border-color 0.15s ease;

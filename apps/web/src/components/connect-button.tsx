@@ -44,7 +44,7 @@ export function useConnectAction(): { status: ReturnType<typeof useWallet>["stat
         title="Desktop only, for now"
       >
         <div className="px-2 pb-2">
-          <p className="text-sm leading-relaxed text-gray-600">
+          <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
             Connecting needs the XCP Wallet browser extension, and no mobile
             browser can run it yet. Everything here is readable on a phone —
             launches, prices, holders — but minting and trading need a desktop.
@@ -57,7 +57,7 @@ export function useConnectAction(): { status: ReturnType<typeof useWallet>["stat
         title="Install the XCP Wallet"
       >
         <div className="px-2 pb-2">
-          <p className="mb-4 text-sm text-gray-600">
+          <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
             xcp.fun talks to Counterparty through the XCP Wallet browser
             extension. Install it, then come back and connect.
           </p>
