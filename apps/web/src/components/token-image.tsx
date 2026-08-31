@@ -3,6 +3,52 @@
 import { useEffect, useRef, useState } from "react";
 import { CDN_BASE } from "@/lib/constants";
 
+const ART_UPDATED_EVENT = "xcpfun:art-updated";
+
+type ArtUpdatedDetail = { asset: string; version: string };
+
+/** Refresh every mounted rendering of an image immediately after its owner
+ * replaces it, and remember that version for later navigation in this tab. */
+export function announceArtUpdate(asset: string, version: string) {
+  const normalized = asset.toUpperCase();
+  try {
+    sessionStorage.setItem(`xcpfun:art-version:${normalized}`, version);
+  } catch {
+    // Storage is an enhancement; the live event still refreshes this page.
+  }
+  window.dispatchEvent(
+    new CustomEvent<ArtUpdatedDetail>(ART_UPDATED_EVENT, {
+      detail: { asset: normalized, version },
+    }),
+  );
+}
+
+function useArtVersion(asset: string): string {
+  const normalized = asset.toUpperCase();
+  const [current, setCurrent] = useState({ asset: normalized, version: "" });
+
+  useEffect(() => {
+    let remembered = "";
+    try {
+      remembered = sessionStorage.getItem(`xcpfun:art-version:${normalized}`) ?? "";
+    } catch {
+      // Private browsing can deny storage; the event path still works.
+    }
+    setCurrent({ asset: normalized, version: remembered });
+
+    const onUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<ArtUpdatedDetail>).detail;
+      if (detail?.asset === normalized) {
+        setCurrent({ asset: normalized, version: detail.version });
+      }
+    };
+    window.addEventListener(ART_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(ART_UPDATED_EVENT, onUpdated);
+  }, [normalized]);
+
+  return current.asset === normalized ? current.version : "";
+}
+
 /**
  * Advance the fallback chain for a failure that happened BEFORE hydration.
  *
@@ -65,6 +111,8 @@ export function TokenImage({
   className?: string;
   large?: boolean;
 }) {
+  const version = useArtVersion(asset);
+  const versionParam = version ? `&v=${encodeURIComponent(version)}` : "";
   // `w` asks /i/ for a resized copy. Without it the route hands back the
   // stored original, which is whatever the launch uploaded -- the homepage
   // renders 56 of these at 280x280 and was pulling 34.3MB of originals to do
@@ -72,16 +120,17 @@ export function TokenImage({
   // still gets a sharp image. The CDN fallbacks are already sized variants and
   // need no parameter.
   const sources = large
-    ? [`/i/${asset}?fb=full&w=560`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
-    : [`/i/${asset}?fb=icon&w=96`, `${CDN_BASE}/img/icon/${asset}`];
+    ? [`/i/${asset}?fb=full&w=560${versionParam}`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
+    : [`/i/${asset}?fb=icon&w=96${versionParam}`, `${CDN_BASE}/img/icon/${asset}`];
 
   // Reset the fallback chain when the identity this component is showing
   // changes — TokenImage instances can be reused across a different asset
   // in a list without remounting.
-  const [key, setKey] = useState(`${asset}:${large}`);
+  const imageKey = `${asset}:${large}:${version}`;
+  const [key, setKey] = useState(imageKey);
   const [index, setIndex] = useState(0);
-  if (key !== `${asset}:${large}`) {
-    setKey(`${asset}:${large}`);
+  if (key !== imageKey) {
+    setKey(imageKey);
     setIndex(0);
   }
 
@@ -114,10 +163,12 @@ export function TokenImage({
  * route through our Worker for a check that only matters once per page.
  */
 export function HeroTokenImage({ asset, className = "" }: { asset: string; className?: string }) {
-  const [key, setKey] = useState(asset);
+  const version = useArtVersion(asset);
+  const imageKey = `${asset}:${version}`;
+  const [key, setKey] = useState(imageKey);
   const [failed, setFailed] = useState(false);
-  if (key !== asset) {
-    setKey(asset);
+  if (key !== imageKey) {
+    setKey(imageKey);
     setFailed(false);
   }
 
@@ -130,7 +181,7 @@ export function HeroTokenImage({ asset, className = "" }: { asset: string; class
     // eslint-disable-next-line @next/next/no-img-element -- needs onError for the monogram fallback
     <img
       ref={ref}
-      src={`/art/${asset}`}
+      src={`/art/${asset}${version ? `?v=${encodeURIComponent(version)}` : ""}`}
       alt=""
       className={className}
       onError={() => setFailed(true)}

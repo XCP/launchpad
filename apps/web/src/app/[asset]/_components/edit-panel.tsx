@@ -9,6 +9,7 @@ import { useSession } from "@/providers/session-context";
 import { isValidTelegram, isValidX } from "@/lib/social";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { announceArtUpdate } from "@/components/token-image";
 
 /**
  * Owner-only metadata editing. The on-chain description URL is locked; the
@@ -152,6 +153,7 @@ export function EditPanel({ asset }: { asset: string }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Save failed");
+      if (imageSha) announceArtUpdate(asset, imageSha);
       setState({ status: "saved" });
     } catch (e) {
       setState({
@@ -248,7 +250,7 @@ export function EditPanel({ asset }: { asset: string }) {
         )}
         {state.status === "saved" && (
           <p className="rounded-md border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-2 text-sm text-green-700 dark:text-green-400">
-            Saved. Cached pages may take a minute to refresh.
+            Saved. Changes are live; other open pages may take a minute to refresh.
           </p>
         )}
         <button
