@@ -6,16 +6,13 @@ import { CDN_BASE } from "@/lib/constants";
 const ART_UPDATED_EVENT = "xcpfun:art-updated";
 
 type ArtUpdatedDetail = { asset: string; version: string };
+const artVersions = new Map<string, string>();
 
 /** Refresh every mounted rendering of an image immediately after its owner
  * replaces it, and remember that version for later navigation in this tab. */
 export function announceArtUpdate(asset: string, version: string) {
   const normalized = asset.toUpperCase();
-  try {
-    sessionStorage.setItem(`xcpfun:art-version:${normalized}`, version);
-  } catch {
-    // Storage is an enhancement; the live event still refreshes this page.
-  }
+  artVersions.set(normalized, version);
   window.dispatchEvent(
     new CustomEvent<ArtUpdatedDetail>(ART_UPDATED_EVENT, {
       detail: { asset: normalized, version },
@@ -25,17 +22,12 @@ export function announceArtUpdate(asset: string, version: string) {
 
 function useArtVersion(asset: string): string {
   const normalized = asset.toUpperCase();
-  const [current, setCurrent] = useState({ asset: normalized, version: "" });
+  const [current, setCurrent] = useState(() => ({
+    asset: normalized,
+    version: artVersions.get(normalized) ?? "",
+  }));
 
   useEffect(() => {
-    let remembered = "";
-    try {
-      remembered = sessionStorage.getItem(`xcpfun:art-version:${normalized}`) ?? "";
-    } catch {
-      // Private browsing can deny storage; the event path still works.
-    }
-    setCurrent({ asset: normalized, version: remembered });
-
     const onUpdated = (event: Event) => {
       const detail = (event as CustomEvent<ArtUpdatedDetail>).detail;
       if (detail?.asset === normalized) {
@@ -46,7 +38,9 @@ function useArtVersion(asset: string): string {
     return () => window.removeEventListener(ART_UPDATED_EVENT, onUpdated);
   }, [normalized]);
 
-  return current.asset === normalized ? current.version : "";
+  return current.asset === normalized
+    ? current.version
+    : (artVersions.get(normalized) ?? "");
 }
 
 /**
