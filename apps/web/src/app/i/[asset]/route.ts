@@ -2,7 +2,7 @@ import {
   METADATA_ORIGIN,
   getMetadataEdgeCache,
   getMetadataRuntime,
-  metadataCacheKey,
+  metadataImageCacheKey,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
@@ -11,10 +11,11 @@ import { CDN_BASE } from "@/lib/constants";
  * A replaceable image cannot be `immutable`. The edit panel rewrites this
  * object in place at a URL that never changes, so a year-long browser TTL
  * with no revalidation meant a replaced image stayed replaced for everyone
- * except the caches. Shared caches still hold it for a year — the editor
- * evicts them on write (purgeMetadataCache) — while a browser keeps it for
- * five minutes. That bounds propagation for viewers who already opened the
- * launch without re-fetching card art on every navigation.
+ * except the caches. Shared cached bytes are keyed by the R2 object's etag,
+ * so an edit cannot hit an older object at another edge location; a browser
+ * keeps the public URL for five minutes. That bounds propagation for viewers
+ * who already opened the launch without re-fetching card art on every
+ * navigation.
  */
 const IMAGE_CACHE_CONTROL = "public, max-age=300, s-maxage=31536000";
 
@@ -156,8 +157,15 @@ export async function GET(
     }
   }
 
-  const cacheKey = metadataCacheKey(`/i/${encoded}`);
-  const cached = await cache?.match(cacheKey);
+  // Cache API entries are local to a Cloudflare edge location. Deleting the
+  // old `/i/<ASSET>` entry when an owner edited art therefore only fixed the
+  // edge that handled the edit; another edge could keep returning the former
+  // object for the full shared TTL. The R2 etag changes on every write, making
+  // it the immutable part of this otherwise permanent public URL.
+  const cacheKey = stored.etag
+    ? metadataImageCacheKey(normalizedAsset, stored.etag)
+    : null;
+  const cached = cacheKey ? await cache?.match(cacheKey) : undefined;
   if (cached) {
     const headers = new Headers(cached.headers);
     headers.set("x-metadata-cache", "HIT");
@@ -185,6 +193,10 @@ export async function GET(
       "x-metadata-cache": "MISS",
     },
   });
-  if (cache) ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => undefined));
+  // If a provider ever omits the etag, serve from R2 without shared caching;
+  // falling back to an unversioned key would recreate the stale-art bug.
+  if (cache && cacheKey) {
+    ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => undefined));
+  }
   return response;
 }

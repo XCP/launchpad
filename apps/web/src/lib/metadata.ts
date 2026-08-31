@@ -94,6 +94,21 @@ export function metadataCacheKey(pathname: string): Request {
   return new Request(`${METADATA_CACHE_ORIGIN}${pathname}`, { method: "GET" });
 }
 
+/**
+ * Stored image bytes are replaceable at `i/<ASSET>`, so the public pathname
+ * is not an immutable cache identity. R2's etag is: it changes on every put.
+ *
+ * Keep the version in the PATH of our private Cache API key. Apart from being
+ * unambiguous, this avoids depending on query-string cache behavior configured
+ * outside this Worker. An edit can leave the old entry behind harmlessly; no
+ * request for the new etag can ever match it.
+ */
+export function metadataImageCacheKey(asset: string, etag: string): Request {
+  return metadataCacheKey(
+    `/_image-object/${encodeURIComponent(asset.toUpperCase())}/${encodeURIComponent(etag)}`,
+  );
+}
+
 const ART_LOCATION_TTL = 300;
 const ART_LOCATION_KIND = "x-metadata-art-kind";
 const ART_LOCATION_ETAG = "x-metadata-art-etag";
