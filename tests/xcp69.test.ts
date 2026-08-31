@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  circulatingSupplyRaw,
   remainingLotsForAddress,
   announcedBeforeStart,
   isXcp69,
   launchPhase,
+  netBurnedSupplyRaw,
   saleProgress,
   saleTarget,
   windowIsExact,
@@ -58,6 +60,24 @@ describe("the standard's own arithmetic", () => {
     // If these drift, the copy on every page is lying.
     expect(XCP69_RAISE_SATS / 1e8).toBe(690);
     expect(XCP69_MIN_PARTICIPANTS).toBe(69);
+  });
+
+  it("subtracts burned tokens from circulating supply and never goes negative", () => {
+    expect(circulatingSupplyRaw("10000000000000000", "100000000000000")).toBe(
+      9_900_000_000_000_000n,
+    );
+    expect(circulatingSupplyRaw("100", "101")).toBe(0n);
+  });
+
+  it("does not mistake the pre-graduation pool reservation for burned supply", () => {
+    const pool = "3100000000000000";
+    expect(netBurnedSupplyRaw(pool, pool, "minting")).toBe(0n);
+    expect(netBurnedSupplyRaw("3200000000000000", pool, "minting")).toBe(
+      100_000_000_000_000n,
+    );
+    expect(netBurnedSupplyRaw("100000000000000", pool, "graduated")).toBe(
+      100_000_000_000_000n,
+    );
   });
 });
 

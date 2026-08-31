@@ -1,5 +1,6 @@
 import { q } from "#api/db";
 import {
+  fetchAddressBalances,
   fetchAddressReceives,
   type CpAddressReceive,
 } from "#api/integrations/counterparty";
@@ -8,9 +9,14 @@ import {
   tokenBurned,
   type Announcement,
 } from "#api/telegram/format";
+import {
+  netBurnedSupplyRaw,
+  type LaunchPhase,
+} from "@launchpad/xcp69/xcp69";
 
 export const COUNTERPARTY_BURN_ADDRESS = "1CounterpartyXXXXXXXXXXXXXXXUWLpVr";
 const CURSOR_KEY = "telegram_burn_receive_tx_index";
+const SUPPLY_SEED_KEY = "burned_supply_seeded";
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 
@@ -56,6 +62,59 @@ async function recordBurns(db: D1Database, rows: CpAddressReceive[]): Promise<vo
       ),
     );
   }
+}
+
+/** Replace every indexed launch's burn amount with Counterparty's current
+ * balance at the canonical unspendable address. Absolute reconciliation avoids
+ * both historical gaps and double-counting across retries. It runs once at
+ * rollout, then only on a tick that actually observed a new token burn. */
+async function reconcileBurnedSupply(db: D1Database): Promise<void> {
+  const balances = await fetchAddressBalances(COUNTERPARTY_BURN_ADDRESS);
+  const burned = new Map<string, bigint>();
+  for (const row of balances) {
+    let quantity: bigint;
+    try {
+      quantity = BigInt(String(row.quantity));
+    } catch {
+      continue;
+    }
+    if (quantity <= 0n) continue;
+    burned.set(row.asset, (burned.get(row.asset) ?? 0n) + quantity);
+  }
+
+  const launches = await q<{
+    tx_hash: string;
+    asset: string;
+    phase: LaunchPhase;
+    pool_quantity: string | null;
+  }>(
+    db,
+    `SELECT tx_hash, asset, phase, pool_quantity FROM launches`,
+  );
+  const update = db.prepare(
+    `UPDATE launches
+        SET burned_quantity = ?1
+      WHERE tx_hash = ?2 AND burned_quantity IS NOT ?1`,
+  );
+  for (let i = 0; i < launches.length; i += 50) {
+    await db.batch(
+      launches.slice(i, i + 50).map((launch) => {
+        const quantity = netBurnedSupplyRaw(
+          burned.get(launch.asset) ?? 0n,
+          launch.pool_quantity ?? 0,
+          launch.phase,
+        );
+        return update.bind(String(quantity), launch.tx_hash);
+      }),
+    );
+  }
+  await db
+    .prepare(
+      `INSERT INTO chain_state (key, value) VALUES (?1, '1')
+       ON CONFLICT(key) DO UPDATE SET value = '1'`,
+    )
+    .bind(SUPPLY_SEED_KEY)
+    .run();
 }
 
 interface CoveredBurn {
@@ -106,12 +165,20 @@ async function coveredBurns(
  * historical burns into Telegram.
  */
 export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
-  const state = await q<{ value: string }>(
+  const state = await q<{ key: string; value: string }>(
     db,
-    `SELECT value FROM chain_state WHERE key = ?1`,
+    `SELECT key, value FROM chain_state WHERE key IN (?1, ?2)`,
     CURSOR_KEY,
+    SUPPLY_SEED_KEY,
   );
-  const stored = state[0] ? Number(state[0].value) : null;
+  const states = new Map(state.map((row) => [row.key, row.value]));
+  const storedValue = states.get(CURSOR_KEY);
+  const stored = storedValue === undefined ? null : Number(storedValue);
+  let reconciled = false;
+  if (states.get(SUPPLY_SEED_KEY) !== "1") {
+    await reconcileBurnedSupply(db);
+    reconciled = true;
+  }
 
   // A one-row probe is the entire foreign read on the normal quiet tick.
   const latestPage = await fetchAddressReceives(COUNTERPARTY_BURN_ADDRESS, 1);
@@ -170,10 +237,11 @@ export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
   // /activity's token burn count is a circulating-supply measure. LP burns
   // are announced, but keeping them out of this table prevents a graduation
   // from looking like launch-token supply was destroyed.
-  await recordBurns(
-    db,
-    matching.filter(({ match }) => match.kind === "token").map(({ row }) => row),
-  );
+  const tokenBurns = matching
+    .filter(({ match }) => match.kind === "token")
+    .map(({ row }) => row);
+  await recordBurns(db, tokenBurns);
+  if (tokenBurns.length > 0 && !reconciled) await reconcileBurnedSupply(db);
   const announcements = matching
     .map(({ row, match }) => ({
       key: burnKey(row),

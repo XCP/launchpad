@@ -57,7 +57,8 @@ primitive: matching routes through the pool whenever the pool's marginal
 price beats the order book, so a "market order" is an order at the router's
 quoted output, and a "limit order" rests on the book until counter-orders —
 or the pool's own price crossing yours — fill it. Price = XCP reserve ÷
-token reserve. "Market cap" = price × 100M supply — a convention, not a
+token reserve. "Market cap" = price × circulating supply (issued supply minus
+burned tokens) — a convention, not a
 promise.
 
 ## Fees

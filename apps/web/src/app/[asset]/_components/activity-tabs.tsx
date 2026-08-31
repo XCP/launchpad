@@ -157,7 +157,7 @@ export function ActivityTabs({
     () => fetchHolderBalances(asset),
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
-  const liveHolderCount = holders ? currentHolderCount(holders) : null;
+  const liveHolderCount = holders ? currentHolderCount(holders, [BURN_ADDRESS]) : null;
 
   // Who holds the LP decides whether the pool's tokens are actually locked.
   // Slow-moving — liquidity events are rare — so this polls far less often

@@ -21,6 +21,14 @@ describe("holder balances", () => {
     ]);
   });
 
+  it("does not count an explicitly excluded burn address", () => {
+    const rows = [
+      { address: "alice", quantity: 50n },
+      { address: "burn", quantity: 25n },
+    ];
+    expect(currentHolderCount(rows, ["burn"])).toBe(1);
+  });
+
   it("coalesces every balance location owned by the same address", () => {
     const rows = coalesceHolderBalances([
       { address: "alice", utxo: null, quantity: "40" },

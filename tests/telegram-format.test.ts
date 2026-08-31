@@ -135,6 +135,18 @@ describe("messages", () => {
     expect(m.text.split("\n").at(-1)).toContain(">Trade</a>");
   });
 
+  it("uses circulating rather than issued supply for trade market cap", () => {
+    const m = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      supplyRaw: raw(99_000_000n),
+      venue: "pool",
+    });
+    expect(m.text).toContain("MCap: 3,960 XCP");
+  });
+
   it("says graduated and refunded differently", () => {
     const facts = { asset: "A", earnedRaw: raw(690n), mints: 142, minters: 69 };
     expect(mintClosed({ ...facts, graduated: true }).text).toContain("GRADUATED");

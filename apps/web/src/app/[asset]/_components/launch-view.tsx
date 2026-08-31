@@ -26,6 +26,7 @@ import {
 import { big, rawEquals } from "@/lib/numeric";
 import { usdPriceChangePercent } from "@/lib/market";
 import {
+  circulatingSupplyRaw,
   type Fairminter,
   XCP69_EXACT,
   type LaunchPhase,
@@ -67,6 +68,7 @@ export function LaunchView({
   devTrades = [],
   concentration,
   displayDescription,
+  burnedQuantity,
 }: {
   asset: string;
   fm: Fairminter;
@@ -85,6 +87,7 @@ export function LaunchView({
   devTrades?: DevTrade[];
   concentration?: { top10Pct: number; devPct: number };
   displayDescription: string | null;
+  burnedQuantity: string;
 }) {
   const progress = saleProgress(fm);
   // An inscribed launch's description IS its content (hex-encoded on the
@@ -137,7 +140,7 @@ export function LaunchView({
   const athPrice = history.reduce((max, c) => (c.high > max ? c.high : max), 0);
   const athPct = athPrice > 0 && spot > 0 ? Math.min(100, (spot / athPrice) * 100) : 0;
 
-  const supplyTokens = fromSats(fm.hard_cap);
+  const supplyTokens = fromSats(circulatingSupplyRaw(fm.hard_cap, burnedQuantity));
   const mcapUsd = xcpUsd && spot > 0 ? spot * supplyTokens * xcpUsd : null;
 
   // Minting now renders as a poster (above); the terminal layout is for

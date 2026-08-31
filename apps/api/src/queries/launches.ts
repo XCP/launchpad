@@ -47,6 +47,8 @@ export interface LaunchRow {
    *  the token's fixed dollar launch baseline. */
   launch_time: number | null;
   launch_xcp_usd: number | null;
+  /** Launch tokens actually destroyed, net of any pre-graduation pool reservation. */
+  burned_quantity: string;
   /** Creator prose mirrored from hosted metadata. Empty means checked with no
    *  safe prose; null means the metadata worklist has not reached it yet. */
   display_description: string | null;
@@ -60,7 +62,7 @@ const BASE_COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisibl
   conforming, conformance_version, status, phase, earned_quantity,
   paid_quantity, current_deadline_block, mints, minters, pool_xcp_reserve,
   pool_token_reserve, pool_xcp_sats, seen_at_block, updated_at,
-  last_mint_block, launch_time, launch_xcp_usd`;
+  last_mint_block, launch_time, launch_xcp_usd, burned_quantity`;
 
 /** Detail reads get the full creator prose. */
 const COLUMNS = `${BASE_COLUMNS}, display_description`;
@@ -108,14 +110,18 @@ export async function listLaunches(
   db: D1Database,
   perPhase: number,
 ): Promise<LaunchRow[]> {
-  const stmt = db.prepare(
-    `SELECT ${LIST_COLUMNS} FROM launches
-      WHERE conforming = 1 AND phase = ?1
-      ORDER BY rank_key DESC, tx_index DESC
-      LIMIT ?2`,
-  );
   const perPhaseRows = await db.batch<LaunchRow>(
-    PHASE_ORDER.map((phase) => stmt.bind(phase, perPhase)),
+    PHASE_ORDER.map((phase) =>
+      db
+        .prepare(
+          `SELECT ${LIST_COLUMNS} FROM launches
+            WHERE conforming = 1 AND phase = ?1
+            ORDER BY ${phase === "graduated" ? "market_cap_rank" : "rank_key"} DESC,
+                     tx_index DESC
+            LIMIT ?2`,
+        )
+        .bind(phase, perPhase),
+    ),
   );
   // Concatenated in PHASE_ORDER, which is what the old query's trailing
   // ORDER BY CASE phase ... produced — the ordering is now structural rather
@@ -144,10 +150,9 @@ export function isLaunchPhase(s: string): s is LaunchPhase {
  * has to happen where the whole phase is. Each entry says which index serves
  * it, since that is the difference between a seek and a sort:
  *
- *  - progress / mcap → idx_launches_rank. `rank_key` IS the phase's own
- *    measure (migration 0009): progress toward the soft cap while minting,
- *    price — and therefore market cap, the supply being fixed — once
- *    graduated. Index-served, no sort at all.
+ *  - progress → idx_launches_rank; mcap → idx_launches_market_cap.
+ *    Burned supply makes price alone insufficient for market-cap ordering,
+ *    so migration 0030 materializes the effective-supply rank separately.
  *  - closing / minters / newest / soonest → no index. SQLite reads the phase
  *    off idx_launches_rank's `phase=?` seek and sorts it, so the rows read are
  *    bounded by the size of ONE PHASE rather than by the table. That is the
@@ -164,7 +169,7 @@ export function isLaunchPhase(s: string): s is LaunchPhase {
  */
 const SORT_SQL = {
   progress: "rank_key DESC",
-  mcap: "rank_key DESC",
+  mcap: "market_cap_rank DESC",
   closing: "current_deadline_block ASC",
   minters: "minters DESC",
   newest: "(CASE WHEN announce_block > 0 THEN announce_block ELSE start_block END) DESC",
@@ -350,6 +355,7 @@ export interface SearchIndexRow {
   earned_quantity: string | null;
   soft_cap: string;
   hard_cap: string;
+  burned_quantity: string;
   pool_xcp_reserve: string | null;
   pool_token_reserve: string | null;
 }
@@ -377,7 +383,7 @@ export function listSearchIndex(db: D1Database): Promise<SearchIndexRow[]> {
   return q<SearchIndexRow>(
     db,
     `SELECT asset, asset_longname, source, phase, announce_block, start_block,
-            minters, earned_quantity, soft_cap, hard_cap,
+            minters, earned_quantity, soft_cap, hard_cap, burned_quantity,
             pool_xcp_reserve, pool_token_reserve
        FROM launches WHERE conforming = 1`,
   );
@@ -441,7 +447,10 @@ export function countByPhase(db: D1Database): Promise<PhaseCount[]> {
               CASE
                 WHEN pool_token_reserve IS NOT NULL
                  AND CAST(pool_token_reserve AS REAL) > 0
-                THEN CAST(hard_cap AS REAL)
+                THEN MAX(
+                       CAST(hard_cap AS REAL) - CAST(burned_quantity AS REAL),
+                       0
+                     )
                    * CAST(pool_xcp_reserve AS REAL)
                    / CAST(pool_token_reserve AS REAL)
                 ELSE 0

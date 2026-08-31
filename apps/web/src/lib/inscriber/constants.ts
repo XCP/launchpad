@@ -1,5 +1,6 @@
 import * as btc from '@scure/btc-signer'
 import { hex } from '@scure/base'
+import { COUNTERPARTY_BURN_ADDRESS } from '@/lib/constants'
 
 export const NETWORK = btc.NETWORK
 export const P2PKH_DUST_SATS = 546
@@ -11,8 +12,7 @@ export const RBF_SEQUENCE = 0xfffffffd
 export const COMMIT_TX_VSIZE = 160
 export const REVEAL_FEE_PADDING_BPS = 1_000
 
-/** Counterparty's canonical unspendable burn address. */
-export const COUNTERPARTY_BURN_ADDRESS = '1CounterpartyXXXXXXXXXXXXXXXUWLpVr'
+export { COUNTERPARTY_BURN_ADDRESS }
 
 /** Backward-compatible alias for current app code. */
 export const BURN_ADDRESS = COUNTERPARTY_BURN_ADDRESS

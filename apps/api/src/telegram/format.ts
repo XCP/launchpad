@@ -449,16 +449,19 @@ export interface TradeFacts {
   /** Final fill, used for post-trade market cap rather than average entry. */
   marketTokenRaw?: bigint;
   marketXcpRaw?: bigint;
+  /** Issued launch supply minus the indexed quantity actually burned. */
+  supplyRaw?: bigint;
 }
 
 export function trade(f: TradeFacts): Announcement {
   const priceRaw = f.tokenRaw > 0n ? (f.xcpRaw * 100_000_000n) / f.tokenRaw : 0n;
   const marketTokenRaw = f.marketTokenRaw ?? f.tokenRaw;
   const marketXcpRaw = f.marketXcpRaw ?? f.xcpRaw;
-  // Every graduated XCP-69 asset has exactly 100M issued tokens. Multiplying
-  // the execution price by that fixed supply makes this market cap, not FDV.
+  // Burns remain part of Counterparty's issued supply but cannot circulate.
+  // The indexed effective supply keeps this market cap aligned with the site.
+  const supplyRaw = f.supplyRaw ?? XCP69_EXACT.HARD_CAP;
   const marketCapRaw =
-    marketTokenRaw > 0n ? (marketXcpRaw * XCP69_EXACT.HARD_CAP) / marketTokenRaw : 0n;
+    marketTokenRaw > 0n ? (marketXcpRaw * supplyRaw) / marketTokenRaw : 0n;
   const marketPriceRaw =
     marketTokenRaw > 0n ? (marketXcpRaw * 100_000_000n) / marketTokenRaw : 0n;
   const launchPriceRaw =

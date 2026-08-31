@@ -1,5 +1,9 @@
 import type { MempoolMint } from "@launchpad/xcp69/mempool";
-import { COUNTERPARTY_API_BASE, XCP_API_BASE } from "@/lib/constants";
+import {
+  COUNTERPARTY_API_BASE,
+  COUNTERPARTY_BURN_ADDRESS,
+  XCP_API_BASE,
+} from "@/lib/constants";
 import {
   coalesceHolderBalances,
   currentHolderCount,
@@ -174,7 +178,7 @@ export async function fetchAddressBalances(address: string): Promise<Map<string,
 }
 
 export interface HolderConcentration {
-  /** Share of total supply held by the ten largest addresses, 0–100. */
+  /** Share of circulating supply held by the ten largest addresses, 0–100. */
   top10Pct: number;
   /** Share held by the launch's creator, 0–100. */
   devPct: number;
@@ -224,7 +228,10 @@ export async function fetchLpBalances(
  */
 export async function fetchHolderCount(asset: string): Promise<number | null> {
   try {
-    return currentHolderCount(await fetchHolderBalances(asset));
+    return currentHolderCount(
+      await fetchHolderBalances(asset),
+      [COUNTERPARTY_BURN_ADDRESS],
+    );
   } catch {
     return null;
   }
@@ -233,11 +240,12 @@ export async function fetchHolderCount(asset: string): Promise<number | null> {
 /**
  * How concentrated the holder base is.
  *
- * Measured against TOTAL SUPPLY, not the sum of address balances, because the
- * pool's own reserve is not an address balance — a graduated XCP-69 launch has
- * ~31% of supply sitting in the locked pool, and dividing by holders alone
- * would inflate every percentage by that much and make a normal distribution
- * look like a cartel.
+ * Measured against circulating supply, not the sum of address balances,
+ * because the pool's own reserve is not an address balance — a graduated
+ * XCP-69 launch has ~31% of supply sitting in the locked pool, and dividing by
+ * holders alone would inflate every percentage by that much and make a normal
+ * distribution look like a cartel. The caller has already removed the
+ * canonical burn balance from this denominator.
  *
  * Percentages go through ratio(), which divides in BigInt before narrowing:
  * supply here is 1e16 raw, well past what a double holds exactly.
@@ -251,7 +259,7 @@ export async function fetchHolderConcentration(
   if (supply <= 0n) return { top10Pct: 0, devPct: 0 };
   try {
     const held = (await fetchHolderBalances(asset)).filter(
-      (row) => row.quantity > 0n,
+      (row) => row.quantity > 0n && row.address !== COUNTERPARTY_BURN_ADDRESS,
     );
     const sorted = held.map((row) => row.quantity);
     const top10 = sorted.slice(0, 10).reduce((sum, q) => sum + q, 0n);

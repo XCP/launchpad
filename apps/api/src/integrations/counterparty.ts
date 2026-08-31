@@ -340,6 +340,31 @@ export interface CpAddressReceivePage {
   next_cursor: number | null;
 }
 
+export interface CpAddressBalance {
+  asset: string;
+  quantity: number | string;
+}
+
+/** Every current asset balance at one address. Used rarely for an absolute
+ * reconciliation of the canonical burn address: once when the feature is
+ * introduced, then only after a new token burn is observed. */
+export async function fetchAddressBalances(address: string): Promise<CpAddressBalance[]> {
+  const rows: CpAddressBalance[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < 20; page++) {
+    const qs = new URLSearchParams({ limit: "1000" });
+    if (cursor !== null) qs.set("cursor", String(cursor));
+    const data = await get<{
+      result: CpAddressBalance[];
+      next_cursor: number | null;
+    }>(`/addresses/${encodeURIComponent(address)}/balances?${qs.toString()}`);
+    rows.push(...data.result);
+    cursor = data.next_cursor;
+    if (cursor === null) return rows;
+  }
+  throw new Error("Address balance pagination exceeded safety limit");
+}
+
 /**
  * Sends received by one address, newest first.
  *

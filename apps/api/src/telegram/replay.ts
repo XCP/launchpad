@@ -17,6 +17,7 @@
  */
 import { q } from "#api/db";
 import { fetchXcpUsd } from "#api/integrations/price";
+import { circulatingSupplyRaw } from "@launchpad/xcp69/xcp69";
 import {
   MIN_TOKENS,
   mint,
@@ -68,6 +69,7 @@ interface LaunchRow {
   minters: number;
   last_mint_block: number | null;
   launch_xcp_usd: number | null;
+  burned_quantity: string;
 }
 
 interface MintRow {
@@ -156,7 +158,7 @@ export async function buildBacklog(
       db,
       `SELECT tx_hash, asset, announce_block, start_block, phase, soft_cap,
               hard_cap, earned_quantity, mints, minters, last_mint_block,
-              launch_xcp_usd
+              launch_xcp_usd, burned_quantity
          FROM launches WHERE conforming = 1`,
     ),
     q<MintRow>(
@@ -258,6 +260,12 @@ export async function buildBacklog(
   // would be wrong in a way that still looked plausible.
   const softCapOf = new Map(launches.map((l) => [l.tx_hash, BigInt(l.soft_cap)]));
   const launchXcpUsdOf = new Map(launches.map((l) => [l.asset, l.launch_xcp_usd]));
+  const circulatingSupplyOf = new Map(
+    launches.map((l) => [
+      l.asset,
+      circulatingSupplyRaw(l.hard_cap, l.burned_quantity),
+    ]),
+  );
   // Running total per launch, so each replayed mint shows the progress it
   // showed at the time rather than the launch's final number.
   //
@@ -386,6 +394,7 @@ export async function buildBacklog(
         marketXcpRaw: t.lastXcpRaw,
         xcpUsd,
         launchXcpUsd: launchXcpUsdOf.get(t.asset) ?? null,
+        supplyRaw: circulatingSupplyOf.get(t.asset),
         txHash: t.txHash,
         address: t.address,
         venue: t.venue,

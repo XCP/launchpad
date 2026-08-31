@@ -70,6 +70,8 @@ interface ApiLaunchRow {
   price: string;
   quantity_by_price: string;
   hard_cap: string;
+  /** Optional during the API/web rolling deploy. */
+  burned_quantity?: string;
   soft_cap: string;
   pool_quantity: string | null;
   max_mint_per_tx: string;
@@ -124,6 +126,8 @@ export interface IndexedLaunch {
   launchXcpUsd: number | null;
   /** Creator prose from D1; null until the bounded metadata worklist resolves it. */
   displayDescription: string | null;
+  /** Launch tokens actually destroyed, net of any pre-graduation pool reservation. */
+  burnedQuantity: string;
 }
 
 function toFairminter(row: ApiLaunchRow): Fairminter {
@@ -212,6 +216,7 @@ export interface ResearchLaunchBehavior {
   earnedQuantity: string | null;
   softCap: string;
   hardCap: string;
+  burnedQuantity: string;
   poolXcpReserve: string | null;
   poolTokenReserve: string | null;
   behavior: {
@@ -284,6 +289,7 @@ interface ApiResearchBehavior {
   earned_quantity: string | null;
   soft_cap: string;
   hard_cap: string;
+  burned_quantity?: string;
   pool_xcp_reserve: string | null;
   pool_token_reserve: string | null;
   behavior: {
@@ -370,6 +376,7 @@ export async function fetchResearchBehavior(): Promise<ResearchBehaviorSnapshot 
         earnedQuantity: row.earned_quantity,
         softCap: row.soft_cap,
         hardCap: row.hard_cap,
+        burnedQuantity: row.burned_quantity ?? "0",
         poolXcpReserve: row.pool_xcp_reserve,
         poolTokenReserve: row.pool_token_reserve,
         behavior: {
@@ -690,6 +697,7 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
     launchTime: row.launch_time ?? null,
     launchXcpUsd: row.launch_xcp_usd ?? null,
     displayDescription: row.display_description?.trim() || null,
+    burnedQuantity: row.burned_quantity ?? "0",
   };
 }
 
@@ -827,6 +835,7 @@ export interface SearchIndexEntry {
   earned_quantity: string | null;
   soft_cap: string;
   hard_cap: string;
+  burned_quantity?: string;
   pool_xcp_reserve: string | null;
   pool_token_reserve: string | null;
 }

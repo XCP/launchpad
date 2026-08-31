@@ -26,6 +26,7 @@ import { proseDescription } from "@launchpad/xcp69/description";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import {
+  circulatingSupplyRaw,
   isXcp69,
   launchPhase,
   windowIsExact,
@@ -206,13 +207,15 @@ export default async function LaunchPage({
       : Promise.resolve(null),
     fetchIndexedLaunch(asset),
   ]);
+  const burnedQuantity = indexed?.burnedQuantity ?? "0";
+  const circulatingRaw = circulatingSupplyRaw(fm.hard_cap, burnedQuantity);
   // The creator's own trades on this asset, for the chart's markers. Indexed
   // by address, so this is one read — and only worth asking once a market
   // exists to trade in.
   // Distribution facts. Only meaningful once a market exists, and the holder
   // list is the same one the Holders tab reads.
   const concentration = pool
-    ? await fetchHolderConcentration(asset, fm.source, fm.hard_cap)
+    ? await fetchHolderConcentration(asset, fm.source, String(circulatingRaw))
     : { top10Pct: 0, devPct: 0 };
 
   const devTrades =
@@ -289,6 +292,7 @@ export default async function LaunchPage({
       holderCount={holderCount}
       poolVolume={poolVolume}
       displayDescription={indexed?.displayDescription ?? null}
+      burnedQuantity={burnedQuantity}
     />
   );
 }

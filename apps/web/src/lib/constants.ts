@@ -1,6 +1,8 @@
 export const COUNTERPARTY_API_BASE = "https://api.counterparty.io:4000/v2";
 export const XCP_API_BASE = "https://api.xcp.io/v2";
 export const CDN_BASE = "https://cdn.xcp.io";
+/** Counterparty's canonical unspendable address. */
+export const COUNTERPARTY_BURN_ADDRESS = "1CounterpartyXXXXXXXXXXXXXXXUWLpVr";
 
 /**
  * Where an inscription is looked at. `/content/<id>` is the inscribed thing

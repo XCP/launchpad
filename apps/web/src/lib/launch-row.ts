@@ -10,7 +10,7 @@
  */
 import type { SearchIndexEntry } from "@/lib/api/launchpad-api";
 import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
-import { saleProgress } from "@/lib/xcp69";
+import { circulatingSupplyRaw, saleProgress } from "@/lib/xcp69";
 import { fromSats } from "@/lib/format";
 import { big, ratio } from "@/lib/numeric";
 
@@ -41,6 +41,8 @@ export interface SectionRow {
   launchXcpUsd: number | null;
   /** Creator prose for the graduated card, already mirrored into D1. */
   displayDescription: string | null;
+  /** Launch tokens actually destroyed, net of any pre-graduation pool reservation. */
+  burnedQuantity: string;
 }
 
 /**
@@ -68,6 +70,8 @@ export interface RowSource {
   holders?: number | null;
   /** Optional on the live Counterparty fallback and older API workers. */
   displayDescription?: string | null;
+  /** Optional on the live Counterparty fallback and older API workers. */
+  burnedQuantity?: string;
 }
 
 /**
@@ -85,7 +89,8 @@ export function toSectionRow(p: RowSource): SectionRow {
     phase: p.phase,
     conforming: p.conforming,
     priceXcp,
-    marketCapXcp: priceXcp * fromSats(p.fm.hard_cap),
+    marketCapXcp:
+      priceXcp * fromSats(circulatingSupplyRaw(p.fm.hard_cap, p.burnedQuantity ?? "0")),
     // Passed through, null and all. Coalescing to 0 here is exactly the bug
     // this used to have: an unknown count printed as a confident zero.
     minters: p.minters,
@@ -96,6 +101,7 @@ export function toSectionRow(p: RowSource): SectionRow {
     lastMintBlock: p.lastMintBlock ?? null,
     launchXcpUsd: p.launchXcpUsd ?? null,
     displayDescription: p.displayDescription?.trim() || null,
+    burnedQuantity: p.burnedQuantity ?? "0",
   };
 }
 
@@ -141,7 +147,8 @@ export function toSearchRow(e: SearchIndexEntry): SearchRow {
     source: e.source,
     announceBlock: e.announce_block ?? 0,
     minters: e.minters,
-    marketCapXcp: priceXcp * fromSats(e.hard_cap),
+    marketCapXcp:
+      priceXcp * fromSats(circulatingSupplyRaw(e.hard_cap, e.burned_quantity ?? "0")),
     progress: ratio(e.earned_quantity, target),
     startBlock: e.start_block,
   };

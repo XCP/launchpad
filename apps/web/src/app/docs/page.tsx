@@ -201,7 +201,7 @@ export default function DocsPage() {
               ],
               [
                 "Market cap",
-                "Pool price × 100M total supply. A convention, not a promise — the pool could not pay it out.",
+                "Pool price × circulating supply (issued minus burned). A convention, not a promise — the pool could not pay it out.",
               ],
               [
                 "Price impact",

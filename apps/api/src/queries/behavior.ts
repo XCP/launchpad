@@ -8,6 +8,7 @@ export interface BehaviorTarget {
   earned_quantity: string | null;
   soft_cap: string;
   hard_cap: string;
+  burned_quantity: string;
   pool_xcp_reserve: string | null;
   pool_token_reserve: string | null;
 }
@@ -93,17 +94,19 @@ export interface BehaviorCohorts {
 /** The two universes the research surface compares, already in the same order
  * as the public launch index: graduated by market cap, minting by progress. */
 export async function listBehaviorTargets(db: D1Database): Promise<BehaviorTarget[]> {
-  const statement = db.prepare(
-    `SELECT asset, phase, minters, earned_quantity, soft_cap, hard_cap,
-            pool_xcp_reserve, pool_token_reserve
-       FROM launches
-      WHERE conforming = 1 AND phase = ?1
-      ORDER BY rank_key DESC, tx_index DESC
-      LIMIT 10`,
-  );
+  const columns = `asset, phase, minters, earned_quantity, soft_cap, hard_cap,
+    burned_quantity, pool_xcp_reserve, pool_token_reserve`;
   const [graduated, minting] = await db.batch<BehaviorTarget>([
-    statement.bind("graduated"),
-    statement.bind("minting"),
+    db.prepare(
+      `SELECT ${columns} FROM launches
+        WHERE conforming = 1 AND phase = 'graduated'
+        ORDER BY market_cap_rank DESC, tx_index DESC LIMIT 10`,
+    ),
+    db.prepare(
+      `SELECT ${columns} FROM launches
+        WHERE conforming = 1 AND phase = 'minting'
+        ORDER BY rank_key DESC, tx_index DESC LIMIT 10`,
+    ),
   ]);
   return [...graduated.results, ...minting.results];
 }

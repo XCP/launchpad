@@ -12,6 +12,7 @@ import {
 } from "@/lib/api/launchpad-api";
 import { compact, fromSats } from "@/lib/format";
 import { big, ratio } from "@/lib/numeric";
+import { circulatingSupplyRaw } from "@/lib/xcp69";
 
 const EMPTY_PENDING: PendingPressure = {
   sellTransactions: 0,
@@ -475,7 +476,9 @@ function rankSignal(row: ResearchLaunchBehavior): string {
   }
   const tokenReserve = big(row.poolTokenReserve);
   if (tokenReserve <= 0n) return "—";
-  const marketCapRaw = (big(row.hardCap) * big(row.poolXcpReserve)) / tokenReserve;
+  const marketCapRaw =
+    (circulatingSupplyRaw(row.hardCap, row.burnedQuantity) * big(row.poolXcpReserve)) /
+    tokenReserve;
   return `${compact(fromSats(marketCapRaw))} XCP market cap`;
 }
 

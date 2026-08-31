@@ -33,8 +33,12 @@ export function coalesceHolderBalances(
 }
 
 /** Current holders, as opposed to the historical ownership rows above. */
-export function currentHolderCount(rows: HolderRow[]): number {
-  return rows.filter((row) => row.quantity > 0n).length;
+export function currentHolderCount(
+  rows: HolderRow[],
+  excludedAddresses: Iterable<string> = [],
+): number {
+  const excluded = new Set(excludedAddresses);
+  return rows.filter((row) => row.quantity > 0n && !excluded.has(row.address)).length;
 }
 
 /**
