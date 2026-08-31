@@ -36,7 +36,7 @@ describe("metadata art location cache", () => {
     expect(newKey.url).toContain("/_image-object/XCPMINTS/new-etag");
     expect(newKey.url).not.toBe(oldKey.url);
     expect(metadataImageSourceUrl("xcpMints", "new-etag")).toBe(
-      "https://xcp.fun/i/XCPMINTS/new-etag",
+      "https://xcp.fun/image-source/XCPMINTS/new-etag",
     );
   });
 

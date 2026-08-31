@@ -113,7 +113,7 @@ export function metadataImageCacheKey(asset: string, etag: string): Request {
  * deliberately a path segment, not a query parameter: cache rules are allowed
  * to ignore queries, but two object versions must never share a source URL. */
 export function metadataImageSourceUrl(asset: string, etag: string): string {
-  return `${METADATA_ORIGIN}/i/${encodeURIComponent(asset.toUpperCase())}/${encodeURIComponent(etag)}`;
+  return `${METADATA_ORIGIN}/image-source/${encodeURIComponent(asset.toUpperCase())}/${encodeURIComponent(etag)}`;
 }
 
 const ART_LOCATION_TTL = 300;

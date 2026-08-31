@@ -3,9 +3,10 @@ import { getMetadataRuntime } from "@/lib/metadata";
 /**
  * Immutable source used only by Cloudflare Image transformations.
  *
- * The public `/i/<ASSET>` URL is permanent and replaceable. This source puts
- * the R2 etag in the pathname, so a replacement can never collide with a
- * transform or fetch cache created for the previous object.
+ * This intentionally does not live below `/i/*`. Older deployments and a
+ * zone-side metadata proxy cached that namespace before image replacement was
+ * supported. A separate namespace prevents those legacy rules from collapsing
+ * this path-versioned object back into `/i/<ASSET>`.
  */
 export async function GET(
   _request: Request,
