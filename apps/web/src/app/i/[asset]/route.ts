@@ -12,11 +12,11 @@ import { CDN_BASE } from "@/lib/constants";
  * object in place at a URL that never changes, so a year-long browser TTL
  * with no revalidation meant a replaced image stayed replaced for everyone
  * except the caches. Shared caches still hold it for a year — the editor
- * evicts them on write (purgeMetadataCache) — and an hour is what a browser
- * keeps, which self-heals a replacement without re-fetching hero art on
- * every navigation.
+ * evicts them on write (purgeMetadataCache) — while a browser keeps it for
+ * five minutes. That bounds propagation for viewers who already opened the
+ * launch without re-fetching card art on every navigation.
  */
-const IMAGE_CACHE_CONTROL = "public, max-age=3600, s-maxage=31536000";
+const IMAGE_CACHE_CONTROL = "public, max-age=300, s-maxage=31536000";
 
 /**
  * A MIRROR is not an original, and must not be cached like one.

@@ -5,6 +5,13 @@ import { CDN_BASE } from "@/lib/constants";
 
 const ART_UPDATED_EVENT = "xcpfun:art-updated";
 
+// Bust the legacy card-image URL once. Some browsers cached that URL under
+// the route's former one-year browser TTL, so merely correcting Cache-Control
+// could not reach them until the already-cached response expired. Future
+// owner edits self-heal within /i's bounded browser TTL, while the editor's
+// event-specific version below remains immediate in the tab that made it.
+const CARD_ART_CACHE_VERSION = "2";
+
 type ArtUpdatedDetail = { asset: string; version: string };
 const artVersions = new Map<string, string>();
 
@@ -107,6 +114,7 @@ export function TokenImage({
 }) {
   const version = useArtVersion(asset);
   const versionParam = version ? `&v=${encodeURIComponent(version)}` : "";
+  const cacheVersionParam = `&cv=${CARD_ART_CACHE_VERSION}`;
   // `w` asks /i/ for a resized copy. Without it the route hands back the
   // stored original, which is whatever the launch uploaded -- the homepage
   // renders 56 of these at 280x280 and was pulling 34.3MB of originals to do
@@ -114,8 +122,8 @@ export function TokenImage({
   // still gets a sharp image. The CDN fallbacks are already sized variants and
   // need no parameter.
   const sources = large
-    ? [`/i/${asset}?fb=full&w=560${versionParam}`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
-    : [`/i/${asset}?fb=icon&w=96${versionParam}`, `${CDN_BASE}/img/icon/${asset}`];
+    ? [`/i/${asset}?fb=full&w=560${cacheVersionParam}${versionParam}`, `${CDN_BASE}/img/full/${asset}`, `${CDN_BASE}/img/icon/${asset}`]
+    : [`/i/${asset}?fb=icon&w=96${cacheVersionParam}${versionParam}`, `${CDN_BASE}/img/icon/${asset}`];
 
   // Reset the fallback chain when the identity this component is showing
   // changes — TokenImage instances can be reused across a different asset
