@@ -16,6 +16,7 @@ import {
   nearingSoldOut,
   blocksEta,
   imageUrl,
+  lpBurned,
   mint,
   mintClosed,
   mintClosing,
@@ -150,6 +151,7 @@ describe("messages", () => {
       minters: 69,
     });
     expect(g.text).toContain(GRADUATE_EMOJI);
+    expect(g.text).toContain("Pool is live · LP burned · liquidity locked forever");
   });
 
   it("puts no size bar on a close, in either direction", () => {
@@ -338,6 +340,22 @@ describe("burn announcements", () => {
     expect(message.text).toContain("NAKAMOTOFUN</b></a> burned");
     expect(message.text).toContain("1.23456789 tokens sent to the Counterparty burn address");
     expect(message.text).toContain("/profile/1BurnerAddressExample");
+    expect(message.text).toContain(`https://xcp.io/tx/${txHash}`);
+  });
+
+  it("distinguishes a burned LP position from destroyed launch-token supply", () => {
+    const txHash = "b".repeat(64);
+    const message = lpBurned({
+      asset: "CAPTAINDAN",
+      lpRaw: 447_213_600_000n,
+      source: "1LiquidityLockerExample",
+      txHash,
+    });
+
+    expect(message.asset).toBe("CAPTAINDAN");
+    expect(message.text).toContain("CAPTAINDAN</b></a> LP burned");
+    expect(message.text).toContain("4,472.136 LP tokens · liquidity locked forever");
+    expect(message.text).not.toContain("CAPTAINDAN</b></a> burned");
     expect(message.text).toContain(`https://xcp.io/tx/${txHash}`);
   });
 });

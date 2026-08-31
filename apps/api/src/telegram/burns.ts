@@ -3,7 +3,11 @@ import {
   fetchAddressReceives,
   type CpAddressReceive,
 } from "#api/integrations/counterparty";
-import { tokenBurned, type Announcement } from "#api/telegram/format";
+import {
+  lpBurned,
+  tokenBurned,
+  type Announcement,
+} from "#api/telegram/format";
 
 export const COUNTERPARTY_BURN_ADDRESS = "1CounterpartyXXXXXXXXXXXXXXXUWLpVr";
 const CURSOR_KEY = "telegram_burn_receive_tx_index";
@@ -54,27 +58,52 @@ async function recordBurns(db: D1Database, rows: CpAddressReceive[]): Promise<vo
   }
 }
 
-async function coveredAssets(db: D1Database, assets: string[]): Promise<Set<string>> {
-  const covered = new Set<string>();
+interface CoveredBurn {
+  launchAsset: string;
+  kind: "token" | "lp";
+}
+
+/** Match both sides explicitly. Numeric asset names are not enough to prove
+ * something is an LP; launches.lp_asset is the protocol relationship that
+ * lets us announce the burn as locked liquidity for the right launch. */
+async function coveredBurns(
+  db: D1Database,
+  assets: string[],
+): Promise<Map<string, CoveredBurn>> {
+  const covered = new Map<string, CoveredBurn>();
   for (let i = 0; i < assets.length; i += 50) {
     const chunk = assets.slice(i, i + 50);
-    const placeholders = chunk.map((_, n) => `?${n + 1}`).join(", ");
-    const rows = await q<{ asset: string }>(
+    const wanted = new Set(chunk);
+    const assetPlaceholders = chunk.map((_, n) => `?${n + 1}`).join(", ");
+    const lpPlaceholders = chunk
+      .map((_, n) => `?${chunk.length + n + 1}`)
+      .join(", ");
+    const rows = await q<{ asset: string; lp_asset: string | null }>(
       db,
-      `SELECT DISTINCT asset
+      `SELECT asset, lp_asset
          FROM launches
-        WHERE conforming = 1 AND asset IN (${placeholders})`,
+        WHERE conforming = 1
+          AND (asset IN (${assetPlaceholders}) OR lp_asset IN (${lpPlaceholders}))`,
+      ...chunk,
       ...chunk,
     );
-    for (const row of rows) covered.add(row.asset);
+    for (const row of rows) {
+      if (wanted.has(row.asset)) {
+        covered.set(row.asset, { launchAsset: row.asset, kind: "token" });
+      }
+      if (row.lp_asset && wanted.has(row.lp_asset) && !covered.has(row.lp_asset)) {
+        covered.set(row.lp_asset, { launchAsset: row.asset, kind: "lp" });
+      }
+    }
   }
   return covered;
 }
 
 /**
- * Find newly confirmed xcp.fun assets sent to Counterparty's canonical burn
- * address. The first run seeds at the current newest receive so deploying the
- * feature cannot replay the address's historical burns into Telegram.
+ * Find newly confirmed xcp.fun launch tokens and their recorded LP assets sent
+ * to Counterparty's canonical burn address. The first run seeds at the current
+ * newest receive so deploying the feature cannot replay the address's
+ * historical burns into Telegram.
  */
 export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
   const state = await q<{ value: string }>(
@@ -129,20 +158,38 @@ export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
     }
   });
   const assets = [...new Set(valid.map((row) => row.asset))];
-  const covered = assets.length > 0 ? await coveredAssets(db, assets) : new Set<string>();
+  const covered = assets.length > 0
+    ? await coveredBurns(db, assets)
+    : new Map<string, CoveredBurn>();
 
   valid.sort((a, b) => txIndex(a) - txIndex(b) || a.msg_index - b.msg_index);
-  const matching = valid.filter((row) => covered.has(row.asset));
-  await recordBurns(db, matching);
+  const matching = valid.flatMap((row) => {
+    const match = covered.get(row.asset);
+    return match ? [{ row, match }] : [];
+  });
+  // /activity's token burn count is a circulating-supply measure. LP burns
+  // are announced, but keeping them out of this table prevents a graduation
+  // from looking like launch-token supply was destroyed.
+  await recordBurns(
+    db,
+    matching.filter(({ match }) => match.kind === "token").map(({ row }) => row),
+  );
   const announcements = matching
-    .map((row) => ({
+    .map(({ row, match }) => ({
       key: burnKey(row),
-      a: tokenBurned({
-        asset: row.asset,
-        tokenRaw: BigInt(String(row.quantity)),
-        source: row.source,
-        txHash: row.tx_hash,
-      }),
+      a: match.kind === "lp"
+        ? lpBurned({
+            asset: match.launchAsset,
+            lpRaw: BigInt(String(row.quantity)),
+            source: row.source,
+            txHash: row.tx_hash,
+          })
+        : tokenBurned({
+            asset: match.launchAsset,
+            tokenRaw: BigInt(String(row.quantity)),
+            source: row.source,
+            txHash: row.tx_hash,
+          }),
     }));
 
   return { announcements, nextCursor: newest, seeded: false };

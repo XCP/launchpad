@@ -222,6 +222,31 @@ export function tokenBurned(f: BurnFacts): Announcement {
   );
 }
 
+export interface LpBurnFacts {
+  /** The XCP-69 launch whose pool minted the numeric LP asset. */
+  asset: string;
+  lpRaw: bigint;
+  source: string;
+  txHash: string;
+}
+
+/** A launch-token burn destroys circulating supply. An LP burn instead makes
+ * the pool position unwithdrawable, so give it distinct copy rather than
+ * implying that the launch token itself was destroyed. */
+export function lpBurned(f: LpBurnFacts): Announcement {
+  const tx = /^[0-9a-f]{64}$/i.test(f.txHash)
+    ? `<a href="https://xcp.io/tx/${f.txHash}">TX</a>`
+    : null;
+  return withPhoto(
+    f.asset,
+    [
+      `${BURN_EMOJI.repeat(3)} ${assetLink(f.asset)} LP burned`,
+      `${burnedTokens(f.lpRaw)} LP tokens · liquidity locked forever`,
+      [addressLink(f.source), tx].filter((link): link is string => link !== null).join(" · "),
+    ].join("\n"),
+  );
+}
+
 export interface LaunchFacts {
   asset: string;
   startBlock: number;
@@ -395,7 +420,7 @@ export function mintClosed(f: CloseFacts): Announcement {
           `${GRADUATE_EMOJI}${LAUNCHED_EMOJI} ${assetLink(f.asset)} GRADUATED ${LAUNCHED_EMOJI}${GRADUATE_EMOJI}`,
           `${xcpOfTokens(f.earnedRaw)} XCP raised`,
           `${f.minters} minters · ${f.mints} mints`,
-          `Pool is live`,
+          `Pool is live · LP burned · liquidity locked forever`,
         ].join("\n")
       : [
           `💔 ${assetLink(f.asset)} refunded`,
