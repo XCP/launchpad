@@ -10,12 +10,14 @@ import { FOCUS } from "@/components/ui/tokens";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
 import {
   fetchActivityLaunches,
+  fetchActivityBurns,
   fetchActivityMints,
   fetchActivityOrders,
   fetchActivityPools,
   fetchActivityTotals,
   fetchActivityTrades,
   type ActivityLaunch,
+  type ActivityBurn,
   type ActivityMint,
   type ActivityOrder,
   type ActivityPoolEvent,
@@ -40,7 +42,7 @@ const REFRESH_MS = 30_000;
  *  honest alternative — a block-time lookup per row — is fifty of them. */
 const HEIGHT_REFRESH_MS = 60_000;
 
-type Tab = "mints" | "trades" | "orders" | "pools" | "launches";
+type Tab = "mints" | "trades" | "burns" | "orders" | "pools" | "launches";
 
 // Pools sits beside Orders rather than at the end: both are about a market
 // rather than about a launch, and the pair reads as "what is on offer" then
@@ -48,6 +50,7 @@ type Tab = "mints" | "trades" | "orders" | "pools" | "launches";
 const TABS: { id: Tab; label: string }[] = [
   { id: "mints", label: "Mints" },
   { id: "trades", label: "Trades" },
+  { id: "burns", label: "Burns" },
   { id: "orders", label: "Orders" },
   { id: "pools", label: "Pools" },
   { id: "launches", label: "Launches" },
@@ -61,22 +64,22 @@ const TABS: { id: Tab; label: string }[] = [
  * one idea at two time horizons and a reader moving between them should not
  * have to relearn the furniture.
  *
- * The four tapes share ONE row grammar, which is what makes this a feed rather
- * than four tables stapled together: when · what · who did it · what it cost.
+ * The tapes share ONE row grammar, which is what makes this a feed rather
+ * than several tables stapled together: when · what · who did it · what it cost.
  * Every tab fills the same skeleton — time and block, the asset, a coloured
  * pill naming the event, a price in XCP, an amount, an XCP total, an address,
  * and one tab-specific tail column. A reader who learns to scan one row has
  * learned all four.
  *
  * Every tape loads once; only the visible one keeps polling. That split is
- * what lets all five tabs carry a count on arrival — Orders and Pools have no
+ * what lets every tab carry a count on arrival — Orders and Pools have no
  * cumulative row in D1 to count from, their totals come back with their own
  * feeds, so a tab nobody has opened has nothing to show. Loading them once
  * costs one edge-cached request each and buys two things: the counts, and tab
  * switches that render immediately instead of on a fresh round trip.
  *
  * The polling is where the real cost of a page left open lives, and that stays
- * on the tab in front of you. apps/api serving these as five routes is what
+ * on the tab in front of you. apps/api serving these as separate routes is what
  * makes both halves possible.
  */
 export function ActivityView() {
@@ -85,7 +88,7 @@ export function ActivityView() {
   // narrowed feed rather than filtering a page that was already truncated.
   const [hideFilled, setHideFilled] = useState(false);
 
-  // One row, shared by all four tab labels. Its own subscription rather than
+  // One row, shared by the cumulative tab labels. Its own subscription rather than
   // a field on each feed: the counts are about the whole site, not about the
   // tab in front of you, and they should not blink when you change tabs.
   const { data: totals } = useSWR("activity:totals", fetchActivityTotals, {
@@ -99,12 +102,11 @@ export function ActivityView() {
     keepPreviousData: true,
   });
 
-  // One hook per tape, three of them parked on a null key. That is SWR's own
-  // way of saying "not now" — a null key fetches nothing and schedules
-  // nothing — and it keeps each feed's rows exactly typed, where a single
+  // One hook per tape keeps each feed's rows exactly typed, where a single
   // hook returning the union would need a cast per tab to get them back.
   const mints = useFeed(tab === "mints", "activity:mints", () => fetchActivityMints(ROWS));
   const trades = useFeed(tab === "trades", "activity:trades", () => fetchActivityTrades(ROWS));
+  const burns = useFeed(tab === "burns", "activity:burns", () => fetchActivityBurns(ROWS));
   const orders = useFeed(tab === "orders", `activity:orders:${hideFilled}`, () =>
     fetchActivityOrders(ROWS, hideFilled),
   );
@@ -142,7 +144,9 @@ export function ActivityView() {
                     ? (totals?.mints ?? null)
                     : t.id === "trades"
                       ? (totals?.trades ?? null)
-                      : (totals?.launches ?? null);
+                      : t.id === "burns"
+                        ? (totals?.burns ?? null)
+                        : (totals?.launches ?? null);
             return (
               <SegmentedTrigger key={t.id} value={t.id} grow={false}>
                 {t.label}
@@ -174,13 +178,13 @@ export function ActivityView() {
               <span>Hide filled</span>
             </label>
           )}
-          {/* All four, because three of them are parked on a null key and
-              revalidating one of those is a no-op — which is cheaper to say
-              than to narrow a union of mutate signatures down to the live one. */}
+          {/* Refresh every tape on an explicit click; normal interval polling
+              still runs only for the tab in front of the reader. */}
           <RefreshButton
             onRefresh={() => {
               void mints.mutate();
               void trades.mutate();
+              void burns.mutate();
               void orders.mutate();
               void pools.mutate();
               void launches.mutate();
@@ -197,6 +201,11 @@ export function ActivityView() {
       <TabsContent value="trades" className="mt-4">
         <Feed feed={trades} empty={EMPTY.trades}>
           {(rows) => <TradeTape rows={rows} height={height} />}
+        </Feed>
+      </TabsContent>
+      <TabsContent value="burns" className="mt-4">
+        <Feed feed={burns} empty={EMPTY.burns}>
+          {(rows) => <BurnTape rows={rows} height={height} />}
         </Feed>
       </TabsContent>
       <TabsContent value="orders" className="mt-4">
@@ -228,7 +237,7 @@ export function ActivityView() {
  * A tape's subscription.
  *
  * Every tape has a real key, so every tape loads once — that is what puts a
- * count on all five tabs and makes switching instant. Only the active one gets
+ * count on every tab and makes switching instant. Only the active one gets
  * an interval, so a page left open all afternoon polls one feed rather than
  * five. Same reason `revalidateOnFocus` follows `active`: coming back to the
  * tab should refresh what you are looking at, not everything.
@@ -246,7 +255,7 @@ function useFeed<D>(active: boolean, key: string, fetcher: () => Promise<D | nul
 }
 
 /**
- * The four states every tape has, said once.
+ * The states every tape has, said once.
  *
  * `null` is a failed request and is deliberately not the same as `[]`: the
  * client returns null rather than an empty array precisely so a bad minute
@@ -277,13 +286,14 @@ function Feed<T>({
 const EMPTY: Record<Tab, string> = {
   mints: "No mints yet — the first one will appear here.",
   trades: "Nothing has traded yet. A launch has to graduate before it has a market.",
+  burns: "No XCP-69 tokens have been sent to the Counterparty burn address yet.",
   orders: "The book is empty — no resting orders on any XCP-69 pair.",
   pools: "No pools yet. A launch has to graduate before its liquidity exists.",
   launches: "No launches yet.",
 };
 
 /* --------------------------------------------------------------------- */
-/* The four tapes                                                        */
+/* The tapes                                                             */
 /* --------------------------------------------------------------------- */
 
 function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
@@ -349,6 +359,34 @@ function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number })
           </tr>
         );
       })}
+    </Tape>
+  );
+}
+
+function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
+  return (
+    <Tape columns={["When", "Asset", "Event", "Amount", "Burner", "Destination"]}>
+      {rows.map((r) => (
+        <tr key={r.key} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
+          <When block={r.block} height={height} txHash={r.txHash} />
+          <Asset asset={r.asset} />
+          <Cell>
+            <Pill tone="orange">Burn</Pill>
+          </Cell>
+          <Num strong>{compact(tokenQty(r.quantity, true))}</Num>
+          <Who address={r.source} />
+          <Cell right>
+            <a
+              href={`https://xcp.io/address/${r.destination}`}
+              target="_blank"
+              rel="noreferrer"
+              className={`text-xs text-orange-600 hover:underline dark:text-orange-400 ${FOCUS}`}
+            >
+              🔥 burn
+            </a>
+          </Cell>
+        </tr>
+      ))}
     </Tape>
   );
 }
@@ -612,7 +650,9 @@ function Tape({ columns, children }: { columns: string[]; children: React.ReactN
                   // The three numeric columns sit in the middle of every tape,
                   // and the tail column closes it — both right-aligned so a
                   // column of figures reads as a column.
-                  i >= 3 && i <= 5 ? "text-right" : ""
+                  ["Price", "Amount", "Size", "Tokens", "XCP", "Hard cap", "Raised", "Mints", "LP"].includes(c)
+                    ? "text-right"
+                    : ""
                 } ${i === columns.length - 1 ? "text-right" : ""}`}
               >
                 {c}
@@ -741,13 +781,14 @@ function Num({
   );
 }
 
-type Tone = "green" | "red" | "purple" | "amber" | "gray";
+type Tone = "green" | "red" | "purple" | "amber" | "orange" | "gray";
 
 const TONES: Record<Tone, string> = {
   green: "border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400",
   red: "border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400",
   purple: "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300",
   amber: "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400",
+  orange: "border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300",
   gray: "border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 text-gray-600 dark:text-gray-400",
 };
 

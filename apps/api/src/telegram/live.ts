@@ -24,6 +24,7 @@ import {
   type Announcement,
 } from "#api/telegram/format";
 import { buildBacklog } from "#api/telegram/replay";
+import { advanceBurnCursor, scanBurnReceives } from "#api/telegram/burns";
 
 /** How close to the deadline the countdown fires. */
 const CLOSING_BLOCKS = 5;
@@ -164,6 +165,10 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
   if (!(await isLive(env.DB))) return { announced: 0, queued: 0 };
 
   const items: AnnouncementItem[] = [];
+  const burnScan = await scanBurnReceives(env.DB);
+  for (const burn of burnScan.announcements) {
+    items.push({ key: burn.key, a: burn.a, mintOf: null, earned: "0", paid: "0" });
+  }
 
   // Everything with a chain fact behind it: launches, opens, mints, closes,
   // trades. Mint/trade history comes from the pending-work outbox, so this
@@ -247,8 +252,15 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
     }
   }
 
-  if (items.length === 0) return { announced: 0, queued: 0 };
+  if (items.length === 0) {
+    await advanceBurnCursor(env.DB, burnScan.nextCursor);
+    return { announced: 0, queued: 0 };
+  }
 
   const queued = await queueAnnouncements(env, items);
+  // Once queueAnnouncements returns, a matching burn is durably accepted (or
+  // already acknowledged). Advancing afterward prevents a failed enqueue from
+  // skipping it; a failed cursor write merely retries through the same dedupe.
+  await advanceBurnCursor(env.DB, burnScan.nextCursor);
   return { announced: queued.accepted, queued: queued.depth };
 }

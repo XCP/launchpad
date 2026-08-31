@@ -882,6 +882,14 @@ export function ActivityTabs({
                           dev
                         </span>
                       )}
+                      {h.address === BURN_ADDRESS && (
+                        <span
+                          className="shrink-0 rounded-full border border-orange-200 bg-orange-50 px-1.5 py-px text-[10px] font-medium text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
+                          title="Counterparty's canonical unspendable burn address"
+                        >
+                          🔥 burn
+                        </span>
+                      )}
                     </span>
                     <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900 dark:text-gray-100">
                       {soldOut ? (

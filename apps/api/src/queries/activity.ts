@@ -74,6 +74,33 @@ export interface RecentTradeRow {
   divisible: number;
 }
 
+export interface RecentBurnRow {
+  key: string;
+  tx_hash: string;
+  asset: string;
+  source: string;
+  destination: string;
+  block_index: number;
+  quantity: string;
+}
+
+/** Confirmed XCP-69 sends to the canonical burn address, newest first. */
+export function listRecentBurns(
+  db: D1Database,
+  limit: number,
+  offset: number,
+): Promise<RecentBurnRow[]> {
+  return q<RecentBurnRow>(
+    db,
+    `SELECT key, tx_hash, asset, source, destination, block_index, quantity
+       FROM token_burns
+      ORDER BY block_index DESC, tx_index DESC, msg_index DESC, key DESC
+      LIMIT ?1 OFFSET ?2`,
+    limit,
+    offset,
+  );
+}
+
 /**
  * Every confirmed fill on the site, newest first — the tape the asset page
  * shows for one pair, unscoped.
@@ -248,6 +275,7 @@ export function listMarketAssets(
 export interface ActivityTotals {
   mints: number;
   trades: number;
+  burns: number;
   launches: number;
 }
 
@@ -271,6 +299,7 @@ export function getActivityTotals(db: D1Database): Promise<ActivityTotals | null
     `SELECT
        (SELECT COALESCE(mints, 0) FROM mint_totals WHERE id = 1) AS mints,
        (SELECT COUNT(*) FROM asset_events WHERE primary_actor = 1) AS trades,
+       (SELECT COALESCE(burns, 0) FROM burn_totals WHERE id = 1) AS burns,
        (SELECT COUNT(*) FROM launches WHERE conforming = 1) AS launches`,
   );
 }

@@ -25,6 +25,7 @@ import {
   sizeBar,
   tokens,
   trade,
+  tokenBurned,
   xcp,
 } from "#api/telegram/format";
 import { eventTxHash } from "#api/telegram/replay";
@@ -320,6 +321,24 @@ describe("multi-fill trade messages", () => {
     expect(m.text).toContain("Avg 0.00004044 XCP/token");
     expect(m.text).toContain("MCap: 4,533.34 XCP");
     expect(m.text).toContain("Performance: +353.3%");
+  });
+});
+
+describe("burn announcements", () => {
+  it("names the burn address, preserves fractional tokens, and links the source and tx", () => {
+    const txHash = "a".repeat(64);
+    const message = tokenBurned({
+      asset: "NAKAMOTOFUN",
+      tokenRaw: 123_456_789n,
+      source: "1BurnerAddressExample",
+      txHash,
+    });
+
+    expect(message.asset).toBe("NAKAMOTOFUN");
+    expect(message.text).toContain("NAKAMOTOFUN</b></a> burned");
+    expect(message.text).toContain("1.23456789 tokens sent to the Counterparty burn address");
+    expect(message.text).toContain("/profile/1BurnerAddressExample");
+    expect(message.text).toContain(`https://xcp.io/tx/${txHash}`);
   });
 });
 

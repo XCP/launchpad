@@ -1252,6 +1252,16 @@ export interface ActivityTrade {
   divisible: boolean;
 }
 
+export interface ActivityBurn {
+  key: string;
+  txHash: string;
+  asset: string;
+  source: string;
+  destination: string;
+  block: number;
+  quantity: Raw;
+}
+
 /** Counterparty names four; `partial` is derived by apps/api because "open,
  *  but partly taken" is the state a reader most needs and the one the protocol
  *  does not name. There is no `closed` — filled, cancelled and expired are the
@@ -1375,6 +1385,28 @@ export function fetchActivityTrades(limit = 50): Promise<ActivityTrade[] | null>
   }));
 }
 
+interface ApiActivityBurn {
+  key: string;
+  tx_hash: string;
+  asset: string;
+  source: string;
+  destination: string;
+  block_index: number;
+  quantity: Raw;
+}
+
+export function fetchActivityBurns(limit = 50): Promise<ActivityBurn[] | null> {
+  return activity<ApiActivityBurn, ActivityBurn>("burns", limit, (r) => ({
+    key: r.key,
+    txHash: r.tx_hash,
+    asset: r.asset,
+    source: r.source,
+    destination: r.destination,
+    block: r.block_index,
+    quantity: r.quantity,
+  }));
+}
+
 interface ApiActivityOrder {
   tx_hash: string;
   asset: string;
@@ -1396,6 +1428,7 @@ const ORDER_STATES: OrderState[] = ["open", "partial", "filled", "cancelled", "e
 export interface ActivityTotals {
   mints: number;
   trades: number;
+  burns: number;
   launches: number;
 }
 

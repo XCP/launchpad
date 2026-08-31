@@ -323,6 +323,42 @@ export async function fetchBlockHeight(): Promise<number> {
   return data.result.counterparty_height;
 }
 
+export interface CpAddressReceive {
+  tx_index: number;
+  tx_hash: string;
+  block_index: number;
+  source: string;
+  destination: string;
+  asset: string;
+  quantity: number | string;
+  status: string;
+  msg_index: number;
+}
+
+export interface CpAddressReceivePage {
+  result: CpAddressReceive[];
+  next_cursor: number | null;
+}
+
+/**
+ * Sends received by one address, newest first.
+ *
+ * The burn monitor uses this address-scoped route instead of polling the
+ * chain-wide SEND event tables. That keeps a quiet tick to one tiny response
+ * no matter how large Counterparty's send history becomes.
+ */
+export function fetchAddressReceives(
+  address: string,
+  limit: number,
+  cursor?: number,
+): Promise<CpAddressReceivePage> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (cursor !== undefined) qs.set("cursor", String(cursor));
+  return get<CpAddressReceivePage>(
+    `/addresses/${encodeURIComponent(address)}/receives?${qs.toString()}`,
+  );
+}
+
 export interface CpAssetBalance {
   address: string | null;
   utxo_address?: string | null;

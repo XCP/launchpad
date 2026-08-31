@@ -10,7 +10,13 @@
  * only rewards reading if something looks big. That only works if the scale is
  * consistent, so every bar in here counts the same unit.
  */
-import { formatExact, rawToDecimalString, big } from "@launchpad/xcp69/numeric";
+import {
+  approx,
+  big,
+  formatExact,
+  ratio,
+  rawToDecimalString,
+} from "@launchpad/xcp69/numeric";
 import { XCP69, XCP69_EXACT } from "@launchpad/xcp69/xcp69";
 
 /**
@@ -50,6 +56,7 @@ const TRADE_PAIR_CAP = 30;
 export const MINT_EMOJI = "🟪";
 export const BUY_EMOJI = "🟢";
 export const SELL_EMOJI = "🔴";
+export const BURN_EMOJI = "🔥";
 /** The wordmark's own emoji, so a graduation reads as the site celebrating. */
 export const GRADUATE_EMOJI = "🎉";
 
@@ -86,6 +93,12 @@ export function sizeBar(emoji: string, rawTokens: bigint, cap: number): string {
 /** Whole tokens, grouped, no decimals — 1,250,000 rather than 1250000.00. */
 export function tokens(raw: bigint): string {
   return formatExact(rawToDecimalString(raw, 8), { maximumFractionDigits: 0 });
+}
+
+/** Burns can be smaller than one token, so unlike the high-volume mint/trade
+ * feed they retain the on-chain precision instead of rounding to a whole. */
+function burnedTokens(raw: bigint): string {
+  return formatExact(rawToDecimalString(raw, 8), { maximumFractionDigits: 8 });
 }
 
 /** XCP to at most 2 decimals: raised totals are read, not transacted. */
@@ -187,6 +200,27 @@ const withPhoto = (asset: string, text: string): Announcement => ({
   photo: imageUrl(asset),
   asset,
 });
+
+export interface BurnFacts {
+  asset: string;
+  tokenRaw: bigint;
+  source: string;
+  txHash: string;
+}
+
+export function tokenBurned(f: BurnFacts): Announcement {
+  const tx = /^[0-9a-f]{64}$/i.test(f.txHash)
+    ? `<a href="https://xcp.io/tx/${f.txHash}">TX</a>`
+    : null;
+  return withPhoto(
+    f.asset,
+    [
+      `${BURN_EMOJI.repeat(3)} ${assetLink(f.asset)} burned`,
+      `${burnedTokens(f.tokenRaw)} tokens sent to the Counterparty burn address`,
+      [addressLink(f.source), tx].filter((link): link is string => link !== null).join(" · "),
+    ].join("\n"),
+  );
+}
 
 export interface LaunchFacts {
   asset: string;
@@ -410,14 +444,14 @@ export function trade(f: TradeFacts): Announcement {
   });
   const usdTotal =
     f.xcpUsd && f.xcpUsd > 0
-      ? ` · $${((Number(f.xcpRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
+      ? ` · $${((approx(f.xcpRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`
       : "";
   const marketCapUsd =
     f.xcpUsd && f.xcpUsd > 0
-      ? ` · $${((Number(marketCapRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
+      ? ` · $${((approx(marketCapRaw) / 100_000_000) * f.xcpUsd).toLocaleString("en-US", {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         })}`
@@ -469,9 +503,7 @@ function performance(
     launchXcpUsd > 0
   ) {
     const percent =
-      (Number(priceRaw) * currentXcpUsd) /
-        (Number(launchPriceRaw) * launchXcpUsd) -
-      1;
+      ratio(priceRaw, launchPriceRaw) * (currentXcpUsd / launchXcpUsd) - 1;
     const tenths = Math.round(Math.abs(percent) * 1_000);
     const sign = percent > 0 ? "+" : percent < 0 ? "−" : "";
     return `${sign}${Math.floor(tenths / 10)}.${tenths % 10}%`;

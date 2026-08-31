@@ -4,7 +4,7 @@ import { ActivityView } from "@/app/activity/_components/activity-view";
 export const metadata: Metadata = {
   title: "Activity — xcp.fun",
   description:
-    "Every XCP-69 mint, trade, resting order and launch, newest first.",
+    "Every XCP-69 mint, trade, burn, resting order and launch, newest first.",
 };
 
 /* No revalidate directive, for the same reason /mempool has none: nothing on

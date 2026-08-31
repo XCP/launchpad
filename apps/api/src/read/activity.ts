@@ -1,12 +1,12 @@
 /**
  * /v2/activity/* — the sitewide tape.
  *
- * Four feeds, four routes, rather than one route returning all four. The page
+ * Separate feeds rather than one route returning every tape. The page
  * shows one tab at a time, and a combined response would make every visitor
  * pay for the three feeds they are not looking at — on a page built to be left
  * open. Separate URLs also means each feed keeps its own edge-cache entry and
- * its own honest TTL: three of these are as fresh as the indexer, and the
- * fourth is someone else's public node.
+ * its own honest TTL. Burns, mints, trades, launches and orders are local
+ * indexed reads; only pool history comes from a public node.
  *
  * The wire shape is snake_case, like every other D1-backed route here. The
  * camelCase in /v2/mempool is a documented exception for rows handed straight
@@ -20,6 +20,7 @@ import {
   getActivityTotals,
   listConformingAssetInfo,
   listRecentLaunches,
+  listRecentBurns,
   listRecentMints,
   listRecentOrders,
   listRecentTrades,
@@ -88,6 +89,12 @@ activityRoute.get("/v2/activity/mints", async (c) => {
 activityRoute.get("/v2/activity/trades", async (c) => {
   const { limit, offset } = paging(c);
   const rows = await listRecentTrades(c.env.DB, limit, offset);
+  return J(c, page(rows, limit, offset), INDEXED_TTL);
+});
+
+activityRoute.get("/v2/activity/burns", async (c) => {
+  const { limit, offset } = paging(c);
+  const rows = await listRecentBurns(c.env.DB, limit, offset);
   return J(c, page(rows, limit, offset), INDEXED_TTL);
 });
 
