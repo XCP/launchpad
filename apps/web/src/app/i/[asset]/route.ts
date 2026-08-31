@@ -3,6 +3,7 @@ import {
   getMetadataEdgeCache,
   getMetadataRuntime,
   metadataImageCacheKey,
+  metadataImageSourceUrl,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
@@ -132,8 +133,14 @@ export async function GET(
     // advanced to its next stage lands on a key nothing has cached. This
     // route already ignores query parameters it doesn't read, so the inner
     // request still takes the stored-bytes branch and cannot recurse.
-    const version = stored.etag ? `?v=${encodeURIComponent(stored.etag)}` : "";
-    const source = `${METADATA_ORIGIN}/i/${encoded}${version}`;
+    // The etag lives in the path, not only in a query. Before this route's
+    // stored-byte cache was corrected, a transform could cache the wrong
+    // source response under the right etag query. Some zone cache rules also
+    // intentionally ignore queries. A new object version now has a URL that
+    // cannot collide with either of those entries.
+    const source = stored.etag
+      ? metadataImageSourceUrl(normalizedAsset, stored.etag)
+      : `${METADATA_ORIGIN}/i/${encoded}`;
     const res = await fetch(source, {
       cf: {
         // scale-down, not contain: contain enlarges a source smaller than the

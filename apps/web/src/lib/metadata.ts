@@ -109,6 +109,13 @@ export function metadataImageCacheKey(asset: string, etag: string): Request {
   );
 }
 
+/** A path-versioned source for Cloudflare Image transformations. The etag is
+ * deliberately a path segment, not a query parameter: cache rules are allowed
+ * to ignore queries, but two object versions must never share a source URL. */
+export function metadataImageSourceUrl(asset: string, etag: string): string {
+  return `${METADATA_ORIGIN}/i/${encodeURIComponent(asset.toUpperCase())}/${encodeURIComponent(etag)}`;
+}
+
 const ART_LOCATION_TTL = 300;
 const ART_LOCATION_KIND = "x-metadata-art-kind";
 const ART_LOCATION_ETAG = "x-metadata-art-etag";

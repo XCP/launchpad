@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   metadataImageCacheKey,
+  metadataImageSourceUrl,
   resolveMetadataArtLocation,
   type R2Bucket,
 } from "@/lib/metadata";
@@ -34,6 +35,9 @@ describe("metadata art location cache", () => {
     expect(oldKey.url).toContain("/_image-object/XCPMINTS/old-etag");
     expect(newKey.url).toContain("/_image-object/XCPMINTS/new-etag");
     expect(newKey.url).not.toBe(oldKey.url);
+    expect(metadataImageSourceUrl("xcpMints", "new-etag")).toBe(
+      "https://xcp.fun/i/XCPMINTS/new-etag",
+    );
   });
 
   it("negative-caches missing art instead of repeating two R2 heads", async () => {
