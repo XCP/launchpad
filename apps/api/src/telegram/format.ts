@@ -420,7 +420,7 @@ export function mintClosed(f: CloseFacts): Announcement {
           `${GRADUATE_EMOJI}${LAUNCHED_EMOJI} ${assetLink(f.asset)} GRADUATED ${LAUNCHED_EMOJI}${GRADUATE_EMOJI}`,
           `${xcpOfTokens(f.earnedRaw)} XCP raised`,
           `${f.minters} minters · ${f.mints} mints`,
-          `Pool is live · LP burned · liquidity locked forever`,
+          `Pool is live`,
         ].join("\n")
       : [
           `💔 ${assetLink(f.asset)} refunded`,

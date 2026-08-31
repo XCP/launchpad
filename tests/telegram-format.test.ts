@@ -151,7 +151,6 @@ describe("messages", () => {
       minters: 69,
     });
     expect(g.text).toContain(GRADUATE_EMOJI);
-    expect(g.text).toContain("Pool is live · LP burned · liquidity locked forever");
   });
 
   it("puts no size bar on a close, in either direction", () => {
