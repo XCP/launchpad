@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { RewardsCard } from "@/app/profile/_components/rewards-card";
@@ -14,10 +14,12 @@ import { LaunchesTab } from "@/app/profile/_components/launches-tab";
 import { MintingTab } from "@/app/profile/_components/minting-tab";
 import { OrdersTab } from "@/app/profile/_components/orders-tab";
 import { PositionsTab } from "@/app/profile/_components/positions-tab";
+import { PoolsTab } from "@/app/profile/_components/pools-tab";
 import { RewardsTab } from "@/app/profile/_components/rewards-tab";
-import { fetchRewardAccount } from "@/lib/api/launchpad-api";
+import { fetchAddressPoolPositions } from "@/lib/api/counterparty";
+import { fetchRewardAccount, fetchSearchIndex } from "@/lib/api/launchpad-api";
 
-type Tab = "positions" | "orders" | "history" | "activity" | "rewards" | "minting" | "launches";
+type Tab = "positions" | "pools" | "orders" | "history" | "activity" | "rewards" | "minting" | "launches";
 
 const BASE_TABS: { id: Tab; label: string }[] = [
   { id: "positions", label: "Positions" },
@@ -52,21 +54,52 @@ export function ProfileView({ viewing }: { viewing?: string }) {
     () => fetchRewardAccount(address!),
     { revalidateOnFocus: false },
   );
+  const { data: poolRows } = useSWR(
+    address ? ["address-pools", address] : null,
+    () => fetchAddressPoolPositions(address!),
+    // One address-scoped read, block-paced. This discovers the tab without
+    // checking every launch LP asset or touching the launchpad Worker/D1.
+    { refreshInterval: 600_000, revalidateOnFocus: false },
+  );
+  const { data: launchRows } = useSWR(
+    poolRows && poolRows.length > 0 ? "xcp69-pool-membership" : null,
+    fetchSearchIndex,
+    // The launch index is edge-cached and shared by every pool on the profile.
+    // Fetch it only for wallets that actually own LP tokens; this replaces a
+    // per-pool launch lookup and keeps the membership test to one request.
+    { refreshInterval: 600_000, revalidateOnFocus: false },
+  );
+  const xcp69Assets = useMemo(
+    () => new Set((launchRows ?? []).map((launch) => launch.asset)),
+    [launchRows],
+  );
+  const pools = (poolRows ?? []).filter(
+    (pool) => xcp69Assets.has(pool.asset_a) || xcp69Assets.has(pool.asset_b),
+  );
+  const hasPools = pools.length > 0;
+  const poolClassificationReady =
+    poolRows !== undefined && (poolRows.length === 0 || launchRows !== undefined);
+  // If the last LP tokens are withdrawn while this tab is selected, render a
+  // tab that still exists instead of leaving an empty panel selected.
+  const activeTab: Tab =
+    tab === "pools" && poolClassificationReady && !hasPools ? "positions" : tab;
+
   // A profile does not get an empty tab for an accrued promise. Reward
   // history exists only once this address has a real transaction to inspect.
-  const tabs = rewardAccount?.hasRewardTx
-    ? (() => {
+  const tabs = (() => {
+    const visible = [...BASE_TABS];
+    if (hasPools) {
+      visible.splice(1, 0, { id: "pools", label: "Pools" });
+    }
+    if (rewardAccount?.hasRewardTx) {
         // Anchored to the tab it follows, not to an index: the previous
         // slice(0, 3) silently moved Rewards the moment a tab was inserted
         // above it.
-        const after = BASE_TABS.findIndex((t) => t.id === "activity") + 1;
-        return [
-          ...BASE_TABS.slice(0, after),
-          { id: "rewards" as const, label: "Rewards" },
-          ...BASE_TABS.slice(after),
-        ];
-      })()
-    : BASE_TABS;
+      const after = visible.findIndex((item) => item.id === "activity") + 1;
+      visible.splice(after, 0, { id: "rewards", label: "Rewards" });
+    }
+    return visible;
+  })();
 
   if (!address || (!viewing && status !== "connected")) {
     return (
@@ -146,7 +179,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
       />
 
       <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-        <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
+        <Tabs value={activeTab} onValueChange={(v) => setTab(v as Tab)}>
           <div className="border-b border-gray-200 dark:border-gray-800 p-2">
             <SegmentedList
               variant="card"
@@ -161,15 +194,18 @@ export function ProfileView({ viewing }: { viewing?: string }) {
           </div>
         </Tabs>
         <div className="p-4">
-          {tab === "positions" && <PositionsTab address={address} />}
-          {tab === "orders" && <OrdersTab address={address} canCancel={!viewing} />}
-          {tab === "history" && <HistoryTab address={address} />}
-          {tab === "activity" && <ActivityTab address={address} />}
-          {tab === "rewards" && rewardAccount?.hasRewardTx && (
+          {activeTab === "positions" && <PositionsTab address={address} />}
+          {activeTab === "pools" && (
+            <PoolsTab address={address} pools={pools} xcp69Assets={xcp69Assets} />
+          )}
+          {activeTab === "orders" && <OrdersTab address={address} canCancel={!viewing} />}
+          {activeTab === "history" && <HistoryTab address={address} />}
+          {activeTab === "activity" && <ActivityTab address={address} />}
+          {activeTab === "rewards" && rewardAccount?.hasRewardTx && (
             <RewardsTab account={rewardAccount} />
           )}
-          {tab === "minting" && <MintingTab address={address} />}
-          {tab === "launches" && <LaunchesTab address={address} />}
+          {activeTab === "minting" && <MintingTab address={address} />}
+          {activeTab === "launches" && <LaunchesTab address={address} />}
         </div>
       </div>
     </div>

@@ -110,6 +110,55 @@ export interface AddressBalance {
   quantity: Raw;
 }
 
+/** One live LP-token balance, already joined to its pool by Counterparty. */
+export interface AddressPoolPosition {
+  asset_a: string;
+  asset_b: string;
+  lp_asset: string;
+  reserve_a: Raw;
+  reserve_b: Raw;
+  quantity: Raw;
+  asset_a_info?: { divisible?: boolean } | null;
+  asset_b_info?: { divisible?: boolean } | null;
+}
+
+export interface PoolWithdrawQuote {
+  pool_exists: boolean;
+  asset_a?: string;
+  asset_b?: string;
+  quantity_a_estimate?: Raw;
+  quantity_b_estimate?: Raw;
+  supply?: Raw;
+}
+
+/**
+ * Live AMM positions for one address.
+ *
+ * This endpoint is deliberately used instead of checking the balance of every
+ * launch LP asset. Its work scales with the wallet's LP positions, not with
+ * the number of launches on the site.
+ */
+export async function fetchAddressPoolPositions(
+  address: string,
+): Promise<AddressPoolPosition[]> {
+  return pageAll<AddressPoolPosition>(
+    `/addresses/${encodeURIComponent(address)}/pools?verbose=true`,
+  );
+}
+
+/** Exact underlying amounts available if this LP balance were withdrawn now. */
+export async function fetchPoolWithdrawQuote(
+  assetA: string,
+  assetB: string,
+  lpQuantity: Raw,
+): Promise<PoolWithdrawQuote> {
+  const response = await get<{ result: PoolWithdrawQuote }>(
+    `/pools/${encodeURIComponent(assetA)}/${encodeURIComponent(assetB)}` +
+      `/quote/withdraw?quantity=${encodeURIComponent(String(lpQuantity))}`,
+  );
+  return response.result;
+}
+
 /** Confirmed balances for an address, keyed by asset. UTXO-attached balances
  *  are included: they are still the address's holdings. */
 export async function fetchAddressBalances(address: string): Promise<Map<string, Raw>> {
