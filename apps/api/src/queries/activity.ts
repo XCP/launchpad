@@ -84,7 +84,7 @@ export interface RecentBurnRow {
   quantity: string;
 }
 
-/** Confirmed XCP-69 sends to the canonical burn address, newest first. */
+/** Confirmed XCP-69 SEND burns and explicit destructions, newest first. */
 export function listRecentBurns(
   db: D1Database,
   limit: number,
@@ -114,7 +114,9 @@ export function listRecentTrades(
   db: D1Database,
   limit: number,
   offset: number,
+  asset?: string,
 ): Promise<RecentTradeRow[]> {
+  const assetWhere = asset ? "AND e.asset = ?3" : "";
   return q<RecentTradeRow>(
     db,
     `SELECT e.event, e.tx_hash, e.asset, e.address, e.block_index,
@@ -124,11 +126,28 @@ export function listRecentTrades(
        FROM asset_events e
        LEFT JOIN launches l ON l.asset = e.asset
       WHERE e.primary_actor = 1
+        ${assetWhere}
       ORDER BY e.block_index DESC, e.tx_index DESC, e.event_index DESC, e.id DESC
       LIMIT ?1 OFFSET ?2`,
     limit,
     offset,
+    ...(asset ? [asset] : []),
   );
+}
+
+/** Exact tab count for server-paged per-asset history. */
+export async function countTradesByAsset(
+  db: D1Database,
+  asset: string,
+): Promise<number> {
+  const rows = await q<{ n: number }>(
+    db,
+    `SELECT COUNT(*) AS n
+       FROM asset_events
+      WHERE primary_actor = 1 AND asset = ?1`,
+    asset,
+  );
+  return Number(rows[0]?.n ?? 0);
 }
 
 export interface RecentLaunchRow {

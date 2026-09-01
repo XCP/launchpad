@@ -5,7 +5,6 @@ import {
   announcedBeforeStart,
   isXcp69,
   launchPhase,
-  netBurnedSupplyRaw,
   saleProgress,
   saleTarget,
   windowIsExact,
@@ -69,16 +68,6 @@ describe("the standard's own arithmetic", () => {
     expect(circulatingSupplyRaw("100", "101")).toBe(0n);
   });
 
-  it("does not mistake the pre-graduation pool reservation for burned supply", () => {
-    const pool = "3100000000000000";
-    expect(netBurnedSupplyRaw(pool, pool, "minting")).toBe(0n);
-    expect(netBurnedSupplyRaw("3200000000000000", pool, "minting")).toBe(
-      100_000_000_000_000n,
-    );
-    expect(netBurnedSupplyRaw("100000000000000", pool, "graduated")).toBe(
-      100_000_000_000_000n,
-    );
-  });
 });
 
 describe("xcp69Params — accepts the conforming shape", () => {

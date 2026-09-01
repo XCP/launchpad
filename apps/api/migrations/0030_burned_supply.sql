@@ -1,8 +1,7 @@
--- Confirmed launch-token quantity actually destroyed at Counterparty's
--- canonical unspendable address. Before graduation the protocol parks the
--- planned pool allocation at that address too; the reconciler removes that
--- reservation. This is not the launch's numeric LP asset (LP burns lock
--- liquidity; they do not destroy launch-token supply).
+-- Confirmed launch-token quantity reduced by explicit destruction or a SEND
+-- to Counterparty's canonical unspendable address. This is indexed from chain
+-- events, never inferred from that address's live balance. This is not the
+-- launch's numeric LP asset (LP burns do not destroy launch-token supply).
 ALTER TABLE launches ADD COLUMN burned_quantity TEXT NOT NULL DEFAULT '0';
 
 -- Graduated cards are ranked by the same market cap they display. Price alone

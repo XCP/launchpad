@@ -34,7 +34,10 @@ import {
 } from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
-import { mergePairTrades } from "@launchpad/xcp69/trades";
+import {
+  fetchAssetTradesPage,
+  type AssetTradePage,
+} from "@/lib/api/launchpad-api";
 import {
   currentHolderCount,
   includeFormerHolders,
@@ -167,59 +170,36 @@ export function ActivityTabs({
     () => fetchLpBalances(lpAsset!),
     { revalidateOnFocus: false, refreshInterval: 300_000 },
   );
-  // Trades come over the room's shared socket when it's connected — one poll
-  // per launch instead of one per viewer, and new fills simply appear. This
-  // fetch is the fallback for a socket that never connected.
-  const roomTrades: TradeRow[] | null =
-    roomState?.trades?.map((t) => ({
-      key: t.key,
-      block: t.block,
-      time: t.time,
-      buy: t.buy,
-      tokenRaw: t.token_quantity,
-      xcpRaw: t.xcp_quantity,
-      addr: t.address,
-      via: t.venue,
-      txHash: t.tx_hash,
-    })) ?? null;
-
-  const { data: fetchedTrades } = useSWR<TradeRow[]>(
-    tab === "trades" && roomTrades === null ? [asset, "pair-trades"] : null,
-    async () => {
-      const [pm, om] = await Promise.all([
-        fetchJson(
-          `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/matches?verbose=true&limit=250`,
-        ).catch(() => ({ result: [] })),
-        fetchJson(
-          `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP/matches?verbose=true&status=completed&limit=250`,
-        ).catch(() => ({ result: [] })),
-      ]);
-      const merged = await mergePairTrades(
-        asset,
-        pm.result ?? [],
-        om.result ?? [],
-        async (txHash) =>
-          (
-            await fetchJson(
-              `${COUNTERPARTY_API_BASE}/transactions/${txHash}/events?limit=1000`,
-            )
-          ).result ?? [],
-      );
-      return merged.map((trade) => ({
-        key: trade.key,
-        block: trade.block,
-        time: trade.time,
-        buy: trade.buy,
-        tokenRaw: trade.tokenQuantity,
-        xcpRaw: trade.xcpQuantity,
-        addr: trade.address,
-        via: trade.venue,
-        txHash: trade.txHash,
-      }));
-    },
+  // The room intentionally carries only a small live snapshot; using it as
+  // table history silently capped every asset at 50 rows. Page the append-only
+  // D1 tape instead, so history is complete and websocket frames stay small.
+  const tradeOffset = (Math.max(1, pageParam) - 1) * PER_PAGE;
+  const { data: tradePage } = useSWR<AssetTradePage | null>(
+    !minting && tab === "trades"
+      ? [asset, "pair-trades", PER_PAGE, tradeOffset]
+      : null,
+    () => fetchAssetTradesPage(asset, PER_PAGE, tradeOffset),
     { refreshInterval: 30_000 },
   );
-  const trades = roomTrades ?? fetchedTrades;
+  const trades: TradeRow[] | null = tradePage === undefined
+    ? null
+    : (tradePage?.result ?? []).map((trade) => {
+        const token = big(trade.tokenDelta);
+        const xcp = big(trade.xcpDelta);
+        return {
+          key: trade.key,
+          block: trade.block,
+          // Indexed history predates local block-time storage. The row already
+          // has an exact block fallback, so do not fabricate a timestamp.
+          time: 0,
+          buy: trade.side === "buy",
+          tokenRaw: (token < 0n ? -token : token).toString(),
+          xcpRaw: (xcp < 0n ? -xcp : xcp).toString(),
+          addr: trade.address,
+          via: trade.venue,
+          txHash: trade.txHash ?? "",
+        };
+      });
 
   /** Synthesised, not fetched — the pool has no address to report a balance
    *  for. Marked unmistakably in the row itself, because a fabricated entry in
@@ -232,6 +212,7 @@ export function ActivityTabs({
     holders ?? [],
     [
       ...mints.map((mint) => mint.source),
+      ...(roomState?.trades ?? []).map((trade) => trade.address),
       ...(trades ?? []).map((trade) => trade.addr),
     ],
   );
@@ -419,7 +400,7 @@ export function ActivityTabs({
       : t === "mempool"
         ? `Mempool${minting ? (roomState ? ` (${pending.length})` : "") : pendingOrders.length > 0 ? ` (${pendingOrders.length})` : ""}`
         : t === "trades"
-          ? `Trades${trades ? ` (${trades.length})` : ""}`
+          ? `Trades${tradePage ? ` (${tradePage.total})` : ""}`
           : t === "holders"
             ? `Holders${liveHolderCount !== null ? ` (${liveHolderCount})` : ""}`
             : `Orders${orders ? ` (${orders.length})` : ""}`;
@@ -432,7 +413,7 @@ export function ActivityTabs({
           ? pending.length
           : pendingOrders.length
         : tab === "trades"
-          ? (trades?.length ?? 0)
+          ? (tradePage?.total ?? 0)
           : tab === "holders"
             ? holderRows.length
             : ordered.length;
@@ -693,7 +674,7 @@ export function ActivityTabs({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {trades.slice(from, from + PER_PAGE).map((t) => {
+                  {trades.map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
                     // block_time is missing only if a node responded without
                     // it; fall back to the block height rather than to a

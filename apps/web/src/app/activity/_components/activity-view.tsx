@@ -15,7 +15,7 @@ import {
   fetchActivityOrders,
   fetchActivityPools,
   fetchActivityTotals,
-  fetchActivityTrades,
+  fetchActivityTradesPage,
   type ActivityLaunch,
   type ActivityBurn,
   type ActivityMint,
@@ -84,6 +84,7 @@ const TABS: { id: Tab; label: string }[] = [
  */
 export function ActivityView() {
   const [tab, setTab] = useState<Tab>("mints");
+  const [tradePage, setTradePage] = useState(1);
   // Orders only. Part of the SWR key below, so toggling it refetches the
   // narrowed feed rather than filtering a page that was already truncated.
   const [hideFilled, setHideFilled] = useState(false);
@@ -105,7 +106,12 @@ export function ActivityView() {
   // One hook per tape keeps each feed's rows exactly typed, where a single
   // hook returning the union would need a cast per tab to get them back.
   const mints = useFeed(tab === "mints", "activity:mints", () => fetchActivityMints(ROWS));
-  const trades = useFeed(tab === "trades", "activity:trades", () => fetchActivityTrades(ROWS));
+  const tradeOffset = (tradePage - 1) * ROWS;
+  const trades = useFeed(
+    tab === "trades",
+    `activity:trades:${tradeOffset}`,
+    () => fetchActivityTradesPage(ROWS, tradeOffset),
+  );
   const burns = useFeed(tab === "burns", "activity:burns", () => fetchActivityBurns(ROWS));
   const orders = useFeed(tab === "orders", `activity:orders:${hideFilled}`, () =>
     fetchActivityOrders(ROWS, hideFilled),
@@ -200,7 +206,16 @@ export function ActivityView() {
       </TabsContent>
       <TabsContent value="trades" className="mt-4">
         <Feed feed={trades} empty={EMPTY.trades}>
-          {(rows) => <TradeTape rows={rows} height={height} />}
+          {(rows) => (
+            <>
+              <TradeTape rows={rows} height={height} />
+              <TapePager
+                page={tradePage}
+                totalPages={Math.max(1, Math.ceil((totals?.trades ?? rows.length) / ROWS))}
+                onPage={setTradePage}
+              />
+            </>
+          )}
         </Feed>
       </TabsContent>
       <TabsContent value="burns" className="mt-4">
@@ -360,6 +375,39 @@ function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number })
         );
       })}
     </Tape>
+  );
+}
+
+function TapePager({
+  page,
+  totalPages,
+  onPage,
+}: {
+  page: number;
+  totalPages: number;
+  onPage: (page: number) => void;
+}) {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
+      <button
+        type="button"
+        disabled={page <= 1}
+        onClick={() => onPage(page - 1)}
+        className="rounded-md border border-gray-200 px-3 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800"
+      >
+        ← Prev
+      </button>
+      <span>Page {page} of {totalPages}</span>
+      <button
+        type="button"
+        disabled={page >= totalPages}
+        onClick={() => onPage(page + 1)}
+        className="rounded-md border border-gray-200 px-3 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800"
+      >
+        Next →
+      </button>
+    </div>
   );
 }
 

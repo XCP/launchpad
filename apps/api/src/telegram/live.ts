@@ -253,7 +253,11 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
   }
 
   if (items.length === 0) {
-    await advanceBurnCursor(env.DB, burnScan.nextCursor);
+    await advanceBurnCursor(
+      env.DB,
+      burnScan.nextCursor,
+      burnScan.nextDestructionCursor,
+    );
     return { announced: 0, queued: 0 };
   }
 
@@ -261,6 +265,10 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
   // Once queueAnnouncements returns, a matching burn is durably accepted (or
   // already acknowledged). Advancing afterward prevents a failed enqueue from
   // skipping it; a failed cursor write merely retries through the same dedupe.
-  await advanceBurnCursor(env.DB, burnScan.nextCursor);
+  await advanceBurnCursor(
+    env.DB,
+    burnScan.nextCursor,
+    burnScan.nextDestructionCursor,
+  );
   return { announced: queued.accepted, queued: queued.depth };
 }

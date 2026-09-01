@@ -17,6 +17,7 @@ import type { Raw } from "@launchpad/xcp69/numeric";
 import { fetchPoolEvents } from "#api/integrations/counterparty";
 import { countOrders } from "#api/indexer/orders";
 import {
+  countTradesByAsset,
   getActivityTotals,
   listConformingAssetInfo,
   listRecentLaunches,
@@ -88,8 +89,12 @@ activityRoute.get("/v2/activity/mints", async (c) => {
 
 activityRoute.get("/v2/activity/trades", async (c) => {
   const { limit, offset } = paging(c);
-  const rows = await listRecentTrades(c.env.DB, limit, offset);
-  return J(c, page(rows, limit, offset), INDEXED_TTL);
+  const asset = c.req.query("asset")?.trim().toUpperCase() || undefined;
+  const [rows, total] = await Promise.all([
+    listRecentTrades(c.env.DB, limit, offset, asset),
+    asset ? countTradesByAsset(c.env.DB, asset) : Promise.resolve(null),
+  ]);
+  return J(c, { ...page(rows, limit, offset), ...(total === null ? {} : { total }) }, INDEXED_TTL);
 });
 
 activityRoute.get("/v2/activity/burns", async (c) => {

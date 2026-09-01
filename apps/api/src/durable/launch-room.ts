@@ -15,7 +15,8 @@ const POLL_MS = 15_000;
  *  a slower cadence than the mempool does. Polling them every tick would be
  *  three-quarters wasted requests for information that cannot have moved. */
 const TRADES_MS = 24_000;
-/** Enough tape to fill the visible table; the client paginates locally. */
+/** Small live snapshot for room broadcasts and holder restoration. Complete
+ * trade-table history is server-paged from D1, never carried over the room. */
 const MAX_TRADES = 50;
 const MEMPOOL_BASE = "https://api.counterparty.io:4000/v2";
 /** Individual pending rows are for the "who's minting right now" list —
