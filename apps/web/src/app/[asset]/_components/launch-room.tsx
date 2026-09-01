@@ -17,6 +17,8 @@ export interface RoomTrade {
   token_quantity: string;
   xcp_quantity: string;
   address: string;
+  /** Optional while an older deployed room payload is still in flight. */
+  counterparty_address?: string;
   venue: "pool" | "book";
   tx_hash: string;
 }

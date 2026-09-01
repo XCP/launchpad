@@ -34,7 +34,10 @@ import {
 } from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
-import { mergePairTrades } from "@launchpad/xcp69/trades";
+import {
+  mergePairTrades,
+  tradeRoleForAddress,
+} from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
   includeFormerHolders,
@@ -61,6 +64,7 @@ interface TradeRow {
   tokenRaw: Raw;
   xcpRaw: Raw;
   addr: string;
+  counterpartyAddr: string;
   via: "pool" | "book";
   txHash: string;
 }
@@ -179,12 +183,29 @@ export function ActivityTabs({
       tokenRaw: t.token_quantity,
       xcpRaw: t.xcp_quantity,
       addr: t.address,
+      counterpartyAddr: t.counterparty_address ?? "",
       via: t.venue,
       txHash: t.tx_hash,
     })) ?? null;
 
+  // During rollout, an already-deployed room may still send the older book
+  // shape without its resting maker. Only a connected viewer needs that fact,
+  // so temporarily use the existing direct-fetch fallback for them. Once the
+  // room deploy includes counterparty_address this becomes false and adds no
+  // per-viewer traffic.
+  const needsBookParticipantBackfill = Boolean(
+    address &&
+      roomState?.trades?.some(
+        (trade) =>
+          trade.venue === "book" && trade.counterparty_address === undefined,
+      ),
+  );
+
   const { data: fetchedTrades } = useSWR<TradeRow[]>(
-    tab === "trades" && roomTrades === null ? [asset, "pair-trades"] : null,
+    tab === "trades" &&
+      (roomTrades === null || needsBookParticipantBackfill)
+      ? [asset, "pair-trades"]
+      : null,
     async () => {
       const [pm, om] = await Promise.all([
         fetchJson(
@@ -213,13 +234,16 @@ export function ActivityTabs({
         tokenRaw: trade.tokenQuantity,
         xcpRaw: trade.xcpQuantity,
         addr: trade.address,
+        counterpartyAddr: trade.counterpartyAddress,
         via: trade.venue,
         txHash: trade.txHash,
       }));
     },
     { refreshInterval: 30_000 },
   );
-  const trades = roomTrades ?? fetchedTrades;
+  const trades = needsBookParticipantBackfill
+    ? (fetchedTrades ?? roomTrades)
+    : (roomTrades ?? fetchedTrades);
 
   /** Synthesised, not fetched — the pool has no address to report a balance
    *  for. Marked unmistakably in the row itself, because a fabricated entry in
@@ -695,14 +719,41 @@ export function ActivityTabs({
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {trades.slice(from, from + PER_PAGE).map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
+                    const walletRole = tradeRoleForAddress(
+                      {
+                        address: t.addr,
+                        counterpartyAddress: t.counterpartyAddr,
+                        venue: t.via,
+                      },
+                      address,
+                    );
                     // block_time is missing only if a node responded without
                     // it; fall back to the block height rather than to a
                     // placeholder string.
                     const hasTime = t.time > 0;
                     const at = hasTime ? new Date(t.time * 1000) : null;
                     return (
-                      <tr key={t.key}>
+                      <tr
+                        key={t.key}
+                        className={
+                          walletRole
+                            ? "bg-purple-100/70 dark:bg-purple-950/50 shadow-[inset_4px_0_0_0_rgb(126_34_206/0.85)] dark:shadow-[inset_4px_0_0_0_rgb(192_132_252/0.85)]"
+                            : undefined
+                        }
+                        title={
+                          walletRole === "counterparty"
+                            ? "Your connected wallet's resting order participated in this fill"
+                            : walletRole
+                              ? "Trade from your connected wallet"
+                              : undefined
+                        }
+                      >
                         <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {walletRole && (
+                            <span className="sr-only">
+                              Your connected wallet participated in this trade. {" "}
+                            </span>
+                          )}
                           {t.buy ? "↗ Buy" : "↘ Sell"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">

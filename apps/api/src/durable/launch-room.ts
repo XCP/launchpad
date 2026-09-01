@@ -56,6 +56,8 @@ interface RoomTrade {
   token_quantity: string;
   xcp_quantity: string;
   address: string;
+  /** Resting maker for a book fill; empty for pool fills. */
+  counterparty_address: string;
   venue: "pool" | "book";
   tx_hash: string;
 }
@@ -389,6 +391,7 @@ export class LaunchRoom extends DurableObject<Env> {
         token_quantity: trade.tokenQuantity,
         xcp_quantity: trade.xcpQuantity,
         address: trade.address,
+        counterparty_address: trade.counterpartyAddress,
         venue: trade.venue,
         tx_hash: trade.txHash,
       }))
