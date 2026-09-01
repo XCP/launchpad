@@ -55,8 +55,10 @@ describe("burn send classification", () => {
     expect(isConfirmedBurnSend(receive({ quantity: "0" }))).toBe(false);
   });
 
-  it("accepts valid explicit asset destructions independently of SENDs", () => {
+  it("accepts holder destructions but rejects automatic failed-mint cleanup", () => {
     expect(isConfirmedAssetDestruction(destruction())).toBe(true);
+    expect(isConfirmedAssetDestruction(destruction({ tag: "soft cap not reached" }))).toBe(false);
+    expect(isConfirmedAssetDestruction(destruction({ tag: "Soft Cap Not Reached" }))).toBe(false);
     expect(isConfirmedAssetDestruction(destruction({ status: "invalid" }))).toBe(false);
     expect(isConfirmedAssetDestruction(destruction({ quantity: "0" }))).toBe(false);
     expect(isConfirmedAssetDestruction(destruction({ quantity: "not-a-number" }))).toBe(false);

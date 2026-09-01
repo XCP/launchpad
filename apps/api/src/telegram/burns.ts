@@ -149,6 +149,10 @@ export const isConfirmedAssetDestruction = (
   if (
     row.event !== "ASSET_DESTRUCTION" ||
     row.params.status !== "valid" ||
+    // Counterparty emits an ASSET_DESTRUCTION with this protocol tag when a
+    // fairminter misses its soft cap. That is automatic failed-mint cleanup,
+    // already covered by the refunded launch announcement, not a holder burn.
+    row.params.tag.trim().toLowerCase() === "soft cap not reached" ||
     row.params.asset.length === 0 ||
     !Number.isFinite(Number(row.params.tx_index))
   ) {
