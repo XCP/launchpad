@@ -58,4 +58,16 @@ describe("launch unminted filter", () => {
     expect(statements[0]!.bindings).toEqual(["graduated", 8, 0]);
     expect(statements[1]!.bindings).toEqual(["graduated"]);
   });
+
+  it("sorts the complete graduated phase by USD performance", async () => {
+    const { db, statements } = captureDb();
+
+    await listLaunchPage(db, "graduated", "performance", 12, 0);
+
+    expect(statements).toHaveLength(2);
+    expect(statements[0]!.sql).toContain("launch_xcp_usd > 0");
+    expect(statements[0]!.sql).toContain("CAST(pool_xcp_reserve AS REAL)");
+    expect(statements[0]!.sql).toContain("CAST(price AS REAL)");
+    expect(statements[0]!.sql).toContain("END DESC, tx_index DESC");
+  });
 });

@@ -100,6 +100,34 @@ const minterText = (n: number | null) => (n === null ? "—" : commas(n));
 const holderText = (n: number | null) => (n === null ? "—" : commas(n));
 
 /**
+ * Dollar-performance rank with the sitewide current XCP/USD factor removed.
+ *
+ * The badge compares (current TOKEN/XCP × current XCP/USD) with
+ * (mint TOKEN/XCP × graduation XCP/USD). Current XCP/USD is identical for
+ * every row, so removing it preserves the exact ordering and lets both the
+ * live fallback and the database rank without threading a volatile quote
+ * into the sort key. Rows without a usable historical baseline belong last.
+ */
+const performanceRank = (r: SectionRow): number => {
+  const launchPriceXcp = ratio(r.fm.price, r.fm.quantity_by_price);
+  if (
+    r.priceXcp <= 0 ||
+    launchPriceXcp <= 0 ||
+    r.launchXcpUsd === null ||
+    r.launchXcpUsd <= 0
+  ) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return r.priceXcp / (launchPriceXcp * r.launchXcpUsd);
+};
+
+const comparePerformance = (a: SectionRow, b: SectionRow): number => {
+  const aRank = performanceRank(a);
+  const bRank = performanceRank(b);
+  return aRank === bRank ? 0 : bRank > aRank ? 1 : -1;
+};
+
+/**
  * Each phase is judged by its own measure, so each gets its own sort menu
  * rather than one shared list where two thirds of the options are inert.
  * The first entry is the default, and matches the order apps/api already
@@ -118,6 +146,7 @@ const holderText = (n: number | null) => (n === null ? "—" : commas(n));
 const SORTS: Record<string, SortOption[]> = {
   graduated: [
     { id: "mcap", label: "Market cap", by: (a, b) => b.marketCapXcp - a.marketCapXcp },
+    { id: "performance", label: "Performance", by: comparePerformance },
     { id: "minters", label: "Minters", by: (a, b) => minterRank(b) - minterRank(a) },
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],

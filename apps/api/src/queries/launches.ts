@@ -153,7 +153,7 @@ export function isLaunchPhase(s: string): s is LaunchPhase {
  *  - progress → idx_launches_rank; mcap → idx_launches_market_cap.
  *    Burned supply makes price alone insufficient for market-cap ordering,
  *    so migration 0030 materializes the effective-supply rank separately.
- *  - closing / minters / newest / soonest → no index. SQLite reads the phase
+ *  - performance / closing / minters / newest / soonest → no index. SQLite reads the phase
  *    off idx_launches_rank's `phase=?` seek and sorts it, so the rows read are
  *    bounded by the size of ONE PHASE rather than by the table. That is the
  *    property that matters for D1 billing, and it is why these are acceptable
@@ -170,6 +170,20 @@ export function isLaunchPhase(s: string): s is LaunchPhase {
 const SORT_SQL = {
   progress: "rank_key DESC",
   mcap: "market_cap_rank DESC",
+  // USD return is current TOKEN/XCP * current XCP/USD divided by mint
+  // TOKEN/XCP * graduation XCP/USD. The current XCP/USD factor is common to
+  // every launch, so omitting it preserves the exact rank. NULL sorts last
+  // for old launches whose historical XCP/USD baseline is unavailable.
+  performance: `CASE
+    WHEN CAST(pool_xcp_reserve AS REAL) > 0
+     AND CAST(pool_token_reserve AS REAL) > 0
+     AND CAST(price AS REAL) > 0
+     AND CAST(quantity_by_price AS REAL) > 0
+     AND launch_xcp_usd > 0
+    THEN (CAST(pool_xcp_reserve AS REAL) / CAST(pool_token_reserve AS REAL))
+       / ((CAST(price AS REAL) / CAST(quantity_by_price AS REAL)) * launch_xcp_usd)
+    ELSE NULL
+  END DESC`,
   closing: "current_deadline_block ASC",
   minters: "minters DESC",
   newest: "(CASE WHEN announce_block > 0 THEN announce_block ELSE start_block END) DESC",
