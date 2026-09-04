@@ -185,6 +185,10 @@ const SORT_SQL = {
     ELSE NULL
   END DESC`,
   closing: "current_deadline_block ASC",
+  // Refunded launches belong in the order they actually failed, not the
+  // order they were announced. Delayed starts and deadline extensions make
+  // those two histories diverge.
+  failed: "current_deadline_block DESC",
   minters: "minters DESC",
   newest: "(CASE WHEN announce_block > 0 THEN announce_block ELSE start_block END) DESC",
   soonest: "start_block ASC",

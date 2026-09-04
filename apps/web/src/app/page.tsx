@@ -170,7 +170,7 @@ export default async function HomePage() {
       total: p.total,
       king: p.king ? toSectionRow(p.king) : null,
     })) as [LaunchPage, LaunchPage, LaunchPage];
-    // Only the eight graduated rows actually rendered ask Counterparty for a
+    // Only the up-to-twelve graduated rows actually rendered ask Counterparty for a
     // positive-balance holder count. The balance pages are cached for five
     // minutes, so this is one shared refresh per asset rather than a scan per
     // visitor — and unlike an explorer rollup it cannot count sold-out rows.

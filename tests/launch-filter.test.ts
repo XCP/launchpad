@@ -70,4 +70,16 @@ describe("launch unminted filter", () => {
     expect(statements[0]!.sql).toContain("CAST(price AS REAL)");
     expect(statements[0]!.sql).toContain("END DESC, tx_index DESC");
   });
+
+  it("sorts the graveyard by when each launch failed", async () => {
+    const { db, statements } = captureDb();
+
+    await listLaunchPage(db, "refunded", "failed", 20, 20);
+
+    expect(statements).toHaveLength(2);
+    expect(statements[0]!.sql).toContain(
+      "ORDER BY current_deadline_block DESC, tx_index DESC",
+    );
+    expect(statements[0]!.bindings).toEqual(["refunded", 20, 20]);
+  });
 });
