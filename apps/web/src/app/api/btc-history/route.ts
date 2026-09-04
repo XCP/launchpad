@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import { approx } from "@/lib/numeric";
+import { XCP_API_BASE } from "@/lib/constants";
 
 /**
  * BTC/USD history for the homepage market modal.
  *
- * Keep the third-party price feed on the server. The browser already has a
- * same-origin route for the spot price, and the chart should have the same
- * failure and caching behavior instead of adding CoinGecko to every visitor's
- * network path.
+ * Keep the market request server-side so visitors share one cached response.
+ * The XCP market feed is primary because it already supplies the BTC spot and
+ * 30-day baseline printed on the homepage. Its daily BTC column makes the
+ * chart and percentage use the same source, and it is reachable from the
+ * Cloudflare worker where anonymous CoinGecko requests are throttled.
  */
 const ALLOWED_DAYS = new Set([1, 7, 30, 365]);
 
@@ -16,14 +17,59 @@ interface PricePoint {
   price: number;
 }
 
-const validPoint = (point: unknown): point is [number, number] =>
-  Array.isArray(point) &&
-  typeof point[0] === "number" &&
-  Number.isFinite(point[0]) &&
-  typeof point[1] === "number" &&
-  Number.isFinite(point[1]) &&
-  point[1] > 0;
+async function fetchXcpMarket(days: number): Promise<PricePoint[]> {
+  const response = await fetch(`${XCP_API_BASE}/price`, {
+    signal: AbortSignal.timeout(6_000),
+    next: { revalidate: 300 },
+  });
+  if (!response.ok) return [];
 
+  const data = (await response.json()) as {
+    result?: {
+      history?: { day?: unknown; btc?: unknown }[];
+      btc?: { day?: unknown; usd?: unknown };
+    };
+  };
+  const result = data.result;
+  const points = (result?.history ?? [])
+    .slice(-(days + 1))
+    .map((row): PricePoint | null => {
+      const timestamp =
+        typeof row.day === "string"
+          ? Date.parse(`${row.day}T00:00:00Z`)
+          : NaN;
+      return Number.isFinite(timestamp) &&
+        typeof row.btc === "number" &&
+        Number.isFinite(row.btc) &&
+        row.btc > 0
+        ? { timestamp, price: row.btc }
+        : null;
+    })
+    .filter((point): point is PricePoint => point !== null);
+
+  const latest = result?.btc;
+  const latestTimestamp =
+    typeof latest?.day === "string"
+      ? Date.parse(`${latest.day}T00:00:00Z`)
+      : NaN;
+  if (
+    Number.isFinite(latestTimestamp) &&
+    typeof latest?.usd === "number" &&
+    Number.isFinite(latest.usd) &&
+    latest.usd > 0
+  ) {
+    const point = { timestamp: latestTimestamp, price: latest.usd };
+    if (points[points.length - 1]?.timestamp === latestTimestamp) {
+      points[points.length - 1] = point;
+    } else {
+      points.push(point);
+    }
+  }
+
+  return points;
+}
+
+/** CoinGecko remains a best-effort fallback if the primary feed is down. */
 async function fetchCoinGecko(days: number): Promise<PricePoint[]> {
   const upstream = new URL(
     "https://api.coingecko.com/api/v3/coins/bitcoin/market_chart",
@@ -39,50 +85,12 @@ async function fetchCoinGecko(days: number): Promise<PricePoint[]> {
 
   const data = (await response.json()) as { prices?: unknown[] };
   return (data.prices ?? [])
-    .filter(validPoint)
-    .map(([timestamp, price]) => ({ timestamp, price }));
-}
-
-/**
- * CoinGecko's anonymous endpoint can throttle shared Cloudflare egress IPs.
- * Kraken's public OHLC feed is the fallback: hourly points cover up to 30
- * days, while daily points keep the one-year response below its 720-row cap.
- */
-async function fetchKraken(days: number): Promise<PricePoint[]> {
-  const upstream = new URL("https://api.kraken.com/0/public/OHLC");
-  upstream.searchParams.set("pair", "XBTUSD");
-  upstream.searchParams.set("interval", days <= 30 ? "60" : "1440");
-  upstream.searchParams.set(
-    "since",
-    String(Math.floor(Date.now() / 1_000) - days * 86_400),
-  );
-
-  const response = await fetch(upstream, {
-    signal: AbortSignal.timeout(5_000),
-    next: { revalidate: 300 },
-  });
-  if (!response.ok) return [];
-
-  const data = (await response.json()) as {
-    error?: unknown[];
-    result?: Record<string, unknown>;
-  };
-  if ((data.error?.length ?? 0) > 0) return [];
-  const rows = Object.entries(data.result ?? {}).find(
-    ([key, value]) => key !== "last" && Array.isArray(value),
-  )?.[1];
-  if (!Array.isArray(rows)) return [];
-
-  return rows
     .map((row): PricePoint | null => {
       if (!Array.isArray(row)) return null;
-      const timestamp = typeof row[0] === "number" ? row[0] * 1_000 : NaN;
-      const close = row[4];
-      const price =
-        typeof close === "string" || typeof close === "number"
-          ? approx(close)
-          : NaN;
-      return Number.isFinite(timestamp) &&
+      const timestamp = row[0];
+      const price = row[1];
+      return typeof timestamp === "number" &&
+        Number.isFinite(timestamp) &&
         typeof price === "number" &&
         Number.isFinite(price) &&
         price > 0
@@ -97,8 +105,8 @@ export async function GET(request: Request) {
   const days = ALLOWED_DAYS.has(requested) ? requested : 30;
 
   try {
-    const primary = await fetchCoinGecko(days).catch(() => []);
-    const result = primary.length > 0 ? primary : await fetchKraken(days);
+    const primary = await fetchXcpMarket(days).catch(() => []);
+    const result = primary.length > 0 ? primary : await fetchCoinGecko(days);
 
     if (result.length === 0) {
       return NextResponse.json(
