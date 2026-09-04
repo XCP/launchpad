@@ -96,19 +96,21 @@ export function MarketPulse({
         />
       </section>
 
-      <MarketModal
-        market={market}
-        range={range}
-        onRangeChange={setRange}
-        onMarketChange={open}
-        onOpenChange={(isOpen) => {
-          if (!isOpen) setMarket(null);
-        }}
-        btcUsd={btcUsd}
-        xcpUsd={xcpUsd}
-        btcChange30d={btcChange30d}
-        xcpChange30d={xcpChange30d}
-      />
+      {market !== null && (
+        <MarketModal
+          market={market}
+          range={range}
+          onRangeChange={setRange}
+          onMarketChange={open}
+          onOpenChange={(isOpen) => {
+            if (!isOpen) setMarket(null);
+          }}
+          btcUsd={btcUsd}
+          xcpUsd={xcpUsd}
+          btcChange30d={btcChange30d}
+          xcpChange30d={xcpChange30d}
+        />
+      )}
     </>
   );
 }
@@ -186,7 +188,7 @@ function MarketModal({
   btcChange30d,
   xcpChange30d,
 }: {
-  market: Market | null;
+  market: Market;
   range: Range;
   onRangeChange: (range: Range) => void;
   onMarketChange: (market: Market) => void;
@@ -243,8 +245,6 @@ function MarketModal({
     return () => controller.abort();
   }, [market, range, refresh]);
 
-  if (!market) return null;
-
   const isBtc = market === "btc";
   const spot = isBtc ? btcUsd : xcpUsd;
   const first = points?.[0]?.price;
@@ -258,6 +258,14 @@ function MarketModal({
       : chartChange;
   const floorSats = btcUsd && xcpUsd ? (xcpUsd / btcUsd) * 100_000_000 : null;
   const btcInXcp = btcUsd && xcpUsd ? btcUsd / xcpUsd : null;
+  const startLoading = () => {
+    setPoints(null);
+    setFailed(false);
+  };
+  const retry = () => {
+    startLoading();
+    setRefresh((value) => value + 1);
+  };
 
   return (
     <D.Root open onOpenChange={onOpenChange}>
@@ -283,7 +291,11 @@ function MarketModal({
                   <button
                     key={item}
                     type="button"
-                    onClick={() => onMarketChange(item)}
+                    onClick={() => {
+                      if (item === market) return;
+                      startLoading();
+                      onMarketChange(item);
+                    }}
                     aria-pressed={market === item}
                     className={`rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition-colors ${
                       market === item
@@ -299,7 +311,7 @@ function MarketModal({
               </div>
               <button
                 type="button"
-                onClick={() => setRefresh((value) => value + 1)}
+                onClick={retry}
                 aria-label="Refresh price chart"
                 className="flex size-9 items-center justify-center rounded-full text-gray-400 hover:bg-white hover:text-gray-700 dark:hover:bg-gray-900 dark:hover:text-gray-200"
               >
@@ -342,7 +354,11 @@ function MarketModal({
                 <button
                   key={item.id}
                   type="button"
-                  onClick={() => onRangeChange(item.id)}
+                  onClick={() => {
+                    if (item.id === range) return;
+                    startLoading();
+                    onRangeChange(item.id);
+                  }}
                   aria-pressed={range === item.id}
                   className={`rounded-full px-3 py-1 text-xs font-semibold transition-colors ${
                     range === item.id
@@ -376,7 +392,7 @@ function MarketModal({
             ) : failed ? (
               <div className="flex h-64 flex-col items-center justify-center gap-3 text-center">
                 <p className="text-sm text-gray-500 dark:text-gray-400">Price history is temporarily unavailable.</p>
-                <button type="button" onClick={() => setRefresh((value) => value + 1)} className="rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold">Try again</button>
+                <button type="button" onClick={retry} className="rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold">Try again</button>
               </div>
             ) : (
               <MarketLineChart market={market} points={points} />
@@ -393,7 +409,7 @@ function MarketModal({
                   ? `1 XCP = ${Math.round(approx(floorSats)).toLocaleString("en-US")} sats`
                   : "—"
             } />
-            <Stat label="Data" value={isBtc ? "CoinGecko · cached 5 min" : "XCP market · cached 15 min"} />
+            <Stat label="Data" value={isBtc ? "BTC market · cached 5 min" : "XCP market · cached 15 min"} />
           </div>
         </D.Content>
       </D.Portal>
