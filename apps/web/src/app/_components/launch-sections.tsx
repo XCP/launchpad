@@ -565,6 +565,19 @@ function Section({
 
         {showControls && (
           <div className="flex shrink-0 items-center gap-2">
+            {phase === "graduated" && (
+              <a
+                href="https://opreturn.art/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 sm:inline-flex"
+              >
+                <span aria-hidden="true">🐐</span>
+                <span>Trading Data</span>
+                <span aria-hidden="true">↗</span>
+              </a>
+            )}
+
             {walletAddress && phase === "minting" && (
               <label className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 sm:flex">
                 <input
