@@ -7,8 +7,13 @@ import { shortAddress } from "@/lib/format";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
 import { fetchPriorityFeeRate } from "@/lib/wallet/useCompose";
-import { parseTxInputs } from "@/lib/wallet/raw-tx";
-import { recentlySpentUtxos, registerSpentUtxos } from "@/lib/wallet/spent-utxos";
+import { ownTransactionOutputs, parseTxInputs } from "@/lib/wallet/raw-tx";
+import {
+  pendingChangeInputs,
+  recentlySpentUtxos,
+  registerBroadcast,
+} from "@/lib/wallet/spent-utxos";
+import { withAddressTransactionLock } from "@/lib/wallet/transaction-lock";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
@@ -148,7 +153,6 @@ export function useDispenseRouter(btcUsd?: number | null) {
   const [planError, setPlanError] = useState<string | null>(null);
   const legsRef = useRef<Leg[]>([]);
   const chainModeRef = useRef(false);
-  const usedInputsRef = useRef<string[]>([]);
   const feeRateRef = useRef(3);
   const runningRef = useRef(false);
 
@@ -164,73 +168,107 @@ export function useDispenseRouter(btcUsd?: number | null) {
     runningRef.current = true;
     setPhase("running");
     try {
-      for (let i = startIdx; i < legsRef.current.length; i++) {
-        const leg = legsRef.current[i];
-        if (leg.status === "done") continue;
-        if (i > startIdx) await sleep(INTER_LEG_DELAY_MS);
-
-        try {
-          // Compose (unless retrying an already-composed hex — same hex
-          // re-sign is deduped by the wallet, so reuse it).
-          let rawHex = leg.rawHex;
-          if (!rawHex) {
-            patch(i, { status: "composing", error: null });
-            const stale = await preflightLeg(leg);
-            if (stale) throw new Error(`Skipped: ${stale}`);
-            rawHex = await composeLeg(address, leg, feeRateRef.current, {
-              inputsSet: leg.utxoAssigned,
-              excludeUtxos:
-                chainModeRef.current && !leg.utxoAssigned
-                  ? usedInputsRef.current
-                  : undefined,
-              // Leg zero deliberately starts from confirmed coins. Once it
-              // broadcasts, later legs may chain from its mempool change.
-              allowUnconfirmed:
-                chainModeRef.current && !leg.utxoAssigned && i > 0,
-            });
-            patch(i, { rawHex });
+      await withAddressTransactionLock(address, async () => {
+        // Planning happens before the lock because it includes public API
+        // reads. If another tab broadcast while this one waited for approval,
+        // discard any now-spent assignments and continue from the shared
+        // pending-change journal instead.
+        const latestSpent = new Set(recentlySpentUtxos(address));
+        const staleLeg = legsRef.current.some((leg) => {
+          if (leg.status === "done") return false;
+          if (leg.utxoAssigned && latestSpent.has(leg.utxoAssigned)) return true;
+          if (!leg.rawHex) return false;
+          try {
+            return parseTxInputs(leg.rawHex).some((input) =>
+              latestSpent.has(`${input.txid}:${input.vout}`),
+            );
+          } catch {
+            return true;
           }
-
-          const inputs = parseTxInputs(rawHex);
-          usedInputsRef.current = [
-            ...new Set([
-              ...usedInputsRef.current,
-              ...inputs.map((input) => `${input.txid}:${input.vout}`),
-            ]),
-          ];
-
-          patch(i, { status: "signing", error: null });
-          const signedHex = await signTransaction(rawHex);
-
-          patch(i, { status: "broadcasting" });
-          const txid = await broadcastTransaction(signedHex);
-          patch(i, { status: "done", txid });
-          registerSpentUtxos(inputs);
-          registerPending({
-            txid,
-            kind: "dispense",
-            label: `Load ${leg.units * (leg.dispenser.give_quantity / 1e8)} XCP via ${shortAddress(leg.dispenser.source)}`,
-            address: address ?? undefined,
-          });
-          // One event per LEG, not per plan: each leg is its own broadcast
-          // that can succeed while a later one fails, so a plan that
-          // half-filled must report the half that actually happened.
-          trackTx(
-            txid,
-            "xcp purchased",
-            btcUsd ? (leg.btcSats / 1e8) * btcUsd : null,
-          );
-        } catch (e) {
-          patch(i, {
-            status: "error",
-            error: e instanceof Error ? e.message : "Failed",
-          });
-          setPhase("partial");
-          runningRef.current = false;
-          return;
+        });
+        if (staleLeg) {
+          chainModeRef.current = true;
+          legsRef.current = legsRef.current.map((leg) => ({
+            ...leg,
+            utxoAssigned: leg.status === "done" ? leg.utxoAssigned : undefined,
+            rawHex: leg.status === "done" ? leg.rawHex : null,
+          }));
+          sync();
         }
-      }
-      setPhase(legsRef.current.every((l) => l.status === "done") ? "done" : "partial");
+
+        for (let i = startIdx; i < legsRef.current.length; i++) {
+          const leg = legsRef.current[i];
+          if (leg.status === "done") continue;
+          if (i > startIdx) await sleep(INTER_LEG_DELAY_MS);
+
+          try {
+            // Compose (unless retrying an already-composed hex — same hex
+            // re-sign is deduped by the wallet, so reuse it).
+            let rawHex = leg.rawHex;
+            if (!rawHex) {
+              patch(i, { status: "composing", error: null });
+              const stale = await preflightLeg(leg);
+              if (stale) throw new Error(`Skipped: ${stale}`);
+              const chainedInputs =
+                chainModeRef.current && !leg.utxoAssigned
+                  ? pendingChangeInputs(address)
+                  : [];
+              rawHex = await composeLeg(address, leg, feeRateRef.current, {
+                inputsSet: leg.utxoAssigned ?? (chainedInputs.join(",") || undefined),
+                excludeUtxos:
+                  chainModeRef.current && !leg.utxoAssigned
+                    ? recentlySpentUtxos(address)
+                    : undefined,
+                allowUnconfirmed: chainedInputs.length > 0 || (
+                  chainModeRef.current && !leg.utxoAssigned && i > 0
+                ),
+              });
+              patch(i, { rawHex });
+            }
+
+            const inputs = parseTxInputs(rawHex);
+
+            patch(i, { status: "signing", error: null });
+            const signedHex = await signTransaction(rawHex);
+
+            patch(i, { status: "broadcasting" });
+            const txid = await broadcastTransaction(signedHex);
+            patch(i, { status: "done", txid });
+            try {
+              registerBroadcast(
+                address,
+                txid,
+                inputs,
+                ownTransactionOutputs(signedHex, address),
+              );
+            } catch (journalError) {
+              console.warn("Could not record broadcast UTXO state", journalError);
+            }
+            registerPending({
+              txid,
+              kind: "dispense",
+              label: `Load ${leg.units * (leg.dispenser.give_quantity / 1e8)} XCP via ${shortAddress(leg.dispenser.source)}`,
+              address: address ?? undefined,
+            });
+            // One event per LEG, not per plan: each leg is its own broadcast
+            // that can succeed while a later one fails, so a plan that
+            // half-filled must report the half that actually happened.
+            trackTx(
+              txid,
+              "xcp purchased",
+              btcUsd ? (leg.btcSats / 1e8) * btcUsd : null,
+            );
+          } catch (e) {
+            patch(i, {
+              status: "error",
+              error: e instanceof Error ? e.message : "Failed",
+            });
+            setPhase("partial");
+            return;
+          }
+        }
+        setPhase(legsRef.current.every((l) => l.status === "done") ? "done" : "partial");
+      });
     } finally {
       runningRef.current = false;
     }
@@ -252,7 +290,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
 
     try {
       feeRateRef.current = feeRateOverride ?? (await fetchPriorityFeeRate());
-      const knownSpent = new Set(recentlySpentUtxos());
+      const knownSpent = new Set(recentlySpentUtxos(address));
       const utxos = (await fetchConfirmedUtxos(address)).filter(
         (utxo) => !knownSpent.has(`${utxo.txid}:${utxo.vout}`),
       );
@@ -299,11 +337,6 @@ export function useDispenseRouter(btcUsd?: number | null) {
           ...l,
           utxoAssigned: undefined,
         }));
-        usedInputsRef.current = [...knownSpent];
-      } else {
-        usedInputsRef.current = legsRef.current
-          .map((l) => l.utxoAssigned)
-          .filter((u): u is string => Boolean(u));
       }
       sync();
       await run(0);
@@ -323,7 +356,6 @@ export function useDispenseRouter(btcUsd?: number | null) {
   const reset = () => {
     if (runningRef.current) return;
     legsRef.current = [];
-    usedInputsRef.current = [];
     chainModeRef.current = false;
     setLegs([]);
     setPhase("idle");
