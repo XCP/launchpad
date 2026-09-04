@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Dialog as D } from "radix-ui";
 import { useEffect, useId, useState } from "react";
 import { TokenImage } from "@/components/token-image";
+import { trackEvent } from "@/lib/analytics";
 import { priceChangePercent } from "@/lib/market";
 import { approx } from "@/lib/numeric";
 
@@ -127,7 +128,10 @@ function TickerButton({
   return (
     <button
       type="button"
-      onClick={onClick}
+      onClick={() => {
+        trackEvent(isBtc ? "bitcoin price opened" : "xcp price opened");
+        onClick();
+      }}
       aria-label={`Open ${isBtc ? "Bitcoin" : "XCP"} price`}
       className={`group h-9 min-w-0 items-center gap-2 rounded-full border bg-white dark:bg-gray-900 px-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 sm:w-44 ${isBtc ? "hidden sm:flex" : "flex"} ${
         isBtc

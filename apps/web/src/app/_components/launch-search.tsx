@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Dialog as D } from "radix-ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TokenImage } from "@/components/token-image";
+import { trackEvent } from "@/lib/analytics";
 import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
 import { fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { type SearchRow, toSearchRow } from "@/lib/launch-row";
@@ -115,6 +116,7 @@ export function LaunchSearch({
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
+        trackEvent("search opened");
         setOpen(true);
         load();
       }
@@ -147,6 +149,7 @@ export function LaunchSearch({
   }, [rows, query, phase]);
 
   const go = (asset: string) => {
+    trackEvent("search result opened");
     setOpen(false);
     setQuery("");
     router.push(`/${asset}`);
@@ -161,6 +164,7 @@ export function LaunchSearch({
     <D.Root
       open={open}
       onOpenChange={(next) => {
+        if (next && !open) trackEvent("search opened");
         setOpen(next);
         if (next) load();
       }}
