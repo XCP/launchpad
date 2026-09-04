@@ -11,7 +11,13 @@ import {
   fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
-import { fetchXcpUsd } from "@/lib/api/price";
+import {
+  fetchBtcUsd,
+  fetchBtcUsd30dAgo,
+  fetchXcpUsd,
+  fetchXcpUsd30dAgo,
+} from "@/lib/api/price";
+import { priceChangePercent } from "@/lib/market";
 import { big } from "@/lib/numeric";
 import {
   isXcp69,
@@ -47,13 +53,31 @@ export const revalidate = 60;
 const SECTIONS = ["graduated", "minting", "scheduled"] as const;
 
 export default async function HomePage() {
-  const [blockHeight, xcpUsd, ...first] = await Promise.all([
+  const [
+    blockHeight,
+    xcpUsd,
+    btcUsd,
+    btcUsd30dAgo,
+    xcpUsd30dAgo,
+    ...first
+  ] = await Promise.all([
     fetchBlockHeight(),
     fetchXcpUsd(),
+    fetchBtcUsd(),
+    fetchBtcUsd30dAgo(),
+    fetchXcpUsd30dAgo(),
     // No `sort`: the API's own default for each phase, so the ordering has one
     // definition rather than a copy here that could drift from it.
     ...SECTIONS.map((phase) => fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0)),
   ]);
+  const btcChange30d =
+    btcUsd !== null && btcUsd30dAgo !== null
+      ? priceChangePercent(btcUsd, btcUsd30dAgo)
+      : null;
+  const xcpChange30d =
+    xcpUsd !== null && xcpUsd30dAgo !== null
+      ? priceChangePercent(xcpUsd, xcpUsd30dAgo)
+      : null;
 
   // All three or none. A partial answer would render one section paged and
   // another from a live derivation, which is two different orderings of the
@@ -187,7 +211,13 @@ export default async function HomePage() {
     <div className="space-y-10">
       {/* Search fetches its own index when it first opens — it has to see
           every conforming launch, and this page only holds three pages. */}
-      <HomeToolbar height={blockHeight} xcpUsd={xcpUsd} />
+      <HomeToolbar
+        height={blockHeight}
+        btcUsd={btcUsd}
+        xcpUsd={xcpUsd}
+        btcChange30d={btcChange30d}
+        xcpChange30d={xcpChange30d}
+      />
 
       {count === 0 && <FirstLaunchHero />}
 

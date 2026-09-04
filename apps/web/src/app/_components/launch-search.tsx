@@ -168,7 +168,7 @@ export function LaunchSearch({
       <D.Trigger asChild>
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2 pl-3.5 pr-2 text-left text-sm text-gray-400 dark:text-gray-500 transition-colors hover:border-gray-300 dark:hover:border-gray-700"
+          className="flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 pl-3.5 pr-2 text-left text-sm text-gray-400 dark:text-gray-500 transition-colors hover:border-gray-300 dark:hover:border-gray-700"
         >
           <svg aria-hidden viewBox="0 0 16 16" fill="none" className="size-4 shrink-0">
             <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
