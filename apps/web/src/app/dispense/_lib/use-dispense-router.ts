@@ -11,6 +11,7 @@ import { parseTxInputs } from "@/lib/wallet/raw-tx";
 import { recentlySpentUtxos, registerSpentUtxos } from "@/lib/wallet/spent-utxos";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { relayingFetch } from "@/lib/counterparty-relay";
 
 /**
  * Multi-dispense router: fills one load across up to MAX_LEGS dispensers as
@@ -86,7 +87,7 @@ async function fetchConfirmedUtxos(address: string): Promise<Utxo[]> {
     .sort((a, b) => b.value - a.value);
 }
 
-async function composeLeg(
+export async function composeLeg(
   address: string,
   leg: PlannedLeg,
   feeRate: number,
@@ -104,7 +105,11 @@ async function composeLeg(
   if (opts.allowUnconfirmed) qp.set("allow_unconfirmed_inputs", "true");
 
   const url = `${COUNTERPARTY_API_BASE}/addresses/${address}/compose/dispense?${qp}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
+  // A person is waiting on this request, so use the same unbudgeted relay
+  // protection as the shared compose pipeline. The direct Counterparty host
+  // can surface a CORS-hidden rate limit as the browser's raw "Failed to
+  // fetch"; in that case the same-origin retry is the transaction path.
+  const res = await relayingFetch(url, 30_000, { essential: true });
   const data = await res.json();
   if (!res.ok || data.error) {
     throw new Error(data.error?.description ?? data.error ?? `Compose failed (${res.status})`);
@@ -115,9 +120,9 @@ async function composeLeg(
 /** Live re-check of one dispenser right before composing its leg. */
 async function preflightLeg(leg: PlannedLeg): Promise<string | null> {
   try {
-    const res = await fetch(
+    const res = await relayingFetch(
       `${COUNTERPARTY_API_BASE}/addresses/${leg.dispenser.source}/dispensers`,
-      { signal: AbortSignal.timeout(10_000) },
+      10_000,
     );
     const rows: {
       asset: string;
