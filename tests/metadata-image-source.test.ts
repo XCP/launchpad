@@ -241,6 +241,55 @@ describe("public image route", () => {
     expect(await (await image()).text()).toBe("after");
   });
 
+  it("answers a revalidation with 304 and no body once the browser holds the version", async () => {
+    const f = fixture();
+    f.objects.set("i/COIN", { etag: "version-1", contentType: "image/png", bytes: "original" });
+    const first = await image();
+    expect(first.headers.get("etag")).toBe('"version-1"');
+    await f.flush();
+    const again = await publicImage(
+      new Request("https://xcp.fun/i/COIN", { headers: { "if-none-match": 'W/"other", "version-1"' } }),
+      { params: Promise.resolve({ asset: "COIN" }) },
+    );
+    expect(again.status).toBe(304);
+    expect(again.headers.get("etag")).toBe('"version-1"');
+    expect(again.headers.get("cache-control")).toBe("public, max-age=300, s-maxage=31536000");
+    expect(await again.text()).toBe("");
+    // The version moved on: the stale validator no longer matches.
+    f.objects.set("i/COIN", { etag: "version-2", bytes: "edited" });
+    f.entries.clear();
+    const edited = await publicImage(
+      new Request("https://xcp.fun/i/COIN", { headers: { "if-none-match": '"version-1"' } }),
+      { params: Promise.resolve({ asset: "COIN" }) },
+    );
+    expect(edited.status).toBe(200);
+    expect(await edited.text()).toBe("edited");
+    expect(edited.headers.get("etag")).toBe('"version-2"');
+  });
+
+  it("names the transform by version and width and skips the transform on a match", async () => {
+    const f = fixture();
+    f.objects.set("i/COIN", { etag: "version-1", bytes: "original" });
+    const transformed = vi.fn(async () => new Response("resized", { headers: { "content-type": "image/webp" } }));
+    vi.stubGlobal("fetch", transformed);
+    const first = await image("COIN", "?w=280");
+    expect(await first.text()).toBe("resized");
+    expect(first.headers.get("etag")).toBe('"version-1-w280"');
+    await f.flush();
+    const again = await publicImage(
+      new Request("https://xcp.fun/i/COIN?w=280", { headers: { "if-none-match": '"version-1-w280"' } }),
+      { params: Promise.resolve({ asset: "COIN" }) },
+    );
+    expect(again.status).toBe(304);
+    expect(transformed).toHaveBeenCalledTimes(1);
+    // A different width is a different response.
+    const other = await publicImage(
+      new Request("https://xcp.fun/i/COIN?w=96", { headers: { "if-none-match": '"version-1-w280"' } }),
+      { params: Promise.resolve({ asset: "COIN" }) },
+    );
+    expect(other.status).toBe(200);
+    expect(other.headers.get("etag")).toBe('"version-1-w96"');
+  });
   it("redirects to the CDN when the remembered object was deleted", async () => {
     const f = fixture();
     f.objects.set("i/COIN", { etag: "version-1", bytes: "before" });
@@ -272,6 +321,19 @@ describe("hero art route", () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it("revalidates hero art by version", async () => {
+    const f = fixture();
+    f.objects.set("i/COIN", { etag: "version-1", bytes: "hero" });
+    expect((await art()).headers.get("etag")).toBe('"version-1"');
+    await f.flush();
+    const again = await heroArt(
+      new Request("https://xcp.fun/art/COIN", { headers: { "if-none-match": '"version-1"' } }),
+      { params: Promise.resolve({ asset: "COIN" }) },
+    );
+    expect(again.status).toBe(304);
+    expect(again.headers.get("cache-control")).toBe("public, max-age=60");
+    expect(f.conditionalGets()).toBe(1);
+  });
   it("defaults an untyped object to image/png and serves an unseen edit unversioned", async () => {
     const f = fixture();
     f.objects.set("i/COIN", { etag: "version-1", bytes: "before" });

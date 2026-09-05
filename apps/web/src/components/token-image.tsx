@@ -149,6 +149,11 @@ export function TokenImage({
       src={sources[index]}
       alt=""
       className={className}
+      // Fetched when it nears the viewport, not when the page does. The homepage
+      // renders 56 of these; without this a visitor who never scrolls still
+      // costs 56 image requests, each a Worker invocation.
+      loading="lazy"
+      decoding="async"
       onError={advance}
     />
   );

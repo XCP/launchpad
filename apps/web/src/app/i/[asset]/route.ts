@@ -1,9 +1,11 @@
 import {
   METADATA_ORIGIN,
+  clientHoldsVersion,
   forgetMetadataArtLocation,
   getMetadataEdgeCache,
   getMetadataRuntime,
   metadataImageSourceUrl,
+  notModified,
   readVersionedImage,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
@@ -139,6 +141,13 @@ export async function GET(
     // source response under the right etag query. Some zone cache rules also
     // intentionally ignore queries. A new object version now has a URL that
     // cannot collide with either of those entries.
+    // The etag names the source bytes and the width names the transform, so
+    // together they name this response exactly. A browser past its five
+    // minutes sends the pair back and gets a 304 with no transform fetched.
+    const validator = stored.etag ? `"${stored.etag}-w${width}"` : null;
+    if (validator && clientHoldsVersion(request, validator)) {
+      return notModified(validator, cacheControl);
+    }
     const source = stored.etag
       ? metadataImageSourceUrl(normalizedAsset, stored.etag)
       : `${METADATA_ORIGIN}/i/${encoded}`;
@@ -160,6 +169,7 @@ export async function GET(
           "content-type": res.headers.get("content-type") ?? "image/png",
           "cache-control": cacheControl,
           "access-control-allow-origin": "*",
+          ...(validator ? { etag: validator } : {}),
         },
       });
     }
@@ -175,6 +185,10 @@ export async function GET(
   //
   // If a provider ever omits the etag, serve from R2 without shared caching;
   // falling back to an unversioned key would recreate the stale-art bug.
+  const validator = stored.etag ? `"${stored.etag}"` : null;
+  if (validator && clientHoldsVersion(request, validator)) {
+    return notModified(validator, cacheControl);
+  }
   const image = stored.etag
     ? await readVersionedImage(bucket, cache, ctx, normalizedAsset, stored.etag, [stored.key])
     : null;
@@ -185,6 +199,7 @@ export async function GET(
         "cache-control": cacheControl,
         "access-control-allow-origin": "*",
         "x-metadata-cache": image.cacheStatus,
+        ...(validator ? { etag: validator } : {}),
       },
     });
   }

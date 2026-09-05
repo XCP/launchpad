@@ -1,7 +1,9 @@
 import {
+  clientHoldsVersion,
   forgetMetadataArtLocation,
   getMetadataEdgeCache,
   getMetadataRuntime,
+  notModified,
   readVersionedImage,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
@@ -28,7 +30,7 @@ import { CDN_BASE } from "@/lib/constants";
  * fresh GET each time for a picture that has not changed.
  */
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ asset: string }> },
 ) {
   const { asset: rawAsset } = await params;
@@ -42,6 +44,10 @@ export async function GET(
     // browser TTL makes previously open asset pages self-heal too.
     const cacheControl =
       stored.kind === "original" ? "public, max-age=60" : "public, max-age=300";
+    const validator = stored.etag ? `"${stored.etag}"` : null;
+    if (validator && clientHoldsVersion(request, validator)) {
+      return notModified(validator, cacheControl);
+    }
     const image = stored.etag
       ? await readVersionedImage(bucket, cache, ctx, asset, stored.etag, [stored.key])
       : null;
@@ -52,6 +58,7 @@ export async function GET(
           "cache-control": cacheControl,
           "access-control-allow-origin": "*",
           "x-metadata-cache": image.cacheStatus,
+          ...(validator ? { etag: validator } : {}),
         },
       });
     }

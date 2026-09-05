@@ -120,6 +120,35 @@ export function metadataImageCacheKey(asset: string, etag: string): Request {
   );
 }
 
+/**
+ * Does the client already hold the response this validator names?
+ *
+ * The image routes served no validator at all, so a browser whose five
+ * minutes were up had no way to ask "still this one?" and downloaded every
+ * card again: production showed zero conditional requests. An ETag built
+ * from the R2 etag (which changes on every write) plus whatever else shaped
+ * the bytes lets that visit cost a 304 and no body.
+ */
+export function clientHoldsVersion(request: Request, etag: string): boolean {
+  const header = request.headers.get("if-none-match");
+  if (!header) return false;
+  return header
+    .split(",")
+    .map((tag) => tag.trim().replace(/^W\//, ""))
+    .some((tag) => tag === etag || tag === "*");
+}
+
+export function notModified(etag: string, cacheControl: string): Response {
+  return new Response(null, {
+    status: 304,
+    headers: {
+      etag,
+      "cache-control": cacheControl,
+      "access-control-allow-origin": "*",
+    },
+  });
+}
+
 /** One exact version of a stored image, from {@link readVersionedImage}. */
 export interface VersionedImage {
   body: ReadableStream;
