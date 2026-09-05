@@ -31,6 +31,10 @@ interface R2Object extends R2ObjectMeta {
 export interface R2Bucket {
   head(key: string): Promise<R2ObjectMeta | null>;
   get(key: string): Promise<R2Object | null>;
+  get(
+    key: string,
+    options: { onlyIf: { etagMatches: string } },
+  ): Promise<R2ObjectMeta | R2Object | null>;
   put(
     key: string,
     value: ArrayBuffer | string,
@@ -102,11 +106,86 @@ export function metadataCacheKey(pathname: string): Request {
  * unambiguous, this avoids depending on query-string cache behavior configured
  * outside this Worker. An edit can leave the old entry behind harmlessly; no
  * request for the new etag can ever match it.
+ *
+ * The `_image-version` namespace replaced `_image-object` when the fill path
+ * became version-validated ({@link readVersionedImage}). The older namespace
+ * was filled by an unconditional GET issued after a separate ownership
+ * lookup, so an edit landing between the two could file the replacement's
+ * bytes under the previous etag — an entry nothing could ever evict. Those
+ * entries age out on their own; nothing reads them any more.
  */
 export function metadataImageCacheKey(asset: string, etag: string): Request {
   return metadataCacheKey(
-    `/_image-object/${encodeURIComponent(asset.toUpperCase())}/${encodeURIComponent(etag)}`,
+    `/_image-version/${encodeURIComponent(asset.toUpperCase())}/${encodeURIComponent(etag)}`,
   );
+}
+
+/** One exact version of a stored image, from {@link readVersionedImage}. */
+export interface VersionedImage {
+  body: ReadableStream;
+  /** As stored; null when the writer recorded none. Callers pick the default. */
+  contentType: string | null;
+  cacheStatus: "HIT" | "MISS";
+}
+
+/** The entry is keyed by etag, so the bytes cannot change under it. */
+const VERSIONED_IMAGE_CACHE_CONTROL = "public, max-age=31536000, immutable";
+
+/**
+ * Read the bytes of exactly one object version, reusing them across requests.
+ *
+ * A miss is a conditional GET against the version itself, not a HEAD and then
+ * a GET. Two calls can straddle an owner's edit; one call cannot, so what is
+ * stored under an etag is always the body that carried it. R2 answers a failed
+ * precondition with metadata and no body, which still counts as an object
+ * that exists: an original whose version has moved on is not a reason to let
+ * a mirror answer for it. Only an absent key lets the next candidate be tried,
+ * which keeps the original-before-mirror precedence ownership resolution uses.
+ *
+ * Returns null when no candidate carries this version. The caller decides
+ * whether that is a 404 or a reason to re-resolve.
+ */
+export async function readVersionedImage(
+  bucket: R2Bucket,
+  cache: Cache | null,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  asset: string,
+  etag: string,
+  keys: string[],
+): Promise<VersionedImage | null> {
+  const cacheKey = metadataImageCacheKey(asset, etag);
+  const cached = await cache?.match(cacheKey).catch(() => undefined);
+  if (cached?.body) {
+    return {
+      body: cached.body,
+      contentType: cached.headers.get("content-type"),
+      cacheStatus: "HIT",
+    };
+  }
+
+  let object: R2ObjectMeta | R2Object | null = null;
+  for (const key of keys) {
+    object = await bucket.get(key, { onlyIf: { etagMatches: etag } });
+    if (object) break;
+  }
+  if (!object || !("body" in object)) return null;
+  if (object.etag !== etag) {
+    ctx.waitUntil(object.body.cancel().catch(() => undefined));
+    return null;
+  }
+
+  const contentType = object.httpMetadata?.contentType ?? null;
+  const [serve, store] = object.body.tee();
+  if (cache) {
+    const headers = new Headers({ "cache-control": VERSIONED_IMAGE_CACHE_CONTROL });
+    if (contentType) headers.set("content-type", contentType);
+    ctx.waitUntil(
+      cache.put(cacheKey, new Response(store, { headers })).catch(() => undefined),
+    );
+  } else {
+    ctx.waitUntil(store.cancel().catch(() => undefined));
+  }
+  return { body: serve, contentType, cacheStatus: "MISS" };
 }
 
 /** A path-versioned source for Cloudflare Image transformations. The etag is
@@ -122,6 +201,23 @@ const ART_LOCATION_ETAG = "x-metadata-art-etag";
 
 export function metadataArtLocationCacheKey(asset: string): Request {
   return metadataCacheKey(`/_art-location/${encodeURIComponent(asset.toUpperCase())}`);
+}
+
+/**
+ * Drop a remembered location whose version the object no longer carries.
+ *
+ * The editor evicts this entry on the edge that handled the edit; every other
+ * edge keeps its copy for up to five minutes. A version-validated read that
+ * comes back empty is proof this edge is one of those, so forget the entry
+ * now rather than serving the previous version's answer until it expires.
+ */
+export function forgetMetadataArtLocation(
+  cache: Cache | null,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+  asset: string,
+): void {
+  if (!cache) return;
+  ctx.waitUntil(cache.delete(metadataArtLocationCacheKey(asset)).catch(() => false));
 }
 
 /**

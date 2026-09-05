@@ -1,6 +1,8 @@
 import {
+  forgetMetadataArtLocation,
   getMetadataEdgeCache,
   getMetadataRuntime,
+  readVersionedImage,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
@@ -20,7 +22,10 @@ import { CDN_BASE } from "@/lib/constants";
  *
  * The location lookup is edge-cached for five minutes and explicitly evicted
  * by the editor. The object itself is read directly from R2 rather than by
- * self-fetching /i/<ASSET>, which is unreliable from inside the same Worker.
+ * self-fetching /i/<ASSET>, which is unreliable from inside the same Worker,
+ * and its bytes are reused by version the same way /i reuses them: a preview
+ * card fetched by every chat client that unfurls a link should not cost a
+ * fresh GET each time for a picture that has not changed.
  */
 export async function GET(
   _request: Request,
@@ -33,17 +38,34 @@ export async function GET(
 
   const stored = await resolveMetadataArtLocation(bucket, cache, ctx, asset);
   if (stored) {
+    // The editor updates its own mounted images immediately. A short
+    // browser TTL makes previously open asset pages self-heal too.
+    const cacheControl =
+      stored.kind === "original" ? "public, max-age=60" : "public, max-age=300";
+    const image = stored.etag
+      ? await readVersionedImage(bucket, cache, ctx, asset, stored.etag, [stored.key])
+      : null;
+    if (image) {
+      return new Response(image.body, {
+        headers: {
+          "content-type": image.contentType ?? "image/png",
+          "cache-control": cacheControl,
+          "access-control-allow-origin": "*",
+          "x-metadata-cache": image.cacheStatus,
+        },
+      });
+    }
+
+    // The remembered version has been replaced or deleted since this edge
+    // cached the location. Serve the current object unversioned and forget
+    // the location so the next request re-resolves it.
+    if (stored.etag) forgetMetadataArtLocation(cache, ctx, asset);
     const object = await bucket.get(stored.key);
     if (object) {
       return new Response(object.body, {
         headers: {
           "content-type": object.httpMetadata?.contentType ?? "image/png",
-          // The editor updates its own mounted images immediately. A short
-          // browser TTL makes previously open asset pages self-heal too.
-          "cache-control":
-            stored.kind === "original"
-              ? "public, max-age=60"
-              : "public, max-age=300",
+          "cache-control": cacheControl,
           "access-control-allow-origin": "*",
         },
       });
