@@ -36,6 +36,12 @@ import { LaunchView } from "@/app/[asset]/_components/launch-view";
 
 export const revalidate = 30;
 
+// Generate only requested assets, then share their public render for 30s.
+// An empty list opts dynamic paths into ISR without prebuilding the universe.
+export function generateStaticParams(): { asset: string }[] {
+  return [];
+}
+
 /** Long enough to say something, short enough that no platform truncates
  *  it mid-word. */
 const SHARE_DESCRIPTION_MAX = 200;

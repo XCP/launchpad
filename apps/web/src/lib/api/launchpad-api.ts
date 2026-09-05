@@ -44,15 +44,23 @@ async function launchpadApiFetch(path: string, init: NextFetchInit = {}): Promis
   const url = `${API_BASE}${path}`;
 
   if (typeof window === "undefined") {
+    // Browser polling must bypass the browser cache, but Next interprets
+    // that same no-store flag as "render this entire public page on every
+    // request". Keep the two policies separate. Deployed binding reads use
+    // the API's edge cache; build/dev HTTP reads participate in Next's cache.
+    const serverInit: NextFetchInit = init.cache === "no-store"
+      ? { ...init, cache: "force-cache", next: { ...init.next, revalidate: 30 } }
+      : init;
     try {
       const { getCloudflareContext } = await import("@opennextjs/cloudflare");
       const { env, cf } = await getCloudflareContext({ async: true });
       const binding = (env as typeof env & { LAUNCHPAD_API?: WorkerBinding }).LAUNCHPAD_API;
 
-      if (cf && binding) return binding.fetch(new Request(url, init));
+      if (cf && binding) return binding.fetch(new Request(url, serverInit));
     } catch {
       // Next development and static generation use the configured public URL.
     }
+    return fetch(url, serverInit);
   }
 
   return fetch(url, init);
