@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { FOCUS } from "@/components/ui/tokens";
 
 /**
@@ -13,7 +13,7 @@ import { FOCUS } from "@/components/ui/tokens";
  */
 export function RewardsChip({ className = "" }: { className?: string }) {
   return (
-    <Link
+    <LazyLink
       href="/rewards"
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 px-2.5 py-1 text-xs font-medium text-green-800 dark:text-green-300 transition-colors hover:border-green-300 dark:hover:border-green-700 ${FOCUS} ${className}`}
     >
@@ -24,6 +24,6 @@ export function RewardsChip({ className = "" }: { className?: string }) {
         <span className="relative inline-flex size-1.5 rounded-full bg-green-500" />
       </span>
       <span>XCP Rewards</span>
-    </Link>
+    </LazyLink>
   );
 }
