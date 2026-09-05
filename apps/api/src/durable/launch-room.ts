@@ -12,7 +12,6 @@ import { fetchFairminter } from "#api/integrations/counterparty";
  *  before a launch is the reason anyone notices. */
 const POLL_MS = 15_000;
 const IDLE_POLL_MS = 30_000;
-const BACKOFF_POLL_MS = 60_000;
 /** Confirmed trades can only change when a block lands (~10 min), so they ride
  *  a slower cadence than the mempool does. Polling them every tick would be
  *  three-quarters wasted requests for information that cannot have moved. */
@@ -26,13 +25,8 @@ const MEMPOOL_BASE = "https://api.counterparty.io:4000/v2";
  *  every broadcast frame; the aggregate count/quantity below stay exact
  *  regardless of the cap. */
 const MAX_PENDING_ROWS = 25;
-/** After five minutes of unchanged pending state, nudges check once a minute.
- * A changed snapshot restores the fast cadence. */
-const UNCHANGED_MS = 20 * POLL_MS;
-
 interface PollClock {
   lastPolledAt: number;
-  unchangedSince: number;
 }
 
 interface PendingMint {
@@ -111,12 +105,12 @@ export class LaunchRoom extends DurableObject<Env> {
    */
   private last: RoomState | null = null;
   private lastEncoded: string | null = null;
-  private clock: PollClock = { lastPolledAt: 0, unchangedSince: 0 };
+  private clock: PollClock = { lastPolledAt: 0 };
   private restored: Promise<void> | null = null;
   private polling = false;
 
-  /** Both the cooldown and unchanged-state age survive hibernation. A new
-   * viewer or the minute cron is not evidence that the chain changed. */
+  /** The shared cooldown survives hibernation. A new viewer or the minute
+   * cron is not evidence that the chain changed. */
   private restore(): Promise<void> {
     return this.restored ??= Promise.all([
       this.ctx.storage.get<RoomState>("last"),
@@ -132,10 +126,9 @@ export class LaunchRoom extends DurableObject<Env> {
   }
 
   private pollInterval(): number {
-    if (!this.last?.pending_count) return IDLE_POLL_MS;
-    return this.clock.lastPolledAt - this.clock.unchangedSince >= UNCHANGED_MS
-      ? BACKOFF_POLL_MS
-      : POLL_MS;
+    // An unchanged pending transaction can confirm at any time. Keep the
+    // existing 15-second detection cadence for as long as viewers await it.
+    return this.last?.pending_count ? POLL_MS : IDLE_POLL_MS;
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -191,7 +184,7 @@ export class LaunchRoom extends DurableObject<Env> {
   }
 
   /** Visible viewers request freshness, but share the persisted room cooldown.
-   * Redundant pings and cron nudges never reset unchanged-state backoff. */
+   * Redundant pings and cron nudges never create a per-viewer poll loop. */
   async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {
     await this.ensurePolling();
   }
@@ -244,11 +237,7 @@ export class LaunchRoom extends DurableObject<Env> {
         if (state) {
           const moved = await this.remember(state);
           if (moved) this.broadcast({ type: "state", ...state });
-          this.clock = {
-            lastPolledAt: startedAt,
-            unchangedSince: moved || !this.clock.unchangedSince
-              ? startedAt : this.clock.unchangedSince,
-          };
+          this.clock = { lastPolledAt: startedAt };
           // One small clock row per completed poll prevents an evicted room
           // from polling again for every staggered viewer. State bytes are
           // still written only when changed, including after hibernation.
@@ -262,10 +251,10 @@ export class LaunchRoom extends DurableObject<Env> {
       this.polling = false;
     }
 
-    // Keep the 15-second loop only for pending state that is still changing.
-    // Idle and backed-off rooms get one due-time-gated poll when a viewer or
-    // the minute cron nudges them; an unchanged answer is not broadcast.
-    if (state && state.pending_count > 0 && this.pollInterval() === POLL_MS) {
+    // Preserve confirmation freshness even after a long unchanged queue.
+    // Idle rooms get one due-time-gated poll when a viewer or the minute cron
+    // nudges them; an unchanged answer is not broadcast.
+    if (state && state.pending_count > 0) {
       await this.ctx.storage.setAlarm(Math.max(Date.now(), startedAt + POLL_MS));
     }
   }

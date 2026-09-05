@@ -72,28 +72,35 @@ function setup(initial = snapshot()) {
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 describe("shared launch room polling", () => {
-  it("backs off an unchanged queue despite minute nudges and hibernation", async () => {
+  it("keeps pending confirmations on a 15-second cadence through a long unchanged queue and hibernation", async () => {
     const s = setup();
     await s.nudge();
     await s.fire();
-    for (let tick = 1; tick <= 20; tick++) {
+    for (let tick = 1; tick <= 80; tick++) {
       if (tick % 4 === 0) { s.hibernate(); await s.nudge(); }
       await s.fire();
+      expect(s.alarm).toBe(s.now + 15_000);
     }
-    expect(s.poll).toHaveBeenCalledTimes(21);
-    expect(s.alarm).toBeNull();
+    expect(s.poll).toHaveBeenCalledTimes(81);
     expect(s.sent).toHaveLength(1);
     s.hibernate();
     await s.nudge();
-    expect(s.alarm).toBe(s.now + 60_000);
+    expect(s.alarm).toBe(s.now + 15_000);
     await s.ping();
-    expect(s.alarm).toBe(s.now + 60_000);
+    expect(s.alarm).toBe(s.now + 15_000);
     await s.fire();
-    expect(s.alarm).toBeNull();
+    expect(s.alarm).toBe(s.now + 15_000);
     expect(s.put.mock.calls.filter(([key]) => key === "last")).toHaveLength(1);
+    const beforeConfirmation = s.now;
+    s.advance(1_000);
+    s.poll.mockResolvedValue(snapshot(0, "100"));
+    await s.fire();
+    expect(s.now - beforeConfirmation).toBe(15_000);
+    expect(JSON.parse(s.sent.at(-1)!).pending_count).toBe(0);
+    expect(s.alarm).toBeNull();
   });
 
-  it("restores fast updates when a backed-off queue changes", async () => {
+  it("broadcasts a changed pending queue on its next 15-second poll", async () => {
     const s = setup();
     await s.nudge();
     for (let tick = 0; tick <= 20; tick++) await s.fire();
