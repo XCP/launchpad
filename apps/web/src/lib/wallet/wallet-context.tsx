@@ -44,7 +44,7 @@ interface WalletContextValue {
   disconnect: () => Promise<void>
   signMessage: (message: string) => Promise<string>
   signTransaction: (hex: string) => Promise<string>
-  signPsbt: (hex: string, signInputs?: Record<string, number[]>, sighashTypes?: number[]) => Promise<string>
+  signPsbt: XcpWallet['signPsbt']
   broadcastTransaction: (hex: string) => Promise<string>
 }
 
@@ -424,13 +424,9 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     return withAuthCheck(() => walletRef.current!.signTransaction(hex))
   }
 
-  const signPsbt = (
-    hex: string,
-    signInputs?: Record<string, number[]>,
-    sighashTypes?: number[],
-  ): Promise<string> => {
+  const signPsbt: XcpWallet['signPsbt'] = (...args) => {
     if (!walletRef.current) throw new Error('Wallet not available')
-    return withAuthCheck(() => walletRef.current!.signPsbt(hex, signInputs, sighashTypes))
+    return withAuthCheck(() => walletRef.current!.signPsbt(...args))
   }
 
   const broadcastTransaction = (hex: string): Promise<string> => {
