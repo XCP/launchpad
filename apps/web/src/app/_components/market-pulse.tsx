@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { Dialog as D } from "radix-ui";
 import { useEffect, useId, useState } from "react";
 import { TokenImage } from "@/components/token-image";
@@ -380,9 +380,9 @@ function MarketModal({
                 Buy BTC ↗
               </a>
             ) : (
-              <Link href="/dispense" className="text-sm font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+              <LazyLink href="/dispense" className="text-sm font-semibold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
                 Buy XCP →
-              </Link>
+              </LazyLink>
             )}
           </div>
 

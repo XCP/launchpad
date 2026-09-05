@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import type { RewardAccount } from "@/lib/api/launchpad-api";
 import { commas, commasRaw } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
@@ -37,9 +37,9 @@ export function RewardsCard({
               Payouts
             </button>
           )}
-          <Link href="/rewards" className="text-purple-600 dark:text-purple-400 hover:underline">
+          <LazyLink href="/rewards" className="text-purple-600 dark:text-purple-400 hover:underline">
             Program
-          </Link>
+          </LazyLink>
         </div>
       </div>
 

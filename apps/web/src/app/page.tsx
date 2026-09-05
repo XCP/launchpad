@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { HomeToolbar } from "@/app/_components/home-toolbar";
 import { type InitialPages, LaunchSections } from "@/app/_components/launch-sections";
 import { type LaunchPage, PER_PAGE, toSectionRow } from "@/lib/launch-row";
@@ -241,12 +241,12 @@ function FirstLaunchHero() {
         raised XCP locked into the pool forever — enforced by consensus, not by
         this website.
       </p>
-      <Link
+      <LazyLink
         href="/create"
         className="mt-6 inline-block rounded-md bg-gray-900 dark:bg-gray-100 px-5 py-2.5 font-medium text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300"
       >
         Launch the first
-      </Link>
+      </LazyLink>
     </div>
   );
 }

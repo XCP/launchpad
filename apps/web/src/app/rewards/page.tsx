@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
 import {
   fetchLaunchPage,
@@ -102,9 +102,9 @@ export default async function RewardsPage() {
           least {XCP69_MIN_PARTICIPANTS} different addresses, at which point
           the pool is created and its liquidity is burned. A launch that misses
           its target refunds every satoshi by consensus and does not count.{" "}
-          <Link href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
+          <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
             How that works
-          </Link>
+          </LazyLink>
         </p>
       </section>
 
@@ -310,10 +310,10 @@ function Podium({ graduated, winners }: { graduated: number; winners: string[] }
             >
               {claimed ? (
                 winner ? (
-                  <Link href={`/${winner}`} className="flex max-w-full items-center gap-1 rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-1 text-[10px] font-semibold text-green-700 dark:text-green-400">
+                  <LazyLink href={`/${winner}`} className="flex max-w-full items-center gap-1 rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-1 text-[10px] font-semibold text-green-700 dark:text-green-400">
                     <TokenImage asset={winner} className="size-4 rounded-full object-cover" />
                     <span className="truncate">{winner}</span>
-                  </Link>
+                  </LazyLink>
                 ) : (
                   <span className="rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:text-green-400">claimed</span>
                 )

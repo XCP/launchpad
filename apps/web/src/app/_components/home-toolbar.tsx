@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { LaunchSearch } from "@/app/_components/launch-search";
 import { MarketPulse } from "@/app/_components/market-pulse";
 
@@ -33,12 +33,12 @@ export function HomeToolbar({
         btcChange30d={btcChange30d}
         xcpChange30d={xcpChange30d}
       />
-      <Link
+      <LazyLink
         href="/create"
         className="flex h-9 shrink-0 items-center rounded-full bg-gray-900 dark:bg-gray-100 px-4 text-sm font-medium text-white dark:text-gray-900 transition-colors hover:bg-gray-700 dark:hover:bg-gray-300"
       >
         Create
-      </Link>
+      </LazyLink>
     </div>
   );
 }

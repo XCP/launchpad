@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import { TokenImage } from "@/components/token-image";
@@ -188,12 +187,12 @@ export function PositionsTab({ address }: { address: string }) {
       {open.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">No open positions in this wallet.</p>
-          <Link
+          <LazyLink
             href="/"
             className="inline-block rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-purple-500"
           >
             Explore launches
-          </Link>
+          </LazyLink>
         </div>
       ) : (
         <div className="overflow-x-auto">

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import {
   XCP69_MIN_PARTICIPANTS,
   XCP69_OPENING_MULTIPLE,
@@ -115,7 +115,7 @@ export default function DocsPage() {
           10 XCP per-address cap, an on-chain pre-announcement before minting
           opens, and a 1,000-block window. There is no fine print to read
           because there is no fine print. The full parameter set lives on
-          the <Link href="/faq" className="text-purple-600 dark:text-purple-400 underline">How it works</Link> page.
+          the <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 underline">How it works</LazyLink> page.
         </p>
       </section>
 

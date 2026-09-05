@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[asset]/_components/launch-chrome";
 import { HostedDescription, HostedSocials, InscriptionChip, LaunchDescription, isOurMetadata } from "@/app/[asset]/_components/launch-metadata";
 import { DenomToggle, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[asset]/_components/launch-stats";
@@ -386,12 +386,12 @@ export function LaunchView({
               }
               waitingCta={
                 standardTerms ? (
-                  <Link
+                  <LazyLink
                     href="/dispense"
                     className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
                   >
                     Get XCP before it opens
-                  </Link>
+                  </LazyLink>
                 ) : undefined
               }
             />

@@ -25,9 +25,13 @@ type Props = Omit<ComponentProps<typeof Link>, "href" | "prefetch"> & {
  * pointer arrives, the finger lands, or focus reaches the link — the moment
  * a navigation becomes likely rather than merely possible. On desktop that
  * is indistinguishable from the old behaviour; on touch the prefetch gets a
- * head start of roughly the tap duration instead of the scroll-by. Use it
- * for per-row links in lists and tables. The bounded site chrome — header
- * nav, a page's single call-to-action — keeps the default.
+ * head start of roughly the tap duration instead of the scroll-by.
+ *
+ * Every internal link on the site goes through this, not only the lists.
+ * The header nav and a page's single call-to-action looked bounded, but a
+ * "Get XCP" button on every asset page prefetched /dispense twice per view
+ * and could set off a 200 ms+ revalidation render of a page the visitor
+ * never opened. Nothing here should import next/link directly.
  */
 export function LazyLink({
   href,

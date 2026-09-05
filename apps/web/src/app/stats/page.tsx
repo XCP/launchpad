@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchLaunchStats } from "@/lib/api/launchpad-api";
 import { fetchXcpUsd, fetchXcpUsdHistory } from "@/lib/api/price";
@@ -239,9 +239,9 @@ export default async function StatsPage() {
           A refunded launch is not money lost. XCP-69 is all-or-nothing: one
           that misses its soft cap returns every satoshi by consensus, with no
           decision by us and no way for anyone to keep it.{" "}
-          <Link href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
+          <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
             How that works
-          </Link>
+          </LazyLink>
         </p>
 
         <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pt-4">

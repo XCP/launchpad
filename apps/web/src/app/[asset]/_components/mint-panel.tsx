@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AssetChip } from "@/components/asset-chip";
@@ -352,9 +352,9 @@ export function MintPanel({
         {insufficient && (
           <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">
             Need XCP?{" "}
-            <Link href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
+            <LazyLink href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
               Buy some with BTC
-            </Link>
+            </LazyLink>
             .
           </p>
         )}

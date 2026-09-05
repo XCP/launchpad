@@ -1,7 +1,6 @@
 "use client";
 
 import { type ReactNode, useState } from "react";
-import Link from "next/link";
 import { LazyLink } from "@/components/lazy-link";
 import useSWR from "swr";
 import { HoverCard } from "@/components/ui/hover-card";
@@ -199,7 +198,7 @@ export function IssuerChips({
   }
   if (data.latest) {
     chips.push(
-      <Link
+      <LazyLink
         key="latest"
         href={`/${data.latest.asset}`}
         className={`${chip} transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400`}
@@ -209,7 +208,7 @@ export function IssuerChips({
             it says — "there is a newer one, and it's recent" is the whole
             point, and the link carries you there either way. */}
         <span className="hidden sm:inline"> · {data.latest.asset}</span>
-      </Link>,
+      </LazyLink>,
     );
   }
   if (data.prior === 0 && standing) {
@@ -436,9 +435,9 @@ export function AddressHoverCard({
         </p>
       )}
       <div className="mt-2 flex items-center gap-3 text-xs font-medium">
-        <Link href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
+        <LazyLink href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
           View profile
-        </Link>
+        </LazyLink>
         <a
           href={`https://xcp.io/address/${source}`}
           target="_blank"
@@ -581,9 +580,9 @@ export function LaunchpadAddressHoverCard({
         </>
       )}
       <div className="mt-2 text-xs font-medium">
-        <Link href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
+        <LazyLink href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
           View profile
-        </Link>
+        </LazyLink>
       </div>
     </HoverCard>
   );
