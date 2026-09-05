@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import useSWR from "swr";
 import { useDebounced } from "@/hooks/use-debounced";
@@ -94,12 +94,12 @@ export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
                     <span className="mr-2 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                       {source ? "" : page * PER_PAGE + i + 1}
                     </span>
-                    <Link
+                    <LazyLink
                       href={`/profile/${m.source}`}
                       className="font-mono text-xs text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
                     >
                       {shortAddress(m.source)}
-                    </Link>
+                    </LazyLink>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">
                     {commas(m.mints)}

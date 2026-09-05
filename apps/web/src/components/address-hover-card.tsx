@@ -2,6 +2,7 @@
 
 import { type ReactNode, useState } from "react";
 import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import useSWR from "swr";
 import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
@@ -387,12 +388,12 @@ export function AddressHoverCard({
             {children}
           </button>
         ) : (
-          <Link
+          <LazyLink
             href={`/profile/${source}`}
             className={`rounded hover:underline ${FOCUS} ${className}`}
           >
             {children}
-          </Link>
+          </LazyLink>
         )
       }
     >
@@ -518,12 +519,12 @@ export function LaunchpadAddressHoverCard({
             {children}
           </button>
         ) : (
-          <Link
+          <LazyLink
             href={`/profile/${source}`}
             className={`rounded hover:underline ${FOCUS} ${className}`}
           >
             {children}
-          </Link>
+          </LazyLink>
         )
       }
     >

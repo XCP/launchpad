@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import { RefreshButton } from "@/components/ui/refresh-button";
 import { TokenImage } from "@/components/token-image";
@@ -80,23 +80,23 @@ export function MempoolView() {
                 {groups.map((g) => (
                   <tr key={g.source}>
                     <td className="whitespace-nowrap p-3">
-                      <Link
+                      <LazyLink
                         href={`/profile/${g.source}`}
                         className="font-mono text-xs text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
                       >
                         {shortAddress(g.source)}
-                      </Link>
+                      </LazyLink>
                     </td>
                     <td className="p-3">
                       <div className="flex flex-wrap gap-1">
                         {g.assets.map((a) => (
-                          <Link
+                          <LazyLink
                             key={a}
                             href={`/${a}`}
                             className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
                           >
                             {a}
-                          </Link>
+                          </LazyLink>
                         ))}
                       </div>
                     </td>
@@ -134,14 +134,14 @@ export function MempoolView() {
                 {orders.map((o) => (
                   <tr key={o.txHash}>
                     <td className="whitespace-nowrap p-3">
-                      <Link href={`/profile/${o.source}`} className="font-mono text-xs text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300">
+                      <LazyLink href={`/profile/${o.source}`} className="font-mono text-xs text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300">
                         {shortAddress(o.source)}
-                      </Link>
+                      </LazyLink>
                     </td>
                     <td className="p-3">
-                      <Link href={`/${o.asset}`} className="font-medium text-gray-800 dark:text-gray-200 hover:text-purple-700 dark:hover:text-purple-300">
+                      <LazyLink href={`/${o.asset}`} className="font-medium text-gray-800 dark:text-gray-200 hover:text-purple-700 dark:hover:text-purple-300">
                         {o.asset}
-                      </Link>
+                      </LazyLink>
                     </td>
                     <td className={`p-3 font-medium ${o.getAsset === o.asset ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                       {o.getAsset === o.asset ? "Buy" : "Sell"}
@@ -178,17 +178,17 @@ export function MempoolView() {
                 />
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-semibold text-gray-900 dark:text-gray-100">
-                    <Link href={`/${fm.asset}`} className={FOCUS}>
+                    <LazyLink href={`/${fm.asset}`} className={FOCUS}>
                       <span className="absolute inset-0" aria-hidden />
                       {fm.asset}
-                    </Link>
+                    </LazyLink>
                   </div>
-                  <Link
+                  <LazyLink
                     href={`/profile/${fm.source}`}
                     className="relative font-mono text-xs text-gray-500 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
                   >
                     {shortAddress(fm.source)}
-                  </Link>
+                  </LazyLink>
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="text-xs font-medium text-gray-900 dark:text-gray-100 tabular-nums">

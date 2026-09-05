@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { Fragment, useEffect, useState } from "react";
 import useSWR from "swr";
 import {
@@ -596,7 +596,7 @@ export function ActivityTabs({
                       className="absolute inset-y-0 left-0 bg-amber-50 dark:bg-amber-950/40"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
-                    <Link
+                    <LazyLink
                       href={`/profile/${p.source}`}
                       className="relative z-10 flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                     >
@@ -605,7 +605,7 @@ export function ActivityTabs({
                       </span>
                       <Identicon address={p.source} />
                       <span className="truncate">{shortAddress(p.source)}</span>
-                    </Link>
+                    </LazyLink>
                     <a
                       href={`https://xcp.io/tx/${p.txHash}`}
                       target="_blank"
@@ -638,11 +638,11 @@ export function ActivityTabs({
                 const buy = o.getAsset === asset;
                 return (
                   <li key={o.txHash} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                    <Link href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
+                    <LazyLink href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
                       <span className="w-8 shrink-0 text-right text-xs text-gray-400 dark:text-gray-500 tabular-nums">{from + i + 1}</span>
                       <Identicon address={o.source} />
                       <span className="truncate">{shortAddress(o.source)}</span>
-                    </Link>
+                    </LazyLink>
                     <a href={`https://xcp.io/tx/${o.txHash}`} target="_blank" rel="noreferrer" className={`shrink-0 font-medium hover:underline ${buy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                       {buy ? "Buy" : "Sell"} pending
                     </a>

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { DropdownMenu as DM } from "radix-ui";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
@@ -881,7 +881,7 @@ function LaunchTable({
             return (
               <tr key={r.fm.tx_hash} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60">
                 <td className="px-3 py-2.5">
-                  <Link href={`/${r.fm.asset}`} className="flex min-w-0 items-center gap-2.5">
+                  <LazyLink href={`/${r.fm.asset}`} className="flex min-w-0 items-center gap-2.5">
                     <span className="w-5 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                       {offset + i + 1}
                     </span>
@@ -897,7 +897,7 @@ function LaunchTable({
                         by {shortAddress(r.fm.source)}
                       </span>
                     </span>
-                  </Link>
+                  </LazyLink>
                 </td>
                 {graduated ? (
                   <>
@@ -1112,7 +1112,7 @@ function Card({
           : `${since} ago`;
 
   return (
-    <Link
+    <LazyLink
       href={`/${fm.asset}`}
       // The holographic border is the graduated mark and nothing else. Worn
       // by every conforming launch it said only "this one conforms" — which is
@@ -1281,7 +1281,7 @@ function Card({
           )}
         </div>
       </div>
-    </Link>
+    </LazyLink>
   );
 }
 

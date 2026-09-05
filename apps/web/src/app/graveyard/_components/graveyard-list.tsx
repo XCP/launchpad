@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
@@ -122,7 +122,7 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
   const refunded = fromSats(fm.paid_quantity ?? 0);
 
   return (
-    <Link
+    <LazyLink
       href={`/${fm.asset}`}
       className="group block overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
     >
@@ -163,7 +163,7 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
           </span>
         </div>
       </div>
-    </Link>
+    </LazyLink>
   );
 }
 

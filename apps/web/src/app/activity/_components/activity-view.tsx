@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
@@ -577,12 +577,12 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
                   asset={r.asset}
                   className="size-6 shrink-0 rounded object-cover"
                 />
-                <Link
+                <LazyLink
                   href={`/${r.asset}`}
                   className={`font-medium text-gray-900 dark:text-gray-100 hover:text-purple-700 dark:hover:text-purple-300 ${FOCUS}`}
                 >
                   {r.asset}
-                </Link>
+                </LazyLink>
                 <span className="text-xs text-gray-400 dark:text-gray-500">/ {r.counterAsset}</span>
               </span>
             </td>
@@ -772,7 +772,7 @@ function When({
 function Asset({ asset, dim = false }: { asset: string; dim?: boolean }) {
   return (
     <td className="whitespace-nowrap px-3 py-2">
-      <Link
+      <LazyLink
         href={`/${asset}`}
         className={`flex items-center gap-2 font-medium hover:text-purple-700 dark:hover:text-purple-300 ${
           dim ? "text-gray-400 dark:text-gray-500" : "text-gray-900 dark:text-gray-100"
@@ -783,7 +783,7 @@ function Asset({ asset, dim = false }: { asset: string; dim?: boolean }) {
           className={`size-6 shrink-0 rounded object-cover ${dim ? "opacity-60" : ""}`}
         />
         {asset}
-      </Link>
+      </LazyLink>
     </td>
   );
 }
@@ -791,14 +791,14 @@ function Asset({ asset, dim = false }: { asset: string; dim?: boolean }) {
 function Who({ address, dim = false }: { address: string; dim?: boolean }) {
   return (
     <td className="whitespace-nowrap px-3 py-2">
-      <Link
+      <LazyLink
         href={`/profile/${address}`}
         className={`font-mono text-xs hover:text-purple-700 dark:hover:text-purple-300 hover:underline ${
           dim ? "text-gray-400 dark:text-gray-500" : "text-gray-500 dark:text-gray-400"
         } ${FOCUS}`}
       >
         {shortAddress(address)}
-      </Link>
+      </LazyLink>
     </td>
   );
 }

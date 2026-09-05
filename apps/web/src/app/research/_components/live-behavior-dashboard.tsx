@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 import { pendingPressureByAsset, type PendingPressure } from "@/app/research/_lib/behavior";
@@ -187,7 +187,7 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {rows.map(([asset, row]) => (
-          <Link
+          <LazyLink
             key={asset}
             href={`/${asset}`}
             className="rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-2 text-xs hover:border-red-400 dark:hover:border-red-500"
@@ -195,7 +195,7 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
             <strong className="text-gray-900 dark:text-gray-100">{asset}</strong>
             <span className="ml-2 font-semibold text-red-700 dark:text-red-400">{compact(fromSats(row.sellQuantity))} tokens</span>
             <span className="ml-1 text-gray-500 dark:text-gray-400">· {row.sellWallets} wallets · {row.sellTransactions} txs</span>
-          </Link>
+          </LazyLink>
         ))}
       </div>
     </div>
@@ -400,9 +400,9 @@ function LaunchName({
     <div>
       <div className="flex flex-wrap items-baseline gap-2">
         <span className="text-xs tabular-nums text-gray-400 dark:text-gray-500">#{rank}</span>
-        <Link href={`/${row.asset}`} className="font-bold text-purple-600 dark:text-purple-400 hover:underline">
+        <LazyLink href={`/${row.asset}`} className="font-bold text-purple-600 dark:text-purple-400 hover:underline">
           {row.asset}
-        </Link>
+        </LazyLink>
       </div>
       <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{rankSignal(row)}</div>
       {pending.sellTransactions > 0 && (

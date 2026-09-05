@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { TokenImage } from "@/components/token-image";
 import { compact, fromSats, usd } from "@/lib/format";
 import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
@@ -39,10 +39,10 @@ export function HistoryTab({ address }: { address: string }) {
       <ul className="divide-y divide-gray-100 dark:divide-gray-800">
         {closed.map((c) => (
           <li key={c.asset} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-            <Link href={`/${c.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
+            <LazyLink href={`/${c.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
               <TokenImage asset={c.asset} className="size-7 shrink-0 rounded" />
               <span className="truncate font-medium">{c.asset}</span>
-            </Link>
+            </LazyLink>
             <span className="shrink-0 text-right">
               <Realized sats={c.realizedXcpSats} xcpUsd={xcpUsd} />
               {/* This list dropped the reason entirely — it was computed and

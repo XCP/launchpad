@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import useSWR from "swr";
 import { EditPanel } from "@/app/[asset]/_components/edit-panel";
 import { TokenImage } from "@/components/token-image";
@@ -36,17 +36,17 @@ function ConformingBadge({ conforming }: { conforming: boolean | null }) {
 function LaunchCard({ launch }: { launch: MyLaunch }) {
   return (
     <div className="flex gap-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
-      <Link href={`/${launch.asset}`} className="shrink-0">
+      <LazyLink href={`/${launch.asset}`} className="shrink-0">
         <TokenImage asset={launch.asset} className="size-16 rounded-lg object-cover" />
-      </Link>
+      </LazyLink>
       <div className="min-w-0 flex-1 space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <Link
+          <LazyLink
             href={`/${launch.asset}`}
             className="truncate font-semibold text-gray-900 dark:text-gray-100 hover:text-purple-600 dark:hover:text-purple-400"
           >
             {launch.asset}
-          </Link>
+          </LazyLink>
           <div className="flex shrink-0 items-center gap-2">
             <ConformingBadge conforming={launch.conforming} />
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_TONE[launch.phase]}`}>

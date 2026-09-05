@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
@@ -174,7 +174,7 @@ export function PoolsTab({
             className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 py-3 text-sm"
           >
             <div className="min-w-0">
-              <Link
+              <LazyLink
                 href={`/${position.primaryAsset}`}
                 className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400"
               >
@@ -182,7 +182,7 @@ export function PoolsTab({
                 <span className="truncate font-medium">
                   {position.assetA}/{position.assetB}
                 </span>
-              </Link>
+              </LazyLink>
               <p className="mt-1 truncate pl-9 text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 {position.amountA !== null && position.amountB !== null
                   ? `${holding(tokenQty(position.amountA, position.divisibleA))} ${position.assetA} + ${holding(tokenQty(position.amountB, position.divisibleB))} ${position.assetB}`
