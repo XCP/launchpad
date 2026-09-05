@@ -38,6 +38,19 @@ binding = "ASSETS"
 binding = "LAUNCHPAD_API"
 service = "launchpad-api"
 
+# OpenNext's queue refreshes an expired public render through this binding.
+[[services]]
+binding = "WORKER_SELF_REFERENCE"
+service = "launchpad"
+
+[[durable_objects.bindings]]
+name = "NEXT_CACHE_DO_QUEUE"
+class_name = "DOQueueHandler"
+
+[[migrations]]
+tag = "launchpad-isr-v1"
+new_sqlite_classes = ["DOQueueHandler"]
+
 # Hosted token metadata: enhanced-asset-info JSON at /j/<ASSET>.json and the
 # uploaded image at /i/<ASSET>. Write-once — descriptions lock on-chain, so
 # what they point at must not drift.
