@@ -23,9 +23,23 @@ const eslintConfig = defineConfig([
               message: "Use the @/ path alias instead of a relative import.",
             },
           ],
+          // Links prefetch on intent, not on sight; see LazyLink for the
+          // measurement behind it. A bare next/link here reintroduces two
+          // server requests per link that scrolls into view.
+          paths: [
+            {
+              name: "next/link",
+              message: "Import { LazyLink } from @/components/lazy-link instead.",
+            },
+          ],
         },
       ],
     },
+  },
+  {
+    // The one place next/link is meant to be imported.
+    files: ["src/components/lazy-link.tsx"],
+    rules: { "no-restricted-imports": "off" },
   },
   {
     // Copied verbatim from the exchange repo's SDK; kept drop-in compatible
