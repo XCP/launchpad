@@ -1,5 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "#api/env";
+import { closeWebSocket } from "#api/durable/websocket";
 
 /**
  * One singleton room for the whole site — how many people currently have
@@ -63,11 +64,13 @@ export class SitePresence extends DurableObject<Env> {
     this.broadcastCount();
   }
 
-  async webSocketClose() {
+  async webSocketClose(ws: WebSocket, code: number, reason: string) {
+    closeWebSocket(ws, code, reason);
     this.broadcastCount();
   }
 
-  async webSocketError() {
+  async webSocketError(ws: WebSocket) {
+    closeWebSocket(ws, 1011, "WebSocket error");
     this.broadcastCount();
   }
 

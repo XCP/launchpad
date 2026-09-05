@@ -3,6 +3,7 @@ import { compareRawDesc, sumRaw } from "@launchpad/xcp69/numeric";
 import { mergePairTrades } from "@launchpad/xcp69/trades";
 import type { Env } from "#api/env";
 import { fetchFairminter } from "#api/integrations/counterparty";
+import { closeWebSocket } from "#api/durable/websocket";
 
 /** Was 8s. A room polls Counterparty on behalf of everyone watching that
  *  launch, so this is a per-LAUNCH cost, not a per-viewer one — but it is
@@ -187,6 +188,14 @@ export class LaunchRoom extends DurableObject<Env> {
    * Redundant pings and cron nudges never create a per-viewer poll loop. */
   async webSocketMessage(_ws: WebSocket, _message: string | ArrayBuffer) {
     await this.ensurePolling();
+  }
+
+  async webSocketClose(ws: WebSocket, code: number, reason: string) {
+    closeWebSocket(ws, code, reason);
+  }
+
+  async webSocketError(ws: WebSocket) {
+    closeWebSocket(ws, 1011, "WebSocket error");
   }
 
   /**
