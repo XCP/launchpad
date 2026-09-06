@@ -41,7 +41,12 @@ export function useSpendableBalance(
   const pending = useSWR(
     address ? [address, "counterparty-pending-debits"] : null,
     ([addr]) => fetchPendingDebits(addr),
-    { refreshInterval: 15_000, dedupingInterval: 5_000 },
+    // Thirty seconds, not fifteen: this read exists to catch the node's own
+    // view of a just-broadcast spend, and pending.ts already subtracts what
+    // THIS browser broadcast the moment it happens. Halving the cadence
+    // costs nothing visible and removes two Counterparty calls a minute from
+    // every surface that shows a balance.
+    { refreshInterval: 30_000, dedupingInterval: 5_000 },
   );
 
   const fromNode = asset ? pending.data?.get(asset) : undefined;

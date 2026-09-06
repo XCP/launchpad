@@ -20,7 +20,15 @@ export function SwrProvider({ children }: { children: ReactNode }) {
         // Identical keys mounted by several widgets (btc-feerate, btc-usd,
         // balances) collapse into one request for this window.
         dedupingInterval: 10_000,
-        // Refetch when a tab is returned to, but not on every alt-tab.
+        // Not on focus, by default. A person minting from several tabs is
+        // exactly the person who switches between them, and with the default
+        // on, each switch re-ran every read on the page that was over a
+        // minute old — a dozen Counterparty calls per tab per minute on top
+        // of the pollers, which is how one visitor gets throttled. The reads
+        // that genuinely go stale while a tab is hidden (the mempool, an
+        // address's own pending mints) opt back in individually; the rest
+        // keep polling at their own cadence and are current enough.
+        revalidateOnFocus: false,
         focusThrottleInterval: 60_000,
         revalidateOnReconnect: true,
         // Give up after a few tries instead of retrying a down API forever;

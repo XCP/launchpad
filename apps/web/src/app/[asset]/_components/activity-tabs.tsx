@@ -256,7 +256,10 @@ export function ActivityTabs({
       ? `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(asset)}/XCP?status=open&verbose=true&limit=200`
       : null,
     async (url: string) => (await fetchJson(url)).result as OpenOrder[],
-    { refreshInterval: 15_000 },
+    // Thirty seconds: an order's fate is decided per block, and the tape
+    // above already reads at that cadence. Fifteen was the single fastest
+    // direct Counterparty poll on the page for the least time-sensitive tab.
+    { refreshInterval: 30_000 },
   );
   // Remaining quantities, not original ones: a half-filled order offers what is
   // left of it, and drawing the original overstates the depth actually there.

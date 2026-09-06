@@ -46,22 +46,28 @@ export function MintPanel({
   const compose = useCompose();
   const [tokens, setTokens] = useState("10000");
 
+  // The conforming fairminter for this ticker, read once and shared by both
+  // ceilings below. They used to fetch it independently on the same cadence,
+  // which was two identical Counterparty reads every twenty seconds per tab
+  // for one answer.
+  const { data: fairminter } = useSWR(
+    ["mint-fairminter", asset],
+    async () => (await fetchFairmintersByAsset(asset)).find((f) => xcp69Params(f)) ?? null,
+    { refreshInterval: 20_000, revalidateOnFocus: false },
+  );
   // How many lots are actually left to mint — core rejects a fairmint whose
   // quantity would push the asset past hard_cap outright (no partial fill
   // for priced fairminters), so a stale or missing read just means no extra
   // clamp is applied rather than a false one.
-  const { data: remainingLots } = useSWR(
-    ["mint-remaining", asset],
-    async () => {
-      const fairminters = await fetchFairmintersByAsset(asset);
-      const fm = fairminters.find((f) => xcp69Params(f));
-      if (!fm) return null;
-      const remaining = big(saleTarget(fm)) - big(fm.earned_quantity ?? 0);
-      const remainingRaw = remaining > 0n ? remaining : 0n;
-      return Math.floor(approx(remainingRaw) / XCP69.QUANTITY_BY_PRICE);
-    },
-    { refreshInterval: 20_000, revalidateOnFocus: false },
-  );
+  const remainingRaw = fairminter
+    ? big(saleTarget(fairminter)) - big(fairminter.earned_quantity ?? 0)
+    : 0n;
+  const remainingLots =
+    fairminter === undefined
+      ? undefined
+      : fairminter === null
+        ? null
+        : Math.floor(approx(remainingRaw > 0n ? remainingRaw : 0n) / XCP69.QUANTITY_BY_PRICE);
   // What this address has already committed to THIS launch, confirmed and
   // pending, which is what the per-address cap is measured against.
   //
@@ -72,14 +78,12 @@ export function MintPanel({
   // invalid. No XCP moves on that path, but the Bitcoin fee is spent and the
   // failure shows up minutes later with nothing attached to explain it.
   const { data: alreadyMintedRaw } = useSWR(
-    address ? ["mint-committed", asset, address] : null,
-    async ([, ticker, addr]) => {
-      // Resolved here rather than passed in, so the allowance is measured
-      // against the same launch the panel is quoting.
-      const fm = (await fetchFairmintersByAsset(ticker)).find((f) => xcp69Params(f));
-      if (!fm) return null;
+    // Keyed by the fairminter's hash, so the allowance is measured against
+    // the same launch the panel is quoting, and so the read waits for it.
+    address && fairminter ? ["mint-committed", asset, address, fairminter.tx_hash] : null,
+    async ([, ticker, addr, fairminterHash]) => {
       const [confirmed, mempool] = await Promise.all([
-        fetchAddressFairmints(addr, ticker, fm.tx_hash),
+        fetchAddressFairmints(addr, ticker, fairminterHash),
         fetchMempoolSnapshot(),
       ]);
       // Unconfirmed mints carry no fairminter hash, but they do not need one:
