@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { HomeToolbar } from "@/app/_components/home-toolbar";
 import { type InitialPages, LaunchSections } from "@/app/_components/launch-sections";
@@ -27,6 +28,10 @@ import {
   xcp69Params,
   XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
+
+export const metadata: Metadata = {
+  title: "XCP.FUN - Bitcoin Memecoins on Counterparty",
+};
 
 export const revalidate = 60;
 
