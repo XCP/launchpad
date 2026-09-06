@@ -16,7 +16,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
  * surface.
  */
 export function HeaderWallet() {
-  const { status, address, proofStatus, disconnect } = useWallet();
+  const { status, address, proofStatus, disconnect, accounts, switchAccount } = useWallet();
   /**
    * The dot carries the state; only the red one gets words.
    *
@@ -100,6 +100,26 @@ export function HeaderWallet() {
                   />
                   {proof.note}
                 </p>
+              )}
+              {accounts.length > 1 && (
+                <>
+                  {/* Horizon grants every address at once; the site acts as one. */}
+                  {accounts.map((account) => (
+                    <button
+                      key={account}
+                      type="button"
+                      onClick={() => void switchAccount(account)}
+                      className={`block w-full rounded-xl px-3 py-2 text-left font-mono text-xs ${
+                        account === address
+                          ? "text-purple-600 dark:text-purple-400"
+                          : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
+                      }`}
+                    >
+                      {shortAddress(account)}
+                    </button>
+                  ))}
+                  <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+                </>
               )}
               <LazyLink
                 href="/profile"

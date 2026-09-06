@@ -28,6 +28,7 @@ import { useLaunchRoom } from "@/app/[asset]/_components/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
+import { AddressBadges } from "@/app/[asset]/_components/address-badges";
 import {
   AddressHoverCard,
   LaunchpadAddressHoverCard,
@@ -510,7 +511,9 @@ export function ActivityTabs({
                 shortAddress() is already the shortest honest form, so when
                 the "dev" and "no history" chips both land on one row the row
                 gets wider — never the address shorter. The floor is sized to
-                identicon + 13-char address + both chips; with it, the row's
+                identicon + 13-char address + both chips (the emoji-only
+                creator badges are narrower than "no history" and never share
+                a row with it — a Rare Pepe creator has history); with it, the row's
                 minimum is 41.5rem (2 + 16.5 + 6 + 6.5 + 4.5 tracks, 4rem of
                 gaps, 2rem padding — keep the wrapper's min-w in step), which
                 still fits the max-w-2xl card on desktop. Anything narrower
@@ -554,11 +557,7 @@ export function ActivityTabs({
                               through descendant text regardless of the
                               descendant's own text-decoration, so the only way
                               to keep the chip clean is to not be inside the <a>. */}
-                          {issuerSource === r.source && (
-                            <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
-                              dev
-                            </span>
-                          )}
+                          <AddressBadges address={r.source} issuerSource={issuerSource} />
                           {freshness?.noHistory.has(r.source) && (
                             <span
                               className="shrink-0 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400"
@@ -755,11 +754,7 @@ export function ActivityTabs({
                               <Identicon address={t.addr} />
                               {shortAddress(t.addr)}
                             </LaunchpadAddressHoverCard>
-                            {issuerSource === t.addr && (
-                              <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
-                                dev
-                              </span>
-                            )}
+                            <AddressBadges address={t.addr} issuerSource={issuerSource} />
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-400">
@@ -905,19 +900,7 @@ export function ActivityTabs({
                           doesn't mean anything for a holder who bought in
                           on the market; only the issuer's own row is a
                           fact worth flagging post-graduation. */}
-                      {issuerSource === h.address && (
-                        <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
-                          dev
-                        </span>
-                      )}
-                      {h.address === BURN_ADDRESS && (
-                        <span
-                          className="shrink-0 rounded-full border border-orange-200 bg-orange-50 px-1.5 py-px text-[10px] font-medium text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300"
-                          title="Counterparty's canonical unspendable burn address"
-                        >
-                          🔥 burn
-                        </span>
-                      )}
+                      <AddressBadges address={h.address} issuerSource={issuerSource} />
                     </span>
                     <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900 dark:text-gray-100">
                       {soldOut ? (
@@ -1032,11 +1015,7 @@ export function ActivityTabs({
                               <Identicon address={o!.source} />
                               {shortAddress(o!.source)}
                             </LaunchpadAddressHoverCard>
-                            {issuerSource === o!.source && (
-                              <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
-                                dev
-                              </span>
-                            )}
+                            <AddressBadges address={o!.source} issuerSource={issuerSource} />
                             {mine && (
                               <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                                 you
