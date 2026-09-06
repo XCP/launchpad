@@ -10,6 +10,7 @@ import { QuoteRing } from "@/components/quote-ring";
 import { TokenSelectModal } from "@/components/token-select-modal";
 import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
+import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
@@ -137,6 +138,7 @@ export function SwapWidget({
     balance: effBalance,
     pendingOutgoing,
     balanceError,
+    balanceUnavailable,
   } = useSpendableBalance(
     address,
     giveAsset,
@@ -231,8 +233,11 @@ export function SwapWidget({
     address,
   ]);
 
+  // A failed balance read does not hold the trade — see useSpendableBalance's
+  // balanceUnavailable. Only a read still in flight does, and briefly.
+  const balanceSettled = effBalance !== undefined || balanceUnavailable;
   const ready =
-    effBalance !== undefined &&
+    balanceSettled &&
     amountRaw > 0 &&
     approx(outRaw) > 0 &&
     !busy &&
@@ -375,7 +380,9 @@ export function SwapWidget({
     </span>
   );
 
-  const balanceLabel = effBalance !== undefined && (
+  const balanceLabel = effBalance === undefined ? (
+    <BalanceUnavailable error={balanceError} />
+  ) : (
     <button
       type="button"
       className="min-w-0 truncate text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
@@ -399,10 +406,8 @@ export function SwapWidget({
         : "Broadcasting…"
     : amountRaw === 0
       ? "Enter an amount"
-      : effBalance === undefined
-        ? balanceError
-          ? "Balance unavailable"
-          : "Checking balance…"
+      : !balanceSettled
+        ? "Checking balance…"
       : insufficient
         ? `Insufficient ${giveAsset} balance`
         : approx(outRaw) === 0

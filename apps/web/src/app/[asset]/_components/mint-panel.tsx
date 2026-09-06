@@ -7,6 +7,7 @@ import { AssetChip } from "@/components/asset-chip";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
+import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
@@ -122,7 +123,7 @@ export function MintPanel({
   const costXcp = lots * XCP_PER_LOT;
   const costRaw = lots * XCP69.PRICE;
 
-  const { balance: xcpBalance, balanceError } = useSpendableBalance(
+  const { balance: xcpBalance, balanceError, balanceUnavailable } = useSpendableBalance(
     address,
     "XCP",
     "mint",
@@ -164,8 +165,11 @@ export function MintPanel({
     xcpUsd,
   ]);
 
-  const ready =
-    xcpBalance !== undefined && lots > 0 && !busy && !insufficient;
+  // A balance that could not be read does not block the mint — see
+  // useSpendableBalance's balanceUnavailable. Only a read still in flight
+  // holds the button, and only briefly.
+  const balanceSettled = xcpBalance !== undefined || balanceUnavailable;
+  const ready = balanceSettled && lots > 0 && !busy && !insufficient;
   const buttonLabel = busy
     ? compose.status === "composing"
       ? "Composing…"
@@ -176,10 +180,8 @@ export function MintPanel({
       ? "Address limit reached"
       : lots === 0
       ? "Enter an amount"
-      : xcpBalance === undefined
-        ? balanceError
-          ? "Balance unavailable"
-          : "Checking balance…"
+      : !balanceSettled
+        ? "Checking balance…"
       : insufficient
         ? "Insufficient XCP balance"
         : `Mint ${commas(mintTokens)} ${asset}`;
@@ -279,6 +281,7 @@ export function MintPanel({
                   Balance: {commasRaw(xcpBalance)}
                 </button>
               )}
+              {xcpBalance === undefined && <BalanceUnavailable error={balanceError} />}
             </>
           }
         >

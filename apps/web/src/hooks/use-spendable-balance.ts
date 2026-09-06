@@ -61,6 +61,18 @@ export function useSpendableBalance(
     confirmedBalance: confirmed.data,
     pendingOutgoing: (fromNode?.quantity ?? 0n) + local,
     balanceError: confirmed.error as Error | undefined,
+    /**
+     * The read has failed and nothing older is cached to show instead.
+     *
+     * Surfaces treat this as "proceed without a balance", not as "wait". A
+     * balance here is a courtesy check ahead of the one consensus runs anyway;
+     * compose returns a specific error when it is short. Gating the button on
+     * this read meant a throttled browser could not transact at all, even
+     * though composing is the one call exempt from the relay's budget — and a
+     * dead button is what sent people refreshing, which is what keeps the
+     * throttle alive.
+     */
+    balanceUnavailable: confirmed.data === undefined && confirmed.error !== undefined,
     pendingError: pending.error as Error | undefined,
     isLoading: confirmed.isLoading,
     refresh: async () => {
