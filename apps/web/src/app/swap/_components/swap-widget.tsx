@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { AssetChip } from "@/components/asset-chip";
@@ -19,6 +19,7 @@ import { fetchJson } from "@/lib/client";
 import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
 import {
   approx,
+  big,
   parseUnitsToRaw,
   percentOf,
   type Raw,
@@ -26,7 +27,14 @@ import {
   reduceByPercent,
   SATS,
 } from "@/lib/numeric";
+import {
+  OTHER_POOL_FEE_BPS,
+  quoteAfterMempool,
+  XCP_POOL_FEE_BPS,
+  type BookOrder as SimBookOrder,
+} from "@/lib/pool-quote";
 import { useDebounced } from "@/hooks/use-debounced";
+import { useMempool } from "@/hooks/use-mempool";
 import { trackTx } from "@/lib/analytics";
 import { registerPending } from "@/lib/pending";
 import { useSpendableBalance } from "@/hooks/use-spendable-balance";
@@ -56,6 +64,23 @@ interface Quote {
   price_impact: number;
   fee_bps?: number;
 }
+
+/** A resting order as `/orders/{a}/{b}` returns it, the fields the replay needs. */
+interface CpBookOrder {
+  give_asset: string;
+  get_asset: string;
+  give_quantity: Raw;
+  get_quantity: Raw;
+  give_remaining: Raw;
+  get_remaining: Raw;
+}
+
+/** Auto slippage's ceiling when nothing is pending: this trade's own impact
+ *  is the only thing it has to allow for. */
+const AUTO_SLIPPAGE_CAP = 5;
+/** ...and with the mempool counted, how far Auto may follow it. Past this the
+ *  trade is not a market order any more, and the button says so. */
+const AUTO_SLIPPAGE_MEMPOOL_CAP = 20;
 
 const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
@@ -184,6 +209,47 @@ export function SwapWidget({
         : null
     : null;
 
+  // What is already in line ahead of this trade.
+  //
+  // Core's quote reflects the confirmed state only, and says so — "actual
+  // execution may differ if trades confirm before yours." Those trades are
+  // not a mystery: the pending orders on a pair are public, and the header
+  // chip already polls them under this same key. A market order priced off
+  // the confirmed quote with slippage that ignores them misses its price
+  // when they land first, and rests for a block instead of filling. So the
+  // pending same-direction orders are replayed through Core's own quote
+  // algorithm (see lib/pool-quote) ahead of this one, and what they leave
+  // is what Auto slippage has to cover.
+  const { orders: mempoolOrders } = useMempool(30_000);
+  const pendingAhead = useMemo(
+    () =>
+      giveAsset && getAsset && giveAsset !== getAsset
+        ? mempoolOrders
+            .filter((o) => o.giveAsset === giveAsset && o.getAsset === getAsset)
+            .map((o) => big(o.giveQuantity))
+        : [],
+    [mempoolOrders, giveAsset, getAsset],
+  );
+  // The resting book exists here only to be replayed through, so it is
+  // fetched only while there is something pending to replay.
+  const { data: restingBook, error: restingBookError } = useSWR<SimBookOrder[]>(
+    pendingAhead.length > 0 ? [giveAsset, getAsset, "swap-resting-book"] : null,
+    () =>
+      fetchJson(
+        `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(getAsset)}/${encodeURIComponent(giveAsset)}?status=open&limit=1000`,
+      ).then((d) =>
+        ((d.result ?? []) as CpBookOrder[])
+          .filter((o) => o.give_asset === getAsset && o.get_asset === giveAsset)
+          .map((o) => ({
+            giveQuantity: big(o.give_quantity),
+            getQuantity: big(o.get_quantity),
+            giveRemaining: big(o.give_remaining),
+            getRemaining: big(o.get_remaining),
+          })),
+      ),
+    { refreshInterval: 60_000 },
+  );
+
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
   const outRaw: Raw = quote && amountRaw > 0 ? quote.estimated_output : 0;
   const out = approx(outRaw) / SATS;
@@ -195,12 +261,66 @@ export function SwapWidget({
     effBalance !== undefined && amountRaw > 0 && amountRaw > effBalance;
   const busy = isBusy(compose.status);
 
-  // What this trade needs: another taker of the same size moves the price
-  // by roughly this trade's own impact, so Auto tolerates that and no
-  // more — floored at 0.5% (pool fee territory), capped at 5%.
+  // The quote once the pending orders have gone first, as a fraction of the
+  // quote against the confirmed state. Null while the inputs are loading or
+  // when nothing is pending. A book that failed to load counts as empty:
+  // the pool then absorbs every pending order, which overstates the drop,
+  // and overstating is the safe direction for a tolerance.
+  const mempoolQuote = useMemo(() => {
+    if (pendingAhead.length === 0 || amountExact <= 0n) return null;
+    if (poolInfo === undefined) return null;
+    const book = restingBook ?? (restingBookError ? [] : undefined);
+    if (book === undefined) return null;
+    const pool =
+      poolInfo && poolHasLiquidity
+        ? {
+            reserveIn: big(poolInfo.asset_a === giveAsset ? poolInfo.reserve_a : poolInfo.reserve_b),
+            reserveOut: big(poolInfo.asset_a === giveAsset ? poolInfo.reserve_b : poolInfo.reserve_a),
+            feeBps:
+              quote?.fee_bps ??
+              (giveAsset === "XCP" || getAsset === "XCP" ? XCP_POOL_FEE_BPS : OTHER_POOL_FEE_BPS),
+          }
+        : null;
+    if (!pool && book.length === 0) return null;
+    return quoteAfterMempool({ pool, book }, pendingAhead, amountExact);
+  }, [
+    pendingAhead,
+    amountExact,
+    poolInfo,
+    poolHasLiquidity,
+    restingBook,
+    restingBookError,
+    giveAsset,
+    getAsset,
+    quote?.fee_bps,
+  ]);
+  const mempoolDrop = mempoolQuote?.dropPercent ?? 0;
+  // Core's quote, scaled by what the replay says the mempool leaves of it.
+  // Scaled rather than used directly so any drift between the port and the
+  // node cancels out: the number the user sees stays anchored to Core's.
+  const afterMempoolRaw =
+    mempoolQuote && mempoolQuote.baseline > 0n && approx(outRaw) > 0
+      ? (big(outRaw) * mempoolQuote.output) / mempoolQuote.baseline
+      : null;
+  // The guarantee row is below what the mempool leaves: this order, as
+  // priced, rests instead of filling if the pending ones confirm first.
+  const minBelowMempool = afterMempoolRaw !== null && minReceivedRaw > afterMempoolRaw;
+
+  // What this trade needs: whatever is already pending ahead of it, plus
+  // room for one more taker of this size — which moves the price by roughly
+  // this trade's own impact. Floored at 0.5% (pool fee territory). The
+  // impact share is capped as it always was; the mempool share is allowed
+  // through, because it is not a guess, up to the point where the button
+  // stops calling this a market order.
   const neededSlippage =
     quote && approx(outRaw) > 0
-      ? Math.min(5, Math.max(0.5, Math.ceil(impact * 10) / 10))
+      ? Math.min(
+          AUTO_SLIPPAGE_MEMPOOL_CAP,
+          Math.max(
+            0.5,
+            Math.ceil((Math.min(impact, AUTO_SLIPPAGE_CAP) + mempoolDrop) * 10) / 10,
+          ),
+        )
       : 1;
   useEffect(() => {
     setAutoValue(neededSlippage);
@@ -554,6 +674,19 @@ export function SwapWidget({
                 Price impact {impact.toFixed(1)}%
               </span>
             )}
+            {mempoolQuote && (
+              <span
+                className={
+                  mempoolDrop >= 3
+                    ? "font-medium text-amber-600 dark:text-amber-400"
+                    : "text-gray-400 dark:text-gray-500"
+                }
+                title={`${mempoolQuote.pendingCount} unconfirmed ${mempoolQuote.pendingCount === 1 ? "order" : "orders"} on this pair in the same direction. If they confirm first, this trade gets about ${mempoolDrop.toFixed(1)}% less than the quote. Auto slippage allows for it.`}
+              >
+                {mempoolQuote.pendingCount} ahead in mempool
+                {mempoolDrop > 0 && ` · −${mempoolDrop.toFixed(1)}%`}
+              </span>
+            )}
             {rateText && (
               <QuoteRing
                 periodMs={QUOTE_REFRESH_MS}
@@ -567,10 +700,32 @@ export function SwapWidget({
           <dl className="mt-1 space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
               <dt>Min received</dt>
-              <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
+              <dd
+                className={`font-medium tabular-nums ${
+                  minBelowMempool
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-gray-700 dark:text-gray-300"
+                }`}
+                title={
+                  minBelowMempool
+                    ? "Above what the pending orders would leave. If they confirm first, this order rests for a block and refunds instead of filling — raise the slippage or use Auto."
+                    : undefined
+                }
+              >
                 {commasRaw(minReceivedRaw)} {getAsset}
+                {minBelowMempool && (
+                  <span className="font-normal"> · above the mempool estimate</span>
+                )}
               </dd>
             </div>
+            {afterMempoolRaw !== null && (
+              <div className="flex justify-between">
+                <dt>After mempool</dt>
+                <dd className="tabular-nums">
+                  ≈ {commasRaw(afterMempoolRaw)} {getAsset}
+                </dd>
+              </div>
+            )}
             <div className="flex justify-between">
               <dt>Route</dt>
               <dd>
