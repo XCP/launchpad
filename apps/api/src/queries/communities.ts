@@ -85,7 +85,9 @@ export interface CommunityLaunchRow {
   minters: number;
 }
 
-/** The raw facts the /v2/communities aggregate is built from. */
+/** The raw facts the /v2/communities aggregate is built from. A community's
+ *  top launch is chosen among graduated ones only: a launch still minting or
+ *  refunded is not somewhere a community ended up. */
 export async function communityFacts(db: D1Database): Promise<{
   memberships: Omit<CommunityMembership, "cards">[];
   byLaunch: CommunityLaunchRow[];
@@ -99,14 +101,14 @@ export async function communityFacts(db: D1Database): Promise<{
       `SELECT member.tag, l.asset, COUNT(DISTINCT m.source) AS minters
          FROM (SELECT DISTINCT address, tag FROM address_communities) member
          JOIN launch_mints m ON m.source = member.address
-         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1 AND l.phase = 'graduated'
         GROUP BY member.tag, l.asset`,
     ),
     q<{ asset: string; minters: number }>(
       db,
       `SELECT l.asset, COUNT(DISTINCT m.source) AS minters
          FROM launch_mints m
-         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1 AND l.phase = 'graduated'
         GROUP BY l.asset`,
     ),
     one<{ n: number }>(

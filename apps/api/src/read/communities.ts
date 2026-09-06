@@ -16,7 +16,7 @@ export interface CommunityRow {
   collectors: number;
   /** Distinct minting addresses in either role. */
   members: number;
-  /** The launch this community is most present in, by share of that launch's minters. */
+  /** The graduated launch this community is most present in, by share of that launch's minters. */
   top: { asset: string; minters: number; share: number } | null;
 }
 
