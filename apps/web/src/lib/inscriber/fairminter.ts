@@ -80,6 +80,9 @@ export function prepareFairminterInscriptionPsbt(
     body: params.imageData,
     metaprotocol: "xcp",
     metadata: buildFairminterInscriptionMetadata(params),
+    // ord shows properties.attributes.title as the inscription page's subtitle (tag 17, which
+    // Counterparty never reads), so the name rides here rather than in the metadata map.
+    properties: { title: params.asset },
   };
   return prepareCommit(pubkey, data, params.feeRate);
 }
