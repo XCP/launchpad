@@ -29,7 +29,7 @@ export async function syncCommunities(db: D1Database): Promise<
   const now = Math.floor(Date.now() / 1000);
   const last = await communitiesSyncedAt(db);
   if (last !== null && now - last < REFRESH_SECONDS) {
-    // The memberships are current; the rollup only ever lags them on the first deploy.
+    // The memberships are current; the rollup only lags them right after a deploy that changed its shape.
     if (!(await hasCommunityRollup(db))) return { ...(await rebuildRollup(db)), skipped: true };
     return { skipped: true };
   }

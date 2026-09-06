@@ -989,8 +989,10 @@ export interface CommunityRow {
   /** Minting addresses that hold a card there but created none. */
   collectors: number;
   members: number;
-  /** The launch this community is most present in, by share of that launch's minters. */
+  /** The graduated launch this community is most present in, by share of that launch's minters. */
   top: { asset: string; minters: number; share: number } | null;
+  /** XCP satoshi its members have committed to mints, raw, as text. */
+  paid_xcp?: string;
 }
 
 export interface Communities {
@@ -1002,6 +1004,8 @@ export interface Communities {
   creators?: number;
   /** Distinct minting addresses that hold cards but created none. */
   collectors?: number;
+  /** XCP satoshi committed to every conforming mint, raw, as text. */
+  paid_xcp?: string;
   communities: CommunityRow[];
 }
 

@@ -16,7 +16,7 @@ communitiesRoute.get("/v2/communities", async (c) => {
   const rollup = await readCommunityRollup(c.env.DB);
   return J(
     c,
-    { result: rollup ?? { minters: 0, represented: 0, creators: 0, collectors: 0, communities: [] } },
+    { result: rollup ?? { minters: 0, represented: 0, creators: 0, collectors: 0, paid_xcp: "0", communities: [] } },
     rollup ? COMMUNITIES_TTL : 60,
   );
 });

@@ -88,6 +88,8 @@ export interface CommunityRow {
   members: number;
   /** The graduated launch this community is most present in, by share of that launch's minters. */
   top: { asset: string; minters: number; share: number } | null;
+  /** XCP satoshi its members have committed to mints, as text. */
+  paid_xcp: string;
 }
 
 export interface CommunityRollup {
@@ -99,6 +101,8 @@ export interface CommunityRollup {
   creators: number;
   /** Distinct members that created nowhere. */
   collectors: number;
+  /** XCP satoshi committed to every conforming mint, as text. */
+  paid_xcp: string;
   communities: CommunityRow[];
 }
 
@@ -120,8 +124,10 @@ export async function communityFacts(db: D1Database): Promise<{
   byLaunch: CommunityLaunchRow[];
   launchMinters: { asset: string; minters: number }[];
   minters: number;
+  paidByTag: { tag: string; paid: string }[];
+  paid: string;
 }> {
-  const [memberships, byLaunch, launchMinters, total] = await Promise.all([
+  const [memberships, byLaunch, launchMinters, total, paidByTag, paidTotal] = await Promise.all([
     q<Omit<CommunityMembership, "cards">>(db, `SELECT address, tag, role FROM address_communities`),
     q<CommunityLaunchRow>(
       db,
@@ -144,8 +150,29 @@ export async function communityFacts(db: D1Database): Promise<{
          FROM launch_mints m
          JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1`,
     ),
+    q<{ tag: string; paid: string }>(
+      db,
+      `SELECT member.tag, CAST(SUM(CAST(m.paid_quantity AS INTEGER)) AS TEXT) AS paid
+         FROM (SELECT DISTINCT address, tag FROM address_communities) member
+         JOIN launch_mints m ON m.source = member.address
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+        GROUP BY member.tag`,
+    ),
+    one<{ paid: string | null }>(
+      db,
+      `SELECT CAST(SUM(CAST(m.paid_quantity AS INTEGER)) AS TEXT) AS paid
+         FROM launch_mints m
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1`,
+    ),
   ]);
-  return { memberships, byLaunch, launchMinters, minters: total?.n ?? 0 };
+  return {
+    memberships,
+    byLaunch,
+    launchMinters,
+    minters: total?.n ?? 0,
+    paidByTag,
+    paid: paidTotal?.paid ?? "0",
+  };
 }
 
 /**
@@ -178,13 +205,21 @@ export function rollUpCommunities(facts: Awaited<ReturnType<typeof communityFact
       topByTag.set(row.tag, candidate);
     }
   }
+  const paidByTag = new Map(facts.paidByTag.map((r) => [r.tag, r.paid]));
   const tags = new Set([...creators.keys(), ...holders.keys()]);
   const communities = [...tags]
     .map((tag) => {
       const made = creators.get(tag) ?? new Set<string>();
       const held = holders.get(tag) ?? new Set<string>();
       const collectors = [...held].filter((a) => !made.has(a)).length;
-      return { tag, creators: made.size, collectors, members: made.size + collectors, top: topByTag.get(tag) ?? null };
+      return {
+        tag,
+        creators: made.size,
+        collectors,
+        members: made.size + collectors,
+        top: topByTag.get(tag) ?? null,
+        paid_xcp: paidByTag.get(tag) ?? "0",
+      };
     })
     .sort((a, b) => b.members - a.members || a.tag.localeCompare(b.tag));
   return {
@@ -192,6 +227,7 @@ export function rollUpCommunities(facts: Awaited<ReturnType<typeof communityFact
     represented: represented.size,
     creators: anyCreator.size,
     collectors: represented.size - anyCreator.size,
+    paid_xcp: facts.paid,
     communities,
   };
 }
@@ -206,26 +242,29 @@ export async function writeCommunityRollup(db: D1Database, rollup: CommunityRoll
     top_asset: c.top?.asset ?? null,
     top_minters: c.top?.minters ?? null,
     top_share: c.top?.share ?? null,
+    paid_xcp: c.paid_xcp,
   }));
   const results = await db.batch([
     db
       .prepare(
-        `INSERT INTO community_stats (tag, creators, collectors, members, top_asset, top_minters, top_share)
+        `INSERT INTO community_stats (tag, creators, collectors, members, top_asset, top_minters, top_share, paid_xcp)
          SELECT json_extract(value, '$.tag'), json_extract(value, '$.creators'),
                 json_extract(value, '$.collectors'), json_extract(value, '$.members'),
                 json_extract(value, '$.top_asset'), json_extract(value, '$.top_minters'),
-                json_extract(value, '$.top_share')
+                json_extract(value, '$.top_share'), json_extract(value, '$.paid_xcp')
            FROM json_each(?1)
           WHERE true
          ON CONFLICT (tag) DO UPDATE SET
            creators = excluded.creators, collectors = excluded.collectors, members = excluded.members,
-           top_asset = excluded.top_asset, top_minters = excluded.top_minters, top_share = excluded.top_share
+           top_asset = excluded.top_asset, top_minters = excluded.top_minters, top_share = excluded.top_share,
+           paid_xcp = excluded.paid_xcp
          WHERE community_stats.creators IS NOT excluded.creators
             OR community_stats.collectors IS NOT excluded.collectors
             OR community_stats.members IS NOT excluded.members
             OR community_stats.top_asset IS NOT excluded.top_asset
             OR community_stats.top_minters IS NOT excluded.top_minters
-            OR community_stats.top_share IS NOT excluded.top_share`,
+            OR community_stats.top_share IS NOT excluded.top_share
+            OR community_stats.paid_xcp IS NOT excluded.paid_xcp`,
       )
       .bind(JSON.stringify(rows)),
     db
@@ -236,17 +275,18 @@ export async function writeCommunityRollup(db: D1Database, rollup: CommunityRoll
       .bind(JSON.stringify(rows)),
     db
       .prepare(
-        `INSERT INTO community_totals (id, minters, represented, creators, collectors)
-         VALUES (1, ?1, ?2, ?3, ?4)
+        `INSERT INTO community_totals (id, minters, represented, creators, collectors, paid_xcp)
+         VALUES (1, ?1, ?2, ?3, ?4, ?5)
          ON CONFLICT (id) DO UPDATE SET
            minters = excluded.minters, represented = excluded.represented,
-           creators = excluded.creators, collectors = excluded.collectors
+           creators = excluded.creators, collectors = excluded.collectors, paid_xcp = excluded.paid_xcp
          WHERE community_totals.minters IS NOT excluded.minters
             OR community_totals.represented IS NOT excluded.represented
             OR community_totals.creators IS NOT excluded.creators
-            OR community_totals.collectors IS NOT excluded.collectors`,
+            OR community_totals.collectors IS NOT excluded.collectors
+            OR community_totals.paid_xcp IS NOT excluded.paid_xcp`,
       )
-      .bind(rollup.minters, rollup.represented, rollup.creators, rollup.collectors),
+      .bind(rollup.minters, rollup.represented, rollup.creators, rollup.collectors, rollup.paid_xcp),
   ]);
   return results.reduce((sum, r) => sum + (r.meta.rows_written ?? 0), 0);
 }
@@ -254,9 +294,9 @@ export async function writeCommunityRollup(db: D1Database, rollup: CommunityRoll
 /** The stored rollup: 72 rows, two indexed reads. Null until the first refresh has run. */
 export async function readCommunityRollup(db: D1Database): Promise<CommunityRollup | null> {
   const [totals, rows] = await Promise.all([
-    one<{ minters: number; represented: number; creators: number; collectors: number }>(
+    one<{ minters: number; represented: number; creators: number; collectors: number; paid_xcp: string }>(
       db,
-      `SELECT minters, represented, creators, collectors FROM community_totals WHERE id = 1`,
+      `SELECT minters, represented, creators, collectors, paid_xcp FROM community_totals WHERE id = 1`,
     ),
     q<{
       tag: string;
@@ -266,9 +306,10 @@ export async function readCommunityRollup(db: D1Database): Promise<CommunityRoll
       top_asset: string | null;
       top_minters: number | null;
       top_share: number | null;
+      paid_xcp: string;
     }>(
       db,
-      `SELECT tag, creators, collectors, members, top_asset, top_minters, top_share
+      `SELECT tag, creators, collectors, members, top_asset, top_minters, top_share, paid_xcp
          FROM community_stats
         ORDER BY members DESC, tag`,
     ),
@@ -285,10 +326,13 @@ export async function readCommunityRollup(db: D1Database): Promise<CommunityRoll
         r.top_asset !== null && r.top_minters !== null && r.top_share !== null
           ? { asset: r.top_asset, minters: r.top_minters, share: r.top_share }
           : null,
+      paid_xcp: r.paid_xcp,
     })),
   };
 }
 
+/** False until a refresh has written every column the current shape carries. */
 export async function hasCommunityRollup(db: D1Database): Promise<boolean> {
-  return (await one<{ id: number }>(db, `SELECT id FROM community_totals WHERE id = 1`)) !== null;
+  const row = await one<{ paid_xcp: string }>(db, `SELECT paid_xcp FROM community_totals WHERE id = 1`);
+  return row !== null && row.paid_xcp !== "0";
 }
