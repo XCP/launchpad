@@ -7,7 +7,8 @@ import {
   toBigInt,
 } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
-import { relayingFetch } from "@/lib/counterparty-relay";
+import { relayingFetch } from "@xcp/wallet-sdk";
+import "@/lib/wallet/sdk-config";
 
 /**
  * Shared client-side API helpers. Before this file, fetchJson and

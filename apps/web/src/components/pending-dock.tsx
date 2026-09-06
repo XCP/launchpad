@@ -9,7 +9,7 @@ import {
   subscribePending,
   sweepResolved,
   updatePending,
-} from "@/lib/pending";
+} from "@xcp/wallet-sdk";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";

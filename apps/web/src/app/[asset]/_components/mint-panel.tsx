@@ -17,10 +17,13 @@ import { fetchMempoolSnapshot } from "@/lib/api/launchpad-api";
 import { commas, commasRaw, satsPerVb, usd as usdFmt } from "@/lib/format";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
-import { registerPending } from "@/lib/pending";
-import { useSpendableBalance } from "@/hooks/use-spendable-balance";
+import {
+  fetchFeeRate,
+  registerPending,
+} from "@xcp/wallet-sdk";
+import { useSpendableBalance } from "@xcp/wallet-sdk/react/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
-import { fetchMedianFeeRate, useCompose } from "@/lib/wallet/useCompose";
+import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { remainingLotsForAddress, saleTarget, xcp69Params, XCP69 } from "@/lib/xcp69";
 
@@ -135,7 +138,7 @@ export function MintPanel({
   const insufficient =
     xcpBalance !== undefined && costRaw > 0 && costRaw > approx(xcpBalance);
 
-  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchFeeRate, {
     refreshInterval: 30_000,
   });
   const { data: btcUsd } = useSWR(

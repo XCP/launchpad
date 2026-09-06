@@ -4,7 +4,7 @@ import * as btc from "@scure/btc-signer";
 import { secp256k1 } from "@noble/curves/secp256k1";
 
 import { groupMintsByAddress } from "@/lib/mempool";
-import { pubkeyFromBip322 } from "@/lib/bip322";
+import { pubkeyFromBip322 } from "@xcp/wallet-sdk";
 import type { MempoolMint } from "@/lib/api/counterparty";
 
 /* ------------------------------------------------------------------ */

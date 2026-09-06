@@ -27,8 +27,8 @@ import {
 } from "@/lib/numeric";
 import { useDebounced } from "@/hooks/use-debounced";
 import { trackTx } from "@/lib/analytics";
-import { registerPending } from "@/lib/pending";
-import { useSpendableBalance } from "@/hooks/use-spendable-balance";
+import { registerPending } from "@xcp/wallet-sdk";
+import { useSpendableBalance } from "@xcp/wallet-sdk/react/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";

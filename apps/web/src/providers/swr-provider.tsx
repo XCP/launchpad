@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { SWRConfig } from "swr";
-import { leaderPolling } from "@/lib/swr-leader";
+import { leaderPolling } from "@xcp/wallet-sdk/react/leader-polling";
 
 /**
  * One polling policy for the whole site. Components still choose their own

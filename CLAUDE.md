@@ -21,8 +21,10 @@ progress, wallet composes — that traffic is free and stays in the browser.
   NaN from this).
 - Success and failure both end at status `closed`; a TOKEN/XCP pool row is the
   launched-vs-refunded oracle (`fetchPool`).
-- `apps/web/src/lib/wallet/` is copied from the exchange repo's SDK — keep it
-  drop-in compatible; don't fork its behavior casually.
+- The wallet layer is `@xcp/wallet-sdk` (github:XCP/wallet-sdk, pinned by tag in
+  apps/web/package.json). `apps/web/src/lib/wallet/` is only this site's policy
+  over it: status vocabulary, the fairminter compose, the connect panel. A
+  capability the site needs and the SDK lacks goes into the SDK, never here.
 - Paginate the Counterparty API with `next_cursor` to exhaustion; never
   hardcode a page limit as if it were the universe.
 - D1 bills every row a statement touches, not every row that changed. Every

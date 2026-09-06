@@ -4,16 +4,16 @@ import {
   ownTransactionOutputs,
   parseTxInputs,
   parseTxOutputs,
-} from '@/lib/wallet/raw-tx'
+} from '@xcp/wallet-sdk'
 import {
   pendingChangeInputs,
   recentlySpentUtxos,
   registerBroadcast,
-} from '@/lib/wallet/spent-utxos'
+} from '@xcp/wallet-sdk'
 import {
   addressTransactionLockName,
   withAddressTransactionLock,
-} from '@/lib/wallet/transaction-lock'
+} from '@xcp/wallet-sdk'
 
 const ADDRESS = '1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa'
 const OTHER_ADDRESS = '1BoatSLRHtKNngkdXEeobR76b53LETtpyT'
