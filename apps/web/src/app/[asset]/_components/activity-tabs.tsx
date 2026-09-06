@@ -469,7 +469,7 @@ export function ActivityTabs({
           say what the list below is. */}
       {tabs.length > 1 ? (
         <Tabs value={tab} onValueChange={(v) => setParams(v as typeof tab, 1)}>
-          <div className="flex items-center justify-between gap-2 border-b border-gray-200 dark:border-gray-800 p-2">
+          <div className="border-b border-gray-200 dark:border-gray-800 p-2">
             <SegmentedList variant="card">
               {tabs.map((t) => (
                 <SegmentedTrigger key={t} value={t} variant="card" grow={false}>
@@ -477,20 +477,6 @@ export function ActivityTabs({
                 </SegmentedTrigger>
               ))}
             </SegmentedList>
-            {/* Same outbound link as the homepage's graduated section: once
-                there's a market, the deeper tape lives at opreturn.art. */}
-            {!minting && (
-              <a
-                href="https://opreturn.art/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mr-1 hidden shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 sm:inline-flex"
-              >
-                <span aria-hidden="true">🐐</span>
-                <span>Data</span>
-                <span aria-hidden="true">↗</span>
-              </a>
-            )}
           </div>
         </Tabs>
       ) : (
