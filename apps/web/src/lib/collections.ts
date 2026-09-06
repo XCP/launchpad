@@ -111,7 +111,7 @@ export const COLLECTIONS: Collection[] = [
   { tag: "skara", emoji: "🗡️", name: "SKARA", noun: "SKARA card", tone: "red" },
   { tag: "spamgelo", emoji: "🥫", name: "Spamgelo", noun: "Spamgelo piece", tone: "red" },
   { tag: "spells-of-genesis", emoji: "🔮", name: "Spells of Genesis", noun: "Spells of Genesis card", tone: "purple" },
-  { tag: "stampunks", emoji: "🧑‍🎤", name: "Stampunks", noun: "Stampunk", tone: "indigo" },
+  { tag: "stampunks", emoji: "😎", name: "Stampunks", noun: "Stampunk", tone: "indigo" },
   { tag: "the-counterpart", emoji: "🖼️", name: "The CounterpART", noun: "CounterpART piece", tone: "pink" },
   { tag: "viva-las-stamps", emoji: "🎰", name: "Viva Las Stamps", noun: "Viva Las Stamps card", tone: "rose" },
   { tag: "xcpinata", emoji: "🪅", name: "XCPinata", noun: "XCPinata card", tone: "lime" },

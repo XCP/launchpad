@@ -8,10 +8,14 @@
 import { ADDRESS_BATCH, fetchAddressCollections } from "#api/integrations/explorer";
 import {
   communitiesSyncedAt,
+  communityFacts,
+  hasCommunityRollup,
   listMinterAddresses,
   markCommunitiesSynced,
   pruneCommunities,
+  rollUpCommunities,
   upsertCommunities,
+  writeCommunityRollup,
   type CommunityMembership,
 } from "#api/queries/communities";
 
@@ -19,11 +23,16 @@ const REFRESH_SECONDS = 6 * 3600;
 const RETRY_SECONDS = 30 * 60;
 
 export async function syncCommunities(db: D1Database): Promise<
-  { skipped: true } | { minters: number; batches: number; failed: number; written: number; removed: number }
+  | { skipped: true }
+  | { minters: number; batches: number; failed: number; written: number; removed: number; rollup: number }
 > {
   const now = Math.floor(Date.now() / 1000);
   const last = await communitiesSyncedAt(db);
-  if (last !== null && now - last < REFRESH_SECONDS) return { skipped: true };
+  if (last !== null && now - last < REFRESH_SECONDS) {
+    // The memberships are current; the rollup only ever lags them on the first deploy.
+    if (!(await hasCommunityRollup(db))) return { ...(await rebuildRollup(db)), skipped: true };
+    return { skipped: true };
+  }
 
   const minters = await listMinterAddresses(db);
   let written = 0;
@@ -49,5 +58,11 @@ export async function syncCommunities(db: D1Database): Promise<
   // A partial run is recorded as older than it is, so the next tick past the
   // retry window tries again instead of waiting the full interval.
   await markCommunitiesSynced(db, failed > 0 ? now - REFRESH_SECONDS + RETRY_SECONDS : now);
-  return { minters: minters.length, batches, failed, written, removed };
+  const { rollup } = await rebuildRollup(db);
+  return { minters: minters.length, batches, failed, written, removed, rollup };
+}
+
+/** The four aggregates over memberships and mints run here, a few times a day, never per request. */
+async function rebuildRollup(db: D1Database): Promise<{ rollup: number }> {
+  return { rollup: await writeCommunityRollup(db, rollUpCommunities(await communityFacts(db))) };
 }
