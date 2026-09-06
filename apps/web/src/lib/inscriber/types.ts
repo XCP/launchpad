@@ -2,7 +2,8 @@ export interface InscriptionData {
   contentType: string
   body: Uint8Array
   parentInscriptionId?: string
-  metadata?: Record<string, unknown>
+  /** CBOR for the envelope's tag-5 field: a map for plain ordinals, the bare Counterparty message array for a fairminter. */
+  metadata?: Record<string, unknown> | unknown[]
   /** Ordinals properties (tag 17): structured attributes/traits. */
   properties?: InscriptionProperties
   /** Metaprotocol identifier (tag 7), e.g. "xcp" for Counterparty. */
@@ -73,7 +74,8 @@ export interface ArtistInscriptionParams {
   bio?: string
   twitter?: string
   website?: string
-  metadata?: Record<string, unknown>
+  /** CBOR for the envelope's tag-5 field: a map for plain ordinals, the bare Counterparty message array for a fairminter. */
+  metadata?: Record<string, unknown> | unknown[]
   traits?: Record<string, string | number | boolean | null>
   brandInscriptionId: string
   feeRate: number
@@ -82,7 +84,8 @@ export interface ArtistInscriptionParams {
 export interface CollectionInscriptionParams {
   name: string
   description?: string
-  metadata?: Record<string, unknown>
+  /** CBOR for the envelope's tag-5 field: a map for plain ordinals, the bare Counterparty message array for a fairminter. */
+  metadata?: Record<string, unknown> | unknown[]
   traits?: Record<string, string | number | boolean | null>
   artistInscriptionId: string
   feeRate: number
@@ -90,7 +93,8 @@ export interface CollectionInscriptionParams {
 
 export interface BrandInscriptionParams {
   name: string
-  metadata?: Record<string, unknown>
+  /** CBOR for the envelope's tag-5 field: a map for plain ordinals, the bare Counterparty message array for a fairminter. */
+  metadata?: Record<string, unknown> | unknown[]
   rootInscriptionId: string
   feeRate: number
 }

@@ -35,9 +35,7 @@ export interface FairminterInscriptionParams {
   feeRate: number;
 }
 
-export function buildFairminterInscriptionMetadata(
-  params: FairminterInscriptionParams,
-): Record<string, unknown> {
+export function buildFairminterInscriptionMetadata(params: FairminterInscriptionParams): unknown[] {
   // Field order is consensus-critical; mirrors compose() exactly. The decoder
   // appends [mime_type, content] from the envelope to complete the message.
   const xcp: unknown[] = [
@@ -63,14 +61,14 @@ export function buildFairminterInscriptionMetadata(
     assetNameToId(params.lpAsset),
   ];
 
-  // The minimal permanent record: the name explorers cannot derive from the numeric id in the
-  // xcp array, and the standard that groups every launch. Deliberately no URL — a link would rot
-  // on an artifact that cannot, and anything wanting the hosted JSON derives it from the name.
-  return {
-    name: params.asset,
-    standard: "XCP-69",
-    xcp,
-  };
+  // The bare array, as core's own composer writes it. Core also defines a map form
+  // ({ name, standard, xcp: [...] }) that would let ordinals.com show the name, but the Rust
+  // indexer gates that form on `ordinals_metadata_support` at a mainnet height it has not set
+  // (999,999,999 as of 11.3.0, whatever protocol_changes.json says), so a mainnet reveal
+  // carrying the map is rejected with "Expected CBOR array" and never becomes a fairminter.
+  // OKAYORDINAL (ce3b86d4…) confirmed that way on 2026-09-06. The array parses before and
+  // after that gate.
+  return xcp;
 }
 
 export function prepareFairminterInscriptionPsbt(
