@@ -4,8 +4,7 @@ import { useState } from "react";
 import useSWR from "swr";
 import { HeroTokenImage, TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
-import { fetchJson } from "@/lib/client";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { fetchBlockTimestamp } from "@/lib/api/explorer";
 
 import { SOCIAL_ICONS } from "@/app/[asset]/_components/launch-metadata";
 import { FOCUS } from "@/components/ui/tokens";
@@ -174,12 +173,7 @@ export function AnnouncedAgo({
   const unconfirmed = blockIndex >= 9_999_999;
   const { data: at } = useSWR(
     unconfirmed ? null : ["block-time", blockIndex],
-    () =>
-      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${blockIndex}`) as Promise<{
-        result: { block_time: number };
-      }>)
-        .then((d) => d.result.block_time)
-        .catch(() => null),
+    () => fetchBlockTimestamp(blockIndex),
     { revalidateOnFocus: false },
   );
   if (!unconfirmed && !at) return null;
@@ -201,12 +195,7 @@ export function AnnouncedAgo({
 export function BlockAgo({ blockIndex }: { blockIndex: number }) {
   const { data: at } = useSWR(
     ["block-time", blockIndex],
-    () =>
-      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${blockIndex}`) as Promise<{
-        result: { block_time: number };
-      }>)
-        .then((d) => d.result.block_time)
-        .catch(() => null),
+    () => fetchBlockTimestamp(blockIndex),
     { revalidateOnFocus: false },
   );
   return <>{at ? timeAgo(at) : "—"}</>;
@@ -217,12 +206,7 @@ export function BlockAgo({ blockIndex }: { blockIndex: number }) {
 export function BlockMonthYear({ blockIndex }: { blockIndex: number }) {
   const { data: at } = useSWR(
     ["block-time", blockIndex],
-    () =>
-      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${blockIndex}`) as Promise<{
-        result: { block_time: number };
-      }>)
-        .then((d) => d.result.block_time)
-        .catch(() => null),
+    () => fetchBlockTimestamp(blockIndex),
     { revalidateOnFocus: false },
   );
   return <>{at ? monthYear(at) : "—"}</>;

@@ -1,4 +1,4 @@
-import { XCP_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_API_BASE, XCP_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
 import { coalesceHolderBalances, type HolderRow, type LpBalance } from "@/lib/holders";
 import type { Raw } from "@/lib/numeric";
@@ -168,4 +168,41 @@ export async function fetchAssetHolderCount(asset: string): Promise<number | nul
   } catch {
     return null;
   }
+}
+
+/**
+ * A fact that never changes once written, so the explorer answers first and
+ * the node only covers what the explorer has not indexed yet (it can trail the
+ * chain by hours).
+ */
+async function explorerFirst<Body, T>(
+  path: string,
+  pick: (body: Body) => T | null | undefined,
+): Promise<T | null> {
+  for (const base of [XCP_API_BASE, COUNTERPARTY_API_BASE]) {
+    try {
+      const value = pick((await fetchJson(`${base}${path}`)) as Body);
+      if (value !== null && value !== undefined) return value;
+    } catch {}
+  }
+  return null;
+}
+
+/** Unix seconds for a confirmed block. */
+export function fetchBlockTimestamp(blockIndex: number): Promise<number | null> {
+  return explorerFirst<{ result?: { block_time?: unknown } | null }, number>(
+    `/blocks/${blockIndex}`,
+    (body) => {
+      const at = body.result?.block_time;
+      return typeof at === "number" ? at : typeof at === "string" && /^[0-9]+$/.test(at) ? Number(at) : null;
+    },
+  );
+}
+
+/** The address that owns an asset today (its issuer when never transferred). */
+export function fetchAssetOwner(asset: string): Promise<string | null> {
+  return explorerFirst<{ result?: { owner?: string | null; issuer?: string | null } | null }, string>(
+    `/assets/${encodeURIComponent(asset)}`,
+    (body) => body.result?.owner ?? body.result?.issuer ?? null,
+  );
 }

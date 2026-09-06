@@ -15,6 +15,7 @@ import {
 import { big, type RawLike } from "@/lib/numeric";
 import { fetchLaunchpadAddressSummary } from "@/lib/api/launchpad-api";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { fetchBlockTimestamp } from "@/lib/api/explorer";
 import {
   type Fairminter,
   isXcp69,
@@ -270,12 +271,7 @@ function useAddressSummary(source: string | null) {
 function useFirstSeen(firstBlock: number | null | undefined) {
   const { data } = useSWR(
     firstBlock ? ["block-time", firstBlock] : null,
-    () =>
-      (fetchJson(`${COUNTERPARTY_API_BASE}/blocks/${firstBlock}`) as Promise<{
-        result: { block_time: number };
-      }>)
-        .then((d) => d.result.block_time)
-        .catch(() => null),
+    () => fetchBlockTimestamp(firstBlock!),
     { revalidateOnFocus: false },
   );
   return data ?? null;

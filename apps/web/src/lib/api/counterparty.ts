@@ -4,7 +4,12 @@ import {
   COUNTERPARTY_BURN_ADDRESS,
   XCP_API_BASE,
 } from "@/lib/constants";
-import { fetchAssetHolderCount, fetchTopHolders, fetchTopLpBalances } from "@/lib/api/explorer";
+import {
+  fetchAssetHolderCount,
+  fetchBlockTimestamp,
+  fetchTopHolders,
+  fetchTopLpBalances,
+} from "@/lib/api/explorer";
 import type { LpBalance } from "@/lib/holders";
 import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
@@ -887,18 +892,9 @@ export async function fetchMempoolFairminter(
   return all.find((fm) => fm.asset === asset) ?? null;
 }
 
-/** Real Unix seconds for a block. Counterparty stores block_time; nothing
- *  here needs to guess at ten-minute averages. */
-export async function fetchBlockTime(blockIndex: number): Promise<number | null> {
-  try {
-    const data = await get<{ result: { block_time?: number } | null }>(
-      `/blocks/${blockIndex}`,
-      3600,
-    );
-    return data.result?.block_time ?? null;
-  } catch {
-    return null;
-  }
+/** Real Unix seconds for a block, from the explorer first. */
+export function fetchBlockTime(blockIndex: number): Promise<number | null> {
+  return fetchBlockTimestamp(blockIndex);
 }
 
 export async function fetchBlockHeight(): Promise<number> {

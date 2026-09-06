@@ -3,12 +3,11 @@
 import { useState } from "react";
 import useSWR from "swr";
 import { fileIsAnimatedWebp } from "@/lib/animated-webp";
-import { fetchJson } from "@/lib/client";
+import { fetchAssetOwner } from "@/lib/api/explorer";
 import { fetchIndexedLaunch } from "@/lib/api/launchpad-api";
 import { useSession } from "@/providers/session-context";
 import { isValidTelegram, isValidX } from "@/lib/social";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { announceArtUpdate } from "@/components/token-image";
 
 /**
@@ -28,12 +27,7 @@ export function EditPanel({ asset }: { asset: string }) {
   const { address: sessionAddress } = useSession();
   const { data: owner } = useSWR<string | null>(
     walletStatus === "connected" ? [asset, "asset-owner"] : null,
-    async () => {
-      const info = (await fetchJson(`${COUNTERPARTY_API_BASE}/assets/${asset}`)).result as
-        | { owner?: string; issuer?: string }
-        | null;
-      return info?.owner ?? info?.issuer ?? null;
-    },
+    () => fetchAssetOwner(asset),
     { revalidateOnFocus: false },
   );
   const [loaded, setLoaded] = useState(false);
