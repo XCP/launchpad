@@ -214,7 +214,6 @@ export default async function StatsPage() {
         </div>
       </section>
 
-      {communities && <CommunitiesSection data={communities} />}
 
       <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Of the launches that finished</h2>
@@ -277,6 +276,8 @@ export default async function StatsPage() {
           )}
         </div>
       </section>
+
+      {communities && <CommunitiesSection data={communities} />}
 
       <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
         {commas(total)} conforming {total === 1 ? "launch" : "launches"} · chain tip{" "}
