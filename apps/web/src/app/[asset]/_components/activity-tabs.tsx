@@ -38,6 +38,7 @@ import {
   fetchAssetTradesPage,
   type AssetTradePage,
 } from "@/lib/api/launchpad-api";
+import { tradeRoleForAddress } from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
   includeFormerHolders,
@@ -64,6 +65,7 @@ interface TradeRow {
   tokenRaw: Raw;
   xcpRaw: Raw;
   addr: string;
+  counterpartyAddr: string;
   via: "pool" | "book";
   txHash: string;
 }
@@ -194,6 +196,7 @@ export function ActivityTabs({
           tokenRaw: (token < 0n ? -token : token).toString(),
           xcpRaw: (xcp < 0n ? -xcp : xcp).toString(),
           addr: trade.address,
+          counterpartyAddr: trade.counterpartyAddress ?? "",
           via: trade.venue,
           txHash: trade.txHash ?? "",
         };
@@ -679,14 +682,41 @@ export function ActivityTabs({
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {trades.map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
+                    const walletRole = tradeRoleForAddress(
+                      {
+                        address: t.addr,
+                        counterpartyAddress: t.counterpartyAddr,
+                        venue: t.via,
+                      },
+                      address,
+                    );
                     // block_time is missing only if a node responded without
                     // it; fall back to the block height rather than to a
                     // placeholder string.
                     const hasTime = t.time > 0;
                     const at = hasTime ? new Date(t.time * 1000) : null;
                     return (
-                      <tr key={t.key}>
+                      <tr
+                        key={t.key}
+                        className={
+                          walletRole
+                            ? "bg-purple-100/70 dark:bg-purple-950/50 shadow-[inset_4px_0_0_0_rgb(126_34_206/0.85)] dark:shadow-[inset_4px_0_0_0_rgb(192_132_252/0.85)]"
+                            : undefined
+                        }
+                        title={
+                          walletRole === "counterparty"
+                            ? "Your connected wallet's resting order participated in this fill"
+                            : walletRole
+                              ? "Trade from your connected wallet"
+                              : undefined
+                        }
+                      >
                         <td className={`whitespace-nowrap px-4 py-2 font-medium ${t.buy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
+                          {walletRole && (
+                            <span className="sr-only">
+                              Your connected wallet participated in this trade. {" "}
+                            </span>
+                          )}
                           {t.buy ? "↗ Buy" : "↘ Sell"}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">

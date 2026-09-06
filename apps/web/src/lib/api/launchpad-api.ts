@@ -1259,6 +1259,8 @@ export interface ActivityTrade {
   side: "buy" | "sell";
   venue: "pool" | "book";
   divisible: boolean;
+  /** The other party of a book fill; null for pool fills. */
+  counterpartyAddress: string | null;
 }
 
 export interface ActivityBurn {
@@ -1374,6 +1376,7 @@ interface ApiActivityTrade {
   kind: string;
   venue: string;
   divisible: number;
+  counterparty_address?: string | null;
 }
 
 const mapActivityTrade = (r: ApiActivityTrade): ActivityTrade => ({
@@ -1390,6 +1393,7 @@ const mapActivityTrade = (r: ApiActivityTrade): ActivityTrade => ({
     side: r.kind === "sell" ? "sell" : "buy",
     venue: r.venue === "book" ? "book" : "pool",
     divisible: Boolean(r.divisible),
+    counterpartyAddress: r.counterparty_address ?? null,
   });
 
 export function fetchActivityTrades(limit = 50): Promise<ActivityTrade[] | null> {

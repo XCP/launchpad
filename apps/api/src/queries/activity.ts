@@ -72,6 +72,9 @@ export interface RecentTradeRow {
   kind: string;
   venue: string;
   divisible: number;
+  /** The other party of a book fill; null for pool fills and for rows indexed
+   *  before the column existed and never backfilled. */
+  counterparty_address: string | null;
 }
 
 export interface RecentBurnRow {
@@ -120,7 +123,7 @@ export function listRecentTrades(
   return q<RecentTradeRow>(
     db,
     `SELECT e.event, e.tx_hash, e.asset, e.address, e.block_index,
-            e.token_delta, e.xcp_delta, e.kind,
+            e.token_delta, e.xcp_delta, e.kind, e.counterparty_address,
             ${VENUE} AS venue,
             COALESCE(l.divisible, 1) AS divisible
        FROM asset_events e

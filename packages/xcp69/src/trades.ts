@@ -28,6 +28,28 @@ export interface PairTrade {
   sourceOrder: number;
 }
 
+export type TradeAddressRole = "primary" | "counterparty";
+
+/**
+ * How an address participated in the one-row representation of a trade.
+ *
+ * Pool rows have one real participant. Order-book rows are shown from tx1's
+ * perspective, but the resting tx0 maker is just as much a party to the fill.
+ * Keeping that distinction explicit prevents a connected maker from
+ * disappearing while preserving the public tape's existing Buy/Sell meaning.
+ */
+export function tradeRoleForAddress(
+  trade: Pick<PairTrade, "address" | "counterpartyAddress" | "venue">,
+  address: string | null | undefined,
+): TradeAddressRole | null {
+  if (!address) return null;
+  if (trade.address === address) return "primary";
+  if (trade.venue === "book" && trade.counterpartyAddress === address) {
+    return "counterparty";
+  }
+  return null;
+}
+
 interface WorkingTrade extends PairTrade {
   forwardAsset: string;
   backwardAsset: string;

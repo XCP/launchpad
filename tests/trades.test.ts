@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
-import { mergePairTrades } from "@launchpad/xcp69/trades";
+import {
+  mergePairTrades,
+  tradeRoleForAddress,
+} from "@launchpad/xcp69/trades";
 import { toIndexedRows } from "#api/indexer/events";
 
 const tx = "e7a3380dbd45ac3e7a142389ae16ce334344837143b9d2854ea28d5ee2818897";
@@ -118,5 +121,64 @@ describe("pair trade chronology", () => {
 
     expect(trades.map((trade) => trade.txHash)).toEqual(["newer", "older"]);
     expect(fetchEvents).not.toHaveBeenCalled();
+  });
+});
+
+describe("tape rows carry the other party of a book fill", () => {
+  const base = {
+    block: 100,
+    time: 0,
+    txIndex: 1,
+    eventIndex: 0,
+    buy: true,
+    tokenQuantity: "5",
+    xcpQuantity: "50",
+    txHash: "tx",
+    sourceOrder: 0,
+  };
+
+  it("records the maker on the taker's row and the taker on the maker's row", () => {
+    const rows = toIndexedRows("TOKEN", [
+      { ...base, key: "fill", address: "taker", venue: "book", matchId: "match", counterpartyAddress: "maker" },
+    ]);
+    expect(rows.map((row) => [row.address, row.primaryActor, row.counterpartyAddress])).toEqual([
+      ["taker", true, "maker"],
+      ["maker", false, "taker"],
+    ]);
+  });
+
+  it("leaves pool fills without a counterparty", () => {
+    const rows = toIndexedRows("TOKEN", [
+      { ...base, key: "swap", address: "trader", venue: "pool", matchId: "", counterpartyAddress: "" },
+    ]);
+    expect(rows.map((row) => row.counterpartyAddress)).toEqual([null]);
+  });
+});
+
+describe("connected-wallet trade attribution", () => {
+  const pool = {
+    address: "pool-trader",
+    counterpartyAddress: "",
+    venue: "pool" as const,
+  };
+  const book = {
+    address: "book-taker",
+    counterpartyAddress: "book-maker",
+    venue: "book" as const,
+  };
+
+  it("recognizes the pool trader and order-book taker as the primary participant", () => {
+    expect(tradeRoleForAddress(pool, "pool-trader")).toBe("primary");
+    expect(tradeRoleForAddress(book, "book-taker")).toBe("primary");
+  });
+
+  it("recognizes the resting maker without inventing a pool counterparty", () => {
+    expect(tradeRoleForAddress(book, "book-maker")).toBe("counterparty");
+    expect(tradeRoleForAddress(pool, "book-maker")).toBeNull();
+  });
+
+  it("does not highlight disconnected or unrelated addresses", () => {
+    expect(tradeRoleForAddress(book, null)).toBeNull();
+    expect(tradeRoleForAddress(book, "someone-else")).toBeNull();
   });
 });
