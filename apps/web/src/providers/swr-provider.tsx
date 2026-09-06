@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { SWRConfig } from "swr";
+import { leaderPolling } from "@/lib/swr-leader";
 
 /**
  * One polling policy for the whole site. Components still choose their own
@@ -36,6 +37,9 @@ export function SwrProvider({ children }: { children: ReactNode }) {
         errorRetryCount: 3,
         errorRetryInterval: 8_000,
         keepPreviousData: true,
+        // One tab polls each key, the others take its broadcast — see
+        // lib/swr-leader. Several tabs are how one visitor gets throttled.
+        use: [leaderPolling],
       }}
     >
       {children}
