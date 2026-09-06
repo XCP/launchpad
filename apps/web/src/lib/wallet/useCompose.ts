@@ -3,8 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useWallet } from './wallet-context'
 import { friendlyError, BTC_ADDRESS_REGEX } from './sdk'
-import { parseTxInputs, type TxInput } from './raw-tx'
-import { msSinceLastSpend, recentlySpentUtxos, registerSpentUtxos } from './spent-utxos'
+import { ownTransactionOutputs, parseTxInputs, type TxInput } from './raw-tx'
+import {
+  msSinceLastSpend,
+  pendingChangeInputs,
+  recentlySpentUtxos,
+  registerBroadcast,
+} from './spent-utxos'
+import { withAddressTransactionLock } from './transaction-lock'
 import { pubkeyFromBip322 } from '@/lib/bip322'
 import { quantityParam } from '@/lib/numeric'
 import { COUNTERPARTY_API_BASE } from '@/lib/constants'
@@ -131,12 +137,12 @@ const NO_SPENDABLE_BTC_PATTERN = /no utxos found for|no unspent outputs/i
  *  beat and try again once before surfacing anything to the user. Anything
  *  else — a different error, or a wallet that's simply been empty for
  *  longer than that window — passes straight through. */
-async function withUtxoRaceRetry<T>(fn: () => Promise<T>): Promise<T> {
+async function withUtxoRaceRetry<T>(address: string, fn: () => Promise<T>): Promise<T> {
   try {
     return await fn()
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e)
-    const sinceSpend = msSinceLastSpend()
+    const sinceSpend = msSinceLastSpend(address)
     if (
       INSUFFICIENT_UTXO_PATTERN.test(msg) &&
       sinceSpend !== null &&
@@ -323,13 +329,13 @@ export function useCompose() {
   }, [address])
 
   /**
-   * Compose → sign → broadcast pipeline. `getUnsigned` returns both the hex
-   * to sign and the inputs it spends — recorded as spent only once broadcast
-   * actually succeeds (composing alone spends nothing), so the NEXT compose
-   * can tell core to exclude them regardless of which backend worker
-   * answers it. See spent-utxos.ts for why that matters.
+   * Compose → sign → broadcast pipeline. The address lock spans the whole
+   * operation, including the journal write, so another tab cannot compose
+   * against stale state while the approval popup is open.
    */
   const run = async (
+    source: string,
+    recordOwnChange: boolean,
     getUnsigned: () => Promise<{ hex: string; inputs: TxInput[] }>,
   ): Promise<void> => {
     if (busyRef.current) return
@@ -337,16 +343,31 @@ export function useCompose() {
 
     try {
       setState({ status: 'composing', txid: null, error: null })
-      const { hex: unsignedHex, inputs } = await withUtxoRaceRetry(getUnsigned)
+      await withAddressTransactionLock(source, async () => {
+        // Every journal read in getUnsigned happens after acquiring this
+        // lock, so a broadcast completed by another tab is visible here.
+        const { hex: unsignedHex, inputs } = await withUtxoRaceRetry(source, getUnsigned)
 
-      setState({ status: 'signing', txid: null, error: null })
-      const signedHex = await signTransaction(unsignedHex)
+        setState({ status: 'signing', txid: null, error: null })
+        const signedHex = await signTransaction(unsignedHex)
 
-      setState({ status: 'broadcasting', txid: null, error: null })
-      const txid = await broadcastTransaction(signedHex)
+        setState({ status: 'broadcasting', txid: null, error: null })
+        const txid = await broadcastTransaction(signedHex)
 
-      registerSpentUtxos(inputs)
-      setState({ status: 'confirmed', txid, error: null })
+        // The transaction is already broadcast; journal/parsing failure must
+        // never turn that success into a scary, retryable UI error.
+        try {
+          registerBroadcast(
+            source,
+            txid,
+            inputs,
+            recordOwnChange ? ownTransactionOutputs(signedHex, source) : [],
+          )
+        } catch (journalError) {
+          console.warn('Could not record broadcast UTXO state', journalError)
+        }
+        setState({ status: 'confirmed', txid, error: null })
+      })
     } catch (e) {
       setState({ status: 'error', txid: null, error: composeError(e) })
     } finally {
@@ -367,9 +388,9 @@ export function useCompose() {
       setState({ status: 'error', txid: null, error: 'Invalid wallet address' })
       return
     }
-    const excludeUtxos = recentlySpentUtxos()
-    const composeWith = (allowUnconfirmed: boolean) =>
-      composeRequest(
+    const composeWith = (allowUnconfirmed: boolean, inputsSet?: string[]) => {
+      const excludeUtxos = recentlySpentUtxos(address)
+      return composeRequest(
         `addresses/${address}`,
         type,
         params,
@@ -391,6 +412,9 @@ export function useCompose() {
           // excludes whatever WE know we just spent, regardless of which
           // worker answers.
           ...(excludeUtxos.length > 0 ? { exclude_utxos: excludeUtxos.join(',') } : {}),
+          ...(inputsSet && inputsSet.length > 0
+            ? { inputs_set: inputsSet.join(',') }
+            : {}),
           // Harmless when it isn't needed: core reads this only if the
           // message is too big for an OP_RETURN and it falls back to
           // multisig, so a mint or a swap ignores it and a launch depends
@@ -399,9 +423,26 @@ export function useCompose() {
         },
         feeRateOverride,
       )
+    }
 
-    run(async () => {
+    run(address, type !== 'attach', async () => {
       let hex: string
+      const pendingInputs = pendingChangeInputs(address)
+      if (pendingInputs.length > 0) {
+        try {
+          // Complete entries include value+script, so Core does not need its
+          // Bitcoin backend to know the just-broadcast parent transaction.
+          hex = await composeWith(true, pendingInputs)
+          return { hex, inputs: parseTxInputs(hex) }
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e)
+          // The pending output may simply be too small for this action. Let
+          // Core combine/select its normal address UTXOs in that case.
+          if (!INSUFFICIENT_UTXO_PATTERN.test(message) && !STALE_UTXO_PATTERN.test(message)) {
+            throw e
+          }
+        }
+      }
       try {
         hex = await composeWith(true)
       } catch (e) {
@@ -430,7 +471,7 @@ export function useCompose() {
     }
     // Targets one exact, caller-specified UTXO — no ambiguous selection to
     // race, so nothing to record here.
-    run(async () => {
+    run(address, false, async () => {
       const hex = await composeRequest(`utxos/${utxo}`, type, params)
       return { hex, inputs: [] }
     })

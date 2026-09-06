@@ -8,6 +8,8 @@ import { bestAskUsd } from "@launchpad/xcp69/dispenser-price";
 interface Ticker {
   xcp: number | null;
   btc: number | null;
+  btcUsd30dAgo: number | null;
+  xcpUsd30dAgo: number | null;
 }
 
 export interface DailyXcpUsd {
@@ -28,12 +30,49 @@ async function fetchTicker(): Promise<Ticker> {
       signal: AbortSignal.timeout(6_000),
       next: { revalidate: 600 },
     });
-    if (!res.ok) return { xcp: null, btc: null };
+    if (!res.ok) {
+      return {
+        xcp: null,
+        btc: null,
+        btcUsd30dAgo: null,
+        xcpUsd30dAgo: null,
+      };
+    }
     const result = (await res.json())?.result;
     const num = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
-    return { xcp: num(result?.xcp?.usd), btc: num(result?.btc?.usd) };
+    const xcpDay =
+      typeof result?.xcp?.day === "string" ? result.xcp.day : null;
+    const monthAgo = xcpDay
+      ? new Date(Date.parse(`${xcpDay}T00:00:00Z`) - 30 * 86_400_000)
+          .toISOString()
+          .slice(0, 10)
+      : null;
+    const monthAgoRow = Array.isArray(result?.history)
+      ? [...result.history]
+          .reverse()
+          .find(
+            (row: unknown) =>
+              typeof row === "object" &&
+              row !== null &&
+              typeof (row as { day?: unknown }).day === "string" &&
+              monthAgo !== null &&
+              (row as { day: string }).day <= monthAgo &&
+              num((row as { usd?: unknown }).usd) !== null,
+          )
+      : null;
+    return {
+      xcp: num(result?.xcp?.usd),
+      btc: num(result?.btc?.usd),
+      btcUsd30dAgo: num(monthAgoRow?.btc),
+      xcpUsd30dAgo: num(monthAgoRow?.usd),
+    };
   } catch {
-    return { xcp: null, btc: null };
+    return {
+      xcp: null,
+      btc: null,
+      btcUsd30dAgo: null,
+      xcpUsd30dAgo: null,
+    };
   }
 }
 
@@ -41,6 +80,16 @@ async function fetchTicker(): Promise<Ticker> {
  *  is it — nothing about the XCP mark below applies to the BTC leg. */
 export async function fetchBtcUsd(): Promise<number | null> {
   return (await fetchTicker()).btc;
+}
+
+/** BTC/USD daily close from 30 days before the current ticker day. */
+export async function fetchBtcUsd30dAgo(): Promise<number | null> {
+  return (await fetchTicker()).btcUsd30dAgo;
+}
+
+/** XCP/USD daily close from 30 days before the current ticker day. */
+export async function fetchXcpUsd30dAgo(): Promise<number | null> {
+  return (await fetchTicker()).xcpUsd30dAgo;
 }
 
 /**

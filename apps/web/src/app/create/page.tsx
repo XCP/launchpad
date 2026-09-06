@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
@@ -535,9 +535,9 @@ export default function CreatePage() {
               {nameCheck === "available" && (
                 <span className="text-green-600 dark:text-green-400">
                   {name} is available (0.5 XCP registration fee applies —{" "}
-                  <Link href="/dispense" className="underline">
+                  <LazyLink href="/dispense" className="underline">
                     need XCP?
-                  </Link>
+                  </LazyLink>
                   ).
                 </span>
               )}

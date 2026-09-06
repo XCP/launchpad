@@ -1376,8 +1376,7 @@ interface ApiActivityTrade {
   divisible: number;
 }
 
-export function fetchActivityTrades(limit = 50): Promise<ActivityTrade[] | null> {
-  return activity<ApiActivityTrade, ActivityTrade>("trades", limit, (r) => ({
+const mapActivityTrade = (r: ApiActivityTrade): ActivityTrade => ({
     // The indexer's own match identity, which is unique per fill and already
     // distinguishes two fills of one transaction. React needs a stable key
     // and the tx hash is not one.
@@ -1391,7 +1390,61 @@ export function fetchActivityTrades(limit = 50): Promise<ActivityTrade[] | null>
     side: r.kind === "sell" ? "sell" : "buy",
     venue: r.venue === "book" ? "book" : "pool",
     divisible: Boolean(r.divisible),
-  }));
+  });
+
+export function fetchActivityTrades(limit = 50): Promise<ActivityTrade[] | null> {
+  return fetchActivityTradesPage(limit, 0);
+}
+
+export function fetchActivityTradesPage(
+  limit = 50,
+  offset = 0,
+): Promise<ActivityTrade[] | null> {
+  return activity<ApiActivityTrade, ActivityTrade>(
+    "trades",
+    limit,
+    mapActivityTrade,
+    `&offset=${offset}`,
+  );
+}
+
+export interface AssetTradePage {
+  result: ActivityTrade[];
+  total: number;
+  nextOffset: number | null;
+}
+
+/** One exact page from an asset's complete indexed trade history. */
+export async function fetchAssetTradesPage(
+  asset: string,
+  limit: number,
+  offset: number,
+): Promise<AssetTradePage | null> {
+  try {
+    const qs = new URLSearchParams({
+      asset,
+      limit: String(limit),
+      offset: String(offset),
+    });
+    const res = await launchpadApiFetch(`/v2/activity/trades?${qs.toString()}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(8_000),
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      result?: ApiActivityTrade[];
+      total?: number;
+      next_offset?: number | null;
+    };
+    if (!Array.isArray(data.result) || !Number.isFinite(data.total)) return null;
+    return {
+      result: data.result.map(mapActivityTrade),
+      total: Number(data.total),
+      nextOffset: data.next_offset ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 interface ApiActivityBurn {

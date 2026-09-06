@@ -8,6 +8,7 @@ import { TokenSelectModal } from "@/components/token-select-modal";
 import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
+import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
@@ -142,16 +143,16 @@ export function LiquidityWidget({
   const depTokenNum = approx(depTokenRaw);
   const depXcpNum = approx(depXcpRaw);
 
-  const { balance: tokenBalance, balanceError: tokenBalanceError } = useSpendableBalance(
-    address,
-    asset,
-    "liquidity-token",
-  );
-  const { balance: xcpBalance, balanceError: xcpBalanceError } = useSpendableBalance(
-    address,
-    "XCP",
-    "liquidity-xcp",
-  );
+  const {
+    balance: tokenBalance,
+    balanceError: tokenBalanceError,
+    balanceUnavailable: tokenBalanceUnavailable,
+  } = useSpendableBalance(address, asset, "liquidity-token");
+  const {
+    balance: xcpBalance,
+    balanceError: xcpBalanceError,
+    balanceUnavailable: xcpBalanceUnavailable,
+  } = useSpendableBalance(address, "XCP", "liquidity-xcp");
 
   // Congestion-priced XCP gas for pool ops — usually 0, but never hardcode.
   const { data: gasFee } = useSWR<number>(
@@ -270,13 +271,17 @@ export function LiquidityWidget({
     depXcpNum > 0 &&
     depXcpNum + (gasFee ?? 0) > xcpBalance;
 
+  // Failed balance reads do not hold the deposit — see useSpendableBalance's
+  // balanceUnavailable. Only a read still in flight does, and briefly.
+  const balancesSettled =
+    (tokenBalance !== undefined || tokenBalanceUnavailable) &&
+    (xcpBalance !== undefined || xcpBalanceUnavailable);
   const addReady =
     tab === "add" &&
     amountRaw > 0 &&
     depTokenNum > 0 &&
     depXcpNum > 0 &&
-    tokenBalance !== undefined &&
-    xcpBalance !== undefined &&
+    balancesSettled &&
     !busy &&
     !insufficientToken &&
     !insufficientXcp &&
@@ -319,10 +324,8 @@ export function LiquidityWidget({
       : "Working…"
     : amountRaw === 0
       ? "Enter an amount"
-      : tokenBalance === undefined || xcpBalance === undefined
-        ? tokenBalanceError || xcpBalanceError
-          ? "Balance unavailable"
-          : "Checking balance…"
+      : !balancesSettled
+        ? "Checking balance…"
       : insufficientToken
         ? `Insufficient ${asset} balance`
         : insufficientXcp
@@ -443,6 +446,7 @@ export function LiquidityWidget({
                     Balance: {commasRaw(tokenBalance)}
                   </button>
                 )}
+                {tokenBalance === undefined && <BalanceUnavailable error={tokenBalanceError} />}
               </>
             }
           >
@@ -507,6 +511,7 @@ export function LiquidityWidget({
                       Balance: {commasRaw(xcpBalance)}
                     </button>
                   )}
+                  {xcpBalance === undefined && <BalanceUnavailable error={xcpBalanceError} />}
                 </>
               }
             >

@@ -97,22 +97,24 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
 
 /* ---------- hosted metadata (site-issued launches) ---------- */
 
-const NEW_ADDRESS_BLOCKS = 90 * 24 * 6;
-
 /**
- * Which of a sale's minters are freshly-created wallets — a batch of
- * addresses with no history before this launch is the sybil pattern the
- * per-address cap can't catch on its own. Capped to the `addresses` the
- * caller passes in (the biggest minters, in practice) and fetched lazily,
- * client-side, once per mount: this is the same shape as the issuer hover
- * card, not a repeat of the SSR fan-out the index page used to do. Callers
- * sharing the same address list hit the same SWR cache entry — no repeat
- * fetch just because two components on the page both want it.
+ * Which of a sale's minters the explorer has never seen do anything on
+ * chain — a batch of such addresses is the sybil pattern the per-address cap
+ * can't catch on its own. Capped to the `addresses` the caller passes in
+ * (the page on screen, in practice) and fetched lazily, client-side, once
+ * per mount: this is the same shape as the issuer hover card, not a repeat
+ * of the SSR fan-out the index page used to do. Callers sharing the same
+ * address list hit the same SWR cache entry.
+ *
+ * "No history" is the explorer's own verdict — no first_block, nothing on
+ * chain, ever — and nothing else. It used to also cover any address first
+ * seen within 90 days, which described wallets with a dozen balances and
+ * forty trades as having no history. Age is not a finding; absence is.
  */
-export function useAddressFreshness(addresses: string[], blockHeight: number) {
+export function useAddressFreshness(addresses: string[]) {
   const capped = addresses.slice(0, 25);
   return useSWR(
-    capped.length > 0 ? ["new-minters", capped.join(",")] : null,
+    capped.length > 0 ? ["no-history-minters", capped.join(",")] : null,
     async () => {
       const summaries = await Promise.all(
         capped.map((addr) =>
@@ -121,21 +123,16 @@ export function useAddressFreshness(addresses: string[], blockHeight: number) {
             .catch(() => undefined),
         ),
       );
-      // A failed lookup is not evidence of anything — only a real
-      // first_block, young enough, counts. (An address the explorer has
-      // literally never seen would report first_block: null, which is
-      // arguably the newest an address can be; that still counts as new.)
-      const isNew = (s: AddressSummary | null) =>
-        !s?.first_block || blockHeight - s.first_block < NEW_ADDRESS_BLOCKS;
-      const newAddresses = new Set<string>();
+      // A failed lookup is not evidence of anything; only an answer counts.
+      const noHistory = new Set<string>();
       let known = 0;
       capped.forEach((addr, i) => {
         const s = summaries[i];
         if (s === undefined) return;
         known++;
-        if (isNew(s)) newAddresses.add(addr);
+        if (!s?.first_block) noHistory.add(addr);
       });
-      return { newAddresses, known };
+      return { noHistory, known };
     },
     { revalidateOnFocus: false },
   ).data;

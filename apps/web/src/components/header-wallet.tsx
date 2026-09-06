@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useEffect, useState } from "react";
 import { Popover as P } from "radix-ui";
 import { useConnectAction } from "@/components/connect-button";
@@ -101,12 +101,12 @@ export function HeaderWallet() {
                   {proof.note}
                 </p>
               )}
-              <Link
+              <LazyLink
                 href="/profile"
                 className="block rounded-xl px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
                 Your profile
-              </Link>
+              </LazyLink>
               <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
               <button
                 type="button"

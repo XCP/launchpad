@@ -213,6 +213,22 @@ export class RelayBudgetExhausted extends Error {
 }
 
 /**
+ * Whether a failed read failed because the node is throttling this browser,
+ * as opposed to the node being down or the request being wrong.
+ *
+ * Two shapes reach a caller during a throttle: the budget rejection above,
+ * and the direct 429/403 handed back unchanged when the lifeboat could not
+ * take the read either. Surfaces use this to say "wait a minute" instead of
+ * "unavailable" — the difference between a user who waits and one who
+ * refreshes, which is the one thing that keeps the window from draining.
+ */
+export function isRateLimited(error: unknown): boolean {
+  if (error instanceof RelayBudgetExhausted) return true;
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return /HTTP (?:429|403)\b|rate limit/i.test(message);
+}
+
+/**
  * Fetch, with the relay behind it.
  *
  * Each attempt gets its OWN deadline rather than sharing one signal. A single

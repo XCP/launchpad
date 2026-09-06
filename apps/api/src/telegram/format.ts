@@ -206,6 +206,7 @@ export interface BurnFacts {
   tokenRaw: bigint;
   source: string;
   txHash: string;
+  method?: "send" | "destroy";
 }
 
 export function tokenBurned(f: BurnFacts): Announcement {
@@ -216,7 +217,9 @@ export function tokenBurned(f: BurnFacts): Announcement {
     f.asset,
     [
       `${BURN_EMOJI.repeat(3)} ${assetLink(f.asset)} burned`,
-      `${burnedTokens(f.tokenRaw)} tokens sent to the Counterparty burn address`,
+      f.method === "destroy"
+        ? `${burnedTokens(f.tokenRaw)} tokens explicitly destroyed`
+        : `${burnedTokens(f.tokenRaw)} tokens sent to the Counterparty burn address`,
       [addressLink(f.source), tx].filter((link): link is string => link !== null).join(" · "),
     ].join("\n"),
   );

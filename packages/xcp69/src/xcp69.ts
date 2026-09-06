@@ -11,9 +11,9 @@ import { big, type Raw, type RawLike, ratio, rawEquals } from "./numeric";
 
 /** Issued supply that remains economically reachable. Sending tokens to
  * Counterparty's canonical unspendable address does not reduce the protocol's
- * issued-supply field, so market-cap and display math subtract that balance
- * explicitly. Clamp protects a stale or malformed upstream value from making
- * supply negative. */
+ * issued-supply field, so market-cap and display math subtract the indexed
+ * total of confirmed SENDs there. Clamp protects a stale or malformed indexed
+ * value from making supply negative. */
 export function circulatingSupplyRaw(total: RawLike, burned: RawLike): bigint {
   const remaining = big(total) - big(burned);
   return remaining > 0n ? remaining : 0n;
@@ -250,22 +250,6 @@ export function windowIsExact(
 }
 
 export type LaunchPhase = "scheduled" | "minting" | "graduated" | "refunded";
-
-/** Actual destroyed launch supply represented by the canonical burn-address
- * balance. Before graduation, Counterparty parks the fairminter's planned
- * pool allocation at that same address; it becomes the pool reserve on
- * graduation and must not be mistaken for a manual burn. Any balance above
- * that reservation is genuinely unreachable. */
-export function netBurnedSupplyRaw(
-  burnAddressBalance: RawLike,
-  poolQuantity: RawLike,
-  phase: LaunchPhase,
-): bigint {
-  const balance = big(burnAddressBalance);
-  const reserved = phase === "graduated" ? 0n : big(poolQuantity);
-  const burned = balance - reserved;
-  return burned > 0n ? burned : 0n;
-}
 
 /**
  * Lifecycle bucket. For pool fairminters, "graduated" requires confirming the

@@ -333,36 +333,14 @@ export interface CpAddressReceive {
   quantity: number | string;
   status: string;
   msg_index: number;
+  /** The address route currently returns sends, but keep the discriminator so
+   * protocol escrow credits can never become burns if that route broadens. */
+  send_type?: string;
 }
 
 export interface CpAddressReceivePage {
   result: CpAddressReceive[];
   next_cursor: number | null;
-}
-
-export interface CpAddressBalance {
-  asset: string;
-  quantity: number | string;
-}
-
-/** Every current asset balance at one address. Used rarely for an absolute
- * reconciliation of the canonical burn address: once when the feature is
- * introduced, then only after a new token burn is observed. */
-export async function fetchAddressBalances(address: string): Promise<CpAddressBalance[]> {
-  const rows: CpAddressBalance[] = [];
-  let cursor: number | null = null;
-  for (let page = 0; page < 20; page++) {
-    const qs = new URLSearchParams({ limit: "1000" });
-    if (cursor !== null) qs.set("cursor", String(cursor));
-    const data = await get<{
-      result: CpAddressBalance[];
-      next_cursor: number | null;
-    }>(`/addresses/${encodeURIComponent(address)}/balances?${qs.toString()}`);
-    rows.push(...data.result);
-    cursor = data.next_cursor;
-    if (cursor === null) return rows;
-  }
-  throw new Error("Address balance pagination exceeded safety limit");
 }
 
 /**
@@ -382,6 +360,77 @@ export function fetchAddressReceives(
   return get<CpAddressReceivePage>(
     `/addresses/${encodeURIComponent(address)}/receives?${qs.toString()}`,
   );
+}
+
+/** Every confirmed send received by one address. This is only for rare
+ * reconciliation/backfill work; the live monitor above reads a one-row probe
+ * and then only the pages newer than its cursor. */
+export async function fetchAllAddressReceives(address: string): Promise<CpAddressReceive[]> {
+  const rows: CpAddressReceive[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < 50; page++) {
+    const result = await fetchAddressReceives(
+      address,
+      1_000,
+      cursor === null ? undefined : cursor,
+    );
+    rows.push(...result.result);
+    cursor = result.next_cursor;
+    if (cursor === null) return rows;
+  }
+  throw new Error("Address receive pagination exceeded safety limit");
+}
+
+export interface CpAssetDestructionEvent {
+  event_index: number;
+  event: "ASSET_DESTRUCTION";
+  tx_hash: string | null;
+  block_index: number;
+  params: {
+    tx_hash: string;
+    tx_index: number;
+    block_index: number;
+    source: string;
+    asset: string;
+    quantity: number | string;
+    status: string;
+    tag: string;
+  };
+}
+
+export interface CpAssetDestructionPage {
+  result: CpAssetDestructionEvent[];
+  next_cursor: number | null;
+}
+
+/** Explicit Counterparty destroy messages, newest first. These are ledger
+ * events rather than SEND rows, even though both permanently reduce supply. */
+export function fetchAssetDestructions(
+  limit: number,
+  cursor?: number,
+): Promise<CpAssetDestructionPage> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (cursor !== undefined) qs.set("cursor", String(cursor));
+  return get<CpAssetDestructionPage>(
+    `/events/ASSET_DESTRUCTION?${qs.toString()}`,
+  );
+}
+
+/** Full destruction history for one-time reconciliation. The global feed is
+ * currently small enough to backfill once; normal ticks use a one-row probe. */
+export async function fetchAllAssetDestructions(): Promise<CpAssetDestructionEvent[]> {
+  const rows: CpAssetDestructionEvent[] = [];
+  let cursor: number | null = null;
+  for (let page = 0; page < 50; page++) {
+    const result = await fetchAssetDestructions(
+      1_000,
+      cursor === null ? undefined : cursor,
+    );
+    rows.push(...result.result);
+    cursor = result.next_cursor;
+    if (cursor === null) return rows;
+  }
+  throw new Error("Asset destruction pagination exceeded safety limit");
 }
 
 export interface CpAssetBalance {

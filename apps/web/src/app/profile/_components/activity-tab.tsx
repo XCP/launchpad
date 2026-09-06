@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { fetchAssetBalance, fetchBlockHeight } from "@/lib/api/counterparty";
@@ -98,10 +98,10 @@ export function ActivityTab({ address }: { address: string }) {
                   key={r.key}
                   className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_7rem_5rem] items-center gap-x-4 py-2.5 text-sm"
                 >
-                  <Link href={`/${r.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
+                  <LazyLink href={`/${r.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
                     <TokenImage asset={r.asset} className="size-6 shrink-0 rounded" />
                     <span className="truncate font-medium">{r.asset}</span>
-                  </Link>
+                  </LazyLink>
                   <span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TONE[r.kind]}`}>
                       {LABEL[r.kind]}

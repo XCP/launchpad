@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { fromSats, tokenQty, usd } from "@/lib/format";
@@ -187,12 +187,12 @@ export function PositionsTab({ address }: { address: string }) {
       {open.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
           <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">No open positions in this wallet.</p>
-          <Link
+          <LazyLink
             href="/"
             className="inline-block rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-purple-500"
           >
             Explore launches
-          </Link>
+          </LazyLink>
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -211,10 +211,10 @@ export function PositionsTab({ address }: { address: string }) {
                     key={p.asset}
                     className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] items-center gap-x-4 py-2.5 text-sm"
                   >
-                    <Link href={`/${p.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
+                    <LazyLink href={`/${p.asset}`} className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400">
                       <TokenImage asset={p.asset} className="size-7 shrink-0 rounded" />
                       <span className="truncate font-medium">{p.asset}</span>
-                    </Link>
+                    </LazyLink>
                     <span className="text-right tabular-nums text-gray-600 dark:text-gray-400">
                       {holding(tokenQty(p.balance.toString(), div))}
                     </span>

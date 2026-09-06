@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { fetchXcpUsd } from "@/lib/api/price";
 import {
   XCP69_MIN_PARTICIPANTS,
@@ -127,9 +127,9 @@ export default async function StandardPage() {
               balance — BTC only covers miner fees. The fastest no-account
               route is an on-chain dispenser: send BTC, the protocol vends
               XCP automatically.{" "}
-              <Link href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
+              <LazyLink href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
                 Buy from the cheapest dispensers here
-              </Link>
+              </LazyLink>
               . A max mint is 10 XCP; a launch needs 0.5 XCP for the name.
             </p>
           </details>

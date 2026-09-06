@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Dialog as D } from "radix-ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TokenImage } from "@/components/token-image";
+import { trackEvent } from "@/lib/analytics";
 import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
 import { fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { type SearchRow, toSearchRow } from "@/lib/launch-row";
@@ -115,6 +116,7 @@ export function LaunchSearch({
     const onKey = (e: KeyboardEvent) => {
       if (e.key.toLowerCase() === "k" && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
+        trackEvent("search opened");
         setOpen(true);
         load();
       }
@@ -147,6 +149,7 @@ export function LaunchSearch({
   }, [rows, query, phase]);
 
   const go = (asset: string) => {
+    trackEvent("search result opened");
     setOpen(false);
     setQuery("");
     router.push(`/${asset}`);
@@ -161,6 +164,7 @@ export function LaunchSearch({
     <D.Root
       open={open}
       onOpenChange={(next) => {
+        if (next && !open) trackEvent("search opened");
         setOpen(next);
         if (next) load();
       }}
@@ -168,7 +172,7 @@ export function LaunchSearch({
       <D.Trigger asChild>
         <button
           type="button"
-          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 py-2 pl-3.5 pr-2 text-left text-sm text-gray-400 dark:text-gray-500 transition-colors hover:border-gray-300 dark:hover:border-gray-700"
+          className="flex h-9 min-w-0 flex-1 items-center gap-2.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 pl-3.5 pr-2 text-left text-sm text-gray-400 dark:text-gray-500 transition-colors hover:border-gray-300 dark:hover:border-gray-700"
         >
           <svg aria-hidden viewBox="0 0 16 16" fill="none" className="size-4 shrink-0">
             <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />

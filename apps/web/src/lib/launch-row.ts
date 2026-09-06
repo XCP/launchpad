@@ -170,16 +170,17 @@ export interface LaunchPage {
  * How many a section shows before paging, by phase.
  *
  * Not one number: these sections answer different questions. Graduated is a
- * shortlist of what did well, so eight is a look rather than a catalogue.
+ * shortlist of what made it through, with enough room to keep early graduates
+ * visible as the market grows.
  * Minting is the one people are actually shopping, so it gets the most room —
  * enough that the whole phase usually fits on one page and the pager is there
  * for the times it doesn't, rather than being the normal way to see the list.
+ * Scheduled is deliberately bounded to one compact preview; it should signal
+ * what is coming without pushing the active and graduated markets down-page.
  *
- * 8 divides evenly by 2, 3 and 4 — the grid's column counts — so graduated
- * never ends on a ragged half-row. 40 and 20 don't divide by 3, so at the md
- * breakpoint a FULL page of either ends short. It only shows once a phase
- * actually reaches its page size; 36/48 and 18/24 are the neighbours that keep
- * all three breakpoints clean if it starts to look wrong.
+ * 12 and 36 both divide evenly by 2, 3 and 4 — the grid's column counts — so
+ * every full section lands on a complete row at each breakpoint. The combined
+ * first-page ceiling is 60 rows, lower than the previous 68-row split.
  *
  * It lives here rather than in launch-sections.tsx because it is now a LIMIT
  * as well as a layout: the server renders the first page and the browser
@@ -188,8 +189,8 @@ export interface LaunchPage {
  * has room to grow but not unboundedly.
  */
 export const PER_PAGE: Record<LaunchPhase, number> = {
-  graduated: 8,
-  minting: 40,
-  scheduled: 20,
+  graduated: 12,
+  minting: 36,
+  scheduled: 12,
   refunded: 20,
 };

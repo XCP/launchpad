@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { DropdownMenu as DM } from "radix-ui";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
@@ -100,6 +100,34 @@ const minterText = (n: number | null) => (n === null ? "—" : commas(n));
 const holderText = (n: number | null) => (n === null ? "—" : commas(n));
 
 /**
+ * Dollar-performance rank with the sitewide current XCP/USD factor removed.
+ *
+ * The badge compares (current TOKEN/XCP × current XCP/USD) with
+ * (mint TOKEN/XCP × graduation XCP/USD). Current XCP/USD is identical for
+ * every row, so removing it preserves the exact ordering and lets both the
+ * live fallback and the database rank without threading a volatile quote
+ * into the sort key. Rows without a usable historical baseline belong last.
+ */
+const performanceRank = (r: SectionRow): number => {
+  const launchPriceXcp = ratio(r.fm.price, r.fm.quantity_by_price);
+  if (
+    r.priceXcp <= 0 ||
+    launchPriceXcp <= 0 ||
+    r.launchXcpUsd === null ||
+    r.launchXcpUsd <= 0
+  ) {
+    return Number.NEGATIVE_INFINITY;
+  }
+  return r.priceXcp / (launchPriceXcp * r.launchXcpUsd);
+};
+
+const comparePerformance = (a: SectionRow, b: SectionRow): number => {
+  const aRank = performanceRank(a);
+  const bRank = performanceRank(b);
+  return aRank === bRank ? 0 : bRank > aRank ? 1 : -1;
+};
+
+/**
  * Each phase is judged by its own measure, so each gets its own sort menu
  * rather than one shared list where two thirds of the options are inert.
  * The first entry is the default, and matches the order apps/api already
@@ -118,6 +146,7 @@ const holderText = (n: number | null) => (n === null ? "—" : commas(n));
 const SORTS: Record<string, SortOption[]> = {
   graduated: [
     { id: "mcap", label: "Market cap", by: (a, b) => b.marketCapXcp - a.marketCapXcp },
+    { id: "performance", label: "Performance", by: comparePerformance },
     { id: "minters", label: "Minters", by: (a, b) => minterRank(b) - minterRank(a) },
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
@@ -536,6 +565,19 @@ function Section({
 
         {showControls && (
           <div className="flex shrink-0 items-center gap-2">
+            {phase === "graduated" && (
+              <a
+                href="https://opreturn.art/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hidden items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 sm:inline-flex"
+              >
+                <span aria-hidden="true">🐐</span>
+                <span>Trading Data</span>
+                <span aria-hidden="true">↗</span>
+              </a>
+            )}
+
             {walletAddress && phase === "minting" && (
               <label className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 sm:flex">
                 <input
@@ -839,7 +881,7 @@ function LaunchTable({
             return (
               <tr key={r.fm.tx_hash} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60">
                 <td className="px-3 py-2.5">
-                  <Link href={`/${r.fm.asset}`} className="flex min-w-0 items-center gap-2.5">
+                  <LazyLink href={`/${r.fm.asset}`} className="flex min-w-0 items-center gap-2.5">
                     <span className="w-5 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
                       {offset + i + 1}
                     </span>
@@ -855,7 +897,7 @@ function LaunchTable({
                         by {shortAddress(r.fm.source)}
                       </span>
                     </span>
-                  </Link>
+                  </LazyLink>
                 </td>
                 {graduated ? (
                   <>
@@ -1070,7 +1112,7 @@ function Card({
           : `${since} ago`;
 
   return (
-    <Link
+    <LazyLink
       href={`/${fm.asset}`}
       // The holographic border is the graduated mark and nothing else. Worn
       // by every conforming launch it said only "this one conforms" — which is
@@ -1239,7 +1281,7 @@ function Card({
           )}
         </div>
       </div>
-    </Link>
+    </LazyLink>
   );
 }
 

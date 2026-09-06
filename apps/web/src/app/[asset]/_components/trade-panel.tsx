@@ -8,6 +8,7 @@ import { ConnectButton } from "@/components/connect-button";
 import { OrderTracker } from "@/components/order-tracker";
 import { CTA } from "@/components/ui/button";
 import { TxLink } from "@/components/ui/confirm-card";
+import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
@@ -143,16 +144,16 @@ export function TradePanel({
       null,
     );
 
-  const { balance: tokenBalance, balanceError: tokenBalanceError } = useSpendableBalance(
-    address,
-    asset,
-    "limit-token",
-  );
-  const { balance: xcpBalance, balanceError: xcpBalanceError } = useSpendableBalance(
-    address,
-    "XCP",
-    "limit-xcp",
-  );
+  const {
+    balance: tokenBalance,
+    balanceError: tokenBalanceError,
+    balanceUnavailable: tokenBalanceUnavailable,
+  } = useSpendableBalance(address, asset, "limit-token");
+  const {
+    balance: xcpBalance,
+    balanceError: xcpBalanceError,
+    balanceUnavailable: xcpBalanceUnavailable,
+  } = useSpendableBalance(address, "XCP", "limit-xcp");
 
   const busy = isBusy(compose.status);
 
@@ -210,8 +211,11 @@ export function TradePanel({
     limitTotalRaw > xcpBalance;
   const insufficient = insufficientToken || insufficientXcp;
   const spendBalance = side === "buy" ? xcpBalance : tokenBalance;
-  const spendBalanceError =
-    side === "buy" ? xcpBalanceError : tokenBalanceError;
+  // A failed read does not hold the order — see useSpendableBalance's
+  // balanceUnavailable. Only a read still in flight does, and briefly.
+  const spendBalanceSettled =
+    spendBalance !== undefined ||
+    (side === "buy" ? xcpBalanceUnavailable : tokenBalanceUnavailable);
 
   // A limit order is a stated intent, not a fill — but placing one is the
   // conversion this surface exists for, and its XCP total is what the user
@@ -229,7 +233,7 @@ export function TradePanel({
     limitPriceNum > 0 &&
     limitAmountRaw > 0 &&
     limitTotalRaw > 0 &&
-    spendBalance !== undefined &&
+    spendBalanceSettled &&
     !busy &&
     !insufficient;
   // Fill forecast vs the pool. The pool's 50 bps fee is charged in-curve,
@@ -328,10 +332,8 @@ export function TradePanel({
       ? "Enter a price"
     : limitAmountRaw === 0
       ? "Enter an amount"
-      : spendBalance === undefined
-        ? spendBalanceError
-          ? "Balance unavailable"
-          : "Checking balance…"
+      : !spendBalanceSettled
+        ? "Checking balance…"
       : insufficient
           ? `Insufficient ${side === "buy" ? "XCP" : asset} balance`
           : `Place limit ${side}`;
@@ -509,6 +511,7 @@ export function TradePanel({
                         Balance: {commasRaw(tokenBalance)}
                       </button>
                     )}
+                    {tokenBalance === undefined && <BalanceUnavailable error={tokenBalanceError} />}
                   </>
                 }
               >
@@ -560,6 +563,7 @@ export function TradePanel({
                         Balance: {commasRaw(xcpBalance)}
                       </button>
                     )}
+                    {xcpBalance === undefined && <BalanceUnavailable error={xcpBalanceError} />}
                   </>
                 }
               >

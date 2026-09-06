@@ -1,9 +1,12 @@
 import {
   METADATA_ORIGIN,
+  clientHoldsVersion,
+  forgetMetadataArtLocation,
   getMetadataEdgeCache,
   getMetadataRuntime,
-  metadataImageCacheKey,
   metadataImageSourceUrl,
+  notModified,
+  readVersionedImage,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
@@ -138,6 +141,13 @@ export async function GET(
     // source response under the right etag query. Some zone cache rules also
     // intentionally ignore queries. A new object version now has a URL that
     // cannot collide with either of those entries.
+    // The etag names the source bytes and the width names the transform, so
+    // together they name this response exactly. A browser past its five
+    // minutes sends the pair back and gets a 304 with no transform fetched.
+    const validator = stored.etag ? `"${stored.etag}-w${width}"` : null;
+    if (validator && clientHoldsVersion(request, validator)) {
+      return notModified(validator, cacheControl);
+    }
     const source = stored.etag
       ? metadataImageSourceUrl(normalizedAsset, stored.etag)
       : `${METADATA_ORIGIN}/i/${encoded}`;
@@ -159,6 +169,7 @@ export async function GET(
           "content-type": res.headers.get("content-type") ?? "image/png",
           "cache-control": cacheControl,
           "access-control-allow-origin": "*",
+          ...(validator ? { etag: validator } : {}),
         },
       });
     }
@@ -168,21 +179,38 @@ export async function GET(
   // old `/i/<ASSET>` entry when an owner edited art therefore only fixed the
   // edge that handled the edit; another edge could keep returning the former
   // object for the full shared TTL. The R2 etag changes on every write, making
-  // it the immutable part of this otherwise permanent public URL.
-  const cacheKey = stored.etag
-    ? metadataImageCacheKey(normalizedAsset, stored.etag)
+  // it the immutable part of this otherwise permanent public URL. The bytes
+  // are read against that version, so a location remembered before an edit
+  // cannot file the replacement under the etag it used to have.
+  //
+  // If a provider ever omits the etag, serve from R2 without shared caching;
+  // falling back to an unversioned key would recreate the stale-art bug.
+  const validator = stored.etag ? `"${stored.etag}"` : null;
+  if (validator && clientHoldsVersion(request, validator)) {
+    return notModified(validator, cacheControl);
+  }
+  const image = stored.etag
+    ? await readVersionedImage(bucket, cache, ctx, normalizedAsset, stored.etag, [stored.key])
     : null;
-  const cached = cacheKey ? await cache?.match(cacheKey) : undefined;
-  if (cached) {
-    const headers = new Headers(cached.headers);
-    headers.set("x-metadata-cache", "HIT");
-    return new Response(cached.body, { status: cached.status, headers });
+  if (image) {
+    return new Response(image.body, {
+      headers: {
+        "content-type": image.contentType ?? "application/octet-stream",
+        "cache-control": cacheControl,
+        "access-control-allow-origin": "*",
+        "x-metadata-cache": image.cacheStatus,
+        ...(validator ? { etag: validator } : {}),
+      },
+    });
   }
 
+  // The remembered version is gone: replaced by an edit this edge did not
+  // see, or deleted. Serve what is there now without filing it under a version
+  // it does not carry, and forget the location so the next request re-resolves.
+  if (stored.etag) forgetMetadataArtLocation(cache, ctx, normalizedAsset);
   const object = await bucket.get(stored.key);
   if (!object) {
-    // Deleted between the head and the get. Rare, and the CDN is the same
-    // answer the miss above would have given.
+    // The CDN is the same answer the miss above would have given.
     const fb = search.get("fb") === "full" ? "full" : "icon";
     return new Response(null, {
       status: 302,
@@ -192,18 +220,11 @@ export async function GET(
       },
     });
   }
-  const response = new Response(object.body, {
+  return new Response(object.body, {
     headers: {
       "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
       "cache-control": cacheControl,
       "access-control-allow-origin": "*",
-      "x-metadata-cache": "MISS",
     },
   });
-  // If a provider ever omits the etag, serve from R2 without shared caching;
-  // falling back to an unversioned key would recreate the stale-art bug.
-  if (cache && cacheKey) {
-    ctx.waitUntil(cache.put(cacheKey, response.clone()).catch(() => undefined));
-  }
-  return response;
 }

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { LiveBehaviorDashboard } from "@/app/research/_components/live-behavior-dashboard";
 import { METADATA_ORIGIN } from "@/lib/metadata";
 
@@ -58,7 +58,7 @@ export default function ResearchPage() {
       <footer className="flex flex-col gap-3 border-t border-gray-200 dark:border-gray-800 pt-5 text-xs text-gray-400 dark:text-gray-500 sm:flex-row sm:items-center sm:justify-between">
         <p>Observed address behavior, not identity or intent. Not investment advice.</p>
         <div className="flex gap-3">
-          <Link href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">How XCP-69 works</Link>
+          <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">How XCP-69 works</LazyLink>
           <a href="https://t.me/xcpfun" target="_blank" rel="noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">Corrections</a>
         </div>
       </footer>

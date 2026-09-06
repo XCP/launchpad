@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import {
   fetchBlockHeight,
   fetchFairmints,
@@ -36,6 +37,23 @@ import { LaunchView } from "@/app/[asset]/_components/launch-view";
 
 export const revalidate = 30;
 
+/**
+ * The indexed row, read once per render.
+ *
+ * generateMetadata needs it for the unfurled description and the page body
+ * needs it for burned supply and the rest, and Next's fetch memoization does
+ * not see either call: in production the API module goes over a service
+ * binding, not global fetch, so both callers were paying for the same row.
+ * React's cache() shares the promise for the lifetime of one server request
+ * only — a null, whether the launch is absent or the call timed out, is
+ * shared within the render and forgotten with it, so nothing here outlives
+ * the request or delays a later one from seeing the update.
+ *
+ * Kept in this server-only module rather than the API module, which Client
+ * Components import too.
+ */
+const indexedLaunch = cache(fetchIndexedLaunch);
+
 /** Long enough to say something, short enough that no platform truncates
  *  it mid-word. */
 const SHARE_DESCRIPTION_MAX = 200;
@@ -52,7 +70,7 @@ const SHARE_DESCRIPTION_MAX = 200;
  */
 async function shareDescription(asset: string): Promise<string | null> {
   try {
-    const indexed = await fetchIndexedLaunch(asset);
+    const indexed = await indexedLaunch(asset);
     if (indexed?.displayDescription) {
       return clamp(indexed.displayDescription, SHARE_DESCRIPTION_MAX);
     }
@@ -205,7 +223,7 @@ export default async function LaunchPage({
     fm.status === "open" && !isPendingConfirmation
       ? fetchLaunchFees(asset)
       : Promise.resolve(null),
-    fetchIndexedLaunch(asset),
+    indexedLaunch(asset),
   ]);
   const burnedQuantity = indexed?.burnedQuantity ?? "0";
   const circulatingRaw = circulatingSupplyRaw(fm.hard_cap, burnedQuantity);

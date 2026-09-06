@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { useMempool } from "@/hooks/use-mempool";
 import { PendingDot } from "@/components/pending-dot";
 import { FOCUS } from "@/components/ui/tokens";
@@ -48,7 +48,7 @@ export function MempoolChip({ className = "" }: { className?: string }) {
   if (count === 0) return null;
 
   return (
-    <Link
+    <LazyLink
       href="/mempool"
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300 transition-colors hover:border-amber-300 dark:hover:border-amber-700 ${FOCUS} ${className}`}
     >
@@ -57,6 +57,6 @@ export function MempoolChip({ className = "" }: { className?: string }) {
           chip and the page it opens read as one system. */}
       <span>Mempool</span>
       <span className="tabular-nums">({count})</span>
-    </Link>
+    </LazyLink>
   );
 }

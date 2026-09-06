@@ -1,4 +1,5 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { LazyLink } from "@/components/lazy-link";
 import { HomeToolbar } from "@/app/_components/home-toolbar";
 import { type InitialPages, LaunchSections } from "@/app/_components/launch-sections";
 import { type LaunchPage, PER_PAGE, toSectionRow } from "@/lib/launch-row";
@@ -11,7 +12,13 @@ import {
   fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
-import { fetchXcpUsd } from "@/lib/api/price";
+import {
+  fetchBtcUsd,
+  fetchBtcUsd30dAgo,
+  fetchXcpUsd,
+  fetchXcpUsd30dAgo,
+} from "@/lib/api/price";
+import { priceChangePercent } from "@/lib/market";
 import { big } from "@/lib/numeric";
 import {
   isXcp69,
@@ -21,6 +28,10 @@ import {
   xcp69Params,
   XCP69_MIN_PARTICIPANTS,
 } from "@/lib/xcp69";
+
+export const metadata: Metadata = {
+  title: "XCP.FUN - Bitcoin Memecoins on Counterparty",
+};
 
 export const revalidate = 60;
 
@@ -47,13 +58,31 @@ export const revalidate = 60;
 const SECTIONS = ["graduated", "minting", "scheduled"] as const;
 
 export default async function HomePage() {
-  const [blockHeight, xcpUsd, ...first] = await Promise.all([
+  const [
+    blockHeight,
+    xcpUsd,
+    btcUsd,
+    btcUsd30dAgo,
+    xcpUsd30dAgo,
+    ...first
+  ] = await Promise.all([
     fetchBlockHeight(),
     fetchXcpUsd(),
+    fetchBtcUsd(),
+    fetchBtcUsd30dAgo(),
+    fetchXcpUsd30dAgo(),
     // No `sort`: the API's own default for each phase, so the ordering has one
     // definition rather than a copy here that could drift from it.
     ...SECTIONS.map((phase) => fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0)),
   ]);
+  const btcChange30d =
+    btcUsd !== null && btcUsd30dAgo !== null
+      ? priceChangePercent(btcUsd, btcUsd30dAgo)
+      : null;
+  const xcpChange30d =
+    xcpUsd !== null && xcpUsd30dAgo !== null
+      ? priceChangePercent(xcpUsd, xcpUsd30dAgo)
+      : null;
 
   // All three or none. A partial answer would render one section paged and
   // another from a live derivation, which is two different orderings of the
@@ -146,7 +175,7 @@ export default async function HomePage() {
       total: p.total,
       king: p.king ? toSectionRow(p.king) : null,
     })) as [LaunchPage, LaunchPage, LaunchPage];
-    // Only the eight graduated rows actually rendered ask Counterparty for a
+    // Only the up-to-twelve graduated rows actually rendered ask Counterparty for a
     // positive-balance holder count. The balance pages are cached for five
     // minutes, so this is one shared refresh per asset rather than a scan per
     // visitor — and unlike an explorer rollup it cannot count sold-out rows.
@@ -187,7 +216,13 @@ export default async function HomePage() {
     <div className="space-y-10">
       {/* Search fetches its own index when it first opens — it has to see
           every conforming launch, and this page only holds three pages. */}
-      <HomeToolbar height={blockHeight} xcpUsd={xcpUsd} />
+      <HomeToolbar
+        height={blockHeight}
+        btcUsd={btcUsd}
+        xcpUsd={xcpUsd}
+        btcChange30d={btcChange30d}
+        xcpChange30d={xcpChange30d}
+      />
 
       {count === 0 && <FirstLaunchHero />}
 
@@ -211,12 +246,12 @@ function FirstLaunchHero() {
         raised XCP locked into the pool forever — enforced by consensus, not by
         this website.
       </p>
-      <Link
+      <LazyLink
         href="/create"
         className="mt-6 inline-block rounded-md bg-gray-900 dark:bg-gray-100 px-5 py-2.5 font-medium text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300"
       >
         Launch the first
-      </Link>
+      </LazyLink>
     </div>
   );
 }

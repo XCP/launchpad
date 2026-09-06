@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
 import { MempoolChip, useMempoolCount } from "@/components/mempool-chip";
@@ -83,7 +83,7 @@ export function SiteHeader() {
           when you connect isn't one. */}
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-5">
-          <Link
+          <LazyLink
             href="/"
             className="flex shrink-0 items-center gap-1.5 text-lg font-bold tracking-tight"
           >
@@ -97,12 +97,12 @@ export function SiteHeader() {
             <span>
               XCP<span className="text-purple-600 dark:text-purple-400">.FUN</span>
             </span>
-          </Link>
+          </LazyLink>
           <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 dark:text-gray-400 nav:flex">
             {LINKS.map((l) => (
-              <Link key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
+              <LazyLink key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
                 {l.label}
-              </Link>
+              </LazyLink>
             ))}
           </nav>
         </div>
@@ -150,9 +150,9 @@ export function SiteHeader() {
           </span>
           <nav className="hidden items-center gap-4 nav:flex">
             {SECONDARY.map((l) => (
-              <Link key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
+              <LazyLink key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
                 {l.label}
-              </Link>
+              </LazyLink>
             ))}
           </nav>
           <div className="hidden nav:block">
@@ -199,17 +199,17 @@ function MobileMenu() {
         >
           {LINKS.map((l) => (
             <DM.Item key={l.href} asChild>
-              <Link href={l.href} className={item}>
+              <LazyLink href={l.href} className={item}>
                 {l.label}
-              </Link>
+              </LazyLink>
             </DM.Item>
           ))}
           <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
           {[...MENU_EXTRA, ...SECONDARY].map((l) => (
             <DM.Item key={l.href} asChild>
-              <Link href={l.href} className={item}>
+              <LazyLink href={l.href} className={item}>
                 {l.label}
-              </Link>
+              </LazyLink>
             </DM.Item>
           ))}
           <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
@@ -221,9 +221,9 @@ function MobileMenu() {
             </a>
           </DM.Item>
           <DM.Item asChild>
-            <Link href="/create" className={item}>
+            <LazyLink href="/create" className={item}>
               Create a launch
-            </Link>
+            </LazyLink>
           </DM.Item>
         </DM.Content>
       </DM.Portal>

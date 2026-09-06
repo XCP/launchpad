@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import { Fragment, useEffect, useState } from "react";
 import useSWR from "swr";
 import {
@@ -35,9 +35,10 @@ import {
 import { useMempool } from "@/hooks/use-mempool";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import {
-  mergePairTrades,
-  tradeRoleForAddress,
-} from "@launchpad/xcp69/trades";
+  fetchAssetTradesPage,
+  type AssetTradePage,
+} from "@/lib/api/launchpad-api";
+import { tradeRoleForAddress } from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
   includeFormerHolders,
@@ -99,7 +100,6 @@ export function ActivityTabs({
   divisible,
   minting = false,
   issuerSource,
-  blockHeight,
   poolXcpRaw,
   poolTokensRaw,
   lpAsset,
@@ -112,7 +112,6 @@ export function ActivityTabs({
   /** Flags the launch creator's own row in the minters list. */
   issuerSource?: string;
   /** Needed only for the Minters tab, to judge address freshness. */
-  blockHeight?: number;
   /** XCP side of the pool, reused by the trader hover's reconciled PnL. */
   poolXcpRaw?: Raw;
   /** Token side of the locked pool. Counterparty holds pool reserves in the
@@ -171,79 +170,37 @@ export function ActivityTabs({
     () => fetchLpBalances(lpAsset!),
     { revalidateOnFocus: false, refreshInterval: 300_000 },
   );
-  // Trades come over the room's shared socket when it's connected — one poll
-  // per launch instead of one per viewer, and new fills simply appear. This
-  // fetch is the fallback for a socket that never connected.
-  const roomTrades: TradeRow[] | null =
-    roomState?.trades?.map((t) => ({
-      key: t.key,
-      block: t.block,
-      time: t.time,
-      buy: t.buy,
-      tokenRaw: t.token_quantity,
-      xcpRaw: t.xcp_quantity,
-      addr: t.address,
-      counterpartyAddr: t.counterparty_address ?? "",
-      via: t.venue,
-      txHash: t.tx_hash,
-    })) ?? null;
-
-  // During rollout, an already-deployed room may still send the older book
-  // shape without its resting maker. Only a connected viewer needs that fact,
-  // so temporarily use the existing direct-fetch fallback for them. Once the
-  // room deploy includes counterparty_address this becomes false and adds no
-  // per-viewer traffic.
-  const needsBookParticipantBackfill = Boolean(
-    address &&
-      roomState?.trades?.some(
-        (trade) =>
-          trade.venue === "book" && trade.counterparty_address === undefined,
-      ),
-  );
-
-  const { data: fetchedTrades } = useSWR<TradeRow[]>(
-    tab === "trades" &&
-      (roomTrades === null || needsBookParticipantBackfill)
-      ? [asset, "pair-trades"]
+  // The room intentionally carries only a small live snapshot; using it as
+  // table history silently capped every asset at 50 rows. Page the append-only
+  // D1 tape instead, so history is complete and websocket frames stay small.
+  const tradeOffset = (Math.max(1, pageParam) - 1) * PER_PAGE;
+  const { data: tradePage } = useSWR<AssetTradePage | null>(
+    !minting && tab === "trades"
+      ? [asset, "pair-trades", PER_PAGE, tradeOffset]
       : null,
-    async () => {
-      const [pm, om] = await Promise.all([
-        fetchJson(
-          `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP/matches?verbose=true&limit=250`,
-        ).catch(() => ({ result: [] })),
-        fetchJson(
-          `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP/matches?verbose=true&status=completed&limit=250`,
-        ).catch(() => ({ result: [] })),
-      ]);
-      const merged = await mergePairTrades(
-        asset,
-        pm.result ?? [],
-        om.result ?? [],
-        async (txHash) =>
-          (
-            await fetchJson(
-              `${COUNTERPARTY_API_BASE}/transactions/${txHash}/events?limit=1000`,
-            )
-          ).result ?? [],
-      );
-      return merged.map((trade) => ({
-        key: trade.key,
-        block: trade.block,
-        time: trade.time,
-        buy: trade.buy,
-        tokenRaw: trade.tokenQuantity,
-        xcpRaw: trade.xcpQuantity,
-        addr: trade.address,
-        counterpartyAddr: trade.counterpartyAddress,
-        via: trade.venue,
-        txHash: trade.txHash,
-      }));
-    },
+    () => fetchAssetTradesPage(asset, PER_PAGE, tradeOffset),
     { refreshInterval: 30_000 },
   );
-  const trades = needsBookParticipantBackfill
-    ? (fetchedTrades ?? roomTrades)
-    : (roomTrades ?? fetchedTrades);
+  const trades: TradeRow[] | null = tradePage === undefined
+    ? null
+    : (tradePage?.result ?? []).map((trade) => {
+        const token = big(trade.tokenDelta);
+        const xcp = big(trade.xcpDelta);
+        return {
+          key: trade.key,
+          block: trade.block,
+          // Indexed history predates local block-time storage. The row already
+          // has an exact block fallback, so do not fabricate a timestamp.
+          time: 0,
+          buy: trade.side === "buy",
+          tokenRaw: (token < 0n ? -token : token).toString(),
+          xcpRaw: (xcp < 0n ? -xcp : xcp).toString(),
+          addr: trade.address,
+          counterpartyAddr: "",
+          via: trade.venue,
+          txHash: trade.txHash ?? "",
+        };
+      });
 
   /** Synthesised, not fetched — the pool has no address to report a balance
    *  for. Marked unmistakably in the row itself, because a fabricated entry in
@@ -256,6 +213,7 @@ export function ActivityTabs({
     holders ?? [],
     [
       ...mints.map((mint) => mint.source),
+      ...(roomState?.trades ?? []).map((trade) => trade.address),
       ...(trades ?? []).map((trade) => trade.addr),
     ],
   );
@@ -299,7 +257,10 @@ export function ActivityTabs({
       ? `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(asset)}/XCP?status=open&verbose=true&limit=200`
       : null,
     async (url: string) => (await fetchJson(url)).result as OpenOrder[],
-    { refreshInterval: 15_000 },
+    // Thirty seconds: an order's fate is decided per block, and the tape
+    // above already reads at that cadence. Fifteen was the single fastest
+    // direct Counterparty poll on the page for the least time-sensitive tab.
+    { refreshInterval: 30_000 },
   );
   // Remaining quantities, not original ones: a half-filled order offers what is
   // left of it, and drawing the original overstates the depth actually there.
@@ -443,7 +404,7 @@ export function ActivityTabs({
       : t === "mempool"
         ? `Mempool${minting ? (roomState ? ` (${pending.length})` : "") : pendingOrders.length > 0 ? ` (${pendingOrders.length})` : ""}`
         : t === "trades"
-          ? `Trades${trades ? ` (${trades.length})` : ""}`
+          ? `Trades${tradePage ? ` (${tradePage.total})` : ""}`
           : t === "holders"
             ? `Holders${liveHolderCount !== null ? ` (${liveHolderCount})` : ""}`
             : `Orders${orders ? ` (${orders.length})` : ""}`;
@@ -456,7 +417,7 @@ export function ActivityTabs({
           ? pending.length
           : pendingOrders.length
         : tab === "trades"
-          ? (trades?.length ?? 0)
+          ? (tradePage?.total ?? 0)
           : tab === "holders"
             ? holderRows.length
             : ordered.length;
@@ -476,7 +437,6 @@ export function ActivityTabs({
   // ceiling the cap was there to enforce — and makes the chip mean the same thing on every page.
   const freshness = useAddressFreshness(
     minting ? minters.slice(from, from + PER_PAGE).map((r) => r.source) : [],
-    blockHeight ?? 0,
   );
 
   const pager = totalPages > 1 && (
@@ -585,8 +545,11 @@ export function ActivityTabs({
                               dev
                             </span>
                           )}
-                          {freshness?.newAddresses.has(r.source) && (
-                            <span className="shrink-0 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400">
+                          {freshness?.noHistory.has(r.source) && (
+                            <span
+                              className="shrink-0 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400"
+                              title="The explorer has never seen this address do anything on chain."
+                            >
                               no history
                             </span>
                           )}
@@ -639,7 +602,7 @@ export function ActivityTabs({
                       className="absolute inset-y-0 left-0 bg-amber-50 dark:bg-amber-950/40"
                       style={{ width: `${Math.min(100, pct)}%` }}
                     />
-                    <Link
+                    <LazyLink
                       href={`/profile/${p.source}`}
                       className="relative z-10 flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                     >
@@ -648,7 +611,7 @@ export function ActivityTabs({
                       </span>
                       <Identicon address={p.source} />
                       <span className="truncate">{shortAddress(p.source)}</span>
-                    </Link>
+                    </LazyLink>
                     <a
                       href={`https://xcp.io/tx/${p.txHash}`}
                       target="_blank"
@@ -681,11 +644,11 @@ export function ActivityTabs({
                 const buy = o.getAsset === asset;
                 return (
                   <li key={o.txHash} className="flex items-center justify-between gap-3 px-4 py-2 text-sm">
-                    <Link href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
+                    <LazyLink href={`/profile/${o.source}`} className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
                       <span className="w-8 shrink-0 text-right text-xs text-gray-400 dark:text-gray-500 tabular-nums">{from + i + 1}</span>
                       <Identicon address={o.source} />
                       <span className="truncate">{shortAddress(o.source)}</span>
-                    </Link>
+                    </LazyLink>
                     <a href={`https://xcp.io/tx/${o.txHash}`} target="_blank" rel="noreferrer" className={`shrink-0 font-medium hover:underline ${buy ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                       {buy ? "Buy" : "Sell"} pending
                     </a>
@@ -717,7 +680,7 @@ export function ActivityTabs({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-                  {trades.slice(from, from + PER_PAGE).map((t) => {
+                  {trades.map((t) => {
                     const tokens = tokenQty(t.tokenRaw, divisible);
                     const walletRole = tradeRoleForAddress(
                       {

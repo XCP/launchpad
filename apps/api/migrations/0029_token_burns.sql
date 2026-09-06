@@ -1,4 +1,5 @@
--- Confirmed XCP-69 sends to Counterparty's canonical unspendable address.
+-- Confirmed XCP-69 supply burns: explicit asset destructions and SENDs to
+-- Counterparty's canonical unspendable address.
 --
 -- The five-minute Telegram monitor already sees these events. Persisting the
 -- same bounded delta lets /activity answer locally instead of polling the

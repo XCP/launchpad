@@ -1,6 +1,10 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+// The table rows are LazyLinks, which ask the App Router to prefetch on
+// intent; renderToStaticMarkup mounts no router, so give them an inert one.
+vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => undefined }) }));
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { pendingPressureByAsset } from "@/app/research/_lib/behavior";
 import { LaunchTable, SellerSummary } from "@/app/research/_components/live-behavior-dashboard";

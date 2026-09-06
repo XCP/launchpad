@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { LazyLink } from "@/components/lazy-link";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import {
@@ -128,7 +128,7 @@ export function MintingTab({ address }: { address: string }) {
                 key={row.asset}
                 className="grid grid-cols-[minmax(0,1fr)_5rem_8rem_8rem] items-center gap-x-4 py-2.5 text-sm"
               >
-                <Link
+                <LazyLink
                   href={`/${row.asset}`}
                   className="flex min-w-0 items-center gap-2 hover:text-purple-600 dark:hover:text-purple-400"
                 >
@@ -139,7 +139,7 @@ export function MintingTab({ address }: { address: string }) {
                       pending
                     </span>
                   )}
-                </Link>
+                </LazyLink>
                 <span className="text-right tabular-nums text-gray-500 dark:text-gray-400">
                   {row.mints}
                   {row.pendingMints > 0 ? ` +${row.pendingMints}` : ""}
