@@ -27,7 +27,7 @@ import { timeAgo } from "@/lib/chain-time";
 import { useLaunchRoom } from "@/app/[asset]/_components/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
-import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
+import { describeFreshness, useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
 import {
   AddressHoverCard,
   LaunchpadAddressHoverCard,
@@ -545,11 +545,27 @@ export function ActivityTabs({
                               dev
                             </span>
                           )}
-                          {freshness?.newAddresses.has(r.source) && (
-                            <span className="shrink-0 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                              no history
-                            </span>
-                          )}
+                          {(() => {
+                            const finding = freshness?.flagged.get(r.source);
+                            if (!finding) return null;
+                            const { label, suspect } = describeFreshness(finding);
+                            return (
+                              <span
+                                className={`shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium ${
+                                  suspect
+                                    ? "border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400"
+                                    : "border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400"
+                                }`}
+                                title={
+                                  finding.kind === "none"
+                                    ? "The explorer has never seen this address do anything on chain."
+                                    : "First seen on chain within the last 90 days."
+                                }
+                              >
+                                {label}
+                              </span>
+                            );
+                          })()}
                         </span>
                         <span className="relative z-10 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {commas(tokenQty(r.earned, divisible))}
