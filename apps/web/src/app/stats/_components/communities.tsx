@@ -64,7 +64,7 @@ export function CommunitiesSection({ data }: { data: Communities }) {
               const paidPct = percent(row.paid_xcp, data.paid_xcp);
               return (
                 <tr key={row.tag} className="tabular-nums">
-                  <td className="w-10 pl-4 py-2">
+                  <td className="w-12 pl-4 py-2">
                     {collection ? <CollectionChip collection={collection} title={collection.name} /> : null}
                   </td>
                   <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100" title={row.tag}>
