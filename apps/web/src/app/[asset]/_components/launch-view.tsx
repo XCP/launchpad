@@ -434,7 +434,6 @@ export function LaunchView({
               divisible={fm.divisible}
               minting
               issuerSource={fm.source}
-              blockHeight={blockHeight}
             />
           </div>
         )}

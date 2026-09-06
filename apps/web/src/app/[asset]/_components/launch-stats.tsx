@@ -97,44 +97,24 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
 
 /* ---------- hosted metadata (site-issued launches) ---------- */
 
-const NEW_ADDRESS_BLOCKS = 90 * 24 * 6;
-/** Younger than this and the chip turns amber: a batch of week-old wallets
- *  is the sybil pattern; a two-month-old trader is just a newer user. */
-const SUSPECT_ADDRESS_BLOCKS = 7 * 24 * 6;
-
-/** What the chip beside a minter says, when it says anything. */
-export interface AddressFreshness {
-  /** `none`: the explorer has never seen this address do anything on chain.
-   *  `new`: it has, but first appeared within the last 90 days. */
-  kind: "none" | "new";
-  /** Blocks since first appearance; null when the tip is not known. */
-  ageBlocks: number | null;
-}
-
 /**
- * Which of a sale's minters are freshly-created wallets — a batch of
- * addresses with no history before this launch is the sybil pattern the
- * per-address cap can't catch on its own. Capped to the `addresses` the
- * caller passes in (the biggest minters, in practice) and fetched lazily,
- * client-side, once per mount: this is the same shape as the issuer hover
- * card, not a repeat of the SSR fan-out the index page used to do. Callers
- * sharing the same address list hit the same SWR cache entry — no repeat
- * fetch just because two components on the page both want it.
+ * Which of a sale's minters the explorer has never seen do anything on
+ * chain — a batch of such addresses is the sybil pattern the per-address cap
+ * can't catch on its own. Capped to the `addresses` the caller passes in
+ * (the page on screen, in practice) and fetched lazily, client-side, once
+ * per mount: this is the same shape as the issuer hover card, not a repeat
+ * of the SSR fan-out the index page used to do. Callers sharing the same
+ * address list hit the same SWR cache entry.
  *
- * Two findings are kept apart, because they mean different things and used
- * to share one label. "No history" is the explorer's own verdict: no
- * first_block, nothing on chain, ever. "New" is an address the explorer
- * does know, whose first appearance is recent — which described a wallet
- * with twelve balances and forty trades as having no history. The chip now
- * says which, and how recent.
- *
- * A tip of zero means the caller does not know the height yet; age cannot
- * be judged against it, so only the explorer's verdict is reported then.
+ * "No history" is the explorer's own verdict — no first_block, nothing on
+ * chain, ever — and nothing else. It used to also cover any address first
+ * seen within 90 days, which described wallets with a dozen balances and
+ * forty trades as having no history. Age is not a finding; absence is.
  */
-export function useAddressFreshness(addresses: string[], blockHeight: number) {
+export function useAddressFreshness(addresses: string[]) {
   const capped = addresses.slice(0, 25);
   return useSWR(
-    capped.length > 0 ? ["new-minters", capped.join(","), blockHeight > 0] : null,
+    capped.length > 0 ? ["no-history-minters", capped.join(",")] : null,
     async () => {
       const summaries = await Promise.all(
         capped.map((addr) =>
@@ -144,35 +124,18 @@ export function useAddressFreshness(addresses: string[], blockHeight: number) {
         ),
       );
       // A failed lookup is not evidence of anything; only an answer counts.
-      const flagged = new Map<string, AddressFreshness>();
+      const noHistory = new Set<string>();
       let known = 0;
       capped.forEach((addr, i) => {
         const s = summaries[i];
         if (s === undefined) return;
         known++;
-        if (!s?.first_block) {
-          flagged.set(addr, { kind: "none", ageBlocks: null });
-          return;
-        }
-        if (blockHeight <= 0) return;
-        const ageBlocks = blockHeight - s.first_block;
-        if (ageBlocks < NEW_ADDRESS_BLOCKS) flagged.set(addr, { kind: "new", ageBlocks });
+        if (!s?.first_block) noHistory.add(addr);
       });
-      return { flagged, known };
+      return { noHistory, known };
     },
     { revalidateOnFocus: false },
   ).data;
-}
-
-/** The chip's text and tone for one finding. */
-export function describeFreshness(f: AddressFreshness): { label: string; suspect: boolean } {
-  if (f.kind === "none") return { label: "no history", suspect: true };
-  const days = f.ageBlocks === null ? null : Math.floor(f.ageBlocks / 144);
-  const suspect = f.ageBlocks !== null && f.ageBlocks < SUSPECT_ADDRESS_BLOCKS;
-  return {
-    label: days === null ? "new" : days < 1 ? "new today" : `new · ${days}d`,
-    suspect,
-  };
 }
 
 /** Distinct addresses that have minted. Individual no-history addresses
