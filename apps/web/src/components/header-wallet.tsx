@@ -6,7 +6,6 @@ import { Popover as P } from "radix-ui";
 import { useConnectAction } from "@/components/connect-button";
 import { trackTx } from "@/lib/analytics";
 import { shortAddress } from "@/lib/format";
-import { useWalletMenu } from "@xcp/wallet-sdk/react";
 import { useWallet } from "@/lib/wallet/wallet-context";
 
 /**
@@ -17,9 +16,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
  * surface.
  */
 export function HeaderWallet() {
-  const { status, address, proofStatus } = useWallet();
-  const menu = useWalletMenu();
-  const { accounts, switchAccount, disconnect } = menu;
+  const { status, address, proofStatus, disconnect, accounts, switchAccount } = useWallet();
   /**
    * The dot carries the state; only the red one gets words.
    *
@@ -104,11 +101,6 @@ export function HeaderWallet() {
                   {proof.note}
                 </p>
               )}
-              {menu.wallet && (
-                <p className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  via {menu.wallet.name}
-                </p>
-              )}
               {accounts.length > 1 && (
                 <>
                   {/* Horizon grants every address at once; the site acts as one. */}
@@ -157,15 +149,6 @@ export function HeaderWallet() {
                 View on explorer ↗
               </a>
               <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
-              {menu.canSwitchWallet && (
-                <button
-                  type="button"
-                  onClick={() => menu.switchWallet()}
-                  className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
-                >
-                  Switch wallet
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => disconnect()}
