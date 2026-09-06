@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
-import { fetchLaunchStats } from "@/lib/api/launchpad-api";
+import { fetchCommunities, fetchLaunchStats } from "@/lib/api/launchpad-api";
+import { CommunitiesSection } from "@/app/stats/_components/communities";
 import { fetchXcpUsd, fetchXcpUsdHistory } from "@/lib/api/price";
 import { commas, fromSats, usd } from "@/lib/format";
 import { historicalUsdAt } from "@/lib/market";
@@ -38,10 +39,11 @@ const formatXcp = (value: number) =>
  */
 export default async function StatsPage() {
   const height = await fetchBlockHeight();
-  const [stats, xcpUsd, xcpUsdHistory] = await Promise.all([
+  const [stats, xcpUsd, xcpUsdHistory, communities] = await Promise.all([
     fetchLaunchStats(height),
     fetchXcpUsd(),
     fetchXcpUsdHistory(),
+    fetchCommunities(),
   ]);
 
   if (!stats) {
@@ -211,6 +213,8 @@ export default async function StatsPage() {
           <Stat label="Refunded" value={commas(counts.refunded)} hint="missed the cap, paid back" />
         </div>
       </section>
+
+      {communities && <CommunitiesSection data={communities} />}
 
       <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
         <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Of the launches that finished</h2>

@@ -7,6 +7,8 @@ import { syncLaunches } from "#api/indexer/sync";
 import { activityRoute } from "#api/read/activity";
 import { listMarketAssets } from "#api/queries/activity";
 import { launchesRoute } from "#api/read/launches";
+import { communitiesRoute } from "#api/read/communities";
+import { syncCommunities } from "#api/indexer/communities";
 import { mintClosed } from "#api/telegram/format";
 import { announceLive, queueAnnouncements } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
@@ -73,6 +75,7 @@ app.use("*", async (c, next) => {
 app.get("/", (c) => c.text("launchpad-api ok"));
 app.get("/health", (c) => c.text("ok"));
 app.route("/", launchesRoute);
+app.route("/", communitiesRoute);
 app.route("/", activityRoute);
 
 /**
@@ -300,6 +303,8 @@ export default {
         await runScheduledJob("sync_behavior_balances", () =>
           syncBehaviorBalances(env.DB),
         );
+        // Skips itself until six hours have passed; see src/indexer/communities.ts.
+        await runScheduledJob("sync_communities", () => syncCommunities(env.DB));
         // After the indexer, never inside it. The feed reads committed state
         // rather than the tick's own deltas, so an announcement can only
         // describe something D1 already believes — and a tick that dies

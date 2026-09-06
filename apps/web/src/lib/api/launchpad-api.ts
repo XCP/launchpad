@@ -982,6 +982,40 @@ export async function fetchLaunchStats(height = 0): Promise<LaunchStats | null> 
   }
 }
 
+export interface CommunityRow {
+  tag: string;
+  /** Minting addresses that created a card in the collection. */
+  creators: number;
+  /** Minting addresses that hold a card there but created none. */
+  collectors: number;
+  members: number;
+  /** The launch this community is most present in, by share of that launch's minters. */
+  top: { asset: string; minters: number; share: number } | null;
+}
+
+export interface Communities {
+  /** Every address that has minted a conforming launch. */
+  minters: number;
+  /** Of those, how many belong to at least one known collection. */
+  represented: number;
+  communities: CommunityRow[];
+}
+
+/** Which Counterparty communities the minters come from; refreshed a few times a day. */
+export async function fetchCommunities(): Promise<Communities | null> {
+  try {
+    const res = await launchpadApiFetch(`/v2/communities`, {
+      signal: AbortSignal.timeout(3_000),
+      next: { revalidate: 1800 },
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: Communities };
+    return data.result ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export interface MinterEarning {
   source: string;
   mints: number;
