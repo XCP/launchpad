@@ -1,8 +1,11 @@
 /**
- * The curated Counterparty collections the site recognises, keyed by the
- * explorer's tag. Shared by the address badges on a launch page and the
- * Communities section on /stats, so one emoji means one thing everywhere.
+ * Every curated Counterparty collection the explorer indexes, keyed by its
+ * tag. Shared by the address badges on a launch page and the Communities
+ * section on /stats, so one emoji means one thing everywhere. Ordered by how
+ * many of the site's minters created there, which is the order chips appear
+ * in on an address.
  */
+
 /** Chip colours by Tailwind family; full class strings so the scanner sees them. */
 export const TONE = {
   red: "border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300",
@@ -27,60 +30,91 @@ export const TONE = {
   stone: "border-stone-200 bg-stone-50 text-stone-700 dark:border-stone-700 dark:bg-stone-800/60 dark:text-stone-300",
 } as const;
 
-/**
- * One chip per curated collection, keyed by the explorer's tag. Emoji only,
- * the collection's name in the tooltip: an address can carry several and
- * words would not fit. Colour follows the collection's own card art where it
- * has a colour of its own; the emoji carries the identity where it does not.
- */
 export interface Collection {
   tag: string;
   emoji: string;
+  /** The collection's name, as the explorer lists it. */
   name: string;
+  /** What a creator made there, for "Created a …". */
+  noun: string;
   tone: keyof typeof TONE;
 }
 
 export const COLLECTIONS: Collection[] = [
-  { tag: "kaleidoscope", emoji: "🔭", name: "Kaleidoscope card", tone: "indigo" },
-  { tag: "dank-directory", emoji: "🌿", name: "Dank Rare", tone: "red" },
-  { tag: "fake-commons", emoji: "🃏", name: "Fake Common", tone: "emerald" },
-  { tag: "fake-rare", emoji: "🎩", name: "Fake Rare", tone: "pink" },
-  { tag: "bitcorn", emoji: "🌽", name: "Bitcorn", tone: "yellow" },
-  { tag: "the-pepe-project", emoji: "🗽", name: "Pepe Project card", tone: "red" },
-  { tag: "faux-bitcorn", emoji: "🍿", name: "Faux Bitcorn", tone: "amber" },
-  { tag: "rare-coco", emoji: "🐊", name: "Rare Coco", tone: "teal" },
-  { tag: "rare-ordinal-directory", emoji: "🟠", name: "Rare Ordinal", tone: "orange" },
-  { tag: "rare-pigeons", emoji: "🐦", name: "Rare Pigeon", tone: "slate" },
-  { tag: "lfg-collection", emoji: "🚀", name: "LFG Collection card", tone: "rose" },
-  { tag: "the-wojak-way", emoji: "😐", name: "Wojak Way card", tone: "pink" },
-  { tag: "rarepenpen", emoji: "🐧", name: "RarePenPen", tone: "sky" },
-  { tag: "bassmint", emoji: "🐟", name: "Bassmint card", tone: "orange" },
-  { tag: "common-coco", emoji: "🥥", name: "Common Coco", tone: "cyan" },
-  { tag: "rare-gogo", emoji: "🐐", name: "Rare GoGo", tone: "rose" },
-  { tag: "the-greypepe-project", emoji: "🩶", name: "GreyPepe", tone: "zinc" },
-  { tag: "barnyard-club", emoji: "🐷", name: "Barnyard Club card", tone: "red" },
-  { tag: "mafia-wars", emoji: "🔫", name: "Mafia Wars card", tone: "stone" },
-  { tag: "rare-pepe", emoji: "🐸", name: "Rare Pepe", tone: "green" },
-  { tag: "scannable-nfts", emoji: "🔳", name: "Scannable NFT", tone: "fuchsia" },
-  { tag: "unatrare", emoji: "🦄", name: "UNATRARE card", tone: "violet" },
-  { tag: "fake-ape-club", emoji: "🦧", name: "Fake Ape", tone: "blue" },
-  { tag: "retroxcp", emoji: "👾", name: "RetroXCP card", tone: "blue" },
-  { tag: "17art", emoji: "🎨", name: "17ART card", tone: "red" },
-  { tag: "assetic", emoji: "🍑", name: "Assetic card", tone: "orange" },
-  { tag: "drooling-ape-bus-club", emoji: "🚌", name: "Drooling Ape", tone: "lime" },
-  { tag: "faux-sogs", emoji: "🔮", name: "Faux SOG", tone: "cyan" },
-  { tag: "phockheads", emoji: "🗿", name: "Phockhead", tone: "purple" },
-  { tag: "rare-shadilay", emoji: "🌀", name: "Rare Shadilay", tone: "blue" },
-  { tag: "raresocks", emoji: "🧦", name: "RareSock", tone: "violet" },
-  { tag: "comedianas", emoji: "🎭", name: "Comedianas card", tone: "stone" },
-  { tag: "cubism-nakamoto", emoji: "🧊", name: "Cubism Nakamoto card", tone: "orange" },
-  { tag: "fake-munchkin", emoji: "🎲", name: "Fake Munchkin", tone: "amber" },
-  { tag: "memorychain", emoji: "🎌", name: "MemoryChain card", tone: "lime" },
-  { tag: "notable-pepe", emoji: "📝", name: "Notable Pepe", tone: "rose" },
-  { tag: "oasis-mining", emoji: "⛏️", name: "Oasis Mining card", tone: "amber" },
-  { tag: "pepe-vote", emoji: "🗳️", name: "Pepe Vote card", tone: "teal" },
-  { tag: "phunchkins", emoji: "😾", name: "Phunchkin", tone: "orange" },
-  { tag: "rare-bobo", emoji: "🐻", name: "Rare Bobo", tone: "orange" },
+  { tag: "kaleidoscope", emoji: "🔭", name: "Kaleidoscope", noun: "Kaleidoscope card", tone: "indigo" },
+  { tag: "dank-directory", emoji: "🌿", name: "Dank Directory", noun: "Dank Rare", tone: "red" },
+  { tag: "fake-commons", emoji: "🃏", name: "Fake Commons", noun: "Fake Common", tone: "emerald" },
+  { tag: "fake-rare", emoji: "🎩", name: "Fake Rare", noun: "Fake Rare", tone: "pink" },
+  { tag: "bitcorn", emoji: "🌽", name: "Bitcorns", noun: "Bitcorn", tone: "yellow" },
+  { tag: "the-pepe-project", emoji: "🗽", name: "The Pepe Project", noun: "Pepe Project card", tone: "red" },
+  { tag: "faux-bitcorn", emoji: "🍿", name: "Faux Bitcorn", noun: "Faux Bitcorn", tone: "amber" },
+  { tag: "rare-coco", emoji: "🐊", name: "Rare Coco", noun: "Rare Coco", tone: "teal" },
+  { tag: "rare-ordinal-directory", emoji: "🟠", name: "Rare Ordinal Directory", noun: "Rare Ordinal", tone: "orange" },
+  { tag: "rare-pigeons", emoji: "🐦", name: "Rare Pigeons", noun: "Rare Pigeon", tone: "slate" },
+  { tag: "lfg-collection", emoji: "🚀", name: "LFG Collection", noun: "LFG Collection card", tone: "rose" },
+  { tag: "the-wojak-way", emoji: "😐", name: "The Wojak Way", noun: "Wojak Way card", tone: "pink" },
+  { tag: "rarepenpen", emoji: "🐧", name: "RarePenPen", noun: "RarePenPen", tone: "sky" },
+  { tag: "bassmint", emoji: "🐟", name: "Bassmint", noun: "Bassmint card", tone: "orange" },
+  { tag: "common-coco", emoji: "🥥", name: "Common Coco", noun: "Common Coco", tone: "cyan" },
+  { tag: "rare-gogo", emoji: "🐐", name: "Rare GoGo", noun: "Rare GoGo", tone: "rose" },
+  { tag: "the-greypepe-project", emoji: "🩶", name: "The GreyPepe Project", noun: "GreyPepe", tone: "zinc" },
+  { tag: "barnyard-club", emoji: "🐷", name: "Barnyard Club", noun: "Barnyard Club card", tone: "red" },
+  { tag: "mafia-wars", emoji: "🔫", name: "Mafia Wars", noun: "Mafia Wars card", tone: "stone" },
+  { tag: "rare-pepe", emoji: "🐸", name: "Rare Pepe", noun: "Rare Pepe", tone: "green" },
+  { tag: "scannable-nfts", emoji: "🔳", name: "Scannable NFTs", noun: "Scannable NFT", tone: "fuchsia" },
+  { tag: "unatrare", emoji: "🦄", name: "UNATRARE", noun: "UNATRARE card", tone: "violet" },
+  { tag: "fake-ape-club", emoji: "🦧", name: "Fake Ape Club", noun: "Fake Ape", tone: "blue" },
+  { tag: "retroxcp", emoji: "👾", name: "RetroXCP", noun: "RetroXCP card", tone: "blue" },
+  { tag: "17art", emoji: "🎨", name: "17ART", noun: "17ART card", tone: "red" },
+  { tag: "assetic", emoji: "🍑", name: "Assetic", noun: "Assetic card", tone: "orange" },
+  { tag: "drooling-ape-bus-club", emoji: "🚌", name: "Drooling Ape Bus Club", noun: "Drooling Ape", tone: "lime" },
+  { tag: "faux-sogs", emoji: "🪄", name: "FAUX SOGS", noun: "Faux SOG", tone: "cyan" },
+  { tag: "phockheads", emoji: "🗿", name: "PHOCKHEADS", noun: "Phockhead", tone: "purple" },
+  { tag: "rare-shadilay", emoji: "🌀", name: "Rare Shadilay", noun: "Rare Shadilay", tone: "blue" },
+  { tag: "raresocks", emoji: "🧦", name: "RareSocks", noun: "RareSock", tone: "violet" },
+  { tag: "comedianas", emoji: "🎭", name: "Comedianas", noun: "Comedianas card", tone: "stone" },
+  { tag: "cubism-nakamoto", emoji: "🧊", name: "Cubism Nakamoto", noun: "Cubism Nakamoto card", tone: "orange" },
+  { tag: "fake-munchkin", emoji: "🎲", name: "Fake Munchkin", noun: "Fake Munchkin", tone: "amber" },
+  { tag: "memorychain", emoji: "🎌", name: "MemoryChain", noun: "MemoryChain card", tone: "lime" },
+  { tag: "notable-pepe", emoji: "📝", name: "Notable Pepe", noun: "Notable Pepe", tone: "rose" },
+  { tag: "oasis-mining", emoji: "⛏️", name: "Oasis Mining", noun: "Oasis Mining card", tone: "amber" },
+  { tag: "pepe-vote", emoji: "🗳️", name: "Pepe Vote", noun: "Pepe Vote card", tone: "teal" },
+  { tag: "phunchkins", emoji: "😾", name: "Phunchkins", noun: "Phunchkin", tone: "orange" },
+  { tag: "rare-bobo", emoji: "🐻", name: "Rare Bobo", noun: "Rare Bobo", tone: "orange" },
+  { tag: "age-of-chains", emoji: "⚔️", name: "Age of Chains", noun: "Age of Chains card", tone: "slate" },
+  { tag: "age-of-rust", emoji: "🤖", name: "Age of Rust", noun: "Age of Rust card", tone: "orange" },
+  { tag: "artolin", emoji: "🖌️", name: "Artolin", noun: "Artolin piece", tone: "fuchsia" },
+  { tag: "atomo", emoji: "⚛️", name: "AtOMo", noun: "AtOMo collectible", tone: "sky" },
+  { tag: "based-intellectuals", emoji: "🧠", name: "Based Intellectuals", noun: "Based Intellectual", tone: "blue" },
+  { tag: "bitcoin-war-bonds", emoji: "🎖️", name: "Bitcoin War Bonds", noun: "Bitcoin War Bond", tone: "stone" },
+  { tag: "bitgirls", emoji: "👧", name: "Bitgirls", noun: "Bitgirl", tone: "pink" },
+  { tag: "community-rewards", emoji: "🎁", name: "Community Rewards", noun: "Community Reward", tone: "green" },
+  { tag: "corruptionaires", emoji: "💰", name: "Corruptionaires", noun: "Corruptionaire", tone: "emerald" },
+  { tag: "counterparty-bitbowl", emoji: "🏈", name: "Counterparty BitBowl", noun: "BitBowl card", tone: "orange" },
+  { tag: "crystalscraft", emoji: "💎", name: "CrystalsCraft", noun: "CrystalsCraft card", tone: "cyan" },
+  { tag: "diecast", emoji: "🚗", name: "Diecast", noun: "Diecast card", tone: "slate" },
+  { tag: "footballcoin", emoji: "⚽", name: "FootballCoin", noun: "FootballCoin card", tone: "green" },
+  { tag: "force-of-will", emoji: "🎴", name: "Force Of Will", noun: "Force of Will card", tone: "violet" },
+  { tag: "gameicon", emoji: "🎮", name: "Gameicon", noun: "Gameicon", tone: "indigo" },
+  { tag: "hodlpet", emoji: "🐾", name: "HODLPET", noun: "HODLPET", tone: "amber" },
+  { tag: "memeable", emoji: "😂", name: "Memeable", noun: "Memeable card", tone: "yellow" },
+  { tag: "modern-relics", emoji: "🏺", name: "Modern Relics", noun: "Modern Relic", tone: "amber" },
+  { tag: "new-liberty-standard", emoji: "📜", name: "New Liberty Standard", noun: "New Liberty Standard card", tone: "teal" },
+  { tag: "npcs", emoji: "🧍", name: "NPCs", noun: "NPC", tone: "zinc" },
+  { tag: "penisium", emoji: "🍆", name: "Penisium", noun: "Penisium card", tone: "violet" },
+  { tag: "pepe-flags", emoji: "🚩", name: "Pepe Flags", noun: "Pepe Flag", tone: "red" },
+  { tag: "potentially-notable-pepe", emoji: "📋", name: "Potentially Notable Pepe", noun: "Potentially Notable Pepe", tone: "rose" },
+  { tag: "punk-frens", emoji: "🤘", name: "Punk Frens", noun: "Punk Fren", tone: "fuchsia" },
+  { tag: "rarepepecoins", emoji: "🪙", name: "RarePepeCoins", noun: "RarePepeCoin", tone: "yellow" },
+  { tag: "rude-relics", emoji: "🪦", name: "Rude Relics", noun: "Rude Relic", tone: "zinc" },
+  { tag: "sarutobi-island", emoji: "🏝️", name: "Sarutobi Island", noun: "Sarutobi Island card", tone: "emerald" },
+  { tag: "skara", emoji: "🗡️", name: "SKARA", noun: "SKARA card", tone: "red" },
+  { tag: "spamgelo", emoji: "🥫", name: "Spamgelo", noun: "Spamgelo piece", tone: "red" },
+  { tag: "spells-of-genesis", emoji: "🔮", name: "Spells of Genesis", noun: "Spells of Genesis card", tone: "purple" },
+  { tag: "stampunks", emoji: "🧑‍🎤", name: "Stampunks", noun: "Stampunk", tone: "indigo" },
+  { tag: "the-counterpart", emoji: "🖼️", name: "The CounterpART", noun: "CounterpART piece", tone: "pink" },
+  { tag: "viva-las-stamps", emoji: "🎰", name: "Viva Las Stamps", noun: "Viva Las Stamps card", tone: "rose" },
+  { tag: "xcpinata", emoji: "🪅", name: "XCPinata", noun: "XCPinata card", tone: "lime" },
 ];
 
 const BY_TAG = new Map(COLLECTIONS.map((c) => [c.tag, c]));

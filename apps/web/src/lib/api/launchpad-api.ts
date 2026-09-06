@@ -998,6 +998,10 @@ export interface Communities {
   minters: number;
   /** Of those, how many belong to at least one known collection. */
   represented: number;
+  /** Distinct minting addresses that created a card in any collection. */
+  creators: number;
+  /** Distinct minting addresses that hold cards but created none. */
+  collectors: number;
   communities: CommunityRow[];
 }
 

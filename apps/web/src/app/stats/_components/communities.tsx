@@ -4,12 +4,12 @@ import { collectionByTag } from "@/lib/collections";
 import type { Communities } from "@/lib/api/launchpad-api";
 import { commas } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
+import { Stat } from "@/app/stats/_components/stat";
 
 /**
  * Which Counterparty communities the minters come from. One row per
  * collection: creators, collectors, the share of all minters that is either,
- * and the launch the community is most present in. Collections the site has
- * no chip for are listed by name; the explorer knows more than the badge set.
+ * and the graduated launch the community is most present in.
  */
 export function CommunitiesSection({ data }: { data: Communities }) {
   const rows = data.communities.filter((row) => row.members > 0);
@@ -19,13 +19,22 @@ export function CommunitiesSection({ data }: { data: Communities }) {
     <section>
       <h2 className={`mb-1 ${LABEL}`}>Communities</h2>
       <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-        {commas(data.represented)} of {commas(data.minters)} minting addresses created or collect cards in a
-        known Counterparty collection. Creators made a card there; collectors hold one.
+        Which Counterparty collections the minters come from. Creators made a card there; collectors hold one.
       </p>
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Stat
+          label="Represented"
+          value={commas(data.represented)}
+          hint={`of ${commas(data.minters)} minters, ${Math.round((data.represented / data.minters) * 100)}%`}
+        />
+        <Stat label="Communities" value={commas(rows.length)} hint="collections with a minter in them" />
+        <Stat label="Creators" value={commas(data.creators)} hint="made a card in one" />
+        <Stat label="Collectors" value={commas(data.collectors)} hint="hold one, made none" />
+      </div>
       <ul className="divide-y divide-gray-100 dark:divide-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         {rows.map((row) => {
           const collection = collectionByTag(row.tag);
-          const name = collection?.name.replace(/ card$/, "") ?? row.tag;
+          const name = collection?.name ?? row.tag;
           const pct = Math.round((row.members / data.minters) * 100);
           return (
             <li key={row.tag} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 gap-y-1 px-4 py-2 text-sm sm:grid-cols-[auto_11rem_1fr_auto]">

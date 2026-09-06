@@ -3,6 +3,7 @@ import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchCommunities, fetchLaunchStats } from "@/lib/api/launchpad-api";
 import { CommunitiesSection } from "@/app/stats/_components/communities";
+import { Stat } from "@/app/stats/_components/stat";
 import { fetchXcpUsd, fetchXcpUsdHistory } from "@/lib/api/price";
 import { commas, fromSats, usd } from "@/lib/format";
 import { historicalUsdAt } from "@/lib/market";
@@ -283,33 +284,6 @@ export default async function StatsPage() {
         {commas(total)} conforming {total === 1 ? "launch" : "launches"} · chain tip{" "}
         {commas(height)}
       </p>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  hint,
-  mobileHint,
-  className = "",
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  mobileHint?: string;
-  /** Ordering only. Two columns read as three rows of pairs, and the pairs
-   *  that belong together are not the ones source order produces. */
-  className?: string;
-}) {
-  return (
-    <div className={`rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 ${className}`}>
-      <div className={LABEL}>{label}</div>
-      <div className="mt-0.5 truncate text-xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">{value}</div>
-      <div className="mt-1 text-[11px] leading-snug text-gray-400 dark:text-gray-500">
-        <span className={mobileHint ? "hidden sm:inline" : undefined}>{hint}</span>
-        {mobileHint ? <span className="sm:hidden">{mobileHint}</span> : null}
-      </div>
     </div>
   );
 }
