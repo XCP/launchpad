@@ -58,6 +58,9 @@ interface EventRow {
   eventIndex: number;
   /** Telegram announces the taker, not a second alert for the resting maker. */
   primaryActor: boolean;
+  /** The other party of a book fill, recorded on both of its rows so the tape
+   *  can attribute the fill to a viewer's resting order; null for pool fills. */
+  counterpartyAddress: string | null;
 }
 
 /**
@@ -104,6 +107,7 @@ function receives(
   txIndex: number,
   eventIndex: number,
   primaryActor: boolean,
+  counterpartyAddress: string | null = null,
 ): EventRow {
   return {
     // The asset belongs in the key: one transaction can move more than one
@@ -121,6 +125,7 @@ function receives(
     txIndex,
     eventIndex,
     primaryActor,
+    counterpartyAddress,
   };
 }
 
@@ -161,6 +166,7 @@ export function toOrderRows(asset: string, m: CpMatch): EventRow[] {
   const l = legs(asset, m);
   if (!l) return [];
   const txHash = m.tx1_hash ?? m.tx_hash ?? event;
+  const twoParties = Boolean(m.tx0_address && m.tx1_address && m.tx0_address !== m.tx1_address);
   const rows: EventRow[] = [];
   if (m.tx1_address) {
     rows.push(
@@ -176,6 +182,7 @@ export function toOrderRows(asset: string, m: CpMatch): EventRow[] {
         Number(m.tx1_index ?? 0),
         0,
         true,
+        twoParties ? m.tx0_address ?? null : null,
       ),
     );
   }
@@ -193,6 +200,7 @@ export function toOrderRows(asset: string, m: CpMatch): EventRow[] {
         Number(m.tx1_index ?? 0),
         0,
         false,
+        m.tx1_address ?? null,
       ),
     );
   }
@@ -229,6 +237,12 @@ export function toIndexedRows(asset: string, trades: PairTrade[]): EventRow[] {
         : firstPoolFill.get(trade.txHash) === trade
           ? trade.txHash
           : `${trade.txHash}#${trade.eventIndex || trade.key}`;
+    const maker =
+      trade.venue === "book" &&
+      trade.counterpartyAddress &&
+      trade.counterpartyAddress !== trade.address
+        ? trade.counterpartyAddress
+        : null;
     const rows = [
       receives(
         event,
@@ -242,17 +256,14 @@ export function toIndexedRows(asset: string, trades: PairTrade[]): EventRow[] {
         trade.txIndex,
         trade.eventIndex,
         true,
+        maker,
       ),
     ];
-    if (
-      trade.venue === "book" &&
-      trade.counterpartyAddress &&
-      trade.counterpartyAddress !== trade.address
-    ) {
+    if (maker) {
       rows.push(
         receives(
           event,
-          trade.counterpartyAddress,
+          maker,
           asset,
           trade.block,
           tokenQty,
@@ -262,6 +273,7 @@ export function toIndexedRows(asset: string, trades: PairTrade[]): EventRow[] {
           trade.txIndex,
           trade.eventIndex,
           false,
+          trade.address,
         ),
       );
     }
@@ -403,8 +415,8 @@ export async function syncAssetEvents(
       const stmt = db.prepare(
         `INSERT OR IGNORE INTO asset_events
            (id, event, address, asset, block_index, token_delta, xcp_delta, kind,
-            tx_hash, tx_index, event_index, primary_actor)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)`,
+            tx_hash, tx_index, event_index, primary_actor, counterparty_address)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
       );
       const results = await db.batch(
         chunk.map((r) =>
@@ -421,6 +433,7 @@ export async function syncAssetEvents(
             r.txIndex,
             r.eventIndex || null,
             r.primaryActor ? 1 : 0,
+            r.counterpartyAddress,
           ),
         ),
       );

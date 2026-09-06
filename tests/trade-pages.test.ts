@@ -35,21 +35,24 @@ describe("per-asset trade pages", () => {
         tx_hash TEXT,
         event_index INTEGER,
         primary_actor INTEGER NOT NULL,
-        tx_index INTEGER NOT NULL
+        tx_index INTEGER NOT NULL,
+        counterparty_address TEXT
       )`),
       db.prepare(`INSERT INTO launches VALUES ('COIN', 1), ('OTHER', 1)`),
     ]);
 
     const insert = db.prepare(`INSERT INTO asset_events VALUES
-      (?1, ?2, 'TRADER', ?3, ?4, '100', '-10', 'buy', ?2, 0, ?5, ?4)`);
+      (?1, ?2, 'TRADER', ?3, ?4, '100', '-10', 'buy', ?2, 0, ?5, ?4, ?6)`);
     await db.batch([
       ...Array.from({ length: 60 }, (_, i) => {
         const n = i + 1;
-        return insert.bind(`coin-${n}`, `tx-${n}`, "COIN", 100 + n, 1);
+        return insert.bind(`coin-${n}`, `tx-${n}`, "COIN", 100 + n, 1, null);
       }),
-      insert.bind("other", "tx-other", "OTHER", 999, 1),
-      // The maker-side bookkeeping row is not a second trade.
-      insert.bind("maker", "tx-maker", "COIN", 998, 0),
+      insert.bind("other", "tx-other", "OTHER", 999, 1, null),
+      // A book fill: the taker's row names the resting maker, and the
+      // maker-side bookkeeping row is not a second trade.
+      insert.bind("book-taker", "tx-book", "COIN", 997, 1, "MAKER"),
+      insert.bind("maker", "tx-book", "COIN", 997, 0, "TRADER"),
     ]);
   });
 
@@ -57,12 +60,20 @@ describe("per-asset trade pages", () => {
     await mf.dispose();
   });
 
+  it("names the resting maker on a book fill and nobody on a pool fill", async () => {
+    const newest = await listRecentTrades(db, 2, 0, "COIN");
+    expect(newest.map((row) => [row.event, row.counterparty_address])).toEqual([
+      ["tx-book", "MAKER"],
+      ["tx-60", null],
+    ]);
+  });
+
   it("retrieves rows beyond the old 50-trade ceiling", async () => {
-    expect(await countTradesByAsset(db, "COIN")).toBe(60);
+    expect(await countTradesByAsset(db, "COIN")).toBe(61);
     const thirdPage = await listRecentTrades(db, 25, 50, "COIN");
-    expect(thirdPage).toHaveLength(10);
+    expect(thirdPage).toHaveLength(11);
     expect(thirdPage.map((row) => row.block_index)).toEqual([
-      110, 109, 108, 107, 106, 105, 104, 103, 102, 101,
+      111, 110, 109, 108, 107, 106, 105, 104, 103, 102, 101,
     ]);
   });
 });

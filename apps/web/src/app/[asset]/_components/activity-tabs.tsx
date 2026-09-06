@@ -196,7 +196,7 @@ export function ActivityTabs({
           tokenRaw: (token < 0n ? -token : token).toString(),
           xcpRaw: (xcp < 0n ? -xcp : xcp).toString(),
           addr: trade.address,
-          counterpartyAddr: "",
+          counterpartyAddr: trade.counterpartyAddress ?? "",
           via: trade.venue,
           txHash: trade.txHash ?? "",
         };

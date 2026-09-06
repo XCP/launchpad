@@ -124,6 +124,37 @@ describe("pair trade chronology", () => {
   });
 });
 
+describe("tape rows carry the other party of a book fill", () => {
+  const base = {
+    block: 100,
+    time: 0,
+    txIndex: 1,
+    eventIndex: 0,
+    buy: true,
+    tokenQuantity: "5",
+    xcpQuantity: "50",
+    txHash: "tx",
+    sourceOrder: 0,
+  };
+
+  it("records the maker on the taker's row and the taker on the maker's row", () => {
+    const rows = toIndexedRows("TOKEN", [
+      { ...base, key: "fill", address: "taker", venue: "book", matchId: "match", counterpartyAddress: "maker" },
+    ]);
+    expect(rows.map((row) => [row.address, row.primaryActor, row.counterpartyAddress])).toEqual([
+      ["taker", true, "maker"],
+      ["maker", false, "taker"],
+    ]);
+  });
+
+  it("leaves pool fills without a counterparty", () => {
+    const rows = toIndexedRows("TOKEN", [
+      { ...base, key: "swap", address: "trader", venue: "pool", matchId: "", counterpartyAddress: "" },
+    ]);
+    expect(rows.map((row) => row.counterpartyAddress)).toEqual([null]);
+  });
+});
+
 describe("connected-wallet trade attribution", () => {
   const pool = {
     address: "pool-trader",
