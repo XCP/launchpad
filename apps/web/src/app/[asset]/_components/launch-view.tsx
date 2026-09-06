@@ -34,6 +34,7 @@ import {
   saleTarget,
 } from "@/lib/xcp69";
 import { ActivityTabs } from "@/app/[asset]/_components/activity-tabs";
+import { AddressBadges } from "@/app/[asset]/_components/address-badges";
 import { AssetTradeSurface } from "@/app/[asset]/_components/asset-trade-surface";
 import { EditPanel } from "@/app/[asset]/_components/edit-panel";
 import { LiveProgress } from "@/app/[asset]/_components/live-progress";
@@ -561,6 +562,7 @@ export function LaunchView({
                       <Identicon address={source} />
                       <span className="truncate">{shortAddress(source)}</span>
                     </AddressHoverCard>
+                    <AddressBadges address={source} issuerSource={fm.source} />
                   </span>
                   <span className="shrink-0 tabular-nums text-gray-500 dark:text-gray-400">
                     {commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))}{" "}

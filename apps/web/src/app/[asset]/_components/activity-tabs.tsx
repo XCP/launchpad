@@ -28,7 +28,7 @@ import { useLaunchRoom } from "@/app/[asset]/_components/launch-room";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
-import { AddressBadges } from "@/app/[asset]/_components/address-badges";
+import { AddressBadges, DevBadge } from "@/app/[asset]/_components/address-badges";
 import {
   AddressHoverCard,
   LaunchpadAddressHoverCard,
@@ -754,7 +754,7 @@ export function ActivityTabs({
                               <Identicon address={t.addr} />
                               {shortAddress(t.addr)}
                             </LaunchpadAddressHoverCard>
-                            <AddressBadges address={t.addr} issuerSource={issuerSource} />
+                            <DevBadge address={t.addr} issuerSource={issuerSource} />
                           </span>
                         </td>
                         <td className="whitespace-nowrap px-4 py-2 text-right text-xs text-gray-500 dark:text-gray-400">
@@ -1015,7 +1015,7 @@ export function ActivityTabs({
                               <Identicon address={o!.source} />
                               {shortAddress(o!.source)}
                             </LaunchpadAddressHoverCard>
-                            <AddressBadges address={o!.source} issuerSource={issuerSource} />
+                            <DevBadge address={o!.source} issuerSource={issuerSource} />
                             {mine && (
                               <span className="shrink-0 rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-1.5 py-px text-[10px] font-medium text-purple-700 dark:text-purple-300">
                                 you

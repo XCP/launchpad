@@ -14,14 +14,7 @@ const CHIP = "shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium"
 export function AddressBadges({ address, issuerSource }: { address: string; issuerSource?: string }) {
   return (
     <>
-      {issuerSource === address && (
-        <span
-          className={`${CHIP} border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300`}
-          title="Launched this token"
-        >
-          dev
-        </span>
-      )}
+      <DevBadge address={address} issuerSource={issuerSource} />
       {address === BURN_ADDRESS && (
         <span
           className={`${CHIP} border-orange-200 bg-orange-50 text-orange-700 dark:border-orange-800 dark:bg-orange-950/40 dark:text-orange-300`}
@@ -50,5 +43,20 @@ export function AddressBadges({ address, issuerSource }: { address: string; issu
         </span>
       )}
     </>
+  );
+}
+
+/** The launch's own creator. On the trades and orders tapes this is the only
+ *  chip that matters — who someone is elsewhere on Counterparty says nothing
+ *  about a fill — so those tables render just this, not the full set. */
+export function DevBadge({ address, issuerSource }: { address: string; issuerSource?: string }) {
+  if (issuerSource !== address) return null;
+  return (
+    <span
+      className={`${CHIP} border-purple-200 bg-purple-50 text-purple-700 dark:border-purple-800 dark:bg-purple-950/40 dark:text-purple-300`}
+      title="Launched this token"
+    >
+      dev
+    </span>
   );
 }
