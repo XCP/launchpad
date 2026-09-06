@@ -24,7 +24,7 @@ import { announceArtUpdate } from "@/components/token-image";
  * here, since that's the one state where the address itself is in doubt.
  */
 export function EditPanel({ asset }: { asset: string }) {
-  const { address, status: walletStatus, proofStatus, signMessage } = useWallet();
+  const { address, status: walletStatus, proofStatus, signMessage, session } = useWallet();
   const { address: sessionAddress } = useSession();
   const { data: owner } = useSWR<string | null>(
     walletStatus === "connected" ? [asset, "asset-owner"] : null,
@@ -146,6 +146,10 @@ export function EditPanel({ asset }: { asset: string }) {
       form.set("address", address);
       form.set("signature", signature);
       form.set("issued", String(issued));
+      // Horizon signs BIP-137; the route verifies by the declared dialect.
+      if (signature && session.messageVerification) {
+        form.set("verification", JSON.stringify(session.messageVerification));
+      }
       const res = await fetch("/api/launches", {
         method: "PUT",
         body: form,

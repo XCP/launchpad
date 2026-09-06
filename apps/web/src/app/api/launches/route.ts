@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyBip322 } from "@xcp/wallet-sdk";
+import { type ConnectionProof, verifyDeclaredConnectionSignature } from "@xcp/wallet-sdk";
 import {
   getMetadataBucket,
   metadataIconUrl,
@@ -109,6 +109,21 @@ async function fetchRealFairminter(
  * point this route refuses and further edits go through PUT below instead,
  * gated by a BIP-322 signature from the asset's current owner.
  */
+/** The signature dialect the wallet declared, absent for BIP-322 (the XCP Wallet default), false when malformed. */
+function parseVerification(raw: FormDataEntryValue | null): ConnectionProof["verification"] | false {
+  if (raw === null || raw === "") return undefined;
+  try {
+    const parsed: unknown = JSON.parse(String(raw));
+    if (!parsed || typeof parsed !== "object") return false;
+    const { method, format } = parsed as Record<string, unknown>;
+    if (method === "BIP-322" && typeof format === "string") return { method, format };
+    if (method === "BIP-137" && format === "legacy_recoverable") return { method, format };
+    return false;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
   const form = await request.formData();
   const asset = String(form.get("asset") ?? "").toUpperCase();
@@ -228,6 +243,10 @@ export async function PUT(request: Request) {
   const address = String(form.get("address") ?? "");
   const signature = String(form.get("signature") ?? "");
   const issued = Number(form.get("issued"));
+  const verification = parseVerification(form.get("verification"));
+  if (verification === false) {
+    return NextResponse.json({ error: "Invalid signature verification" }, { status: 400 });
+  }
 
   if (!ASSET_NAME_REGEX.test(asset)) {
     return NextResponse.json({ error: "Invalid asset name" }, { status: 400 });
@@ -284,7 +303,7 @@ export async function PUT(request: Request) {
 
   if (!actor) {
     try {
-      if (!verifyBip322(address, message, signature)) {
+      if (!verifyDeclaredConnectionSignature({ address, message, signature, verification }, message, signature, address)) {
         return NextResponse.json({ error: "Signature verification failed" }, { status: 401 });
       }
     } catch (e) {

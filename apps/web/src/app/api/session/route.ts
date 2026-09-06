@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   validateProof,
-  verifyBip322,
+  verifyDeclaredConnectionSignature,
 } from "@xcp/wallet-sdk";
 import {
   SESSION_COOKIE,
@@ -29,7 +29,9 @@ export async function POST(request: Request) {
     address?: unknown;
     message?: unknown;
     signature?: unknown;
-    verification?: { method: "BIP-322"; format: string };
+    verification?:
+      | { method: "BIP-322"; format: string }
+      | { method: "BIP-137"; format: "legacy_recoverable" };
   };
   try {
     proof = ((await request.json()) as { proof?: typeof proof }).proof ?? {};
@@ -62,7 +64,13 @@ export async function POST(request: Request) {
     {
       verifySignature: async (msg, sig, addr) => {
         try {
-          return verifyBip322(addr, msg, sig);
+          // A Horizon proof is BIP-137 and says so; an XCP Wallet proof is BIP-322.
+          return verifyDeclaredConnectionSignature(
+            { address, message, signature, verification: verification ?? { method: "BIP-322", format: "" } },
+            msg,
+            sig,
+            addr,
+          );
         } catch {
           // An address type we can't check is a refusal, not a pass: this is
           // the boundary, so "unknown" has to fail closed.
