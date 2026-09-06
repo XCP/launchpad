@@ -1,3 +1,6 @@
+import { hex as hexCodec } from '@scure/base'
+import { Address, NETWORK, OutScript, Transaction } from '@scure/btc-signer'
+
 /**
  * Just enough raw-transaction parsing to answer one question: which UTXOs
  * does this transaction spend? Counterparty's verbose compose response
@@ -10,6 +13,17 @@
 export interface TxInput {
   txid: string;
   vout: number;
+}
+
+export interface TxOutput {
+  vout: number
+  value: number
+  scriptPubKey: string
+}
+
+function safeBigIntNumber(value: bigint, label: string): number {
+  if (value > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error(`${label} is too large`)
+  return Number(value)
 }
 
 function hexToBytes(hex: string): Uint8Array {
@@ -74,4 +88,40 @@ export function parseTxInputs(hex: string): TxInput[] {
     inputs.push({ txid, vout });
   }
   return inputs;
+}
+
+/** Every output in a signed or unsigned raw transaction. */
+export function parseTxOutputs(rawHex: string): TxOutput[] {
+  const tx = Transaction.fromRaw(hexCodec.decode(rawHex), {
+    allowUnknownInputs: true,
+    allowUnknownOutputs: true,
+    disableScriptCheck: true,
+  })
+
+  const outputs: TxOutput[] = []
+  for (let vout = 0; vout < tx.outputsLength; vout++) {
+    const output = tx.getOutput(vout)
+    if (!output.script || output.amount === undefined) {
+      throw new Error(`Transaction output ${vout} is incomplete`)
+    }
+    outputs.push({
+      vout,
+      value: safeBigIntNumber(output.amount, `Transaction output ${vout}`),
+      scriptPubKey: hexCodec.encode(output.script),
+    })
+  }
+  return outputs
+}
+
+/** The exact script bytes Core needs in a complete inputs_set entry. */
+export function addressScriptPubKey(address: string): string {
+  const decoded = Address(NETWORK).decode(address)
+  if (!decoded) throw new Error(`Cannot decode address: ${address}`)
+  return hexCodec.encode(OutScript.encode(decoded))
+}
+
+/** Outputs that return ordinary bitcoin to the connected address. */
+export function ownTransactionOutputs(rawHex: string, address: string): TxOutput[] {
+  const ownScript = addressScriptPubKey(address)
+  return parseTxOutputs(rawHex).filter((output) => output.scriptPubKey === ownScript)
 }
