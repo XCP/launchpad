@@ -1,5 +1,7 @@
 import { XCP_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
+import { coalesceHolderBalances, type HolderRow, type LpBalance } from "@/lib/holders";
+import type { Raw } from "@/lib/numeric";
 
 interface ExplorerLedgerRow {
   direction: "in" | "out";
@@ -113,4 +115,57 @@ export async function fetchAddressCollections(addresses: string[]): Promise<Map<
     );
   }
   return out;
+}
+
+interface ExplorerHolderRow {
+  /** An address, or `txid:vout` for a UTXO-attached balance. */
+  holder: string;
+  quantity: Raw;
+  role?: string | null;
+}
+
+/** The explorer serves at most 100 balances a page. */
+const HOLDER_PAGE = 100;
+
+/**
+ * The largest balances first, one page. Counterparty's own endpoint pages the
+ * whole holder set at 1,000 a request, which on a launch with ten thousand
+ * holders was ten requests and three megabytes per view.
+ */
+export async function fetchTopHolders(asset: string, limit = HOLDER_PAGE): Promise<HolderRow[]> {
+  const d = (await fetchJson(
+    `${XCP_API_BASE}/assets/${encodeURIComponent(asset)}/balances?limit=${Math.min(limit, HOLDER_PAGE)}`,
+  )) as { result?: ExplorerHolderRow[] };
+  return coalesceHolderBalances(
+    (d.result ?? []).map((row) =>
+      row.holder.includes(":")
+        ? { address: null, utxo: row.holder, quantity: row.quantity }
+        : { address: row.holder, utxo: null, quantity: row.quantity },
+    ),
+  );
+}
+
+/** Every balance location of a small-supply token such as an LP token, one page. */
+export async function fetchTopLpBalances(lpAsset: string): Promise<LpBalance[]> {
+  const d = (await fetchJson(
+    `${XCP_API_BASE}/assets/${encodeURIComponent(lpAsset)}/balances?limit=${HOLDER_PAGE}`,
+  )) as { result?: ExplorerHolderRow[] };
+  return (d.result ?? []).map((row) => ({
+    address: row.holder.includes(":") ? null : row.holder,
+    quantity: row.quantity,
+  }));
+}
+
+/** The explorer's rolled-up holder count; null when it has no row for the asset yet. */
+export async function fetchAssetHolderCount(asset: string): Promise<number | null> {
+  try {
+    const d = (await fetchJson(`${XCP_API_BASE}/assets/${encodeURIComponent(asset)}`)) as {
+      result?: { holder_count?: unknown };
+      holder_count?: unknown;
+    };
+    const count = d.result?.holder_count ?? d.holder_count;
+    return typeof count === "number" ? count : typeof count === "string" && /^\d+$/.test(count) ? Number(count) : null;
+  } catch {
+    return null;
+  }
 }

@@ -5,6 +5,7 @@ import { Fragment, useEffect, useState } from "react";
 import useSWR from "swr";
 import {
   fetchHolderBalances,
+  fetchHolderCount,
   fetchLpBalances,
   type Fairmint,
 } from "@/lib/api/counterparty";
@@ -162,7 +163,13 @@ export function ActivityTabs({
     () => fetchHolderBalances(asset),
     { revalidateOnFocus: false, refreshInterval: 60_000 },
   );
-  const liveHolderCount = holders ? currentHolderCount(holders, [BURN_ADDRESS]) : null;
+  const { data: holderCount } = useSWR<number | null>(
+    !minting ? [asset, "holder-count"] : null,
+    () => fetchHolderCount(asset),
+    { revalidateOnFocus: false, refreshInterval: 60_000 },
+  );
+  // The explorer's rollup counts every holder; the page in hand is only the largest.
+  const liveHolderCount = holderCount ?? (holders ? currentHolderCount(holders, [BURN_ADDRESS]) : null);
 
   // Who holds the LP decides whether the pool's tokens are actually locked.
   // Slow-moving — liquidity events are rare — so this polls far less often
