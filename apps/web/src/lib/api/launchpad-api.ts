@@ -998,19 +998,21 @@ export interface Communities {
   minters: number;
   /** Of those, how many belong to at least one known collection. */
   represented: number;
-  /** Distinct minting addresses that created a card in any collection. */
-  creators: number;
+  /** Distinct minting addresses that created a card in any collection. Absent from a cached answer older than the field. */
+  creators?: number;
   /** Distinct minting addresses that hold cards but created none. */
-  collectors: number;
+  collectors?: number;
   communities: CommunityRow[];
 }
 
 /** Which Counterparty communities the minters come from; refreshed a few times a day. */
 export async function fetchCommunities(): Promise<Communities | null> {
   try {
+    // The page revalidates every minute; a longer data-cache window here
+    // would let one failed build-time fetch hide the section for that long.
     const res = await launchpadApiFetch(`/v2/communities`, {
-      signal: AbortSignal.timeout(3_000),
-      next: { revalidate: 1800 },
+      signal: AbortSignal.timeout(8_000),
+      next: { revalidate: 60 },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { result?: Communities };

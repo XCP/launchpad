@@ -28,8 +28,8 @@ export function CommunitiesSection({ data }: { data: Communities }) {
           hint={`of ${commas(data.minters)} minters, ${Math.round((data.represented / data.minters) * 100)}%`}
         />
         <Stat label="Communities" value={commas(rows.length)} hint="collections with a minter in them" />
-        <Stat label="Creators" value={commas(data.creators)} hint="made a card in one" />
-        <Stat label="Collectors" value={commas(data.collectors)} hint="hold one, made none" />
+        <Stat label="Creators" value={commas(data.creators ?? 0)} hint="made a card in one" />
+        <Stat label="Collectors" value={commas(data.collectors ?? 0)} hint="hold one, made none" />
       </div>
       <ul className="divide-y divide-gray-100 dark:divide-gray-800 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         {rows.map((row) => {
