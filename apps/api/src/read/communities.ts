@@ -31,10 +31,12 @@ communitiesRoute.get("/v2/communities", async (c) => {
   const creators = new Map<string, Set<string>>();
   const holders = new Map<string, Set<string>>();
   const represented = new Set<string>();
+  const anyCreator = new Set<string>();
   for (const m of facts.memberships) {
     const into = m.role === "creator" ? creators : holders;
     (into.get(m.tag) ?? into.set(m.tag, new Set()).get(m.tag)!).add(m.address);
     represented.add(m.address);
+    if (m.role === "creator") anyCreator.add(m.address);
   }
   const launchSize = new Map(facts.launchMinters.map((l) => [l.asset, l.minters]));
   const topByTag = new Map<string, CommunityRow["top"]>();
@@ -61,7 +63,16 @@ communitiesRoute.get("/v2/communities", async (c) => {
     .sort((a, b) => b.members - a.members || a.tag.localeCompare(b.tag));
   return J(
     c,
-    { result: { minters: facts.minters, represented: represented.size, communities } },
+    {
+      result: {
+        minters: facts.minters,
+        represented: represented.size,
+        // site-wide, distinct addresses: a creator anywhere counts once, a collector is a member who created nowhere
+        creators: anyCreator.size,
+        collectors: represented.size - anyCreator.size,
+        communities,
+      },
+    },
     COMMUNITIES_TTL,
   );
 });
