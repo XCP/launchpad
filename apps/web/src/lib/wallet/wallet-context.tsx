@@ -23,7 +23,8 @@ const STATUS: Record<WalletReadyState, XcpWalletStatus> = {
 };
 
 export function WalletProvider({ children }: { children: ReactNode }) {
-  return <SdkWalletProvider>{children}</SdkWalletProvider>;
+  // Connect is login here: a wallet that proves nothing at connect (Horizon) is asked to sign the proof.
+  return <SdkWalletProvider proofOnConnect>{children}</SdkWalletProvider>;
 }
 
 export function useWallet() {
