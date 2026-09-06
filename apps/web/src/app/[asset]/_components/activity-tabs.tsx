@@ -29,6 +29,7 @@ import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[asset]/_components/launch-stats";
 import { AddressBadges, DevBadge } from "@/app/[asset]/_components/address-badges";
+import { useAddressCollections } from "@/hooks/use-address-collections";
 import {
   AddressHoverCard,
   LaunchpadAddressHoverCard,
@@ -439,6 +440,14 @@ export function ActivityTabs({
   const freshness = useAddressFreshness(
     minting ? minters.slice(from, from + PER_PAGE).map((r) => r.source) : [],
   );
+  // Collection-creator badges for the same page, by the same rule: the rows on screen, one call.
+  const collections = useAddressCollections(
+    tab === "minters"
+      ? minters.slice(from, from + PER_PAGE).map((r) => r.source)
+      : tab === "holders"
+        ? holderRows.slice(from, from + PER_PAGE).map((h) => h.address)
+        : [],
+  );
 
   const pager = totalPages > 1 && (
     <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 px-4 py-2 text-xs text-gray-500 dark:text-gray-400">
@@ -557,7 +566,11 @@ export function ActivityTabs({
                               through descendant text regardless of the
                               descendant's own text-decoration, so the only way
                               to keep the chip clean is to not be inside the <a>. */}
-                          <AddressBadges address={r.source} issuerSource={issuerSource} />
+                          <AddressBadges
+                            address={r.source}
+                            issuerSource={issuerSource}
+                            collections={collections?.get(r.source)}
+                          />
                           {freshness?.noHistory.has(r.source) && (
                             <span
                               className="shrink-0 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-1.5 py-px text-[10px] font-medium text-amber-700 dark:text-amber-400"
@@ -900,7 +913,11 @@ export function ActivityTabs({
                           doesn't mean anything for a holder who bought in
                           on the market; only the issuer's own row is a
                           fact worth flagging post-graduation. */}
-                      <AddressBadges address={h.address} issuerSource={issuerSource} />
+                      <AddressBadges
+                        address={h.address}
+                        issuerSource={issuerSource}
+                        collections={collections?.get(h.address)}
+                      />
                     </span>
                     <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900 dark:text-gray-100">
                       {soldOut ? (

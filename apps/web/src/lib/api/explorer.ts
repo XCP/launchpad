@@ -1,4 +1,5 @@
 import { XCP_API_BASE } from "@/lib/constants";
+import { fetchJson } from "@/lib/client";
 
 interface ExplorerLedgerRow {
   direction: "in" | "out";
@@ -82,4 +83,34 @@ export async function fetchAddressLedgerSince(
     movements: movements.sort((a, b) => a.block - b.block),
     complete: nextOffset === null || reachedBoundary,
   };
+}
+
+export interface AddressCollectionCreator {
+  address: string;
+  collections: { tag: string; cards: number }[];
+}
+
+/**
+ * Which curated collections each address created cards in, by the
+ * explorer's collection tag ("rare-pepe", "bitcorn", …). One call for a
+ * whole page of rows; addresses that created nothing are simply absent. The
+ * explorer projects this from every member asset's first issuance and
+ * refreshes it with its daily collections crawl, so the answer follows the
+ * collections as they grow. The list is sorted so the same page hits the
+ * same edge-cache key whatever order the rows came in.
+ */
+export async function fetchAddressCollections(addresses: string[]): Promise<Map<string, string[]>> {
+  const unique = [...new Set(addresses)].sort().slice(0, 50);
+  const out = new Map<string, string[]>();
+  if (unique.length === 0) return out;
+  const d = (await fetchJson(
+    `${XCP_API_BASE}/addresses/collections?addresses=${unique.map(encodeURIComponent).join(",")}`,
+  )) as { result?: AddressCollectionCreator[] };
+  for (const row of d.result ?? []) {
+    out.set(
+      row.address,
+      row.collections.map((c) => c.tag),
+    );
+  }
+  return out;
 }

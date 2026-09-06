@@ -1,20 +1,11 @@
-import { useEffect, useState } from "react";
 import { BURN_ADDRESS } from "@/lib/inscriber/constants";
 
 const CHIP = "shrink-0 rounded-full border px-1.5 py-px text-[10px] font-medium";
 
-type Creators = typeof import("@/lib/collection-creators");
-
-/** One collection badge: which creator set, what to show, what it means. */
-const COLLECTIONS: {
-  set: keyof Creators;
-  emoji: string;
-  label: string;
-  title: string;
-  className: string;
-}[] = [
+/** One collection badge, keyed by the explorer's collection tag: what to show and what it means. */
+const COLLECTIONS: { tag: string; emoji: string; label: string; title: string; className: string }[] = [
   {
-    set: "RARE_PEPE_CREATORS",
+    tag: "rare-pepe",
     emoji: "🐸",
     label: "Rare Pepe creator",
     title: "Created a Rare Pepe",
@@ -22,7 +13,7 @@ const COLLECTIONS: {
       "border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950/40 dark:text-green-400",
   },
   {
-    set: "BITCORN_CREATORS",
+    tag: "bitcorn",
     emoji: "🌽",
     label: "Bitcorn creator",
     title: "Created a Bitcorn",
@@ -30,7 +21,7 @@ const COLLECTIONS: {
       "border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950/40 dark:text-yellow-400",
   },
   {
-    set: "FAKE_RARE_CREATORS",
+    tag: "fake-rare",
     emoji: "🎩",
     label: "Fake Rare creator",
     title: "Created a Fake Rare",
@@ -38,7 +29,7 @@ const COLLECTIONS: {
       "border-pink-200 bg-pink-50 text-pink-700 dark:border-pink-800 dark:bg-pink-950/40 dark:text-pink-300",
   },
   {
-    set: "DANK_RARE_CREATORS",
+    tag: "dank-directory",
     emoji: "🐸",
     label: "Dank Rare creator",
     title: "Created a Dank Rare",
@@ -46,7 +37,7 @@ const COLLECTIONS: {
       "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
   },
   {
-    set: "RARE_COCO_CREATORS",
+    tag: "rare-coco",
     emoji: "🐊",
     label: "Rare Coco creator",
     title: "Created a Rare Coco",
@@ -54,7 +45,7 @@ const COLLECTIONS: {
       "border-teal-200 bg-teal-50 text-teal-700 dark:border-teal-800 dark:bg-teal-950/40 dark:text-teal-300",
   },
   {
-    set: "RARE_PIGEON_CREATORS",
+    tag: "rare-pigeons",
     emoji: "🐦",
     label: "Rare Pigeon creator",
     title: "Created a Rare Pigeon",
@@ -62,7 +53,7 @@ const COLLECTIONS: {
       "border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300",
   },
   {
-    set: "KALEIDOSCOPE_CREATORS",
+    tag: "kaleidoscope",
     emoji: "🔭",
     label: "Kaleidoscope creator",
     title: "Created a Kaleidoscope card",
@@ -71,38 +62,25 @@ const COLLECTIONS: {
   },
 ];
 
-// The creator sets are ~32 KB gzipped — a separate chunk, fetched once per
-// browser after the first list that needs it renders, never before. Every
-// badge on the page shares the one load.
-let creatorsPromise: Promise<Creators> | null = null;
-let creatorsLoaded: Creators | null = null;
-function useCollectionCreators(): Creators | null {
-  const [creators, setCreators] = useState<Creators | null>(creatorsLoaded);
-  useEffect(() => {
-    if (creatorsLoaded) return;
-    creatorsPromise ??= import("@/lib/collection-creators");
-    let live = true;
-    creatorsPromise.then((m) => {
-      creatorsLoaded = m;
-      if (live) setCreators(m);
-    });
-    return () => {
-      live = false;
-    };
-  }, []);
-  return creators;
-}
-
 /**
  * Who an address is, next to it in the launch page's minter and holder
  * lists: the launch's own dev, the burn address, and the creators of the
- * Counterparty collections above. Rendered as siblings of the address link,
- * never inside it — an ancestor's underline paints through descendant text,
- * so the only way to keep a chip clean is to keep it out of the <a>. The
- * tooltip carries the words the chip leaves out.
+ * Counterparty collections above. `collections` is the explorer's answer
+ * for this address (see useAddressCollections) — the list's owner fetches
+ * it once for the page and hands each row its tags. Rendered as siblings of
+ * the address link, never inside it — an ancestor's underline paints
+ * through descendant text, so the only way to keep a chip clean is to keep
+ * it out of the <a>. The tooltip carries the words the chip leaves out.
  */
-export function AddressBadges({ address, issuerSource }: { address: string; issuerSource?: string }) {
-  const creators = useCollectionCreators();
+export function AddressBadges({
+  address,
+  issuerSource,
+  collections,
+}: {
+  address: string;
+  issuerSource?: string;
+  collections?: string[];
+}) {
   return (
     <>
       <DevBadge address={address} issuerSource={issuerSource} />
@@ -115,9 +93,9 @@ export function AddressBadges({ address, issuerSource }: { address: string; issu
           <span className="sr-only">burn address</span>
         </span>
       )}
-      {creators &&
-        COLLECTIONS.filter((c) => creators[c.set].has(address)).map((c) => (
-          <span key={c.set} className={`${CHIP} ${c.className}`} title={c.title}>
+      {collections &&
+        COLLECTIONS.filter((c) => collections.includes(c.tag)).map((c) => (
+          <span key={c.tag} className={`${CHIP} ${c.className}`} title={c.title}>
             <span aria-hidden="true">{c.emoji}</span>
             <span className="sr-only">{c.label}</span>
           </span>

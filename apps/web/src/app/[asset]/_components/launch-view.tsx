@@ -35,6 +35,7 @@ import {
 } from "@/lib/xcp69";
 import { ActivityTabs } from "@/app/[asset]/_components/activity-tabs";
 import { AddressBadges } from "@/app/[asset]/_components/address-badges";
+import { useAddressCollections } from "@/hooks/use-address-collections";
 import { AssetTradeSurface } from "@/app/[asset]/_components/asset-trade-surface";
 import { EditPanel } from "@/app/[asset]/_components/edit-panel";
 import { LiveProgress } from "@/app/[asset]/_components/live-progress";
@@ -545,32 +546,11 @@ export function LaunchView({
             <div className={LABEL}>
               Who was here
             </div>
-            <ul className="mt-3 divide-y divide-gray-100 dark:divide-gray-800">
-              {topMinters.map((source, i) => (
-                <li
-                  key={source}
-                  className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0"
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <span className="w-4 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-                      {i + 1}
-                    </span>
-                    <AddressHoverCard
-                      source={source}
-                      className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
-                    >
-                      <Identicon address={source} />
-                      <span className="truncate">{shortAddress(source)}</span>
-                    </AddressHoverCard>
-                    <AddressBadges address={source} issuerSource={fm.source} />
-                  </span>
-                  <span className="shrink-0 tabular-nums text-gray-500 dark:text-gray-400">
-                    {commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))}{" "}
-                    {asset}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <WhoWasHere
+              addresses={topMinters}
+              issuerSource={fm.source}
+              amount={(source) => `${commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))} ${asset}`}
+            />
             {extraMinters > 0 && (
               <a
                 href={`https://xcp.io/asset/${asset}`}
@@ -865,5 +845,41 @@ export function Identicon({ address }: { address: string }) {
         background: `linear-gradient(135deg, hsl(${h1} 70% 60%), hsl(${h2} 70% 42%))`,
       }}
     />
+  );
+}
+
+/** A refunded launch's record of who showed up. Its own component so it can
+ *  own the one collection-badge lookup for the eight rows it shows — the
+ *  refunded branch above is one of several early returns, where a hook
+ *  can't live. */
+function WhoWasHere({
+  addresses,
+  issuerSource,
+  amount,
+}: {
+  addresses: string[];
+  issuerSource: string;
+  amount: (source: string) => string;
+}) {
+  const collections = useAddressCollections(addresses);
+  return (
+    <ul className="mt-3 divide-y divide-gray-100 dark:divide-gray-800">
+      {addresses.map((source, i) => (
+        <li key={source} className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="w-4 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">{i + 1}</span>
+            <AddressHoverCard
+              source={source}
+              className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
+            >
+              <Identicon address={source} />
+              <span className="truncate">{shortAddress(source)}</span>
+            </AddressHoverCard>
+            <AddressBadges address={source} issuerSource={issuerSource} collections={collections?.get(source)} />
+          </span>
+          <span className="shrink-0 tabular-nums text-gray-500 dark:text-gray-400">{amount(source)}</span>
+        </li>
+      ))}
+    </ul>
   );
 }
