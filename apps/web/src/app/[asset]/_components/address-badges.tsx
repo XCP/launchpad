@@ -106,13 +106,36 @@ export function AddressBadges({
           <span className="sr-only">burn address</span>
         </span>
       )}
-      {collections &&
-        COLLECTIONS.filter((c) => collections.includes(c.tag)).map((c) => (
-          <span key={c.tag} className={`${CHIP} ${TONE[c.tone]}`} title={`Created a ${c.name}`}>
-            <span aria-hidden="true">{c.emoji}</span>
-            <span className="sr-only">{c.name} creator</span>
-          </span>
-        ))}
+      {collections && <CollectionChips tags={collections} />}
+    </>
+  );
+}
+
+/** Six chips fit a row; past that, five and a count, so a prolific creator
+ *  never pushes the balance off the screen. The count's tooltip names the rest. */
+const SHOW_ALL_UP_TO = 6;
+const SHOW_WHEN_MORE = 5;
+
+function CollectionChips({ tags }: { tags: string[] }) {
+  const matched = COLLECTIONS.filter((c) => tags.includes(c.tag));
+  const shown = matched.length <= SHOW_ALL_UP_TO ? matched : matched.slice(0, SHOW_WHEN_MORE);
+  const rest = matched.slice(shown.length);
+  return (
+    <>
+      {shown.map((c) => (
+        <span key={c.tag} className={`${CHIP} ${TONE[c.tone]}`} title={`Created a ${c.name}`}>
+          <span aria-hidden="true">{c.emoji}</span>
+          <span className="sr-only">{c.name} creator</span>
+        </span>
+      ))}
+      {rest.length > 0 && (
+        <span
+          className={`${CHIP} border-gray-200 bg-gray-50 text-gray-600 dark:border-gray-700 dark:bg-gray-800/60 dark:text-gray-300`}
+          title={`Also created: ${rest.map((c) => c.name).join(", ")}`}
+        >
+          +{rest.length}
+        </span>
+      )}
     </>
   );
 }
