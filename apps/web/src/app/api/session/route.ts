@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
-import { verifyBip322 } from "@/lib/bip322";
-import { validateProof } from "@/lib/wallet/sdk";
+import {
+  validateProof,
+  verifyBip322,
+} from "@xcp/wallet-sdk";
 import {
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,

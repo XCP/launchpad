@@ -5,18 +5,19 @@ import type { Dispenser } from "@/lib/api/counterparty";
 import { fetchAddressUtxos } from "@/lib/esplora";
 import { shortAddress } from "@/lib/format";
 import { trackTx } from "@/lib/analytics";
-import { registerPending } from "@/lib/pending";
-import { fetchPriorityFeeRate } from "@/lib/wallet/useCompose";
-import { ownTransactionOutputs, parseTxInputs } from "@/lib/wallet/raw-tx";
 import {
+  fetchFeeRate,
+  ownTransactionOutputs,
+  parseTxInputs,
   pendingChangeInputs,
   recentlySpentUtxos,
   registerBroadcast,
-} from "@/lib/wallet/spent-utxos";
-import { withAddressTransactionLock } from "@/lib/wallet/transaction-lock";
+  registerPending,
+  relayingFetch,
+  withAddressTransactionLock,
+} from "@xcp/wallet-sdk";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
-import { relayingFetch } from "@/lib/counterparty-relay";
 
 /**
  * Multi-dispense router: fills one load across up to MAX_LEGS dispensers as
@@ -294,7 +295,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
     sync();
 
     try {
-      feeRateRef.current = feeRateOverride ?? (await fetchPriorityFeeRate());
+      feeRateRef.current = feeRateOverride ?? (await fetchFeeRate());
       const knownSpent = new Set(recentlySpentUtxos(address));
       const utxos = (await fetchConfirmedUtxos(address)).filter(
         (utxo) => !knownSpent.has(`${utxo.txid}:${utxo.vout}`),

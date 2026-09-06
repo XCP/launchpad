@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { shortAddress } from "@/lib/format";
-import { BTC_ADDRESS_REGEX } from "@/lib/wallet/sdk";
+import { BTC_ADDRESS_REGEX } from "@xcp/wallet-sdk";
 import { ProfileView } from "@/app/profile/_components/profile-view";
 
 export async function generateMetadata({

@@ -11,7 +11,7 @@ import {
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { GearPopover } from "@/components/ui/popover";
-import { fetchMedianFeeRate } from "@/lib/wallet/useCompose";
+import { fetchFeeRate } from "@xcp/wallet-sdk";
 import {
   readSettings,
   readSettingsServer,
@@ -89,7 +89,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
   );
   const [autoValue, setAutoValue] = useState(1);
 
-  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchFeeRate, {
     refreshInterval: 30_000,
   });
 

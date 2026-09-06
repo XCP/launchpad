@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { verifyBip322 } from "@/lib/bip322";
+import { verifyBip322 } from "@xcp/wallet-sdk";
 import {
   getMetadataBucket,
   metadataIconUrl,

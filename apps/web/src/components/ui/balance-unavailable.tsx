@@ -1,6 +1,6 @@
 "use client";
 
-import { isRateLimited } from "@/lib/counterparty-relay";
+import { isRateLimited } from "@xcp/wallet-sdk";
 
 /**
  * The footer slot a balance would have filled, when the read failed.

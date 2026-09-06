@@ -15,10 +15,13 @@ import { fromSats, commas, usd } from "@/lib/format";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { launchCostSats } from "@/lib/launch-cost";
 import { metadataJsonUrl } from "@/lib/metadata";
-import { registerPending } from "@/lib/pending";
+import {
+  fetchFeeRate,
+  registerPending,
+} from "@xcp/wallet-sdk";
 import { SATS } from "@/lib/numeric";
 import { isValidTelegram, isValidX } from "@/lib/social";
-import { fetchPriorityFeeRate, useCompose } from "@/lib/wallet/useCompose";
+import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import {
   generateLpAssetName,
@@ -231,7 +234,7 @@ export default function CreatePage() {
   // forms already use. Next-block rate, not the median: this is a single
   // small transaction that has to confirm before the fixed pre-announcement
   // window elapses, so the estimate shown here is exactly what gets paid.
-  const { data: feeRate } = useSWR("btc-feerate-priority", fetchPriorityFeeRate, {
+  const { data: feeRate } = useSWR("btc-feerate-priority", fetchFeeRate, {
     refreshInterval: 60_000,
   });
   // Sized from THIS launch's description, which is the only part of the
@@ -358,7 +361,7 @@ export default function CreatePage() {
       // after its own start opens the mint instantly and fails the standard.
       // The multiplier buys the confirmation the schedule depends on, and it
       // only applies to a lead the creator chose knowing the price.
-      const baseFeeRate = await fetchPriorityFeeRate();
+      const baseFeeRate = await fetchFeeRate();
       const submitFeeRate =
         startBlock - height <= TIGHT_LEAD_BLOCKS
           ? baseFeeRate * TIGHT_LEAD_FEE_MULTIPLIER

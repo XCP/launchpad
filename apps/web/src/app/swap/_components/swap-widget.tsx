@@ -28,16 +28,16 @@ import {
   SATS,
 } from "@/lib/numeric";
 import {
+  type BookOrder as SimBookOrder,
   OTHER_POOL_FEE_BPS,
   quoteAfterMempool,
+  registerPending,
   XCP_POOL_FEE_BPS,
-  type BookOrder as SimBookOrder,
-} from "@/lib/pool-quote";
+} from "@xcp/wallet-sdk";
 import { useDebounced } from "@/hooks/use-debounced";
 import { useMempool } from "@/hooks/use-mempool";
 import { trackTx } from "@/lib/analytics";
-import { registerPending } from "@/lib/pending";
-import { useSpendableBalance } from "@/hooks/use-spendable-balance";
+import { useSpendableBalance } from "@xcp/wallet-sdk/react/use-spendable-balance";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
@@ -339,8 +339,7 @@ export function SwapWidget({
         kind: "order",
         label,
         address: address ?? undefined,
-        giveAsset,
-        giveRaw: amountExact.toString(),
+        spends: [{ asset: giveAsset, raw: amountExact.toString() }],
       });
     }
   }, [

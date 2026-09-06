@@ -6,7 +6,7 @@ import {
   quoteAfterMempool,
   XCP_POOL_FEE_BPS,
   type MarketState,
-} from "@/lib/pool-quote";
+} from "@xcp/wallet-sdk";
 
 /**
  * The bigint port of Core's swap quote. The numbers below were checked

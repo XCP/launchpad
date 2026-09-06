@@ -30,11 +30,11 @@ import {
   SATS_PER_UNIT,
 } from "@/lib/numeric";
 import { isBusy } from "@/hooks/use-busy";
-import { useSpendableBalance } from "@/hooks/use-spendable-balance";
+import { useSpendableBalance } from "@xcp/wallet-sdk/react/use-spendable-balance";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { GearPopover } from "@/components/ui/popover";
-import { fetchMedianFeeRate } from "@/lib/wallet/useCompose";
+import { fetchFeeRate } from "@xcp/wallet-sdk";
 import {
   readSettings,
   readSettingsServer,
@@ -174,7 +174,7 @@ function DispenseSettingsGear() {
     readSettings,
     readSettingsServer,
   );
-  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchFeeRate, {
     refreshInterval: 30_000,
   });
   // Not rounded: a typed 1.5 sat/vB is a rate Counterparty accepts and prices
@@ -856,7 +856,7 @@ function UnloadCard({
       .filter((r) => priceSats > 0 && r.price <= priceSats)
       .reduce((sum, r) => sum + r.give_remaining, 0) / SATS,
   );
-  const { data: medianFeeRate } = useSWR("btc-feerate", fetchMedianFeeRate, {
+  const { data: medianFeeRate } = useSWR("btc-feerate", fetchFeeRate, {
     refreshInterval: 30_000,
   });
   const sellFeeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
