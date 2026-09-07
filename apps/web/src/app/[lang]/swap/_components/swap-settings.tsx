@@ -150,7 +150,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
       slippage,
       expiration,
       customFee,
-      swapSettingsValid: feeDraft.valid && expirationDraft.valid && (slippageAuto || slipDraft.valid),
+      swapSettingsValid: feeDraft.valid && expirationDraft.valid && slipDraft.valid,
       limitSettingsValid,
       liquiditySettingsValid: feeDraft.valid && lqSlipDraft.valid,
       lqCustomSlip,
@@ -223,7 +223,7 @@ export function SwapSettingsGear() {
             max={50}
             onChange={(v) => {
               s.setCustomSlippage(v);
-              if (v.trim() !== "") s.setSlippageAuto(false);
+              if (v !== "") s.setSlippageAuto(false);
             }}
             placeholder="1.5"
             ariaLabel={t("Custom slippage percent")}
