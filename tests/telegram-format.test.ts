@@ -129,7 +129,7 @@ describe("messages", () => {
     expect(m.text).toContain("0.00004000 XCP/token · $50.00");
     expect(m.text).toContain("MCap: 4,000 XCP · $10,000.00");
     // No day-ago price was supplied, so the day's window is a dash, not 0%.
-    expect(m.text).toContain("24 Hours: —");
+    expect(m.text).toContain("24 Hour: —");
     expect(m.text).toContain("All-Time: +700.0%");
     expect(m.text).toContain(`https://xcp.io/tx/${"ab".repeat(32)}`);
     expect(m.text).toContain("1KacrY…6hC9");
@@ -414,7 +414,7 @@ describe("trade performance", () => {
     });
     // The day is measured in XCP and ignores XCP's own dollar move, which the
     // all-time figure (halved by XCP/USD falling from 3 to 1.5) still carries.
-    expect(m.text).toContain("24 Hours: +100.0%");
+    expect(m.text).toContain("24 Hour: +100.0%");
     expect(m.text).toContain("All-Time: +100.0%");
   });
 
@@ -427,7 +427,7 @@ describe("trade performance", () => {
       venue: "pool",
       priceDayAgoRaw: 5_000n,
     });
-    expect(down.text).toContain("24 Hours: −20.0%");
+    expect(down.text).toContain("24 Hour: −20.0%");
     const flat = trade({
       asset: "A",
       buy: true,
@@ -436,7 +436,7 @@ describe("trade performance", () => {
       venue: "pool",
       priceDayAgoRaw: 4_000n,
     });
-    expect(flat.text).toContain("24 Hours: 0.0%");
+    expect(flat.text).toContain("24 Hour: 0.0%");
   });
 });
 

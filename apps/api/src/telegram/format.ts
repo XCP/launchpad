@@ -509,14 +509,14 @@ export function trade(f: TradeFacts): Announcement {
       `${tokens(f.tokenRaw)} tokens · ${xcp(f.xcpRaw)} XCP${(f.fills ?? 1) > 1 ? ` filled · ${f.fills} fills` : ""}`,
       `${(f.fills ?? 1) > 1 ? "Avg " : ""}${price} XCP/token${usdTotal}`,
       `MCap: ${xcp(marketCapRaw)} XCP${marketCapUsd}`,
-      // Two windows on two lines, shortest first, with labels of matching
+      // Two windows on two lines, shortest first, with labels of near-matching
       // width so the pair scans as a column: the eye lands on the numbers.
       // The day's move is the trader's number; the all-time one is the
       // launch's, and it stays the dollar return the site's card shows. Pairs
       // that graduated within the day measure their 24h from the pool's
       // opening ratio, so a fresh market's first day reads as trading rather
       // than as the 69/31 premium.
-      `24 Hours: ${performance(marketPriceRaw, f.priceDayAgoRaw ?? 0n)}`,
+      `24 Hour: ${performance(marketPriceRaw, f.priceDayAgoRaw ?? 0n)}`,
       `All-Time: ${performance(
         marketPriceRaw,
         launchPriceRaw,
