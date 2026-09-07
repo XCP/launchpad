@@ -3490,6 +3490,9 @@
   "Trade from your connected wallet": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
+  "Trade history is unavailable. Please try again shortly.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
   "Trade pressure through the pool": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
@@ -3573,6 +3576,9 @@
   ],
   "unique addresses": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
+  ],
+  "Units unavailable": [
+    "components/order-tracker.tsx"
   ],
   "unsigned": [
     "app/[lang]/docs/page.tsx"

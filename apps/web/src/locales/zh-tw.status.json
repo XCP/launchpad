@@ -1201,6 +1201,8 @@
     "Your wallet will ask once per route, in order — each popup is one route, nothing more.",
     "Your xcp.fun profile",
     "yours — reused, no fee",
-    "zero existing supply"
+    "zero existing supply",
+    "Trade history is unavailable. Please try again shortly.",
+    "Units unavailable"
   ]
 }
