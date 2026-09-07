@@ -111,16 +111,17 @@
     },
     "holders": {
       "ja": "ホルダー",
-      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址.",
+      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址. MONAPARTY: Monacard writes 所有者, Monapalette 保有者, blogs ホルダー; ホルダー kept for the memecoin register.",
       "zh": "持有者",
       "zh-tw": "持有者",
       "zh-hk": "持有者"
     },
     "supply": {
-      "ja": "供給量",
+      "ja": "発行量",
       "zh": "供应量",
       "zh-tw": "供應量",
-      "zh-hk": "供應量"
+      "zh-hk": "供應量",
+      "note": "MONAPARTY 2026-09-07: the Monaparty wiki writes 発行量ロック for locking supply and Monapalette shows 現在の発行数; 供給量 appears in no Japanese Counterparty source. Circulating supply stays 流通供給量 (CoinGecko Japan)."
     },
     "volume": {
       "ja": "出来高",
@@ -209,7 +210,7 @@
       "zh": "内存池",
       "zh-tw": "記憶體池",
       "zh-hk": "內存池",
-      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存."
+      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存. MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept."
     },
     "connect": {
       "note": "Connect a wallet. ZH: Connect a wallet: 连接钱包 on Uniswap and UniSat. OpenCC turns 连接 into 連線 for Taiwan, which is the network sense; keep 連接.",
@@ -277,18 +278,18 @@
     },
     "send": {
       "ja": "送金",
-      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents."
+      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents. MONAPARTY: 送金 in prose; Mpurse's button says 送信."
     },
     "miner fee": {
-      "ja": "マイナー手数料",
-      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费.",
+      "ja": "トランザクション手数料",
+      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费. MONAPARTY: both Japanese Counterparty wallets, Mpurse and Monapalette, label it トランザクション手数料; replaces マイナー手数料.",
       "zh": "矿工费",
       "zh-tw": "礦工費",
       "zh-hk": "礦工費"
     },
     "burn": {
       "ja": "バーン",
-      "note": "DECIDED 2026-09-07: Japanese press heads the term as バーン（焼却）everywhere (CoinPost glossary, Coincheck, CoinDesk Japan), so バーン is used for every burn on the site including LP バーン済み; 破棄 is kept only for Counterparty’s destroy message, where consensus destroys escrowed supply after a refund. Chinese is 销毁 in every sense; OpenCC emits 銷燬 and the derivation script restores 銷毀.",
+      "note": "DECIDED 2026-09-07: Japanese press heads the term as バーン（焼却）everywhere (CoinPost glossary, Coincheck, CoinDesk Japan), so バーン is used for every burn on the site including LP バーン済み; 破棄 is kept only for Counterparty’s destroy message, where consensus destroys escrowed supply after a refund. Chinese is 销毁 in every sense; OpenCC emits 銷燬 and the derivation script restores 銷毀. MONAPARTY: バーン, Burn and 焼く in community text; confirms バーン.",
       "zh": "销毁",
       "zh-tw": "銷毀",
       "zh-hk": "銷毀"
@@ -314,7 +315,9 @@
     "order book": {
       "zh": "订单簿",
       "zh-tw": "訂單簿",
-      "zh-hk": "訂單簿"
+      "zh-hk": "訂單簿",
+      "ja": "板",
+      "note": "MONAPARTY: 板, 注文, 買い/売り, 約定 are the words in Monapalette, the Spotlight DEX guide and Ask Mona; matches."
     },
     "limit order": {
       "zh": "限价单",
@@ -401,6 +404,14 @@
     "proof of burn": {
       "zh": "销毁证明",
       "note": "Chinese press: 销毁证明 (PoB). Japanese press: プルーフ・オブ・バーン."
+    },
+    "confirmed": {
+      "ja": "承認済み",
+      "note": "MONAPARTY: confirmations are 承認 (承認数, ゼロ承認 in Monapalette; 未承認トランザクション on the wiki). 確定 is kept only for a launch resolving at its deadline and for realized P&L."
+    },
+    "description": {
+      "ja": "説明文",
+      "note": "MONAPARTY: the asset description field is 説明文 (Monapalette トークンの説明文を変更する, wiki)."
     }
   }
 }
