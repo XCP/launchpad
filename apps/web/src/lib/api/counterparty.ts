@@ -43,8 +43,8 @@ interface Paginated<T> {
  * those five attempts are spent waiting rather than re-asking.
  */
 const THROTTLE_RETRIES = process.env.NEXT_PHASE === "phase-production-build" ? 5 : 2;
-/** The longest we will wait on one of those, whatever Retry-After says. */
-const MAX_THROTTLE_WAIT_MS =
+/** Cap only our own fallback backoff, never the server's Retry-After minimum. */
+const MAX_FALLBACK_WAIT_MS =
   process.env.NEXT_PHASE === "phase-production-build" ? 10_000 : 4_000;
 
 /**
@@ -128,9 +128,20 @@ function admit(limit: number) {
  */
 let pausedUntil = 0;
 
-/** Hold here until any shared pause has elapsed. */
-async function clearance(): Promise<void> {
-  for (let waited = pausedUntil - Date.now(); waited > 0; waited = pausedUntil - Date.now()) {
+class CounterpartyReadDeadline extends DOMException {
+  constructor() {
+    super("Counterparty read deadline exceeded", "TimeoutError");
+  }
+}
+
+/** Recheck the shared deadline after waking: another response may extend it. */
+async function clearance(deadline: number, path: string): Promise<void> {
+  for (;;) {
+    const now = Date.now();
+    if (pausedUntil >= deadline) throw new CounterpartyThrottled(path);
+    if (now >= deadline) throw new CounterpartyReadDeadline();
+    const waited = pausedUntil - now;
+    if (waited <= 0) return;
     await new Promise((resume) => setTimeout(resume, waited));
   }
 }
@@ -138,6 +149,43 @@ async function clearance(): Promise<void> {
 /** Ask everyone to stand down for `ms`, without ever shortening an existing pause. */
 function pause(ms: number): void {
   pausedUntil = Math.max(pausedUntil, Date.now() + ms);
+}
+
+/** RFC 9110: delay-seconds or HTTP-date. Never parse a numeric prefix as a delay. */
+function retryAfterDeadline(value: string | null, now: number): number | null {
+  const text = value?.trim();
+  if (!text) return null;
+  if (/^\d+$/.test(text)) {
+    const until = now + Number(text) * 1_000;
+    // An enormous valid delay cannot fit any caller budget. Preserve the
+    // refusal instead of overflowing a timer or treating it as no instruction.
+    return Number.isSafeInteger(until) ? until : Infinity;
+  }
+  // HTTP dates start with a weekday. Date.parse alone accepts strings such as
+  // "1.5" as dates, incorrectly turning malformed seconds into immediate retry.
+  if (!/^(?:Mon(?:day)?|Tue(?:sday)?|Wed(?:nesday)?|Thu(?:rsday)?|Fri(?:day)?|Sat(?:urday)?|Sun(?:day)?)(?:, | )/.test(text)) {
+    return null;
+  }
+  // The obsolete asctime HTTP-date has no zone suffix, but is still GMT.
+  // Date.parse would otherwise interpret it in the browser/server's local zone.
+  let dated = /^[A-Za-z]{3} [A-Za-z]{3} [ \d]\d \d{2}:\d{2}:\d{2} \d{4}$/.test(text)
+    ? `${text} GMT`
+    : text;
+  const shortYear = /^[A-Za-z]+, (\d{2})-([A-Za-z]{3})-(\d{2}) (\d{2}:\d{2}:\d{2} GMT)$/.exec(text);
+  if (shortYear) {
+    // RFC 850's two-digit year uses HTTP's rolling 50-year future limit,
+    // not Date.parse's fixed 1950/2050 split.
+    const futureLimit = new Date(now);
+    futureLimit.setUTCFullYear(futureLimit.getUTCFullYear() + 50);
+    let year = Math.floor(futureLimit.getUTCFullYear() / 100) * 100 + Number(shortYear[3]);
+    dated = `${shortYear[1]} ${shortYear[2]} ${year} ${shortYear[4]}`;
+    if (Date.parse(dated) > futureLimit.getTime()) {
+      year -= 100;
+      dated = `${shortYear[1]} ${shortYear[2]} ${year} ${shortYear[4]}`;
+    }
+  }
+  const until = Date.parse(dated);
+  return Number.isFinite(until) ? Math.max(now, until) : null;
 }
 
 const gated = admit(REQUEST_LIMIT);
@@ -153,7 +201,7 @@ const gated = admit(REQUEST_LIMIT);
  */
 export class CounterpartyThrottled extends Error {
   constructor(path: string) {
-    super(`Counterparty API 429 after ${THROTTLE_RETRIES + 1} attempts: ${path}`);
+    super(`Counterparty API 429: retry limit or read deadline reached: ${path}`);
     this.name = "CounterpartyThrottled";
   }
 }
@@ -165,7 +213,11 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
   const running = inFlight.get(key) as Promise<T> | undefined;
   if (running) return running;
 
-  const started = gated(() => fetchThrottled<T>(path, revalidate));
+  // Time waiting for a concurrency slot is part of the same read budget.
+  const deadline = Date.now() + (
+    process.env.NEXT_PHASE === "phase-production-build" ? BUILD_BUDGET_MS : RUNTIME_BUDGET_MS
+  );
+  const started = gated(() => fetchThrottled<T>(path, revalidate, deadline));
   inFlight.set(key, started);
   try {
     return await started;
@@ -178,13 +230,15 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
 
 /** One request, no retry policy. Separated so the loop below can treat a
  *  thrown transport error and a returned 429 as the same kind of setback. */
-function attemptFetch(path: string, revalidate: number): Promise<Response> {
+function attemptFetch(path: string, revalidate: number, deadline: number): Promise<Response> {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw new CounterpartyReadDeadline();
   return fetch(`${COUNTERPARTY_API_BASE}${path}`, {
     // Counterparty is a third party we do not run, and this is the shared
     // client behind every server-rendered read. Without a deadline a stalled
     // node holds the Worker invocation open and delays the HTML for everyone
     // on that route; the throw is what callers already handle.
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(Math.min(8_000, remaining)),
     next: { revalidate },
   });
 }
@@ -197,37 +251,41 @@ function attemptFetch(path: string, revalidate: number): Promise<Response> {
  * attempts at an eight-second deadline, with a shared pause between each, adds
  * to more than half a minute — and it showed: /zh/swap and /ko/swap were
  * cancelled after 40 seconds of wall time having burned 4ms of CPU, waiting.
- * A build has no such limit because nobody is waiting and the page budget is
- * 180 seconds. Fifteen seconds rather than ten because the other caller of
+ * A build read is capped at 180 seconds, matching the page budget's ceiling.
+ * Fifteen seconds rather than ten at request time because the other caller of
  * this path is background ISR revalidation, and a revalidation that gives up
  * six times stops being retried at all.
  */
 const RUNTIME_BUDGET_MS = 15_000;
+const BUILD_BUDGET_MS = 180_000;
 
-async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
-  const building = process.env.NEXT_PHASE === "phase-production-build";
-  const deadline = building ? Infinity : Date.now() + RUNTIME_BUDGET_MS;
+async function fetchThrottled<T>(path: string, revalidate: number, deadline: number): Promise<T> {
   for (let attempt = 0; ; attempt++) {
-    await clearance();
+    // The await yields even if no pause exists. Recheck synchronously before
+    // starting transport in case another response published a pause meanwhile.
+    do {
+      await clearance(deadline, path);
+    } while (pausedUntil > Date.now());
     // A read can fail without ever producing a response: the node closes the
     // socket mid-body, or our own deadline fires. Observed on the 2MB
     // /fairminters payload as UND_ERR_SOCKET "other side closed" after 865KB,
     // which failed a whole page for a transport hiccup that a second attempt
     // would have survived. Retried on the same budget as a 429 — a dropped
     // connection is at least as good a reason to try again as being asked to.
-    let res: Response;
+    let res: Response | undefined;
     // Read inside the same guard as the request. The observed failure was not
     // the connection opening, it was the body dying part-way through: 865KB of
     // a 2MB payload, then "other side closed".
     let body: string | null = null;
     try {
-      res = await attemptFetch(path, revalidate);
+      res = await attemptFetch(path, revalidate, deadline);
       if (res.ok) body = await res.text();
     } catch (error) {
-      if (attempt >= THROTTLE_RETRIES || Date.now() >= deadline) throw error;
-      const backoff = Math.min(250 * 2 ** attempt, MAX_THROTTLE_WAIT_MS);
+      await discard(res);
+      if (Date.now() >= deadline) throw new CounterpartyReadDeadline();
+      if (attempt >= THROTTLE_RETRIES) throw error;
+      const backoff = Math.min(250 * 2 ** attempt, MAX_FALLBACK_WAIT_MS);
       pause(backoff * (0.5 + Math.random() / 2));
-      await clearance();
       continue;
     }
 
@@ -243,7 +301,14 @@ async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
     // a burst of renders. Treating it as fatal is what turned one throttled
     // read into a failed homepage — and, during a build, a failed build.
     const throttled = res.status === 429;
-    const retryAfter = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
+    if (throttled) {
+      const now = Date.now();
+      const serverDeadline = retryAfterDeadline(res.headers.get("retry-after"), now);
+      const fallback = Math.min(250 * 2 ** attempt, MAX_FALLBACK_WAIT_MS);
+      // Record every refusal before cleanup or giving up, including the last
+      // attempt. Later callers and transport retries share this same minimum.
+      pausedUntil = Math.max(pausedUntil, serverDeadline ?? now + fallback * (0.5 + Math.random() / 2));
+    }
 
     // The body is dead weight from here and holds one of the Worker's six
     // outbound slots until collection. Under a throttle that is every read at
@@ -256,19 +321,8 @@ async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
         : new Error(`Counterparty API ${res.status}: ${path}`);
     }
 
-    // Honour the node's own number when it gives one, and back off otherwise.
-    // Capped because a render is waiting: past a few seconds the honest answer
-    // to the visitor is the error, not a longer blank page.
-    const requested =
-      Number.isSafeInteger(retryAfter) && retryAfter >= 0
-        ? retryAfter * 1_000
-        : 250 * 2 ** attempt;
-    // Jittered so that a wave of readers throttled at the same moment does not
-    // return as a wave. Applied to the shared pause, so this request's penalty
-    // is served by every other request too.
-    const backoff = Math.min(requested, MAX_THROTTLE_WAIT_MS);
-    pause(backoff * (0.5 + Math.random() / 2));
-    await clearance();
+    // The next iteration either waits for the complete shared minimum or
+    // returns an error when it cannot fit. It never retries early to fit.
   }
 }
 
@@ -668,7 +722,7 @@ export async function fetchPool(asset: string): Promise<Pool | null> {
     // while 129 pools were live: every non-English /swap was built from reads
     // the node had refused. Let it fail loudly instead — a build that stops is
     // recoverable, a build that lies is not.
-    if (error instanceof CounterpartyThrottled) throw error;
+    if (error instanceof CounterpartyThrottled || error instanceof CounterpartyReadDeadline) throw error;
     return null;
   }
 }
