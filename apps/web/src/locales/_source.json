@@ -755,6 +755,7 @@
   ],
   "Activity": [
     "app/[lang]/profile/_components/profile-view.tsx",
+    "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
   "Activity — xcp.fun": [
@@ -1481,6 +1482,7 @@
   ],
   "Docs": [
     "app/[lang]/docs/page.tsx",
+    "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
   "Docs — xcp.fun": [
@@ -1645,6 +1647,7 @@
   "FAQ": [
     "app/[lang]/faq/page.tsx",
     "app/[lang]/rewards/page.tsx",
+    "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
   "Feel the mechanism": [
@@ -2977,7 +2980,8 @@
     "app/[lang]/profile/_components/rewards-tab.tsx"
   ],
   "Rewards": [
-    "app/[lang]/profile/_components/profile-view.tsx"
+    "app/[lang]/profile/_components/profile-view.tsx",
+    "components/rewards-chip.tsx"
   ],
   "Rewards accrue as you mint and are sent in batches. Once yours is sent, its transaction appears on your profile. Lifetime earned is an all-time total, not your wallet balance.": [
     "app/[lang]/rewards/page.tsx"
@@ -3210,6 +3214,7 @@
   ],
   "Stats": [
     "app/[lang]/stats/page.tsx",
+    "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
   "Stats — xcp.fun": [
