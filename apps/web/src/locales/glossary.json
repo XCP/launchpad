@@ -176,7 +176,7 @@
       "zh": "售货机",
       "zh-tw": "販賣機",
       "zh-hk": "售賣機",
-      "note": "DECIDED 2026-09-07 (Dan): a dispenser is a vending machine in any language where the literal word is awkward. Japanese 自販機 (everyday word, instantly understood; ディスペンサー was a bare loanword); Simplified 售货机; Taiwan 販賣機; Hong Kong 售賣機. The verb sense, send BTC and receive XCP, is what the word has to carry."
+      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry."
     },
     "activity": {
       "ja": "アクティビティ",
