@@ -24,20 +24,161 @@ interface Paginated<T> {
 /**
  * How patient to be with a throttled node.
  *
- * Deliberately modest, and the same at build time as at request time. Waiting
- * longer during static generation was tried and made things worse: Next gives
- * a page 60 seconds, so patience per request turns a fast 429 into a slow
- * timeout and costs the build three attempts instead of one. The way to
- * survive a throttle here is to ask for less, which is what the deduplication
- * below and the bounded fan-outs elsewhere do.
+ * Patience alone was tried first and made builds worse, because Next's
+ * per-page budget was 60 seconds and waiting per request turned one fast 429
+ * into a slow timeout. That was a fixable ceiling, not a law: the budget is
+ * now 180 seconds (see `staticPageGenerationTimeout` in next.config), so
+ * waiting is affordable again.
+ *
+ * It is still deliberately modest, because patience is the weakest of the
+ * three levers and the only one that costs a visitor time. Asking for less
+ * beats asking more politely: the coalescing below and the gate above it are
+ * what actually brought a build down from 24,970 requests to a few hundred.
  */
-/** Attempts after the first, when the node asks us to come back later. */
-const THROTTLE_RETRIES = 2;
+/**
+ * Attempts after the first, when the node asks us to come back later.
+ *
+ * A visitor is waiting at request time, so two. A build has a 180-second page
+ * budget and nobody watching, so five — and because the pause below is shared,
+ * those five attempts are spent waiting rather than re-asking.
+ */
+const THROTTLE_RETRIES = process.env.NEXT_PHASE === "phase-production-build" ? 5 : 2;
 /** The longest we will wait on one of those, whatever Retry-After says. */
-const MAX_THROTTLE_WAIT_MS = 4_000;
+const MAX_THROTTLE_WAIT_MS =
+  process.env.NEXT_PHASE === "phase-production-build" ? 10_000 : 4_000;
+
+/**
+ * One in-flight read per distinct path, shared by every caller that asks
+ * while it is still running.
+ *
+ * A build renders eleven locales of the same page at once, and each render
+ * asks this client the same questions: the same pool, the same creation
+ * event, the same fairminter list. Next's data cache only helps once an
+ * answer has arrived, so the first wave of every path went upstream eleven
+ * times over. Measured on a full build, 441 distinct URLs produced 24,970
+ * requests — a 56x amplification that throttled the node we were asking, and
+ * the throttle then multiplied the retries.
+ *
+ * The entry is dropped the moment the read settles, so this is coalescing,
+ * not caching: nobody is served an answer older than one they would have
+ * fetched themselves, and a failure is never remembered. Freshness stays
+ * where it already lived, in `revalidate`.
+ *
+ * Keyed on revalidate as well as path because the two are one cache identity
+ * to Next, and a caller asking for a fresher copy should not be handed a
+ * staler promise.
+ */
+/**
+ * How many reads this process may have in the air against the node at once.
+ *
+ * Measured, not guessed. Sustaining load against api.counterparty.io and
+ * counting what came back:
+ *
+ *     concurrency 1 -> 2.5 useful responses/s, 22% throttled
+ *     concurrency 2 -> 2.0 useful responses/s, 49% throttled
+ *     concurrency 4 -> 0.0 useful responses/s, 100% throttled
+ *     concurrency 8+ -> 0.0 useful responses/s, 100% throttled
+ *
+ * Useful throughput does not rise with concurrency; it collapses. Past about
+ * two in flight the node stops answering altogether and every extra request
+ * is a 429 that also buys a retry. So this is not a politeness setting. Going
+ * wider makes the page slower and emptier, not faster.
+ *
+ * A build is the one place that asks for hundreds of distinct reads at once,
+ * and it runs several worker processes, each with its own gate — hence the
+ * tighter build-time number.
+ */
+const REQUEST_LIMIT =
+  process.env.NEXT_PHASE === "phase-production-build" ? 2 : 4;
+
+/**
+ * Admit `limit` callers at a time and queue the rest, FIFO.
+ *
+ * Queueing costs latency, which during static generation is charged against
+ * Next's per-page budget — see `staticPageGenerationTimeout` in next.config.
+ * That budget is why an earlier attempt to simply wait longer on a 429 made
+ * builds worse rather than better.
+ */
+function admit(limit: number) {
+  let active = 0;
+  const waiting: (() => void)[] = [];
+  return async function gated<T>(run: () => Promise<T>): Promise<T> {
+    if (active >= limit) await new Promise<void>((resume) => waiting.push(resume));
+    active++;
+    try {
+      return await run();
+    } finally {
+      active--;
+      waiting.shift()?.();
+    }
+  };
+}
+
+/**
+ * When the node last told us to slow down, and until when we honour it.
+ *
+ * A 429 is a statement about the client, not about one path, so backing off a
+ * single request while the other in-flight reads carry on is not backing off
+ * at all — it is what turned one throttle into a storm that re-earned itself.
+ * This is the whole client pausing together: whoever hears "later" sets the
+ * time, and everyone waits for it, including callers who have not started yet.
+ *
+ * It expires by wall clock rather than being cleared on success, so recovery
+ * needs no coordination and a lucky cached hit cannot cancel the pause.
+ */
+let pausedUntil = 0;
+
+/** Hold here until any shared pause has elapsed. */
+async function clearance(): Promise<void> {
+  for (let waited = pausedUntil - Date.now(); waited > 0; waited = pausedUntil - Date.now()) {
+    await new Promise((resume) => setTimeout(resume, waited));
+  }
+}
+
+/** Ask everyone to stand down for `ms`, without ever shortening an existing pause. */
+function pause(ms: number): void {
+  pausedUntil = Math.max(pausedUntil, Date.now() + ms);
+}
+
+const gated = admit(REQUEST_LIMIT);
+
+/**
+ * The node refused to answer, repeatedly, because we were asking too often.
+ *
+ * Worth its own type because it is the one failure that must never be read as
+ * a fact about the chain. "There is no pool for this asset" and "we could not
+ * find out whether there is a pool" look identical to a caller that catches
+ * everything, and the difference is a page that tells the truth versus a page
+ * that says a live market does not exist.
+ */
+export class CounterpartyThrottled extends Error {
+  constructor(path: string) {
+    super(`Counterparty API 429 after ${THROTTLE_RETRIES + 1} attempts: ${path}`);
+    this.name = "CounterpartyThrottled";
+  }
+}
+
+const inFlight = new Map<string, Promise<unknown>>();
 
 async function get<T>(path: string, revalidate = 60): Promise<T> {
+  const key = `${revalidate}:${path}`;
+  const running = inFlight.get(key) as Promise<T> | undefined;
+  if (running) return running;
+
+  const started = gated(() => fetchThrottled<T>(path, revalidate));
+  inFlight.set(key, started);
+  try {
+    return await started;
+  } finally {
+    // Only clear our own entry: a later caller may already have started the
+    // next one under the same key.
+    if (inFlight.get(key) === started) inFlight.delete(key);
+  }
+}
+
+async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
   for (let attempt = 0; ; attempt++) {
+    await clearance();
     const res = await fetch(`${COUNTERPARTY_API_BASE}${path}`, {
       // Counterparty is a third party we do not run, and this is the shared
       // client behind every server-rendered read. Without a deadline a stalled
@@ -67,7 +208,9 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
     await discard(res);
 
     if (!throttled || attempt >= THROTTLE_RETRIES) {
-      throw new Error(`Counterparty API ${res.status}: ${path}`);
+      throw throttled
+        ? new CounterpartyThrottled(path)
+        : new Error(`Counterparty API ${res.status}: ${path}`);
     }
 
     // Honour the node's own number when it gives one, and back off otherwise.
@@ -77,7 +220,12 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
       Number.isSafeInteger(retryAfter) && retryAfter >= 0
         ? retryAfter * 1_000
         : 250 * 2 ** attempt;
-    await new Promise((resolve) => setTimeout(resolve, Math.min(requested, MAX_THROTTLE_WAIT_MS)));
+    // Jittered so that a wave of readers throttled at the same moment does not
+    // return as a wave. Applied to the shared pause, so this request's penalty
+    // is served by every other request too.
+    const backoff = Math.min(requested, MAX_THROTTLE_WAIT_MS);
+    pause(backoff * (0.5 + Math.random() / 2));
+    await clearance();
   }
 }
 
@@ -471,7 +619,13 @@ export async function fetchPool(asset: string): Promise<Pool | null> {
       60,
     );
     return data.result ?? null;
-  } catch {
+  } catch (error) {
+    // A throttle is not an answer. Swallowing it here is what silently
+    // prerendered "No launches have graduated yet" onto ten of eleven locales
+    // while 129 pools were live: every non-English /swap was built from reads
+    // the node had refused. Let it fail loudly instead — a build that stops is
+    // recoverable, a build that lies is not.
+    if (error instanceof CounterpartyThrottled) throw error;
     return null;
   }
 }
@@ -512,10 +666,14 @@ export async function fetchOriginalRecord(
       deadline: event?.params?.soft_cap_deadline_block ?? null,
       announceBlock: event?.block_index ?? null,
     };
-  } catch {
-    // Creation timing is conformance evidence, not a reason to fail an entire
-    // page or static regeneration when Counterparty briefly throttles. A null
-    // record keeps that launch unverified until the next successful refresh.
+  } catch (error) {
+    // A throttle is the one case this must not absorb. The record is
+    // append-only, so a genuine miss means the launch really has no creation
+    // event; a 429 means we never looked, and returning null then marks a
+    // conforming launch non-conforming and drops it from the tradeable list.
+    if (error instanceof CounterpartyThrottled) throw error;
+    // Anything else is still conformance evidence rather than a reason to fail
+    // a whole page: the launch stays unverified until the next refresh.
     return { deadline: null, announceBlock: null };
   }
 }

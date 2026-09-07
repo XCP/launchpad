@@ -6,6 +6,22 @@ void initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  /**
+   * How long one page may take to prerender, in seconds.
+   *
+   * The default is 60, and that default is why this build used to fail. Every
+   * server-rendered read here goes to a public Counterparty node that throttles
+   * hard, so the client queues its reads and waits when the node says 429.
+   * Waiting is the correct behaviour — measured, useful throughput against that
+   * node collapses to zero above two concurrent requests, so asking harder
+   * returns nothing. But patience is charged against this budget, and at 60
+   * seconds a page that was merely waiting its turn was killed as if it had
+   * hung. The build then failed on a page whose data was about to arrive.
+   *
+   * Three minutes is generous for a page that normally renders in ten seconds.
+   * It is a ceiling for the throttled case, not a target.
+   */
+  staticPageGenerationTimeout: 180,
   // NOTE: `expireTime` does nothing on this deployment target — see the note
   // in open-next.config.ts. It was tried here first, and it is inert.
   // The XCP-69 predicate is shared with apps/api so the two never derive
