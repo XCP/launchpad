@@ -1,6 +1,7 @@
 import { classifyDescription } from "@launchpad/xcp69/description";
 import { big } from "@launchpad/xcp69/numeric";
 import { one, q } from "#api/db";
+import { CounterpartyReadDeferred } from "#api/integrations/cooldown";
 import {
   fetchAllFairminters,
   fetchAnnounceFacts,
@@ -105,6 +106,15 @@ export interface SyncResult {
    *  is skipped entirely when no mint, trade, graduation, or verdict moved. */
   behavior_written: number;
   reward_accounts_written: number;
+  partial: boolean;
+  pool_lookups_failed: number;
+  pool_lookups_deferred: number;
+  mint_feeds_failed: number;
+  mint_feeds_deferred: number;
+  event_assets_failed: number;
+  event_assets_deferred: number;
+  announce_reads_failed: number;
+  announce_reads_deferred: number;
 }
 
 const FEE_BACKFILL_LIMIT = 15;
@@ -129,6 +139,10 @@ export async function syncLaunches(
 
   let written = 0;
   let mintsIngested = 0;
+  let poolLookupsFailed = 0;
+  let poolLookupsDeferred = 0;
+  let mintFeedsFailed = 0;
+  let mintFeedsDeferred = 0;
   const eventTargets: GraduatedTarget[] = [];
   const newGraduations = new Set<string>();
   const now = Math.floor(Date.now() / 1000);
@@ -176,6 +190,10 @@ export async function syncLaunches(
     if (fm.status === "closed" && truthy(fm.pool_quantity)) {
       const lookup = await fetchPool(fm.asset);
       poolUnknown = !lookup.known;
+      if (!lookup.known) {
+        if (lookup.deferred) poolLookupsDeferred++;
+        else poolLookupsFailed++;
+      }
       const pool = lookup.known ? lookup.pool : null;
       if (pool) {
         hasPool = true;
@@ -227,7 +245,18 @@ export async function syncLaunches(
     let mints = stored?.mints ?? 0;
     let minters = stored?.minters ?? 0;
     if ((fm.status === "open" || fm.status === "closed") && (!stored || earnedChanged)) {
-      const fairmints = await fetchFairmints(fm.tx_hash);
+      let fairmints: Awaited<ReturnType<typeof fetchFairmints>>;
+      try {
+        fairmints = await fetchFairmints(fm.tx_hash);
+      } catch (error) {
+        if (error instanceof CounterpartyReadDeferred) mintFeedsDeferred++;
+        else mintFeedsFailed++;
+        // Keep this launch's old earned value so the next pass still knows
+        // its mint history needs reading. Continue to reconcile earlier
+        // committed mints instead of throwing away the whole pass's rollup.
+        newGraduations.delete(fm.tx_hash);
+        continue;
+      }
       mints = fairmints.length;
       minters = new Set(fairmints.map((m) => m.source)).size;
       if (fairmints.length > 0) {
@@ -480,7 +509,8 @@ export async function syncLaunches(
     if (phase === "graduated" && pendingVerdict !== false) {
       eventTargets.push({
         asset: fm.asset,
-        poolChanged: poolXcpReserve !== (stored?.pool_xcp_reserve ?? null),
+        poolRevision: poolXcpReserve !== null && poolTokenReserve !== null
+          ? JSON.stringify([poolXcpReserve, poolTokenReserve]) : null,
       });
     }
   }
@@ -495,9 +525,11 @@ export async function syncLaunches(
     written += results.filter((r) => (r.meta.rows_written ?? 0) > 0).length;
   }
 
-  const eventsIngested = await syncAssetEvents(db, eventTargets, height);
-  const resolved = await resolveUndecided(db);
-  const announceBackfilled = await backfillAnnounceBlocks(db);
+  const eventProgress = { failed: 0, deferred: 0 };
+  const eventsIngested = await syncAssetEvents(db, eventTargets, height, eventProgress);
+  const announceProgress = { failed: 0, deferred: 0 };
+  const resolved = await resolveUndecided(db, announceProgress);
+  const announceBackfilled = await backfillAnnounceBlocks(db, announceProgress);
   const feesBackfilled = await backfillMissingFees(db);
   const descriptionsBackfilled = await backfillDisplayDescriptions(db, metadata);
   const launchPricesBackfilled = await backfillLaunchPrices(db, newGraduations);
@@ -529,6 +561,16 @@ export async function syncLaunches(
   const rewardRollup = rewardsStale ? await refreshRewardAccounts(db) : null;
 
   return {
+    partial: poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
+      + eventProgress.failed + eventProgress.deferred + announceProgress.failed + announceProgress.deferred > 0,
+    pool_lookups_failed: poolLookupsFailed,
+    pool_lookups_deferred: poolLookupsDeferred,
+    mint_feeds_failed: mintFeedsFailed,
+    mint_feeds_deferred: mintFeedsDeferred,
+    event_assets_failed: eventProgress.failed,
+    event_assets_deferred: eventProgress.deferred,
+    announce_reads_failed: announceProgress.failed,
+    announce_reads_deferred: announceProgress.deferred,
     candidates: candidates.length,
     written,
     resolved,
@@ -710,6 +752,18 @@ async function backfillDisplayDescriptions(
   return backfilled;
 }
 
+async function readAnnounceFacts(txHash: string, progress: { failed: number; deferred: number }) {
+  try {
+    return await fetchAnnounceFacts(txHash);
+  } catch (error) {
+    if (error instanceof CounterpartyReadDeferred) progress.deferred++;
+    else progress.failed++;
+    // An unread creation event cannot change conformance. Leave it retryable
+    // and finish the rollups for other launches already committed this pass.
+    return null;
+  }
+}
+
 /**
  * Repairs rows that opened before this indexer recorded their announcement
  * block — the historical shape of the bug fixed above.
@@ -723,7 +777,7 @@ async function backfillDisplayDescriptions(
  * A one-time worklist that drains to empty and stays there, backed by a
  * partial index so the probe costs nothing once it has.
  */
-async function backfillAnnounceBlocks(db: D1Database): Promise<number> {
+async function backfillAnnounceBlocks(db: D1Database, progress: { failed: number; deferred: number }): Promise<number> {
   const missing = await q<{ tx_hash: string }>(
     db,
     `SELECT tx_hash FROM launches
@@ -735,7 +789,9 @@ async function backfillAnnounceBlocks(db: D1Database): Promise<number> {
 
   let repaired = 0;
   for (const row of missing) {
-    const { announceBlock, originalDeadline } = await fetchAnnounceFacts(row.tx_hash);
+    const facts = await readAnnounceFacts(row.tx_hash, progress);
+    if (!facts) continue;
+    const { announceBlock, originalDeadline } = facts;
     if (announceBlock === null) continue; // event not visible yet — ask again next tick
 
     // The verdict is left exactly as it stands. It was reached from this same
@@ -794,7 +850,7 @@ async function backfillMissingFees(db: D1Database): Promise<number> {
 /** Rows whose parameters match but whose timing verdict is still unknown —
  *  each is asked about exactly once, ever, and drops out of this worklist
  *  the moment it's answered. */
-async function resolveUndecided(db: D1Database): Promise<number> {
+async function resolveUndecided(db: D1Database, progress: { failed: number; deferred: number }): Promise<number> {
   const undecided = await db
     .prepare(
       `SELECT tx_hash, asset, source, divisible, start_block, end_block, price,
@@ -833,7 +889,9 @@ async function resolveUndecided(db: D1Database): Promise<number> {
 
   let resolved = 0;
   for (const row of undecided.results) {
-    const { announceBlock, originalDeadline } = await fetchAnnounceFacts(row.tx_hash);
+    const facts = await readAnnounceFacts(row.tx_hash, progress);
+    if (!facts) continue;
+    const { announceBlock, originalDeadline } = facts;
     if (announceBlock === null) continue; // not confirmed yet — ask again next tick
 
     // Reconstructed straight from the stored columns — this is a non-pending

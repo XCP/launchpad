@@ -1221,6 +1221,8 @@
     "The transaction did not match the verified request. It was blocked.",
     "Use digits and a dot, with up to {n} decimal places.",
     "Use whole numbers only.",
-    "Your wallet could not complete this request. Check the details."
+    "Your wallet could not complete this request. Check the details.",
+    "Trade history is unavailable. Please try again shortly.",
+    "Units unavailable"
   ]
 }

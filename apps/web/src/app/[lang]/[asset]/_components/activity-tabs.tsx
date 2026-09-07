@@ -1,7 +1,7 @@
 "use client";
 
 import { LazyLink } from "@/components/lazy-link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   fetchHolderBalances,
@@ -33,9 +33,10 @@ import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import {
-  fetchAssetTradesPage,
   type AssetTradePage,
 } from "@/lib/api/launchpad-api";
+import { createTradeHistoryReader, tradeFingerprint } from "@/lib/api/trade-history";
+import { xcpOrderRemaining } from "@/lib/order-legs";
 import { tradeRoleForAddress } from "@launchpad/xcp69/trades";
 import {
   currentHolderCount,
@@ -180,11 +181,16 @@ export function ActivityTabs({
   // table history silently capped every asset at 50 rows. Page the append-only
   // D1 tape instead, so history is complete and websocket frames stay small.
   const tradeOffset = (Math.max(1, pageParam) - 1) * PER_PAGE;
-  const { data: tradePage } = useSWR<AssetTradePage | null>(
+  const knownLatestTradeBlock = Math.max(0, ...(roomState?.trades ?? []).map(trade => trade.block));
+  const knownHead = (roomState?.trades ?? []).filter(trade => trade.block === knownLatestTradeBlock)
+    .map(trade => tradeFingerprint({ txHash: trade.tx_hash, address: trade.address, buy: trade.buy,
+      tokenQuantity: trade.token_quantity, xcpQuantity: trade.xcp_quantity }));
+  const readTradeHistory = useMemo(() => createTradeHistoryReader(asset, divisible), [asset, divisible]);
+  const { data: tradePage, error: tradeError } = useSWR<AssetTradePage>(
     !minting && tab === "trades"
-      ? [asset, "pair-trades", PER_PAGE, tradeOffset]
+      ? [asset, "pair-trades", PER_PAGE, tradeOffset, knownLatestTradeBlock, JSON.stringify(knownHead)]
       : null,
-    () => fetchAssetTradesPage(asset, PER_PAGE, tradeOffset),
+    () => readTradeHistory(PER_PAGE, tradeOffset, knownLatestTradeBlock, knownHead),
     { refreshInterval: 30_000 },
   );
   const trades: TradeRow[] | null = tradePage === undefined
@@ -270,17 +276,16 @@ export function ActivityTabs({
   );
   // Remaining quantities, not original ones: a half-filled order offers what is
   // left of it, and drawing the original overstates the depth actually there.
-  const book = (orders ?? []).map((o) => {
-    const isBuy = o.get_asset === asset;
-    const tokens = isBuy ? o.get_remaining : o.give_remaining;
-    const xcp = isBuy ? o.give_remaining : o.get_remaining;
-    return {
+  const book = (orders ?? []).flatMap((o) => {
+    const legs = xcpOrderRemaining(o, asset, divisible);
+    if (!legs) return [];
+    return [{
       o,
-      isBuy,
-      price: ratio(xcp, tokens),
-      amountText: num.compact(tokenQty(tokens, divisible)),
-      xcpText: num.fixedRaw(xcp),
-    };
+      isBuy: legs.isBuy,
+      price: legs.price,
+      amountText: num.commasRaw(legs.tokenRaw, divisible ? 8 : 0),
+      xcpText: num.commasRaw(legs.xcpRaw, 8),
+    }];
   });
   const bids = book.filter((r) => r.isBuy).sort((a, b) => b.price - a.price);
   const asks = book.filter((r) => !r.isBuy).sort((a, b) => a.price - b.price);
@@ -309,7 +314,7 @@ export function ActivityTabs({
    */
   const POOL_FEE = 0.005;
   const POOL_BAND = 0.01;
-  const poolTok = Number(big(poolTokensRaw ?? 0)) / 1e8;
+  const poolTok = tokenQty(poolTokensRaw ?? 0, divisible);
   const poolXcp = Number(big(poolXcpRaw ?? 0)) / 1e8;
   const poolSpot = poolTok > 0 ? poolXcp / poolTok : 0;
   const poolRows =
@@ -689,7 +694,9 @@ export function ActivityTabs({
         ))}
 
       {tab === "trades" &&
-        (!trades ? (
+        (tradeError ? (
+          <p role="alert" className="p-6 text-center text-sm text-red-600 dark:text-red-400">{t("Trade history is unavailable. Please try again shortly.")}</p>
+        ) : !trades ? (
           <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("Loading trades…")}</p>
         ) : trades.length === 0 ? (
           <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">{t("No trades yet.")}</p>

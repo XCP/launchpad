@@ -7,6 +7,7 @@ import {
 } from "@launchpad/xcp69/candles";
 import { mergePairTrades, type PairTrade } from "@launchpad/xcp69/trades";
 import { q } from "#api/db";
+import { CounterpartyReadDeferred } from "#api/integrations/cooldown";
 import {
   fetchNewestOrderMatchBlock,
   fetchOrderMatches,
@@ -35,10 +36,9 @@ import {
 
 export interface GraduatedTarget {
   asset: string;
-  /** The pool reserve moved since the last pass — sufficient proof of a
-   *  trade, but NOT necessary: a fill between two resting book orders moves
-   *  no reserve, so quiet-pool assets still get a one-row book probe below. */
-  poolChanged: boolean;
+  /** Reserve snapshot observed by launch sync; acknowledged only after both
+   * match feeds and their writes complete successfully. */
+  poolRevision: string | null;
 }
 
 interface EventRow {
@@ -299,11 +299,18 @@ const INSERT_CHUNK = 100;
 const FIRST_RUNS_PER_TICK = 1;
 
 const cursorKey = (asset: string) => `events_hw:${asset}`;
+const poolRevisionKey = (asset: string) => `events_pool:${asset}`;
+
+export interface EventSyncProgress {
+  failed: number;
+  deferred: number;
+}
 
 export async function syncAssetEvents(
   db: D1Database,
   targets: GraduatedTarget[],
   height: number,
+  progress: EventSyncProgress = { failed: 0, deferred: 0 },
 ): Promise<number> {
   if (targets.length === 0) return 0;
 
@@ -322,6 +329,11 @@ export async function syncAssetEvents(
     `SELECT key, value FROM chain_state WHERE key >= 'events_hw:' AND key < 'events_hw;'`,
   );
   const cursors = new Map(cursorRows.map((r) => [r.key, Number(r.value)]));
+  const revisions = new Map((await q<{ key: string; value: string }>(db,
+    `SELECT key, value FROM chain_state WHERE key >= 'events_pool:' AND key < 'events_pool;'`,
+  )).map(r => [r.key, r.value]));
+  const poolNeedsSync = (target: GraduatedTarget) => target.poolRevision === null
+    || revisions.get(poolRevisionKey(target.asset)) !== target.poolRevision;
 
   // The pool reserve is proof a trade happened, but not the only way one can:
   // two resting book orders match without touching the pool at all. This gate
@@ -338,11 +350,16 @@ export async function syncAssetEvents(
   const bookChanged = new Set<string>();
   await Promise.all(
     targets
-      .filter((t) => !t.poolChanged && cursors.has(cursorKey(t.asset)))
+      .filter((t) => !poolNeedsSync(t) && cursors.has(cursorKey(t.asset)))
       .map(async (t) => {
-        const newest = await fetchNewestOrderMatchBlock(t.asset);
-        if (newest !== null && newest > cursors.get(cursorKey(t.asset))!) {
-          bookChanged.add(t.asset);
+        try {
+          const newest = await fetchNewestOrderMatchBlock(t.asset, true);
+          if (newest !== null && newest > cursors.get(cursorKey(t.asset))!) {
+            bookChanged.add(t.asset);
+          }
+        } catch (error) {
+          if (error instanceof CounterpartyReadDeferred) progress.deferred++;
+          else progress.failed++;
         }
       }),
   );
@@ -357,9 +374,12 @@ export async function syncAssetEvents(
     // moved — the pool reserve, or the book probe above. First run is the
     // exception: a launch that graduated before this existed has a perfectly
     // unchanged reserve and would otherwise never be indexed at all.
-    if (!firstRun && !target.poolChanged && !bookChanged.has(target.asset)) continue;
+    if (!firstRun && !poolNeedsSync(target) && !bookChanged.has(target.asset)) continue;
     if (firstRun) {
-      if (firstRuns >= FIRST_RUNS_PER_TICK) continue; // next tick takes it
+      if (firstRuns >= FIRST_RUNS_PER_TICK) {
+        progress.deferred++;
+        continue; // next tick takes it
+      }
       firstRuns += 1;
     }
 
@@ -377,16 +397,34 @@ export async function syncAssetEvents(
         fetchPoolMatches(target.asset, sinceBlock),
         fetchOrderMatches(target.asset, sinceBlock),
       ]);
-    } catch {
+    } catch (error) {
+      if (error instanceof CounterpartyReadDeferred) progress.deferred++;
+      else progress.failed++;
       continue;
     }
 
+    const enrichmentErrors: unknown[] = [];
     const mergedTrades = await mergePairTrades(
       target.asset,
       poolMatches,
       orderMatches,
-      fetchTransactionEvents,
+      async txHash => {
+        try {
+          return await fetchTransactionEvents(txHash);
+        } catch (error) {
+          enrichmentErrors.push(error);
+          throw error;
+        }
+      },
     );
+    // The shared browser merger can display its deterministic fallback, but
+    // an index must not acknowledge unread transaction ordering permanently.
+    // Retry the complete asset window without writing provisional identities.
+    if (enrichmentErrors.length > 0) {
+      if (enrichmentErrors.every(error => error instanceof CounterpartyReadDeferred)) progress.deferred++;
+      else progress.failed++;
+      continue;
+    }
     const rows = toIndexedRows(target.asset, mergedTrades);
 
     // Same fills, folded a second way. A pool match has one trader and a book
@@ -485,6 +523,16 @@ export async function syncAssetEvents(
         )
         .bind(cursorKey(target.asset), String(next))
         .run();
+    }
+    // Launch reserves are stored before this function runs. Comparing against
+    // that table loses the retry signal after a feed fails: the next tick sees
+    // an unchanged pool and skips its unindexed trades forever. Acknowledge
+    // the reserve here only after the complete pass has succeeded.
+    if (target.poolRevision !== null && revisions.get(poolRevisionKey(target.asset)) !== target.poolRevision) {
+      await db.prepare(`INSERT INTO chain_state (key, value) VALUES (?1, ?2)
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value
+        WHERE chain_state.value IS NOT excluded.value`)
+        .bind(poolRevisionKey(target.asset), target.poolRevision).run();
     }
   }
 
