@@ -299,11 +299,10 @@ describe("the pause is shared", () => {
 
     const laterCalls = stub.calls.filter((call) => !call.url.includes("FIRST"));
     expect(laterCalls).toHaveLength(2);
-    // Jitter halves the wait at most, so half the requested second is the
-    // floor. Backing off only the throttled request is what let a wave of
-    // readers re-earn the throttle the moment it was lifted.
+    // The server's complete requested second is a minimum for every read.
+    // Backing off only the throttled request would re-earn the throttle.
     for (const call of laterCalls) {
-      expect(call.startedAt - throttledAt).toBeGreaterThanOrEqual(400);
+      expect(call.startedAt - throttledAt).toBeGreaterThanOrEqual(1_000);
     }
   });
 
