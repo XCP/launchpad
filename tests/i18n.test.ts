@@ -92,6 +92,17 @@ describe("Chinese variants", () => {
     expect(matchLocale("yue")).toBe("zh-hk");
     expect(matchLocale("ja-JP")).toBe("ja");
     expect(matchLocale("en-GB")).toBe("en");
-    expect(matchLocale("ko")).toBeNull();
+    expect(matchLocale("fr")).toBeNull();
+  });
+});
+
+describe("Spanish and Korean", () => {
+  it("map any regional tag to the one locale", () => {
+    expect(matchLocale("es-MX")).toBe("es");
+    expect(matchLocale("es-419")).toBe("es");
+    expect(matchLocale("es")).toBe("es");
+    expect(matchLocale("ko-KR")).toBe("ko");
+    expect(splitLocale("/ko/faq")).toEqual({ locale: "ko", path: "/faq" });
+    expect(localePath("es", "/")).toBe("/es");
   });
 });

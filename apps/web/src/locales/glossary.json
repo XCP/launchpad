@@ -201,8 +201,8 @@
       "zh": "兑换",
       "zh-tw": "兌換",
       "zh-hk": "兌換",
-      "note": "Uniswap and UniSat both. ES: UniSat's intercambiar; Uniswap says cambiar; the noun stays swap in casual Spanish. KO: 스왑.",
-      "es": "intercambiar",
+      "note": "Uniswap and UniSat both. ES: UniSat's intercambiar; Uniswap says cambiar; the noun stays swap in casual Spanish. KO: 스왑. ES nav/tab label is Swap (the noun every Spanish DEX keeps); intercambiar stays as the verb in prose and on confirm buttons. Preguntas frecuentes overflowed the header, so the nav says FAQ.",
+      "es": "swap",
       "ko": "스왑"
     },
     "limit": {

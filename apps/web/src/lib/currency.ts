@@ -97,13 +97,15 @@ function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * What the page and the browser imply, and they imply exactly two things:
- * Japan, and Hong Kong.
+ * What the page and the browser imply, and they imply exactly three
+ * things: Japan, Hong Kong, and Korea.
  *
  * Dollars are the default for everyone. The markets the site goes out of
  * its way to meet in their own currency are the ones it speaks the language
  * of AND whose currency the ECB quotes: yen for Japan, Hong Kong dollars for
- * Hong Kong. Taiwan reads its own page but keeps US dollars — the ECB does
+ * Hong Kong, won for Korea. Spanish readers span a dozen currencies, so they
+ * get dollars, which Latin America prices in anyway. Taiwan reads its own
+ * page but keeps US dollars — the ECB does
  * not quote TWD, and Taiwanese traders price in USDT anyway — and Simplified
  * Chinese readers are scattered across the mainland, Singapore and Malaysia,
  * where no single currency is right, so they get dollars too. First the page
@@ -114,9 +116,9 @@ function isCurrency(value: unknown): value is Currency {
  * where the machine thinks it is. Any one is enough, and an explicit currency
  * choice in the menu overrides all of them.
  */
-const PAGE_CURRENCY: Partial<Record<Locale, Currency>> = { ja: "JPY", "zh-hk": "HKD" };
-const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD" };
-const TIMEZONE_CURRENCY: Record<string, Currency> = { "Asia/Tokyo": "JPY", "Asia/Hong_Kong": "HKD", "Asia/Macau": "HKD" };
+const PAGE_CURRENCY: Partial<Record<Locale, Currency>> = { ja: "JPY", "zh-hk": "HKD", ko: "KRW" };
+const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD", KR: "KRW" };
+const TIMEZONE_CURRENCY: Record<string, Currency> = { "Asia/Tokyo": "JPY", "Asia/Hong_Kong": "HKD", "Asia/Macau": "HKD", "Asia/Seoul": "KRW" };
 
 function detect(): Currency {
   if (typeof navigator === "undefined") return "USD";
@@ -130,6 +132,7 @@ function detect(): Currency {
       const locale = new Intl.Locale(tag);
       const region = locale.maximize().region ?? "";
       if (locale.language === "ja") return "JPY";
+      if (locale.language === "ko") return "KRW";
       if (locale.language === "yue") return "HKD";
       if (REGION_CURRENCY[region]) return REGION_CURRENCY[region];
     } catch {

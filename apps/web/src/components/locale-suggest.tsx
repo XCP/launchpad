@@ -20,6 +20,8 @@ const OFFER: Record<Locale, { text: string; action: string; dismiss: string }> =
   zh: { text: "本站也提供简体中文版。", action: "切换到简体中文", dismiss: "关闭" },
   "zh-tw": { text: "本站也提供繁體中文版。", action: "切換到繁體中文", dismiss: "關閉" },
   "zh-hk": { text: "本站亦提供繁體中文版。", action: "切換至繁體中文", dismiss: "關閉" },
+  es: { text: "Este sitio también está disponible en español.", action: "Ver en español", dismiss: "Cerrar" },
+  ko: { text: "이 사이트는 한국어로도 볼 수 있습니다.", action: "한국어로 보기", dismiss: "닫기" },
 };
 
 /** The first of the browser's languages the site speaks, or null. */

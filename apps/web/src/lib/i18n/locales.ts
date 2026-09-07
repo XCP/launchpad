@@ -18,8 +18,14 @@
  * where Hong Kong writes 軟件 and 網絡 — so `zh-tw` and `zh-hk` are separate
  * files, derived from the Simplified draft with OpenCC's regional phrase
  * tables and then checked by hand.
+ *
+ * Spanish is one locale for the whole language. The site's Spanish readers
+ * are in the Americas — Mexico, Venezuela, Argentina — so the draft is
+ * Latin American in vocabulary (billetera, not cartera) and neutral enough
+ * that Spain reads it without noticing. Korean is one locale and one
+ * currency, and counts in 만/억 like Japanese and Chinese.
  */
-export const LOCALES = ["en", "ja", "zh", "zh-tw", "zh-hk"] as const;
+export const LOCALES = ["en", "ja", "zh", "zh-tw", "zh-hk", "es", "ko"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -52,6 +58,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
   zh: { native: "简体中文", tag: "zh-Hans", intl: "zh-CN", og: "zh_CN", dir: "ltr", myriads: true },
   "zh-tw": { native: "繁體中文（台灣）", tag: "zh-Hant-TW", intl: "zh-TW", og: "zh_TW", dir: "ltr", myriads: true },
   "zh-hk": { native: "繁體中文（香港）", tag: "zh-Hant-HK", intl: "zh-HK", og: "zh_HK", dir: "ltr", myriads: true },
+  es: { native: "Español", tag: "es", intl: "es-MX", og: "es_LA", dir: "ltr", myriads: false },
+  ko: { native: "한국어", tag: "ko", intl: "ko-KR", og: "ko_KR", dir: "ltr", myriads: true },
 };
 
 export function isLocale(value: unknown): value is Locale {
@@ -72,6 +80,8 @@ export function matchLocale(tag: string): Locale | null {
   const parts = new Set(rest);
   if (language === "en") return "en";
   if (language === "ja") return "ja";
+  if (language === "es") return "es";
+  if (language === "ko") return "ko";
   if (language === "yue") return "zh-hk";
   if (language === "zh") {
     if (parts.has("hk") || parts.has("mo")) return "zh-hk";
