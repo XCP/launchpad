@@ -480,7 +480,8 @@ export async function syncLaunches(
     if (phase === "graduated" && pendingVerdict !== false) {
       eventTargets.push({
         asset: fm.asset,
-        poolChanged: poolXcpReserve !== (stored?.pool_xcp_reserve ?? null),
+        poolRevision: poolXcpReserve !== null && poolTokenReserve !== null
+          ? JSON.stringify([poolXcpReserve, poolTokenReserve]) : null,
       });
     }
   }

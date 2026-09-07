@@ -5,12 +5,14 @@ import { parseJsonLossless, type Raw, ratio } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
+import { orderAssetDecimals } from "@/lib/order-legs";
 
 interface OrderRow {
   status: string;
   give_asset: string;
   give_quantity: Raw;
   give_remaining: Raw;
+  give_asset_info?: { divisible?: boolean };
   get_asset: string;
   get_quantity: Raw;
   get_remaining: Raw;
@@ -34,7 +36,7 @@ export function OrderTracker({
 }) {
   const num = useNumbers();
   const { data: order } = useSWR<OrderRow | null>(
-    `${COUNTERPARTY_API_BASE}/orders/${txHash}`,
+    `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(txHash)}?verbose=true`,
     async (url: string) => {
       const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) return null;
@@ -67,11 +69,15 @@ export function OrderTracker({
       <p className="mt-2 text-sm font-medium text-green-700 dark:text-green-400">✓ {t("Filled")}</p>
     );
   }
+  const decimals = orderAssetDecimals(order.give_asset, order.give_asset_info);
+  const remaining = decimals === null
+    ? t("Units unavailable")
+    : num.commasRaw(order.give_remaining, decimals);
   if (order.status === "expired") {
     return (
       <p className="mt-2 text-sm text-green-700 dark:text-green-400">
         {t("Expired — the unfilled {amount} {asset} was refunded automatically.", {
-          amount: num.commasRaw(order.give_remaining),
+          amount: remaining,
           asset: order.give_asset,
         })}
       </p>
@@ -87,11 +93,11 @@ export function OrderTracker({
         {filledPct > 0
           ? t("{pct}% filled — the rest is resting on the book with {amount} {asset} escrowed.", {
               pct: filledPct.toFixed(0),
-              amount: num.commasRaw(order.give_remaining),
+              amount: remaining,
               asset: order.give_asset,
             })
           : t("Confirmed — resting on the book with {amount} {asset} escrowed.", {
-              amount: num.commasRaw(order.give_remaining),
+              amount: remaining,
               asset: order.give_asset,
             })}
       </p>
