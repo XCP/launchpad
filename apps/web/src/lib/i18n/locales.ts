@@ -24,8 +24,13 @@
  * Latin American in vocabulary (billetera, not cartera) and neutral enough
  * that Spain reads it without noticing. Korean is one locale and one
  * currency, and counts in 만/억 like Japanese and Chinese.
+ *
+ * Portuguese is Brazilian (`pt`, tagged pt-BR): Brazil is where the site's
+ * Portuguese readers are, and Portugal reads Brazilian fine. French is one
+ * locale for France, Belgium, Switzerland, Québec and the Maghreb, in the
+ * neutral register French crypto interfaces use (vous, portefeuille).
  */
-export const LOCALES = ["en", "ja", "zh", "zh-tw", "zh-hk", "es", "ko"] as const;
+export const LOCALES = ["en", "ja", "zh", "zh-tw", "zh-hk", "es", "ko", "pt", "fr"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -60,6 +65,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
   "zh-hk": { native: "繁體中文（香港）", tag: "zh-Hant-HK", intl: "zh-HK", og: "zh_HK", dir: "ltr", myriads: true },
   es: { native: "Español", tag: "es", intl: "es-MX", og: "es_LA", dir: "ltr", myriads: false },
   ko: { native: "한국어", tag: "ko", intl: "ko-KR", og: "ko_KR", dir: "ltr", myriads: true },
+  pt: { native: "Português", tag: "pt-BR", intl: "pt-BR", og: "pt_BR", dir: "ltr", myriads: false },
+  fr: { native: "Français", tag: "fr", intl: "fr-FR", og: "fr_FR", dir: "ltr", myriads: false },
 };
 
 export function isLocale(value: unknown): value is Locale {
@@ -82,6 +89,8 @@ export function matchLocale(tag: string): Locale | null {
   if (language === "ja") return "ja";
   if (language === "es") return "es";
   if (language === "ko") return "ko";
+  if (language === "pt") return "pt";
+  if (language === "fr") return "fr";
   if (language === "yue") return "zh-hk";
   if (language === "zh") {
     if (parts.has("hk") || parts.has("mo")) return "zh-hk";

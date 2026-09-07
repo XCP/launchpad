@@ -92,7 +92,7 @@ describe("Chinese variants", () => {
     expect(matchLocale("yue")).toBe("zh-hk");
     expect(matchLocale("ja-JP")).toBe("ja");
     expect(matchLocale("en-GB")).toBe("en");
-    expect(matchLocale("fr")).toBeNull();
+    expect(matchLocale("tr")).toBeNull();
   });
 });
 
@@ -104,5 +104,16 @@ describe("Spanish and Korean", () => {
     expect(matchLocale("ko-KR")).toBe("ko");
     expect(splitLocale("/ko/faq")).toEqual({ locale: "ko", path: "/faq" });
     expect(localePath("es", "/")).toBe("/es");
+  });
+});
+
+describe("Portuguese and French", () => {
+  it("map any regional tag to the one locale", () => {
+    expect(matchLocale("pt-BR")).toBe("pt");
+    expect(matchLocale("pt-PT")).toBe("pt");
+    expect(matchLocale("fr-CA")).toBe("fr");
+    expect(matchLocale("fr-BE")).toBe("fr");
+    expect(splitLocale("/pt/faq")).toEqual({ locale: "pt", path: "/faq" });
+    expect(localePath("fr", "/")).toBe("/fr");
   });
 });

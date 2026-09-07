@@ -97,14 +97,16 @@ function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * What the page and the browser imply, and they imply exactly three
- * things: Japan, Hong Kong, and Korea.
+ * What the page and the browser imply: Japan, Hong Kong, Korea, Brazil,
+ * and the euro for French pages.
  *
  * Dollars are the default for everyone. The markets the site goes out of
  * its way to meet in their own currency are the ones it speaks the language
  * of AND whose currency the ECB quotes: yen for Japan, Hong Kong dollars for
- * Hong Kong, won for Korea. Spanish readers span a dozen currencies, so they
- * get dollars, which Latin America prices in anyway. Taiwan reads its own
+ * Hong Kong, won for Korea, reais for Brazil. French pages default to euros
+ * because France and Belgium are most of their readers; a Swiss or Québécois
+ * reader picks CHF or CAD from the menu. Spanish readers span a dozen
+ * currencies, so they get dollars, which Latin America prices in anyway. Taiwan reads its own
  * page but keeps US dollars — the ECB does
  * not quote TWD, and Taiwanese traders price in USDT anyway — and Simplified
  * Chinese readers are scattered across the mainland, Singapore and Malaysia,
@@ -116,9 +118,18 @@ function isCurrency(value: unknown): value is Currency {
  * where the machine thinks it is. Any one is enough, and an explicit currency
  * choice in the menu overrides all of them.
  */
-const PAGE_CURRENCY: Partial<Record<Locale, Currency>> = { ja: "JPY", "zh-hk": "HKD", ko: "KRW" };
-const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD", KR: "KRW" };
-const TIMEZONE_CURRENCY: Record<string, Currency> = { "Asia/Tokyo": "JPY", "Asia/Hong_Kong": "HKD", "Asia/Macau": "HKD", "Asia/Seoul": "KRW" };
+const PAGE_CURRENCY: Partial<Record<Locale, Currency>> = { ja: "JPY", "zh-hk": "HKD", ko: "KRW", pt: "BRL", fr: "EUR" };
+const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD", KR: "KRW", BR: "BRL", FR: "EUR", BE: "EUR", LU: "EUR", MC: "EUR" };
+const TIMEZONE_CURRENCY: Record<string, Currency> = {
+  "Asia/Tokyo": "JPY",
+  "Asia/Hong_Kong": "HKD",
+  "Asia/Macau": "HKD",
+  "Asia/Seoul": "KRW",
+  "America/Sao_Paulo": "BRL",
+  "Europe/Paris": "EUR",
+  "Europe/Brussels": "EUR",
+  "Europe/Luxembourg": "EUR",
+};
 
 function detect(): Currency {
   if (typeof navigator === "undefined") return "USD";
@@ -133,6 +144,7 @@ function detect(): Currency {
       const region = locale.maximize().region ?? "";
       if (locale.language === "ja") return "JPY";
       if (locale.language === "ko") return "KRW";
+      if (locale.language === "pt" && region === "BR") return "BRL";
       if (locale.language === "yue") return "HKD";
       if (REGION_CURRENCY[region]) return REGION_CURRENCY[region];
     } catch {

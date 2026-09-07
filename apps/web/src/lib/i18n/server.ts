@@ -20,6 +20,8 @@ const MESSAGES: Record<Locale, () => Promise<Messages>> = {
   "zh-hk": () => import("@/locales/zh-hk.json").then((m) => m.default as Messages),
   es: () => import("@/locales/es.json").then((m) => m.default as Messages),
   ko: () => import("@/locales/ko.json").then((m) => m.default as Messages),
+  pt: () => import("@/locales/pt.json").then((m) => m.default as Messages),
+  fr: () => import("@/locales/fr.json").then((m) => m.default as Messages),
 };
 
 export async function getMessages(locale: Locale): Promise<Messages> {
@@ -36,6 +38,8 @@ const STATUS: Partial<Record<Locale, () => Promise<{ machine: string[] }>>> = {
   "zh-hk": () => import("@/locales/zh-hk.status.json").then((m) => m.default as { machine: string[] }),
   es: () => import("@/locales/es.status.json").then((m) => m.default as { machine: string[] }),
   ko: () => import("@/locales/ko.status.json").then((m) => m.default as { machine: string[] }),
+  pt: () => import("@/locales/pt.status.json").then((m) => m.default as { machine: string[] }),
+  fr: () => import("@/locales/fr.status.json").then((m) => m.default as { machine: string[] }),
 };
 
 export async function isMachineDrafted(locale: Locale): Promise<boolean> {
