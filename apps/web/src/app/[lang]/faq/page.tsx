@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import { LazyLink } from "@/components/lazy-link";
 import { fetchXcpUsd } from "@/lib/api/price";
 import {
@@ -10,9 +12,9 @@ import {
 import { StandardPlayground } from "@/app/[lang]/faq/_components/explainer";
 
 const PAGE_METADATA = {
-  title: "How it works — xcp.fun",
+  title: msg("How it works — xcp.fun"),
   description:
-    "One fixed parameter set for token launches on Counterparty: the launch sells out and liquidity locks forever, or everyone is refunded. Zero creator take, enforced by consensus.",
+    msg("One fixed parameter set for token launches on Counterparty: the launch sells out and liquidity locks forever, or everyone is refunded. Zero creator take, enforced by consensus."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -23,7 +25,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/faq") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/faq"),
+  };
 }
 
 const PARAMS: [string, string][] = [

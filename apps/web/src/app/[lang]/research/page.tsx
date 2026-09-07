@@ -1,5 +1,7 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { LiveBehaviorDashboard } from "@/app/[lang]/research/_components/live-behavior-dashboard";
@@ -32,7 +34,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/research") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/research"),
+  };
 }
 
 export default function ResearchPage() {

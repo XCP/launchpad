@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import { fetchXcpDispensers } from "@/lib/api/counterparty";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { XcpBridge } from "@/app/[lang]/dispense/_components/bridge";
@@ -8,9 +10,9 @@ import { XcpBridge } from "@/app/[lang]/dispense/_components/bridge";
 export const revalidate = 60;
 
 const PAGE_METADATA = {
-  title: "Get XCP — xcp.fun",
+  title: msg("Get XCP — xcp.fun"),
   description:
-    "Load your wallet with XCP straight from Bitcoin — or unload it back. Minting costs XCP: 0.01 XCP per 1,000-token lot, 10 XCP for a max mint.",
+    msg("Load your wallet with XCP straight from Bitcoin — or unload it back. Minting costs XCP: 0.01 XCP per 1,000-token lot, 10 XCP for a max mint."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -21,7 +23,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/dispense") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/dispense"),
+  };
 }
 
 export default async function GetXcpPage() {

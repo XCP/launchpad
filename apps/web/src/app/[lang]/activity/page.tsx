@@ -1,12 +1,14 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import type { Metadata } from "next";
 import { ActivityView } from "@/app/[lang]/activity/_components/activity-view";
 
 const PAGE_METADATA: Metadata = {
-  title: "Activity — xcp.fun",
+  title: msg("Activity — xcp.fun"),
   description:
-    "Every XCP-69 mint, trade, burn, resting order and launch, newest first.",
+    msg("Every XCP-69 mint, trade, burn, resting order and launch, newest first."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -17,7 +19,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/activity") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/activity"),
+  };
 }
 
 /* No revalidate directive, for the same reason /mempool has none: nothing on

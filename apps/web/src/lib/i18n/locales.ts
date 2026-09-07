@@ -24,12 +24,14 @@ export interface LocaleInfo {
   native: string;
   /** BCP 47 tag for `<html lang>` and hreflang. */
   tag: string;
+  /** Open Graph's own locale form, language_TERRITORY. */
+  og: string;
   dir: "ltr" | "rtl";
 }
 
 export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
-  en: { native: "English", tag: "en", dir: "ltr" },
-  ja: { native: "日本語", tag: "ja", dir: "ltr" },
+  en: { native: "English", tag: "en", og: "en_US", dir: "ltr" },
+  ja: { native: "日本語", tag: "ja", og: "ja_JP", dir: "ltr" },
 };
 
 export function isLocale(value: unknown): value is Locale {

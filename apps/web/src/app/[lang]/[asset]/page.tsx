@@ -27,7 +27,7 @@ import { proseDescription } from "@launchpad/xcp69/description";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import { isLocale, localePath } from "@/lib/i18n/locales";
-import { localeAlternates } from "@/lib/i18n/seo";
+import { localeAlternates, openGraphLocale } from "@/lib/i18n/seo";
 import {
   circulatingSupplyRaw,
   isXcp69,
@@ -145,6 +145,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
+      ...openGraphLocale(locale),
       url: `${METADATA_ORIGIN}${localePath(locale, `/${asset}`)}`,
       images: [{ url: image, width: 1024, height: 1024, alt: `${asset} artwork` }],
       type: "website",

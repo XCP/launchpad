@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import { fetchXcpUsd } from "@/lib/api/price";
 import { fetchTradeableAssets } from "@/lib/tradeable";
 import { LimitSurface } from "@/app/[lang]/limit/_components/limit-surface";
@@ -8,9 +10,9 @@ import { LimitSurface } from "@/app/[lang]/limit/_components/limit-surface";
 export const revalidate = 60;
 
 const PAGE_METADATA = {
-  title: "Limit — xcp.fun",
+  title: msg("Limit — xcp.fun"),
   description:
-    "Place limit orders on graduated XCP-69 launches. Your price is enforced by the order itself — fills through the pool at confirmation or rests on the book.",
+    msg("Place limit orders on graduated XCP-69 launches. Your price is enforced by the order itself — fills through the pool at confirmation or rests on the book."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -21,7 +23,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/limit") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/limit"),
+  };
 }
 
 export default async function LimitPage() {

@@ -11,7 +11,7 @@ import { SessionProvider } from "@/providers/session-context";
 import { SwrProvider } from "@/providers/swr-provider";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { isLocale, LOCALE_INFO, LOCALES } from "@/lib/i18n/locales";
-import { localeAlternates } from "@/lib/i18n/seo";
+import { localeAlternates, openGraphLocale } from "@/lib/i18n/seo";
 import { getMessages, isMachineDrafted } from "@/lib/i18n/server";
 import { makeT } from "@/lib/i18n/t";
 import { METADATA_ORIGIN } from "@/lib/metadata";
@@ -45,6 +45,9 @@ export async function generateMetadata({
     // Pages that name their own path override this with their own set;
     // this is the homepage's, and the fallback for anything that does not.
     alternates: localeAlternates(locale, "/"),
+    // No title or description here on purpose: a page's own then flow into
+    // og:title and og:description, while the site-level facts are inherited.
+    openGraph: { type: "website", siteName: "xcp.fun", ...openGraphLocale(locale) },
   };
 }
 

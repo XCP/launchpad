@@ -17,3 +17,16 @@ export function localeAlternates(locale: Locale, path: string): NonNullable<Meta
   languages["x-default"] = localePath("en", path);
   return { canonical: localePath(locale, path), languages };
 }
+
+/**
+ * The Open Graph half of the same fact: which language this version is in
+ * and which others exist, so a link shared in a Japanese group unfurls as
+ * Japanese and the platform knows there is an English one. Spread into any
+ * page's `openGraph`, since a page that sets its own replaces the layout's.
+ */
+export function openGraphLocale(locale: Locale): { locale: string; alternateLocale: string[] } {
+  return {
+    locale: LOCALE_INFO[locale].og,
+    alternateLocale: LOCALES.filter((l) => l !== locale).map((l) => LOCALE_INFO[l].og),
+  };
+}

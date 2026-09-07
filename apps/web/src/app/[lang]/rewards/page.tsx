@@ -1,5 +1,7 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
@@ -26,9 +28,9 @@ import {
 import { EarnersTable } from "@/app/[lang]/rewards/_components/earners-table";
 
 const PAGE_METADATA: Metadata = {
-  title: "XCP Rewards — xcp.fun",
+  title: msg("XCP Rewards — xcp.fun"),
   description:
-    "An XCP bounty for the first three launches to graduate, and MINTS for every mint.",
+    msg("An XCP bounty for the first three launches to graduate, and MINTS for every mint."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -39,7 +41,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/rewards") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/rewards"),
+  };
 }
 
 export const revalidate = 60;

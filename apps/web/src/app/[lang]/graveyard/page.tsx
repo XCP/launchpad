@@ -1,5 +1,7 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import type { Metadata } from "next";
 import { GraveyardList } from "@/app/[lang]/graveyard/_components/graveyard-list";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
@@ -7,8 +9,8 @@ import { fetchLaunchPage } from "@/lib/api/launchpad-api";
 import { type LaunchPage, PER_PAGE, toSectionRow } from "@/lib/launch-row";
 
 const PAGE_METADATA: Metadata = {
-  title: "Graveyard — xcp.fun",
-  description: "XCP-69 launches that closed below their soft cap and refunded participants.",
+  title: msg("Graveyard — xcp.fun"),
+  description: msg("XCP-69 launches that closed below their soft cap and refunded participants."),
   // The route is intentionally available only to someone who knows it. It is
   // not linked from the site, and crawlers should not turn it into navigation.
   robots: { index: false, follow: false },
@@ -22,7 +24,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/graveyard") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/graveyard"),
+  };
 }
 
 export const revalidate = 60;

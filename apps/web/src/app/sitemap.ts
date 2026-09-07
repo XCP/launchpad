@@ -16,12 +16,20 @@ export const revalidate = 3600;
 
 const STATIC_PATHS = ["/", "/faq", "/docs", "/stats", "/activity", "/swap", "/limit", "/dispense", "/rewards", "/mempool", "/graveyard", "/research", "/create"];
 
+/** The homepage is `https://xcp.fun`, no trailing slash — exactly as the
+ *  page's own canonical writes it. A sitemap that says `/` while the page
+ *  says otherwise is the inconsistency crawlers punish. */
+const absolute = (locale: Parameters<typeof localePath>[0], path: string) => {
+  const p = localePath(locale, path);
+  return `${METADATA_ORIGIN}${p === "/" ? "" : p}`;
+};
+
 function entry(path: string, priority: number): MetadataRoute.Sitemap[number] {
   const languages: Record<string, string> = {};
-  for (const l of LOCALES) languages[LOCALE_INFO[l].tag] = `${METADATA_ORIGIN}${localePath(l, path)}`;
-  languages["x-default"] = `${METADATA_ORIGIN}${localePath("en", path)}`;
+  for (const l of LOCALES) languages[LOCALE_INFO[l].tag] = absolute(l, path);
+  languages["x-default"] = absolute("en", path);
   return {
-    url: `${METADATA_ORIGIN}${localePath("en", path)}`,
+    url: absolute("en", path),
     priority,
     alternates: { languages },
   };

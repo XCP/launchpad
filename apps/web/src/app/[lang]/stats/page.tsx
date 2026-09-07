@@ -1,5 +1,7 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight } from "@/lib/api/counterparty";
@@ -13,8 +15,8 @@ import { historicalUsdAt } from "@/lib/market";
 import { LABEL } from "@/components/ui/tokens";
 
 const PAGE_METADATA: Metadata = {
-  title: "Stats — xcp.fun",
-  description: "XCP-69 launches by phase, and what has actually been minted.",
+  title: msg("Stats — xcp.fun"),
+  description: msg("XCP-69 launches by phase, and what has actually been minted."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -25,7 +27,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/stats") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/stats"),
+  };
 }
 
 export const revalidate = 60;

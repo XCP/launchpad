@@ -276,6 +276,9 @@
   "Activity": [
     "components/site-header.tsx"
   ],
+  "Activity — xcp.fun": [
+    "app/[lang]/activity/page.tsx"
+  ],
   "Address": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
@@ -305,6 +308,9 @@
   ],
   "Amount of {asset}": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "An XCP bounty for the first three launches to graduate, and MINTS for every mint.": [
+    "app/[lang]/rewards/page.tsx"
   ],
   "an XCP fairminter on xcp.fun": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
@@ -560,6 +566,9 @@
   "Docs": [
     "components/site-header.tsx"
   ],
+  "Docs — xcp.fun": [
+    "app/[lang]/docs/page.tsx"
+  ],
   "down": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
   ],
@@ -590,6 +599,12 @@
   ],
   "Every LP token is burned — this liquidity can never be withdrawn.": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Every XCP-69 mint, trade, burn, resting order and launch, newest first.": [
+    "app/[lang]/activity/page.tsx"
+  ],
+  "Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, what it costs (nothing), and how to integrate.": [
+    "app/[lang]/docs/page.tsx"
   ],
   "expired · refunded": [
     "components/pending-dock.tsx"
@@ -624,6 +639,9 @@
   "full XCP refund, automatic": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
   ],
+  "Get XCP — xcp.fun": [
+    "app/[lang]/dispense/page.tsx"
+  ],
   "Get XCP before it opens": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
@@ -635,6 +653,9 @@
     "app/[lang]/[asset]/_components/launch-chrome.tsx",
     "app/[lang]/_components/launch-search.tsx",
     "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Graveyard — xcp.fun": [
+    "app/[lang]/graveyard/page.tsx"
   ],
   "Grid view": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -653,6 +674,9 @@
   ],
   "Hourly": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "How it works — xcp.fun": [
+    "app/[lang]/faq/page.tsx"
   ],
   "If it fails to launch": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
@@ -695,6 +719,9 @@
   "Limit": [
     "components/site-header.tsx"
   ],
+  "Limit — xcp.fun": [
+    "app/[lang]/limit/page.tsx"
+  ],
   "Limit price in XCP per {asset}": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
@@ -709,6 +736,9 @@
   ],
   "LIVE · {asset}": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "Load your wallet with XCP straight from Bitcoin — or unload it back. Minting costs XCP: 0.01 XCP per 1,000-token lot, 10 XCP for a max mint.": [
+    "app/[lang]/dispense/page.tsx"
   ],
   "Loading historical XCP/USD": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
@@ -759,6 +789,9 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
     "components/mempool-chip.tsx",
     "components/site-header.tsx"
+  ],
+  "Mempool — xcp.fun": [
+    "app/[lang]/mempool/page.tsx"
   ],
   "Min received": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
@@ -879,6 +912,9 @@
   "of supply": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
   ],
+  "One fixed parameter set for token launches on Counterparty: the launch sells out and liquidity locks forever, or everyone is refunded. Zero creator take, enforced by consensus.": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "open": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
   ],
@@ -939,6 +975,9 @@
   "Place limit buy": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
+  "Place limit orders on graduated XCP-69 launches. Your price is enforced by the order itself — fills through the pool at confirmation or rests on the book.": [
+    "app/[lang]/limit/page.tsx"
+  ],
   "Place limit sell": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
@@ -968,6 +1007,9 @@
   ],
   "Price market": [
     "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Profile — xcp.fun": [
+    "app/[lang]/profile/page.tsx"
   ],
   "Progress": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -1096,12 +1138,21 @@
   "Stats": [
     "components/site-header.tsx"
   ],
+  "Stats — xcp.fun": [
+    "app/[lang]/stats/page.tsx"
+  ],
   "Supply": [
     "app/[lang]/[asset]/_components/launch-stats.tsx",
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "Swap": [
     "components/site-header.tsx"
+  ],
+  "Swap — xcp.fun": [
+    "app/[lang]/swap/page.tsx"
+  ],
+  "Swap graduated XCP-69 assets through Counterparty pools and the order book, including direct token pairs when liquidity exists.": [
+    "app/[lang]/swap/page.tsx"
   ],
   "Switch wallet": [
     "components/header-wallet.tsx"
@@ -1226,11 +1277,26 @@
     "components/rewards-chip.tsx",
     "components/site-header.tsx"
   ],
+  "XCP Rewards — xcp.fun": [
+    "app/[lang]/rewards/page.tsx"
+  ],
+  "XCP-69 launches and mints sitting in the Bitcoin mempool, not yet confirmed.": [
+    "app/[lang]/mempool/page.tsx"
+  ],
+  "XCP-69 launches by phase, and what has actually been minted.": [
+    "app/[lang]/stats/page.tsx"
+  ],
   "XCP-69 launches on Counterparty": [
     "components/site-footer.tsx"
   ],
+  "XCP-69 launches that closed below their soft cap and refunded participants.": [
+    "app/[lang]/graveyard/page.tsx"
+  ],
   "XCP-69 market": [
     "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "XCP.FUN - Bitcoin Memecoins on Counterparty": [
+    "app/[lang]/page.tsx"
   ],
   "xcp.fun — XCP-69 Launchpad": [
     "app/[lang]/layout.tsx"
@@ -1261,6 +1327,9 @@
   ],
   "Your connected wallet's resting order participated in this fill": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Your positions, history, and launches. Every graduated XCP-69 launch trades against XCP, so a position's value is a pool price away from a dollar figure.": [
+    "app/[lang]/profile/page.tsx"
   ],
   "Your profile": [
     "components/header-wallet.tsx"

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import { LazyLink } from "@/components/lazy-link";
 import {
   XCP69_MIN_PARTICIPANTS,
@@ -20,9 +22,9 @@ import {
 } from "@/app/[lang]/docs/_lib/snippets";
 
 const PAGE_METADATA = {
-  title: "Docs — xcp.fun",
+  title: msg("Docs — xcp.fun"),
   description:
-    "Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, what it costs (nothing), and how to integrate.",
+    msg("Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, what it costs (nothing), and how to integrate."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -33,7 +35,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/docs") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/docs"),
+  };
 }
 
 const TOC: { section: string; items: [string, string][] }[] = [

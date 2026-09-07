@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
+import { getMessages } from "@/lib/i18n/server";
+import { makeT, msg } from "@/lib/i18n/t";
 import { fetchXcpUsd } from "@/lib/api/price";
 import { fetchTradeableAssets } from "@/lib/tradeable";
 import { TradeSurface } from "@/app/[lang]/swap/_components/trade-surface";
@@ -8,9 +10,9 @@ import { TradeSurface } from "@/app/[lang]/swap/_components/trade-surface";
 export const revalidate = 60;
 
 const PAGE_METADATA = {
-  title: "Swap — xcp.fun",
+  title: msg("Swap — xcp.fun"),
   description:
-    "Swap graduated XCP-69 assets through Counterparty pools and the order book, including direct token pairs when liquidity exists.",
+    msg("Swap graduated XCP-69 assets through Counterparty pools and the order book, including direct token pairs when liquidity exists."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -21,7 +23,14 @@ export async function generateMetadata({
   params: Promise<{ lang: string }>;
 }): Promise<Metadata> {
   const { lang } = await params;
-  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/swap") };
+  const locale = isLocale(lang) ? lang : "en";
+  const t = makeT(await getMessages(locale));
+  return {
+    ...PAGE_METADATA,
+    title: t(String(PAGE_METADATA.title)),
+    ...(PAGE_METADATA.description ? { description: t(PAGE_METADATA.description) } : {}),
+    alternates: localeAlternates(locale, "/swap"),
+  };
 }
 
 export default async function SwapPage() {
