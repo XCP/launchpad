@@ -4,9 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import type { ComponentProps, FocusEvent, PointerEvent } from "react";
+import { useLocale } from "@/lib/i18n/client";
+import { isUnlocalizedPath, type Locale, localePath } from "@/lib/i18n/locales";
 
 type Props = Omit<ComponentProps<typeof Link>, "href" | "prefetch"> & {
   href: string;
+  /** Link into a specific language rather than the current one — the
+   *  language menu is the only caller. */
+  locale?: Locale;
 };
 
 /**
@@ -48,13 +53,23 @@ const HOVER_DWELL_MS = 80;
  * never opened. Nothing here should import next/link directly.
  */
 export function LazyLink({
-  href,
+  href: rawHref,
+  locale,
   onPointerEnter,
   onPointerLeave,
   onFocus,
   ...rest
 }: Props) {
   const router = useRouter();
+  // Every internal link goes through here, so this is also where a page in
+  // Japanese keeps its visitor in Japanese: `/faq` becomes `/ja/faq` without
+  // any call site knowing. Absolute URLs, route handlers and files pass
+  // through untouched.
+  const current = useLocale();
+  const href =
+    rawHref.startsWith("/") && !isUnlocalizedPath(rawHref)
+      ? localePath(locale ?? current, rawHref)
+      : rawHref;
   const dwell = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cancel = () => {
     if (dwell.current !== null) {

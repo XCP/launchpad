@@ -1,0 +1,40 @@
+import type { Metadata } from "next";
+import { isLocale } from "@/lib/i18n/locales";
+import { localeAlternates } from "@/lib/i18n/seo";
+import { fetchXcpDispensers } from "@/lib/api/counterparty";
+import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
+import { XcpBridge } from "@/app/[lang]/dispense/_components/bridge";
+
+export const revalidate = 60;
+
+const PAGE_METADATA = {
+  title: "Get XCP — xcp.fun",
+  description:
+    "Load your wallet with XCP straight from Bitcoin — or unload it back. Minting costs XCP: 0.01 XCP per 1,000-token lot, 10 XCP for a max mint.",
+};
+
+/** The page's own metadata, plus the hreflang set for the locale it is
+ *  rendered under — see lib/i18n/seo. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ lang: string }>;
+}): Promise<Metadata> {
+  const { lang } = await params;
+  return { ...PAGE_METADATA, alternates: localeAlternates(isLocale(lang) ? lang : "en", "/dispense") };
+}
+
+export default async function GetXcpPage() {
+  const [dispensers, btcUsd, xcpUsd] = await Promise.all([
+    fetchXcpDispensers(),
+    fetchBtcUsd(),
+    fetchXcpUsd(),
+  ]);
+
+  return (
+    <div className="mx-auto max-w-lg space-y-6 lg:max-w-3xl">
+      <XcpBridge dispensers={dispensers} btcUsd={btcUsd} xcpUsd={xcpUsd} />
+
+    </div>
+  );
+}

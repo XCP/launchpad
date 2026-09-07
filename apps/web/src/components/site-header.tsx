@@ -1,8 +1,13 @@
 "use client";
 
+import { msg } from "@/lib/i18n/t";
 import { LazyLink } from "@/components/lazy-link";
 import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
+import { CurrencySubmenu, LanguageItems, LanguageSwitch } from "@/components/language-switch";
+import { usePathname } from "next/navigation";
+import { useT } from "@/lib/i18n/client";
+import { splitLocale } from "@/lib/i18n/locales";
 import { MempoolChip, useMempoolCount } from "@/components/mempool-chip";
 import { RewardsChip } from "@/components/rewards-chip";
 import { TELEGRAM_URL, TelegramChip } from "@/components/telegram-chip";
@@ -42,18 +47,18 @@ import { TELEGRAM_URL, TelegramChip } from "@/components/telegram-chip";
  */
 
 const LINKS = [
-  { href: "/swap", label: "Swap" },
-  { href: "/limit", label: "Limit" },
-  { href: "/dispense", label: "Dispense" },
+  { href: "/swap", label: msg("Swap") },
+  { href: "/limit", label: msg("Limit") },
+  { href: "/dispense", label: msg("Dispense") },
 ];
 
 /** Secondary, and kept beside the wallet per the header's reading order:
  *  what you came to do on the left, what you look up on the right. */
 const SECONDARY = [
-  { href: "/activity", label: "Activity" },
-  { href: "/stats", label: "Stats" },
-  { href: "/faq", label: "FAQ" },
-  { href: "/docs", label: "Docs" },
+  { href: "/activity", label: msg("Activity") },
+  { href: "/stats", label: msg("Stats") },
+  { href: "/faq", label: msg("FAQ") },
+  { href: "/docs", label: msg("Docs") },
 ];
 
 /** Both chips are links in the header rather than in this row — but the phone
@@ -63,11 +68,12 @@ const SECONDARY = [
  *  mempool is up, so without this entry the page would be unreachable for
  *  exactly as long as something is queued. */
 const MENU_EXTRA = [
-  { href: "/rewards", label: "XCP Rewards" },
-  { href: "/mempool", label: "Mempool" },
+  { href: "/rewards", label: msg("XCP Rewards") },
+  { href: "/mempool", label: msg("Mempool") },
 ];
 
 export function SiteHeader() {
+  const t = useT();
   // Below `lg` the chips sit inline, in the row's remaining space — and there
   // is only ever enough of it for one. Two at once pushed the wordmark until
   // 🎉 XCP.FUN began to truncate, which is the one thing in the row that can't
@@ -76,7 +82,18 @@ export function SiteHeader() {
   const queued = useMempoolCount() > 0;
 
   return (
-    <header className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+    // `relative` for the language menu, which sits in the viewport's corner
+    // outside the centred row when the window is wide enough to have one.
+    <header className="relative border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+      {/* The language menu, in three places by width and never two at once.
+          Wide enough for a margin beyond the 1024px row, it sits in the
+          corner where a reader who cannot read the page will look for a
+          globe. Narrower, it joins the row beside the wallet. On phones it
+          is a section of the menu. 1340px is where the corner has room for
+          the widest language name without touching the row. */}
+      <div className="absolute end-4 top-1/2 hidden -translate-y-1/2 min-[1340px]:block">
+        <LanguageSwitch />
+      </div>
       {/* `relative` so the mempool chip can be centred on the HEADER rather
           than on whatever gap the two nav groups happen to leave — those
           change width with the wallet's state, and a "centre" that drifts
@@ -100,8 +117,8 @@ export function SiteHeader() {
           </LazyLink>
           <nav className="hidden items-center gap-4 text-sm font-medium text-gray-600 dark:text-gray-400 nav:flex">
             {LINKS.map((l) => (
-              <LazyLink key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
-                {l.label}
+              <LazyLink key={l.href} href={l.href} className="whitespace-nowrap hover:text-gray-900 dark:hover:text-gray-100">
+                {t(l.label)}
               </LazyLink>
             ))}
           </nav>
@@ -150,11 +167,14 @@ export function SiteHeader() {
           </span>
           <nav className="hidden items-center gap-4 nav:flex">
             {SECONDARY.map((l) => (
-              <LazyLink key={l.href} href={l.href} className="hover:text-gray-900 dark:hover:text-gray-100">
-                {l.label}
+              <LazyLink key={l.href} href={l.href} className="whitespace-nowrap hover:text-gray-900 dark:hover:text-gray-100">
+                {t(l.label)}
               </LazyLink>
             ))}
           </nav>
+          <div className="hidden nav:block min-[1340px]:hidden">
+            <LanguageSwitch compact />
+          </div>
           <div className="hidden nav:block">
             <HeaderWallet />
           </div>
@@ -172,13 +192,15 @@ export function SiteHeader() {
  * to show it stays a plain Tailwind breakpoint.
  */
 function MobileMenu() {
+  const t = useT();
+  const { path } = splitLocale(usePathname() ?? "/");
   const item =
     "block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 outline-none data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-800 data-[highlighted]:text-gray-900 dark:data-[highlighted]:text-gray-100";
 
   return (
     <DM.Root>
       <DM.Trigger
-        aria-label="Open menu"
+        aria-label={t("Open menu")}
         className="flex size-9 items-center justify-center rounded-lg border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 nav:hidden"
       >
         {/* Three bars, drawn rather than shipped as an icon dependency. */}
@@ -200,7 +222,7 @@ function MobileMenu() {
           {LINKS.map((l) => (
             <DM.Item key={l.href} asChild>
               <LazyLink href={l.href} className={item}>
-                {l.label}
+                {t(l.label)}
               </LazyLink>
             </DM.Item>
           ))}
@@ -208,10 +230,16 @@ function MobileMenu() {
           {[...MENU_EXTRA, ...SECONDARY].map((l) => (
             <DM.Item key={l.href} asChild>
               <LazyLink href={l.href} className={item}>
-                {l.label}
+                {t(l.label)}
               </LazyLink>
             </DM.Item>
           ))}
+          <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
+          {/* Languages, each in its own name — the one section of this menu a
+              visitor who cannot read the rest still needs to find — and the
+              currency beneath them, as in the desktop globe menu. */}
+          <LanguageItems path={path} />
+          <CurrencySubmenu />
           <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
           {/* An external destination, so it says so — the menu is the index of
               the site and this is the one row that leaves it. */}
@@ -222,7 +250,7 @@ function MobileMenu() {
           </DM.Item>
           <DM.Item asChild>
             <LazyLink href="/create" className={item}>
-              Create a launch
+              {t("Create a launch")}
             </LazyLink>
           </DM.Item>
         </DM.Content>

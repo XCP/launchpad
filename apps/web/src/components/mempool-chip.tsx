@@ -4,6 +4,7 @@ import { LazyLink } from "@/components/lazy-link";
 import { useMempool } from "@/hooks/use-mempool";
 import { PendingDot } from "@/components/pending-dot";
 import { FOCUS } from "@/components/ui/tokens";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Ambient, not watched: this sits on every page, so it polls at a third of
@@ -41,6 +42,7 @@ export function useMempoolCount() {
  * thousands of transactions and none of them anyone's business here.
  */
 export function MempoolChip({ className = "" }: { className?: string }) {
+  const t = useT();
   const count = useMempoolCount();
 
   // Nothing queued, or nothing known yet: render nothing at all rather than a
@@ -55,7 +57,7 @@ export function MempoolChip({ className = "" }: { className?: string }) {
       <PendingDot />
       {/* Same count grammar as the tabs on /mempool — "Mints (3)" — so the
           chip and the page it opens read as one system. */}
-      <span>Mempool</span>
+      <span>{t("Mempool")}</span>
       <span className="tabular-nums">({count})</span>
     </LazyLink>
   );

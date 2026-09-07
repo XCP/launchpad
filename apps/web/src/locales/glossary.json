@@ -1,0 +1,150 @@
+{
+  "_about": "Fixed renderings of the site's own vocabulary, per locale. The draft script hands these to the model with every batch, and a reviewer changes a term here rather than in a hundred strings. A term with no entry for a locale is the model's call. Keep the note in English: it is the reviewer's brief.",
+  "terms": {
+    "fairminter": {
+      "note": "Counterparty's on-chain mint contract. A proper noun on this site.",
+      "ja": "フェアミンター"
+    },
+    "mint": {
+      "note": "Verb and noun: paying XCP into a fairminter for tokens.",
+      "ja": "ミント"
+    },
+    "minter": {
+      "note": "An address that has minted.",
+      "ja": "ミンター"
+    },
+    "launch": {
+      "note": "One XCP-69 token launch, from announcement to pool.",
+      "ja": "ローンチ"
+    },
+    "graduated": {
+      "note": "The launch sold out and its pool opened. pump.fun's sense of the word.",
+      "ja": "卒業"
+    },
+    "refunded": {
+      "note": "The launch missed its soft cap and everyone was repaid.",
+      "ja": "返金"
+    },
+    "scheduled": {
+      "note": "Announced, not yet open for minting.",
+      "ja": "予定"
+    },
+    "upcoming": {
+      "note": "Chip on a scheduled launch's card.",
+      "ja": "近日"
+    },
+    "minting": {
+      "note": "Open for minting right now.",
+      "ja": "ミント中"
+    },
+    "soft cap": {
+      "note": "The 69M-token sale target. Keep the loanword.",
+      "ja": "ソフトキャップ"
+    },
+    "hard cap": {
+      "ja": "ハードキャップ"
+    },
+    "pool": {
+      "note": "The TOKEN/XCP AMM pool.",
+      "ja": "プール"
+    },
+    "liquidity": {
+      "ja": "流動性"
+    },
+    "LP burned": {
+      "note": "The pool's LP tokens were destroyed, so liquidity is locked forever.",
+      "ja": "LP焼却済み"
+    },
+    "market cap": {
+      "ja": "時価総額"
+    },
+    "price": {
+      "ja": "価格"
+    },
+    "holders": {
+      "ja": "ホルダー",
+      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use."
+    },
+    "supply": {
+      "ja": "供給量"
+    },
+    "volume": {
+      "ja": "出来高"
+    },
+    "since mint": {
+      "note": "Return measured from the mint price.",
+      "ja": "ミント時比"
+    },
+    "all-time": {
+      "note": "The whole life of the market, as a window label beside 24h.",
+      "ja": "全期間"
+    },
+    "performance": {
+      "ja": "パフォーマンス"
+    },
+    "swap": {
+      "ja": "スワップ"
+    },
+    "limit": {
+      "note": "Limit orders on Counterparty's order book (the nav label).",
+      "ja": "指値"
+    },
+    "dispense": {
+      "note": "Buying XCP from Counterparty dispensers (the nav label).",
+      "ja": "ディスペンス"
+    },
+    "dispenser": {
+      "ja": "ディスペンサー"
+    },
+    "activity": {
+      "ja": "アクティビティ"
+    },
+    "stats": {
+      "ja": "統計"
+    },
+    "docs": {
+      "ja": "ドキュメント"
+    },
+    "rewards": {
+      "note": "The XCP Rewards programme for minters.",
+      "ja": "リワード"
+    },
+    "mempool": {
+      "ja": "メンプール"
+    },
+    "connect": {
+      "note": "Connect a wallet.",
+      "ja": "接続"
+    },
+    "create": {
+      "note": "Create a launch.",
+      "ja": "作成"
+    },
+    "wallet": {
+      "ja": "ウォレット"
+    },
+    "address": {
+      "ja": "アドレス"
+    },
+    "block": {
+      "note": "Bitcoin block.",
+      "ja": "ブロック"
+    },
+    "trading data": {
+      "ja": "取引データ"
+    },
+    "sort": {
+      "ja": "並び替え"
+    },
+    "newest": {
+      "ja": "新着"
+    },
+    "search": {
+      "ja": "検索"
+    },
+    "all-time high": {
+      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値.",
+      "ja": "ATH"
+    }
+  }
+}

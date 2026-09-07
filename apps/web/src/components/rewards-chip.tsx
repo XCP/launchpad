@@ -1,5 +1,8 @@
+"use client";
+
 import { LazyLink } from "@/components/lazy-link";
 import { FOCUS } from "@/components/ui/tokens";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * The header's pointer to the rewards programme — the mempool chip's sibling,
@@ -12,6 +15,7 @@ import { FOCUS } from "@/components/ui/tokens";
  * there is room for one chip and queued work is the more urgent of the two.
  */
 export function RewardsChip({ className = "" }: { className?: string }) {
+  const t = useT();
   return (
     <LazyLink
       href="/rewards"
@@ -23,7 +27,7 @@ export function RewardsChip({ className = "" }: { className?: string }) {
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-75" />
         <span className="relative inline-flex size-1.5 rounded-full bg-green-500" />
       </span>
-      <span>XCP Rewards</span>
+      <span>{t("XCP Rewards")}</span>
     </LazyLink>
   );
 }

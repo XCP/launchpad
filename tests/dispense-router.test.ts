@@ -33,7 +33,7 @@ describe("Buy XCP compose", () => {
     }) as unknown as typeof fetch);
 
     const { composeLeg } = await import(
-      "@/app/dispense/_lib/use-dispense-router"
+      "@/app/[lang]/dispense/_lib/use-dispense-router"
     );
     const raw = await composeLeg(
       "bc1qnativewitnessaddress",

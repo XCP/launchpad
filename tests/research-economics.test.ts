@@ -8,7 +8,7 @@ import {
   scenarioCashFlow,
   sequentialSellerProceedsXcp,
   totalSequentialExitProceedsXcp,
-} from "@/app/research/_lib/economics";
+} from "@/app/[lang]/research/_lib/economics";
 
 describe("XCP-69 research economics", () => {
   it("reproduces the coordinated first-exit checkpoints", () => {

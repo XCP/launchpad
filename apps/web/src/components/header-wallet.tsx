@@ -8,6 +8,7 @@ import { trackTx } from "@/lib/analytics";
 import { shortAddress } from "@/lib/format";
 import { useWalletMenu } from "@xcp/wallet-sdk/react";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * The header's wallet slot: same shape as the Launch button beside it
@@ -17,6 +18,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
  * surface.
  */
 export function HeaderWallet() {
+  const t = useT();
   const { status, address, proofStatus } = useWallet();
   const menu = useWalletMenu();
   const { accounts, switchAccount, disconnect } = menu;
@@ -40,7 +42,7 @@ export function HeaderWallet() {
     unverified: { dot: "bg-gray-400 dark:bg-gray-500", note: null },
     failed: {
       dot: "bg-red-500",
-      note: "Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it.",
+      note: t("Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it."),
     },
   }[proofStatus];
   const [copied, setCopied] = useState(false);
@@ -76,7 +78,7 @@ export function HeaderWallet() {
             onClick={onClick}
             className="rounded-md bg-purple-600 px-3 py-1.5 text-white hover:bg-purple-500"
           >
-            Connect
+            {t("Connect")}
           </button>
           {installPrompt}
         </>
@@ -106,7 +108,7 @@ export function HeaderWallet() {
               )}
               {menu.wallet && (
                 <p className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
-                  via {menu.wallet.name}
+                  {t("via {wallet}", { wallet: menu.wallet.name })}
                 </p>
               )}
               {accounts.length > 1 && (
@@ -133,7 +135,7 @@ export function HeaderWallet() {
                 href="/profile"
                 className="block rounded-xl px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
-                Your profile
+                {t("Your profile")}
               </LazyLink>
               <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
               <button
@@ -146,7 +148,7 @@ export function HeaderWallet() {
                 }}
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
-                {copied ? "Copied" : "Copy address"}
+                {copied ? t("Copied") : t("Copy address")}
               </button>
               <a
                 href={`https://xcp.io/address/${address}`}
@@ -154,7 +156,7 @@ export function HeaderWallet() {
                 rel="noreferrer"
                 className="block rounded-xl px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
               >
-                View on explorer ↗
+                {t("View on explorer ↗")}
               </a>
               <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
               {menu.canSwitchWallet && (
@@ -163,7 +165,7 @@ export function HeaderWallet() {
                   onClick={() => menu.switchWallet()}
                   className="block w-full rounded-xl px-3 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800/60"
                 >
-                  Switch wallet
+                  {t("Switch wallet")}
                 </button>
               )}
               <button
@@ -171,7 +173,7 @@ export function HeaderWallet() {
                 onClick={() => disconnect()}
                 className="block w-full rounded-xl px-3 py-2 text-left text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
               >
-                Disconnect
+                {t("Disconnect")}
               </button>
             </P.Content>
           </P.Portal>

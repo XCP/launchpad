@@ -1,0 +1,1271 @@
+{
+  "— minters": [
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/graveyard/_components/graveyard-list.tsx"
+  ],
+  "(optional)": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "(you own this asset)": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "{age} ago": [
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/activity/_components/activity-view.tsx"
+  ],
+  "{age} old": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "{amount} · {tokens} max": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "{amount} buy vol": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "{amount} or refund": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "{amount} sell vol": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "{asset} on {network}": [
+    "app/[lang]/[asset]/_components/launch-metadata.tsx"
+  ],
+  "{asset} price against {unit}, {n} {bucket} {kind}": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "{asset} to mint": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "{asset}: {headline} on xcp.fun": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "{cap} · {liquidity} pool": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "{cap} XCP · {supply} supply": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{code} at the ECB reference rate for {date}": [
+    "components/site-footer.tsx"
+  ],
+  "{count} online": [
+    "components/site-presence.tsx"
+  ],
+  "{currency} return from the mint price at launch": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "{eta} left": [
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/activity/_components/activity-view.tsx"
+  ],
+  "{eta} until minting opens": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "{market} price history with {n} points": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "{n} addresses": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "{n} block": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{n} block · {asset}": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "{n} blocks": [
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "{n} blocks · {asset}": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "{n} buyers": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "{n} buys": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "{n} confirmed": [
+    "components/pending-dock.tsx"
+  ],
+  "{n} holder": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{n} holders": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{n} minted": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{n} minter": [
+    "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/graveyard/_components/graveyard-list.tsx"
+  ],
+  "{n} minters": [
+    "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/graveyard/_components/graveyard-list.tsx"
+  ],
+  "{n} of {min} minters": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "{n} pending": [
+    "components/pending-dock.tsx"
+  ],
+  "{n} refunded hidden": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "{n} sats": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "{n} sellers": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "{n} sells": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "{n} tokens": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "{n} trade": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "{n} trades": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "{n} tx": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "{n} TX": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "{n} txs": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "{n} TXs": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "{n} unconfirmed transaction in the mempool": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "{n} unconfirmed transactions in the mempool": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "{n}× apart": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "{n}d": [
+    "lib/format.ts"
+  ],
+  "{n}d ago": [
+    "lib/chain-time.ts"
+  ],
+  "{n}h": [
+    "lib/format.ts"
+  ],
+  "{n}h ago": [
+    "lib/chain-time.ts"
+  ],
+  "{n}m": [
+    "lib/format.ts"
+  ],
+  "{n}m ago": [
+    "lib/chain-time.ts"
+  ],
+  "{n}mo ago": [
+    "lib/chain-time.ts"
+  ],
+  "{n}w ago": [
+    "lib/chain-time.ts"
+  ],
+  "{n}y ago": [
+    "lib/chain-time.ts"
+  ],
+  "{pct}% locked": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "{pct}% minted": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{pct}% of ATH": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{pct}% of the LP is burned. The rest can be withdrawn by whoever holds it.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "{period} {kind} from every fill on the pair — pool and order book. Volume beneath in XCP; {volume} XCP is the busiest {bucket} shown. Trend {trend} over this range.": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "{shown} of {total}": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "{supply} · {pool} pool": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "{time} · block {n}": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "← Prev": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "↗ Bid": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "↗ Buy": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "↘ Ask": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "↘ Sell": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "+{n} more below.": [
+    "components/pending-dock.tsx"
+  ],
+  "+{n} more on the explorer ↗": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "~{duration}": [
+    "lib/format.ts"
+  ],
+  "~{n}h": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "~{n}m": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "~{pct}% · remainder rests at your limit": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "~100% at confirmation": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "◆ Pool": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "💀 RIP": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "0.01 XCP / 1,000 · sells out or refunds": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "0% — rests until a counter-order takes it": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "24h": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "24h volume": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "30-day change": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "30d": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "A pool never runs out, it only gets worse. This is what it can absorb before its price moves 1%.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Activity": [
+    "components/site-header.tsx"
+  ],
+  "Address": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Address limit reached": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "adjusts to {n}": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "All": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx",
+    "app/[lang]/[asset]/_components/price-chart.tsx",
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "All-time": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "All@@window": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Also created: {names}": [
+    "app/[lang]/[asset]/_components/address-badges.tsx"
+  ],
+  "Amount": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Amount of {asset}": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "an XCP fairminter on xcp.fun": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Animated WEBP shows as a still frame in the announce channel — Telegram cannot play one. A GIF moves there too.": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Announced": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Ask": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "at ATH": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Auto ({code})": [
+    "components/language-switch.tsx"
+  ],
+  "Balance:": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Bid": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Bitcoin": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Bitcoin market price in USD": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Bitcoin Price": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "block": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "block {n}": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "Block {n}": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "blocks": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "book": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Broadcasting…": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "BTC market · cached 5 min": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "burn address": [
+    "app/[lang]/[asset]/_components/address-badges.tsx"
+  ],
+  "Buy": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Buy {asset} — limit order": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Buy BTC ↗": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Buy pending": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Buy some with BTC": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Buy XCP →": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "by {address}": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Cancel": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Cancel broadcast — the remainder refunds when it confirms.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "cancelled": [
+    "components/pending-dock.tsx"
+  ],
+  "candles": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Candles": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Change in {currency} over the last {window}, since the pool opened": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Change in {currency} over the last 24 hours": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Checking balance…": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Choose a wallet": [
+    "components/connect-button.tsx"
+  ],
+  "Clear done": [
+    "components/pending-dock.tsx"
+  ],
+  "Close": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Closed": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "closes": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Closes": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "closing": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Closing soonest": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Collapse": [
+    "components/pending-dock.tsx"
+  ],
+  "Composing…": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Confirm in wallet…": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx",
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "confirmed": [
+    "components/pending-dock.tsx"
+  ],
+  "Confirmed": [
+    "components/pending-dock.tsx"
+  ],
+  "confirmed · announced": [
+    "components/pending-dock.tsx"
+  ],
+  "confirmed · escrowed": [
+    "components/pending-dock.tsx"
+  ],
+  "confirmed · XCP delivered": [
+    "components/pending-dock.tsx"
+  ],
+  "Connect": [
+    "components/connect-button.tsx",
+    "components/header-wallet.tsx"
+  ],
+  "Connect Wallet": [
+    "components/connect-button.tsx"
+  ],
+  "Connecting needs a wallet browser extension, and no mobile browser can run one yet. Everything here is readable on a phone — launches, prices, holders — but minting and trading need a desktop.": [
+    "components/connect-button.tsx"
+  ],
+  "constant-product pool · 0.5% fee": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Copied": [
+    "components/header-wallet.tsx"
+  ],
+  "Copy address": [
+    "components/header-wallet.tsx"
+  ],
+  "Copy link": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "Copy the link, or post it straight to X.": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it.": [
+    "components/header-wallet.tsx"
+  ],
+  "Couldn't load page {n}. Showing the last page that loaded.": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Couldn't refresh this page. Showing the last version that loaded.": [
+    "app/[lang]/graveyard/_components/graveyard-list.tsx"
+  ],
+  "Counterparty": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Counterparty market price in USD": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Counterparty's canonical unspendable burn address": [
+    "app/[lang]/[asset]/_components/address-badges.tsx"
+  ],
+  "Create": [
+    "app/[lang]/_components/home-toolbar.tsx"
+  ],
+  "Create a launch": [
+    "components/site-header.tsx"
+  ],
+  "Creator bought — block {n}": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Creator holds": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Creator sold — block {n}": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Currency": [
+    "components/language-switch.tsx"
+  ],
+  "Daily": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Data": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "day": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Deadline": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Description": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Desktop only, for now": [
+    "components/connect-button.tsx"
+  ],
+  "dev": [
+    "app/[lang]/[asset]/_components/address-badges.tsx"
+  ],
+  "Disconnect": [
+    "components/header-wallet.tsx"
+  ],
+  "Dismiss": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx",
+    "components/pending-dock.tsx"
+  ],
+  "Dispense": [
+    "components/site-header.tsx"
+  ],
+  "Docs": [
+    "components/site-header.tsx"
+  ],
+  "down": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "dropped — nothing was spent": [
+    "components/pending-dock.tsx"
+  ],
+  "Edit token info": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Editing is locked for this session": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Enter a price": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Enter an amount": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Enter opens the first result · Esc closes": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "escrowed until launch": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Escrowed until the launch resolves: tokens if it sells out, full XCP refund if it doesn't.": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Every LP token is burned — this liquidity can never be withdrawn.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "expired · refunded": [
+    "components/pending-dock.tsx"
+  ],
+  "Expires": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Failed on": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Fairmint pools are live.": [
+    "app/[lang]/page.tsx"
+  ],
+  "FAQ": [
+    "components/site-header.tsx"
+  ],
+  "filled": [
+    "components/pending-dock.tsx"
+  ],
+  "Filled / expires": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Fills now": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Find a launch by asset name, and sort or filter the results.": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Floor price": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "full XCP refund, automatic": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Get XCP before it opens": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "graduated": [
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Graduated": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Grid view": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Hide minted": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Holders": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/[asset]/_components/launch-stats.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "hour": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Hourly": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "If it fails to launch": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "In pool": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "in the mempool — waiting for a block": [
+    "components/pending-dock.tsx"
+  ],
+  "Install ↗": [
+    "components/connect-button.tsx"
+  ],
+  "Install a wallet": [
+    "components/connect-button.tsx"
+  ],
+  "Install XCP Wallet": [
+    "components/connect-button.tsx"
+  ],
+  "Insufficient {asset} balance": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Insufficient XCP balance": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "just now": [
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/activity/_components/activity-view.tsx",
+    "lib/chain-time.ts"
+  ],
+  "latest launch {age}": [
+    "components/address-hover-card.tsx"
+  ],
+  "Launch the first": [
+    "app/[lang]/page.tsx"
+  ],
+  "Launched this token": [
+    "app/[lang]/[asset]/_components/address-badges.tsx"
+  ],
+  "Limit": [
+    "components/site-header.tsx"
+  ],
+  "Limit price in XCP per {asset}": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Line": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Link copied": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "Liquidity": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "LIVE · {asset}": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "Loading historical XCP/USD": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Loading holders…": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Loading launches…": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Loading mempool…": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Loading order book…": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Loading price history…": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Loading trades…": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "log": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Lots": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "LP token {asset}": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Market": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Market cap": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Market prices": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Max": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Mempool": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "components/mempool-chip.tsx",
+    "components/site-header.tsx"
+  ],
+  "Min received": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Mint {amount} {asset}": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Mint broadcast": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "mint price": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "minted out": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Minted out": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Minters": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "minting": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Minting": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "minting is live": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "minting is live — refresh the page": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "minting opens at": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "minting opens in {eta}": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "minting opens this block": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Mints": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "More than one wallet is installed. Pick the one to connect with.": [
+    "components/connect-button.tsx"
+  ],
+  "Need XCP?": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Newest": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Next →": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "no history": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "No holders found.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "No launches in this phase yet.": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "No live launches. Start one — it sells out or everyone gets refunded.": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "No mints yet — be the first.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "No open orders on this pair — every trade here is going through the pool.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "No orders for {asset} are waiting in the mempool.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "No trades in this range.": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "No trades in this window.": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "No trades yet — nothing has changed hands since the pool opened.": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "No trades yet.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "not XCP-69": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "nothing": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Nothing matches “{query}”.": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Nothing open matches “{query}” — {n} refunded launch hidden. Type a full name to open one.": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Nothing open matches “{query}” — {n} refunded launches hidden. Type a full name to open one.": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Nothing queued — every mint so far has confirmed.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "now": [
+    "app/[lang]/[asset]/_components/price-chart.tsx",
+    "lib/format.ts"
+  ],
+  "of supply": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "open": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "Open Bitcoin price": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Open menu": [
+    "components/site-header.tsx"
+  ],
+  "Open XCP price": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "opens": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "Opens": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "opens {eta}": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Opens at Block {block}": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Order broadcast": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Orders": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Page {page} of {total}": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Pagination": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Paid": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "partially filled · resting": [
+    "components/pending-dock.tsx"
+  ],
+  "pending": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "People with xcp.fun open right now, including you. Several tabs from the same browser count once. Closing the tab removes you.": [
+    "components/site-presence.tsx"
+  ],
+  "Per address": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "Performance (24h)": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Performance (All)": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Place limit buy": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Place limit sell": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "points": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "pool": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Pool": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Pool:": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Price": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/[asset]/_components/launch-stats.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Price · XCP per {asset}": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Price history is temporarily unavailable.": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Price market": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Progress": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Quote returns and prices in": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Raised": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Reached": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "reached {pct}%": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Reached {pct}% with {n} participants. A classic fairminter — no pool, no locked liquidity; distribution only.": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Recently confirmed": [
+    "components/pending-dock.tsx"
+  ],
+  "Recommended": [
+    "components/connect-button.tsx"
+  ],
+  "Refresh": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Refresh price chart": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "refunded": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Refunded": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Replace image": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Save failed": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Saved. Changes are live; other open pages may take a minute to refresh.": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Saving…": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "scheduled": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Scheduled": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Search asset name": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Search launches": [
+    "app/[lang]/_components/launch-search.tsx"
+  ],
+  "Sell": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Sell {asset} — limit order": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Sell pending": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Share": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "Share on X": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "Share this launch": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "Show amounts in US dollars": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "Show amounts in XCP": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "Show less": [
+    "app/[lang]/[asset]/_components/launch-metadata.tsx"
+  ],
+  "Show more": [
+    "app/[lang]/[asset]/_components/launch-metadata.tsx"
+  ],
+  "Side": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Sign & save": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "since mint": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "sold out": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Sold out in": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Something went wrong": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Soonest": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Sort {section}": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Sort:": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "spread": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Stats": [
+    "components/site-header.tsx"
+  ],
+  "Supply": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx",
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Swap": [
+    "components/site-header.tsx"
+  ],
+  "Switch wallet": [
+    "components/header-wallet.tsx"
+  ],
+  "Table view": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Target": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "The explorer has never seen this address do anything on chain.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "The first XCP-69 launch in history hasn't happened yet. All-or-nothing mints, at least {n} participants required, every raised XCP locked into the pool forever — enforced by consensus, not by this website.": [
+    "app/[lang]/page.tsx"
+  ],
+  "Token": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Top 10": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "Total": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Total in XCP": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "trade": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "Trade from your connected wallet": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "trades": [
+    "app/[lang]/[asset]/_components/pressure-panel.tsx"
+  ],
+  "Trades": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Trading Data": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Translated automatically": [
+    "components/site-footer.tsx"
+  ],
+  "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.": [
+    "app/[lang]/layout.tsx"
+  ],
+  "Try again": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "TX fee": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx",
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "TX fees": [
+    "app/[lang]/[asset]/_components/launch-stats.tsx"
+  ],
+  "unconfirmed": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/activity/_components/activity-view.tsx"
+  ],
+  "Unconfirmed and provisional — mempool mints can exceed what's left, get replaced, or never confirm. Only what lands on-chain counts.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Unconfirmed and provisional — these orders join the book only after confirmation.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "until minting opens": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "up": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
+  ],
+  "Upcoming": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Venue / time": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "via {wallet}": [
+    "components/header-wallet.tsx"
+  ],
+  "View {asset} artwork full size": [
+    "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "View on explorer ↗": [
+    "components/header-wallet.tsx"
+  ],
+  "vs pool": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Wearing the crown: minted more recently than anything else still minting": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "What xcp.fun shows for this launch, and what the hosted metadata says if your on-chain description points here. The on-chain field itself is locked forever; everything behind it is yours to curate.": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "Who was here": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "window closes {n}": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
+  ],
+  "within 1%": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "X profile": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ],
+  "XCP exchange rate": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "XCP market · cached 15 min": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "XCP Price": [
+    "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "XCP Rewards": [
+    "components/rewards-chip.tsx",
+    "components/site-header.tsx"
+  ],
+  "XCP-69 launches on Counterparty": [
+    "components/site-footer.tsx"
+  ],
+  "XCP-69 market": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "xcp.fun — XCP-69 Launchpad": [
+    "app/[lang]/layout.tsx"
+  ],
+  "XCP.FUN on Telegram": [
+    "components/telegram-chip.tsx"
+  ],
+  "xcp.fun talks to Counterparty through a wallet browser extension. Install one, then come back and connect.": [
+    "components/connect-button.tsx"
+  ],
+  "you": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "you have minted this launch’s max": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "You mint": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "You pay": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "You’ve already minted every live launch.": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Your connected wallet participated in this trade.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Your connected wallet's resting order participated in this fill": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
+  "Your profile": [
+    "components/header-wallet.tsx"
+  ],
+  "Your wallet supplied a connection signature that didn't verify, so we can't confirm this address is really yours. Disconnect and reconnect to try again — nothing else on the site is affected.": [
+    "app/[lang]/[asset]/_components/edit-panel.tsx"
+  ]
+}

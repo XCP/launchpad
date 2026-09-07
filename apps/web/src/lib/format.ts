@@ -7,6 +7,10 @@ import {
   rawToDecimalString,
   SATS,
 } from "@/lib/numeric";
+import { makeT, type T } from "@/lib/i18n/t";
+
+/** `t` for callers that have no locale: the English source text itself. */
+const ENGLISH: T = makeT({});
 
 
 /**
@@ -105,12 +109,20 @@ interface CurrencyShape {
 
 const SHAPES = new Map<string, CurrencyShape>();
 
-function currencyShape(code: string): CurrencyShape {
-  const cached = SHAPES.get(code);
+/** The Intl locale a page's numbers are written in. Japanese pages use
+ *  Japan's own conventions — the fullwidth ￥ and 万/億 groupings — and
+ *  everything else uses the English ones, so a page never mixes two. */
+function intlLocale(locale: string): string {
+  return locale === "ja" ? "ja-JP" : "en-US";
+}
+
+function currencyShape(code: string, locale = "en"): CurrencyShape {
+  const key = `${locale}:${code}`;
+  const cached = SHAPES.get(key);
   if (cached) return cached;
   let shape: CurrencyShape;
   try {
-    const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: code });
+    const formatter = new Intl.NumberFormat(intlLocale(locale), { style: "currency", currency: code });
     const parts = formatter.formatToParts(1234.5);
     const first = parts.findIndex((p) => p.type === "integer");
     let last = parts.length - 1;
@@ -125,7 +137,7 @@ function currencyShape(code: string): CurrencyShape {
   } catch {
     shape = { prefix: `${code} `, suffix: "", minor: 2 };
   }
-  SHAPES.set(code, shape);
+  SHAPES.set(key, shape);
   return shape;
 }
 
@@ -134,10 +146,25 @@ function currencyShape(code: string): CurrencyShape {
  * where they matter, and none at all for currencies that have none. The
  * amount is already in `code` — conversion happens before this, in
  * `useFiat` — so this is purely how the number is written.
+ *
+ * Japanese pages compact the Japanese way. CoinMarketCap and CoinGecko's
+ * Japanese editions write 時価総額 as 1,920万 and 12.4億, never 19.2M, and a
+ * reader who thinks in 万 has to convert K/M/B in their head. Intl knows the
+ * groupings, so the locale decides: 万/億/兆 in Japanese, K/M/B elsewhere.
+ * XCP and token amounts stay K/M everywhere — those are tickers' units, and
+ * the same on every exchange.
  */
-export function fiat(n: number, code: string): string {
-  const { prefix, suffix, minor } = currencyShape(code);
+export function fiat(n: number, code: string, locale = "en"): string {
+  const { prefix, suffix, minor } = currencyShape(code, locale);
   const wrap = (body: string) => `${prefix}${body}${suffix}`;
+  if (locale === "ja" && n >= 10_000) {
+    return new Intl.NumberFormat("ja-JP", {
+      style: "currency",
+      currency: code,
+      notation: "compact",
+      maximumFractionDigits: n >= 100_000_000 ? 2 : 1,
+    }).format(n);
+  }
   if (n >= 1000) return wrap(compact(n));
   if (n >= 100 || (n >= 1 && minor === 0)) return wrap(String(Math.round(n)));
   if (n >= 1) return wrap(n.toFixed(2));
@@ -156,11 +183,23 @@ export function shortAddress(addr: string): string {
 }
 
 /** ~10 minute blocks → human duration. */
-export function blocksEta(blocks: number): string {
-  if (blocks <= 0) return "now";
-  const minutes = blocks * 10;
-  if (minutes < 60) return `~${minutes}m`;
+/**
+ * A span of blocks as a compact duration: 40m, 7h, 3d. Ten minutes a block.
+ *
+ * Takes the page's `t` so the unit reads in the visitor's language — "3日"
+ * rather than "3d" — and defaults to English for callers with no locale to
+ * hand (scripts, tests). The digits stay Latin everywhere by design.
+ */
+export function blocksDuration(blocks: number, t: T = ENGLISH): string {
+  const minutes = Math.max(0, blocks) * 10;
+  if (minutes < 60) return t("{n}m", { n: minutes });
   const hours = minutes / 60;
-  if (hours < 48) return `~${Math.round(hours)}h`;
-  return `~${Math.round(hours / 24)}d`;
+  if (hours < 48) return t("{n}h", { n: Math.round(hours) });
+  return t("{n}d", { n: Math.round(hours / 24) });
+}
+
+/** The same span as an estimate: ~40m, ~7h, ~3d, or "now" once it has passed. */
+export function blocksEta(blocks: number, t: T = ENGLISH): string {
+  if (blocks <= 0) return t("now");
+  return t("~{duration}", { duration: blocksDuration(blocks, t) });
 }

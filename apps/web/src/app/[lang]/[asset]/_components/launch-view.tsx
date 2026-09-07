@@ -1,0 +1,913 @@
+"use client";
+
+import { LazyLink } from "@/components/lazy-link";
+import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[lang]/[asset]/_components/launch-chrome";
+import {
+  HostedDescription,
+  HostedInscriptionChip,
+  HostedSocials,
+  InscriptionChip,
+  LaunchDescription,
+  isOurMetadata,
+} from "@/app/[lang]/[asset]/_components/launch-metadata";
+import { DenomToggle, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[lang]/[asset]/_components/launch-stats";
+import { classifyDescription, proseDescription } from "@launchpad/xcp69/description";
+import { ScheduledPulse } from "@/app/[lang]/[asset]/_components/scheduled-pulse";
+import { AddressHoverCard, IssuerChips, IssuerLine } from "@/components/address-hover-card";
+import type { Fairmint, PairActivity, Pool } from "@/lib/api/counterparty";
+import type { ChartCandle, FeeSummary } from "@/lib/api/launchpad-api";
+import type { ChartResolution } from "@/lib/candles";
+import { LABEL } from "@/components/ui/tokens";
+import { LaunchRoomProvider } from "@/app/[lang]/[asset]/_components/launch-room";
+import {
+  blocksEta,
+  commas,
+  commasRaw,
+  compact,
+  fromSats,
+  price as formatPrice,
+  shortAddress,
+  tokenQty,
+} from "@/lib/format";
+import { big, rawEquals } from "@/lib/numeric";
+import { useFiat } from "@/lib/currency";
+import { useT } from "@/lib/i18n/client";
+import { usdPriceChangePercent } from "@/lib/market";
+import {
+  circulatingSupplyRaw,
+  type Fairminter,
+  XCP69_EXACT,
+  type LaunchPhase,
+  saleProgress,
+  saleTarget,
+} from "@/lib/xcp69";
+import { ActivityTabs } from "@/app/[lang]/[asset]/_components/activity-tabs";
+import { AddressBadges } from "@/app/[lang]/[asset]/_components/address-badges";
+import { useAddressCollections } from "@/hooks/use-address-collections";
+import { AssetTradeSurface } from "@/app/[lang]/[asset]/_components/asset-trade-surface";
+import { EditPanel } from "@/app/[lang]/[asset]/_components/edit-panel";
+import { LiveProgress } from "@/app/[lang]/[asset]/_components/live-progress";
+import { MintPanel } from "@/app/[lang]/[asset]/_components/mint-panel";
+import { PressurePanel } from "@/app/[lang]/[asset]/_components/pressure-panel";
+import { PriceChart, type DevTrade } from "@/app/[lang]/[asset]/_components/price-chart";
+
+/**
+ * The launch page's entire presentation, data in via props. No fetching
+ * happens here.
+ *
+ * Shape: a terminal for one asset. Header answers "how's it doing?" at a
+ * glance (price, multiple, change), a dense stat strip carries the numbers,
+ * the aside answers "do I want in or out?" with the forms, and the prose
+ * collapses into chips and tooltips.
+ */
+export function LaunchView({
+  asset,
+  fm,
+  conforming,
+  phase,
+  blockHeight,
+  mints,
+  pool,
+  candles,
+  xcpUsd,
+  launchXcpUsd,
+  btcUsd,
+  feeSats,
+  holderCount,
+  poolVolume,
+  devTrades = [],
+  concentration,
+  displayDescription,
+  burnedQuantity,
+}: {
+  asset: string;
+  fm: Fairminter;
+  conforming: boolean;
+  phase: LaunchPhase;
+  blockHeight: number;
+  mints: Fairmint[];
+  pool: Pool | null;
+  candles: Record<ChartResolution, ChartCandle[]>;
+  xcpUsd: number | null;
+  launchXcpUsd: number | null;
+  btcUsd: number | null;
+  feeSats: FeeSummary | null;
+  holderCount: number | null;
+  poolVolume: PairActivity;
+  devTrades?: DevTrade[];
+  concentration?: { top10Pct: number; devPct: number };
+  displayDescription: string | null;
+  burnedQuantity: string;
+}) {
+  const t = useT();
+  const usd = useFiat();
+  const progress = saleProgress(fm);
+  // An inscribed launch's description IS its content (hex-encoded on the
+  // wire) rather than our hosted JSON URL — mime_type is the only signal
+  // that distinguishes the two, since a raw hex blob isn't a URL either.
+  // Any type but text/plain: an image is the common case, but GENXSIXNINE
+  // inscribed a whole text/html mint viewer, and reading only image/* left
+  // that one classified as a plain description — which is how 33 KB of
+  // markup ended up rendered as the creator's prose.
+  const isInscribed = classifyDescription(fm.description, fm.mime_type) === "inscription";
+  // sort_pair orders the pool lexically — XCP can sit on either side.
+  const xcpIsA = pool?.asset_a === "XCP";
+  // Raw reserves, not `_normalized`: the normalized strings are API-side
+  // float artifacts; the raw integer is authoritative.
+  const poolXcpRaw = pool ? (xcpIsA ? pool.reserve_a : pool.reserve_b) : 0;
+  const poolTokensRaw = pool ? (xcpIsA ? pool.reserve_b : pool.reserve_a) : 0;
+  // Doubles below: ratios, percentages, USD estimates (reserves ~3e15 raw).
+  const poolXcp = fromSats(poolXcpRaw);
+  const poolTokens = fromSats(poolTokensRaw);
+
+  // Per-address totals summed exactly; the concentration stat reads them.
+  const byAddress = new Map<string, bigint>();
+  for (const m of mints) {
+    byAddress.set(m.source, (byAddress.get(m.source) ?? 0n) + big(m.earn_quantity));
+  }
+  const participants = byAddress.size;
+  // Biggest minters first — the addresses worth checking for freshness.
+  const minterAddresses = [...byAddress.entries()]
+    .sort((a, b) => (b[1] > a[1] ? 1 : b[1] < a[1] ? -1 : 0))
+    .map(([source]) => source);
+
+  // "How's it doing" numbers (graduated): spot from the pool and dollar return
+  // from what this launch charged minters, valued at XCP/USD when the market
+  // opened. The first candle is already a completed trade, so using it as the
+  // baseline would understate the launch return.
+  const spot = poolTokens > 0 ? poolXcp / poolTokens : 0;
+  const history = candles["1d"];
+  const quantityByPrice = fromSats(fm.quantity_by_price);
+  const mintPrice = quantityByPrice > 0 ? fromSats(fm.price) / quantityByPrice : 0;
+  const change = usdPriceChangePercent(
+    spot,
+    xcpUsd,
+    mintPrice,
+    launchXcpUsd,
+  );
+  // The highest price the pool ever printed, and where spot sits against it.
+  // Free — the same history the chart already renders.
+  // The high wick, not the close: a peak a candle traded at and gave back is
+  // still a peak the token reached.
+  const athPrice = history.reduce((max, c) => (c.high > max ? c.high : max), 0);
+  const athPct = athPrice > 0 && spot > 0 ? Math.min(100, (spot / athPrice) * 100) : 0;
+
+  const supplyTokens = fromSats(circulatingSupplyRaw(fm.hard_cap, burnedQuantity));
+  const mcapUsd = xcpUsd && spot > 0 ? spot * supplyTokens * xcpUsd : null;
+
+  // Minting now renders as a poster (above); the terminal layout is for
+  // launches with a market to look at.
+
+  // Only "graduated" (pool or not) ever reaches this point — scheduled,
+  // minting, and refunded all return their own views earlier.
+
+  /* The stat strip: dense, phase-specific, no prose. */
+  const strip: [string, string][] = pool
+    ? [
+        [t("24h volume"), `${commas(fromSats(poolVolume["24h"].volumeXcpRaw))} XCP`],
+        [
+          // No "LP burned" here: the launch's own LP was burned, but anyone can
+          // add liquidity on top afterwards, so the claim doesn't hold for the
+          // live total. It belongs on the locked pool row in Holders, which is
+          // about the burned position specifically.
+          t("Liquidity"),
+          `${commas(Math.round(poolXcp))} XCP${xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""}`,
+        ],
+        [t("In pool"), `${compact(poolTokens)} ${asset}`],
+        [
+          t("Holders"),
+          `${commas(holderCount ?? participants)}${
+            participants ? ` · ${t("{n} minted", { n: commas(participants) })}` : ""
+          }`,
+        ],
+        // Two numbers that say whether the supply is spread or held. A creator
+        // at 0% is the strongest thing this page can state about them, and it
+        // sits next to the B/S markers on the chart saying the same thing.
+        [t("Top 10"), concentration ? `${concentration.top10Pct.toFixed(1)}%` : "—"],
+        [
+          t("Creator holds"),
+          concentration
+            ? concentration.devPct === 0
+              ? t("nothing")
+              : `${concentration.devPct.toFixed(1)}%`
+            : "—",
+        ],
+        // "Raised" and "Opened at" were dropped: for a CONFORMING launch both
+        // are constants the standard fixes — every one of them raises the same
+        // soft cap and opens at the same multiple — so printing them as though
+        // they varied was noise, and it made this rail taller than the form
+        // beside it.
+        [
+          t("Sold out in"),
+          fm.soft_cap_deadline_block - fm.start_block === 1
+            ? t("{n} block", { n: commas(fm.soft_cap_deadline_block - fm.start_block) })
+            : t("{n} blocks", { n: commas(fm.soft_cap_deadline_block - fm.start_block) }),
+        ],
+      ]
+    : // A classic fairminter that met its target — "graduated" without a
+      // pool to show a spot price for.
+      [
+        [t("Reached"), `${(progress * 100).toFixed(1)}%`],
+        [
+          t("Holders"),
+          `${commas(holderCount ?? participants)}${
+            participants ? ` · ${t("{n} minted", { n: commas(participants) })}` : ""
+          }`,
+        ],
+        [t("Raised"), `${commasRaw(fm.paid_quantity)} XCP`],
+        [t("Supply"), compact(supplyTokens)],
+      ];
+
+  // Scheduled: a poster, not a terminal — nothing has happened yet, so
+  // there is nothing to tabulate. Identity and issuer up top, a living
+  // countdown (block wall + heartbeat) in the middle, the standard's fixed
+  // terms and a CTA at the bottom. Built to be bookmarked and shared.
+  if (phase === "scheduled" || phase === "minting") {
+    const minting = phase === "minting";
+    // Conformance is editorial and includes the pre-announcement rule, which
+    // an in-block launch fails while still having every one of the standard's
+    // numbers. Those numbers are what the strip prints and what the form
+    // composes, so both key off the parameters rather than the verdict.
+    const standardTerms =
+      rawEquals(fm.price, XCP69_EXACT.PRICE) &&
+      rawEquals(fm.quantity_by_price, XCP69_EXACT.QUANTITY_BY_PRICE) &&
+      rawEquals(fm.max_mint_per_address, XCP69_EXACT.MAX_MINT_PER_ADDRESS) &&
+      rawEquals(fm.hard_cap, XCP69_EXACT.HARD_CAP) &&
+      rawEquals(fm.soft_cap, XCP69_EXACT.SOFT_CAP) &&
+      rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY);
+    const descriptionKind = classifyDescription(fm.description, fm.mime_type);
+    const blocksLeft = fm.start_block - blockHeight;
+    // "opens in now" is what blocksEta returns at the boundary, where the
+    // record is still pending but the chain has caught up.
+    const shareHeadline =
+      phase === "minting"
+        ? t("{pct}% minted", { pct: (saleProgress(fm) * 100).toFixed(0) })
+        : blocksLeft > 0
+          ? t("minting opens in {eta}", { eta: blocksEta(blocksLeft, t) })
+          : t("minting opens this block");
+    // Only a conforming launch has the standard's terms to advertise.
+    const shareSubline = conforming
+      ? t("0.01 XCP / 1,000 · sells out or refunds")
+      : t("an XCP fairminter on xcp.fun");
+    const prose = proseDescription(fm.description, fm.mime_type, asset);
+    // Only real prose earns the space: a URL is machine metadata, a
+    // one-word "description" is noise the poster reads better without, and
+    // an inscription's description is its content — 33 KB of HTML that used
+    // to render here as `<!doctype html><html lang="en">…` under a "Show
+    // more" link.
+    //
+    // `curated` comes first because it is the only copy that exists for a
+    // launch composed outside this site: the owner's words, written through
+    // the editor into our own storage, where the on-chain field is an
+    // inscription or a stranger's URL and can never hold them. It is also
+    // already on the server, so a hosted-metadata launch skips the client
+    // fetch and paints its description with the rest of the page.
+    //
+    // Shared between phases since it renders in two different spots —
+    // before the countdown on scheduled, below the live bar on minting —
+    // each needing its own top margin to land in the same visual place.
+    const curated = displayDescription?.trim() ?? "";
+    const renderDescription = (marginClassName: string) =>
+      curated ? (
+        <LaunchDescription text={curated} marginClassName={marginClassName} />
+      ) : isOurMetadata(fm.description) ? (
+        <HostedDescription url={fm.description} marginClassName={marginClassName} />
+      ) : descriptionKind === "url" ? (
+        // Someone else's host: link it rather than fetch it, so viewing a
+        // launch never reports the visitor to the issuer's server.
+        <p className={`${marginClassName} text-sm text-gray-500 dark:text-gray-400`}>
+          <a
+            href={fm.description}
+            target="_blank"
+            rel="noreferrer nofollow"
+            className="break-all text-purple-600 dark:text-purple-400 hover:underline"
+          >
+            {fm.description}
+          </a>
+        </p>
+      ) : prose ? (
+        <LaunchDescription text={prose} marginClassName={marginClassName} />
+      ) : null;
+    return (
+      <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
+      <div className="mx-auto max-w-2xl">
+        {/* Identity, on its own — separate from the countdown/mint-form
+            card below it, the same way every other phase keeps its header
+            apart from its content. */}
+        <div className="relative rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
+          {/* Art leads on a phone at full width, then steps aside into the
+              identity square once there's a column to sit beside. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+            <ArtLightbox asset={asset} />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 sm:pr-24">
+                <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                  {asset}
+                  <StatusPill phase={phase} hasPool={pool !== null} />
+                  {!conforming && (
+                    <span className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                      {t("not XCP-69")}
+                    </span>
+                  )}
+                </h1>
+              </div>
+              {/* Share rides the ADDRESS line on a phone, not the heading. The
+                  heading carries the status pill, and a 32px button against
+                  that is the mismatch that read as a mistake; the address line
+                  is a quiet full-width row with nothing on its right, so the
+                  button lines up against it instead. Above `sm` the button is
+                  absolutely pinned to the card corner, so its position in the
+                  markup here costs nothing there. */}
+              <div className="flex items-center gap-2 sm:pr-24">
+                <div className="flex min-w-0 flex-1 flex-wrap items-baseline">
+                  <IssuerLine source={fm.source} />
+                  <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+                </div>
+                <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
+                  <ShareButton
+                    asset={asset}
+                    headline={shareHeadline}
+                    subline={shareSubline}
+                  />
+                </div>
+              </div>
+              <IssuerChips
+                source={fm.source}
+                currentAsset={asset}
+                trailing={
+                  isOurMetadata(fm.description) ? (
+                    <>
+                      <HostedSocials url={fm.description} asset={asset} />
+                      <HostedInscriptionChip url={fm.description} />
+                    </>
+                  ) : isInscribed ? (
+                    <InscriptionChip txHash={fm.tx_hash} />
+                  ) : null
+                }
+              />
+            </div>
+          </div>
+
+          {/* The fixed facts (scheduled) or the live number (minting)
+              belong with identity — nothing below this card is a "fact
+              about the launch" anymore, just the countdown or the form.
+
+              Desktop only. Every value in this strip is fixed by the
+              standard, so it is character-for-character identical on every
+              XCP-69 launch: price, per-address cap, target, supply. On a
+              phone — where a shared link gets opened, and where space is
+              scarcest — four numbers that say nothing about THIS launch are
+              exactly what should give way. What's left is what differs: the
+              art, the name, who's launching it, and when it opens. The terms
+              are still a tap away in the countdown's own copy and in the
+              docs. */}
+          {!minting && standardTerms && (
+            <div className="hidden sm:block">
+              <TermsStrip xcpUsd={xcpUsd} />
+            </div>
+          )}
+          {minting && mints.length > 0 && (
+            <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pb-2 pt-2">
+              <LiveProgress
+                initialEarned={fm.earned_quantity ?? 0}
+                target={saleTarget(fm)}
+                allOrNothing={big(fm.pool_quantity) > 0n}
+                divisible={fm.divisible}
+                serverStatus={fm.status}
+              />
+            </div>
+          )}
+          {renderDescription("mt-5")}
+        </div>
+
+        {minting ? (
+          /* MintPanel brings its own card chrome — the same shape the
+             swap/limit/dispense forms use — so it isn't nested inside a
+             second one here. */
+          <div className="mt-4">
+            {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
+            <ScheduledPulse
+              asset={asset}
+              startBlock={fm.start_block}
+              deadlineBlock={fm.soft_cap_deadline_block}
+              initialHeight={blockHeight}
+              mintForm={
+                standardTerms ? (
+                  <MintPanel asset={asset} xcpUsd={xcpUsd} />
+                ) : undefined
+              }
+              waitingCta={
+                standardTerms ? (
+                  <LazyLink
+                    href="/dispense"
+                    className="mt-6 block w-full rounded-2xl bg-purple-600 px-5 py-3.5 text-center font-medium text-white transition-all hover:bg-purple-500 active:scale-[0.99]"
+                  >
+                    {t("Get XCP before it opens")}
+                  </LazyLink>
+                ) : undefined
+              }
+            />
+          </div>
+        )}
+
+        {/* How the sale is actually going — the live progress number now
+            sits above, where the description used to be. These facts are
+            the rest of it: still live, still not a repeat of the fixed
+            terms that ran once on the scheduled poster. */}
+        {minting && mints.length > 0 && (
+          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 sm:grid-cols-4">
+            <RaisedStat paidQuantity={fm.paid_quantity} xcpUsd={xcpUsd} progress={progress} />
+            {feeSats && feeSats.mints > 0 && (
+              <TxFeesStat totalFeeSats={feeSats.totalFeeSats} btcUsd={btcUsd} />
+            )}
+            <ParticipantsStat participants={participants} />
+            <div>
+              <div className="flex items-start justify-between gap-2">
+                <div className={LABEL}>
+                  {t("Deadline")}
+                </div>
+                {xcpUsd !== null && <DenomToggle visibleOn="desktop" />}
+              </div>
+              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                {fm.soft_cap_deadline_block - blockHeight > 0
+                  ? t("Block {n}", { n: commas(fm.soft_cap_deadline_block) })
+                  : t("closing")}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Who has minted so far — the sale's own tape, under the card. */}
+        {minting && (
+          <div className="mt-4">
+            <ActivityTabs
+              asset={asset}
+              mints={mints}
+              divisible={fm.divisible}
+              minting
+              issuerSource={fm.source}
+            />
+          </div>
+        )}
+      </div>
+      </LaunchRoomProvider>
+    );
+  }
+
+  // Refunded: the same header, card, and stat-cell grammar every other
+  // phase uses — the "\u{1F480} RIP" pill is what says this one's over, not a
+  // different-looking page. There's no market, no live holders (supply was
+  // destroyed), no orders, so there's no edit affordance and no CTA, and
+  // the record of who showed up is a plain list rather than the
+  // trading-terminal activity tabs, whose Trades/Holders/Orders tabs would
+  // just be empty here.
+  if (phase === "refunded") {
+    const topMinters = minterAddresses.slice(0, 8);
+    const extraMinters = minterAddresses.length - topMinters.length;
+    return (
+      <div className="mx-auto max-w-2xl">
+        <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
+          {/* Same header shape as every other phase — compact art beside
+              identity, issuer chips and all. The pill alone says this one's
+              over; nothing else about the chrome needs to look different. */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+            <ArtLightbox asset={asset} />
+            <div className="min-w-0 flex-1">
+              <h1 className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                {asset}
+                <StatusPill phase={phase} hasPool={false} />
+                {!conforming && (
+                  <span className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                    {t("not XCP-69")}
+                  </span>
+                )}
+              </h1>
+              <div className="flex flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+              </div>
+              <IssuerChips
+                source={fm.source}
+                currentAsset={asset}
+                trailing={
+                  isOurMetadata(fm.description) ? (
+                    <HostedInscriptionChip url={fm.description} />
+                  ) : isInscribed ? (
+                    <InscriptionChip txHash={fm.tx_hash} />
+                  ) : null
+                }
+              />
+            </div>
+          </div>
+
+          {/* Two facts, same weight — when, and what came back. Neither
+              is the headline; they're just what happened. */}
+          <div className="mt-6 grid grid-cols-2 divide-x divide-gray-100 dark:divide-gray-800 border-t border-gray-100 dark:border-gray-800 pt-5 text-center">
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                {t("Failed on")}
+              </div>
+              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                <BlockMonthYear blockIndex={fm.soft_cap_deadline_block} />
+              </div>
+            </div>
+            <div>
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                {t("Refunded")}
+              </div>
+              <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
+                {commasRaw(fm.paid_quantity)}{" "}
+                <span className="text-base font-semibold text-gray-400 dark:text-gray-500">XCP</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 sm:grid-cols-4">
+          <div>
+            <div className={LABEL}>
+              {t("Holders")}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+              {participants}
+            </div>
+          </div>
+          <div>
+            <div className={LABEL}>
+              {t("Mints")}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+              {mints.length}
+            </div>
+          </div>
+          <div>
+            <div className={LABEL}>
+              {t("Reached")}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+              {(progress * 100).toFixed(1)}%
+            </div>
+          </div>
+          <div>
+            <div className={LABEL}>
+              {t("Closed")}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+              <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
+            </div>
+          </div>
+        </div>
+
+        {topMinters.length > 0 && (
+          <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
+            <div className={LABEL}>
+              {t("Who was here")}
+            </div>
+            <WhoWasHere
+              addresses={topMinters}
+              issuerSource={fm.source}
+              amount={(source) => `${commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))} ${asset}`}
+            />
+            {extraMinters > 0 && (
+              <a
+                href={`https://xcp.io/asset/${asset}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-3 inline-block text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline"
+              >
+                {t("+{n} more on the explorer ↗", { n: extraMinters })}
+              </a>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      {/* Identity, same shape every other phase uses: compact art with its
+          own lightbox, issuer line with copy + hover card, announced-ago,
+          issuer chips, share button in the standard corner. Only the "one
+          number worth reading from across the room" changes per phase —
+          here it's spot price instead of a countdown or a refund total. */}
+      <div className="relative rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-5">
+          <ArtLightbox asset={asset} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 sm:pr-24">
+              <h1 className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold leading-tight tracking-tight">
+                {asset}
+                <StatusPill phase={phase} hasPool={pool !== null} />
+                {!conforming && (
+                  <span className="rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                    {t("not XCP-69")}
+                  </span>
+                )}
+              </h1>
+            </div>
+            {/* Share rides the address line on a phone — see the note on the
+                scheduled/minting card above; same reasoning, same shape. */}
+            <div className="flex items-center gap-2 sm:pr-24">
+              <div className="flex min-w-0 flex-1 flex-wrap items-baseline">
+                <IssuerLine source={fm.source} />
+                <AnnouncedAgo blockIndex={fm.block_index} txHash={fm.tx_hash} />
+              </div>
+              <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
+                <ShareButton
+                  asset={asset}
+                  headline={pool ? `${formatPrice(spot)} XCP` : t("minted out")}
+                  subline={
+                    conforming
+                      ? t("0.01 XCP / 1,000 · sells out or refunds")
+                      : t("an XCP fairminter on xcp.fun")
+                  }
+                />
+              </div>
+            </div>
+            {/* Issuer-history chips ("first launch", "3rd launch") answer
+                "should I trust this creator" — the question before minting.
+                Once an asset has graduated it has its own track record;
+                "first launch" here reads as "first launch on the site",
+                not "this issuer's first launch". Facts about the ASSET
+                replace them; the issuer stays named in the line above. */}
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {pool && (
+                <span className="rounded-full border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400 tabular-nums">
+                  {t("graduated")} <BlockAgo blockIndex={fm.soft_cap_deadline_block} />
+                </span>
+              )}
+              {holderCount !== null && (
+                <span className="rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums">
+                  {holderCount === 1
+                    ? t("{n} holder", { n: commas(holderCount) })
+                    : t("{n} holders", { n: commas(holderCount) })}
+                </span>
+              )}
+              {isOurMetadata(fm.description) ? (
+                <>
+                  <HostedSocials url={fm.description} asset={asset} />
+                  <HostedInscriptionChip url={fm.description} />
+                </>
+              ) : isInscribed ? (
+                <InscriptionChip txHash={fm.tx_hash} />
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {/* The three numbers people actually come for. Market cap and volume
+            used to be buried among seven equal-weight facts below the chart;
+            price was alone up here. */}
+        {/* Two, either side — the same shape the refunded state uses. Volume
+            is a real number but not one of the two people lead with, so it
+            moved down to the rail beside the swap form. */}
+        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-gray-100 dark:border-gray-800 pt-4 text-center">
+          {pool ? (
+            <>
+              <Factoid
+                label={t("Market cap")}
+                value={mcapUsd ? usd(mcapUsd) : "—"}
+                sub={t("{cap} XCP · {supply} supply", {
+                  cap: compact(spot * supplyTokens),
+                  supply: compact(supplyTokens),
+                })}
+              />
+              {/* The mint multiple moved to the rail: four numbers here against
+                  two on the left was what made the pair look lopsided. */}
+              <Factoid
+                label={t("Price")}
+                value={xcpPriceLabel(spot)}
+                // The change lives on the sub line: at eight decimals the
+                // price is the widest thing on the row, and hanging a
+                // percentage off it made it wider still.
+                sub={
+                  <>
+                    {xcpUsd ? usd(spot * xcpUsd) : null}
+                    {xcpUsd && change !== null ? " · " : null}
+                    {change !== null && (
+                      <span
+                        className={change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
+                      >
+                        {change >= 0 ? "+" : ""}
+                        {change.toFixed(1)}% {t("since mint")}
+                      </span>
+                    )}
+                  </>
+                }
+              />
+            </>
+          ) : (
+            <div className="col-span-2">
+              <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                {t("Minted out")}
+              </div>
+              <div className="mt-1 text-2xl font-bold text-gray-400 dark:text-gray-500">
+                {t("reached {pct}%", { pct: (progress * 100).toFixed(1) })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {pool && athPrice > 0 && (
+          <div className="mt-4 flex items-center gap-3">
+            <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+              <div
+                className={`h-full rounded-full ${
+                  athPct >= 99.5 ? "bg-green-500" : "bg-purple-500"
+                }`}
+                style={{ width: `${athPct}%` }}
+              />
+            </div>
+            <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
+              {athPct >= 99.5 ? t("at ATH") : t("{pct}% of ATH", { pct: athPct.toFixed(0) })}{" "}
+              <span className="text-gray-400 dark:text-gray-500">{xcpPriceLabel(athPrice)}</span>
+            </span>
+          </div>
+        )}
+
+        {displayDescription && (
+          <LaunchDescription text={displayDescription} marginClassName="mt-4" />
+        )}
+      </div>
+
+      <EditPanel asset={asset} />
+
+      {phase === "graduated" && pool && (
+        <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+          <PriceChart
+            asset={asset}
+            candles={candles}
+            xcpUsd={xcpUsd}
+            launchXcpUsd={launchXcpUsd}
+            devTrades={devTrades}
+          />
+        </div>
+      )}
+
+      <div className="mt-4">
+      <div className="min-w-0 space-y-4">
+
+      {phase === "graduated" && pool && (
+        <PressurePanel activity={poolVolume} xcpUsd={xcpUsd} />
+      )}
+
+      {phase === "graduated" && pool && conforming && (
+        <AssetTradeSurface
+          asset={asset}
+          xcpUsd={xcpUsd}
+          aside={
+            <dl className="mt-4 divide-y divide-gray-100 dark:divide-gray-800 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 sm:mt-0">
+              {strip.map(([label, value], i) => (
+                <div
+                  key={label}
+                  // Facts that still move, then those settled at launch.
+                  className={`px-4 py-2.5 ${i === LIVE_FACTS ? "border-t-4 border-t-gray-100" : ""}`}
+                >
+                  <dt className="text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+                    {label}
+                  </dt>
+                  <dd className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+                    {value}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          }
+        />
+      )}
+
+      {/* Classic (non-pool) fairminter that met its target — relaxed mode only */}
+      {phase === "graduated" && !pool && (
+        <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
+          <h2 className="text-sm font-semibold">{t("Minted out")}</h2>
+          <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
+            {t(
+              "Reached {pct}% with {n} participants. A classic fairminter — no pool, no locked liquidity; distribution only.",
+              { pct: (progress * 100).toFixed(1), n: participants },
+            )}
+          </p>
+        </div>
+      )}
+
+      {/* The receipt — consensus guarantees as chips; expand to verify */}
+
+      {/* Issuer-only metadata curation; renders nothing for everyone else */}
+
+      {/* Activity: the trade tape and live holders. Inside a room so the tape
+          arrives over the launch's shared socket instead of three separate
+          per-visitor polls. */}
+      <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled>
+      <ActivityTabs
+        asset={asset}
+        mints={mints}
+        divisible={fm.divisible}
+        issuerSource={fm.source}
+        poolXcpRaw={pool ? String(poolXcpRaw) : undefined}
+        poolTokensRaw={pool ? String(poolTokensRaw) : undefined}
+        lpAsset={pool?.lp_asset ?? null}
+      />
+      </LaunchRoomProvider>
+      </div>
+      </div>
+    </div>
+  );
+}
+
+/** Deterministic address identicon: two hues from a cheap string hash. */
+/**
+ * A price in XCP at full precision, always carrying its unit.
+ *
+ * XCP divides to eight places, so that is the whole of a price and nothing is
+ * rounded away. The unit is never dropped: an unlabelled sub-one number in a
+ * crypto UI reads as bitcoin to most people, and these are XCP.
+ */
+const xcpPriceLabel = (xcpPrice: number) =>
+  `${xcpPrice.toLocaleString("en-US", {
+    minimumFractionDigits: 8,
+    maximumFractionDigits: 8,
+  })} XCP`;
+
+/** Facts that still move, before those settled at launch. */
+const LIVE_FACTS = 3;
+
+/** One of the three headline numbers: label, the number, an optional second
+ *  line, and an optional accent (the price's own change figure). */
+function Factoid({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+  accent?: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <div className="text-[11px] font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
+        {label}
+      </div>
+      <div className="mt-1 break-words text-base font-bold leading-tight tabular-nums text-gray-900 dark:text-gray-100 sm:text-xl">
+        {value}
+        {accent}
+      </div>
+      {sub && <div className="mt-0.5 truncate text-xs text-gray-500 dark:text-gray-400">{sub}</div>}
+    </div>
+  );
+}
+
+export function Identicon({ address }: { address: string }) {
+  let h = 0;
+  for (let i = 0; i < address.length; i++) h = (h * 31 + address.charCodeAt(i)) >>> 0;
+  const h1 = h % 360;
+  const h2 = (h >> 9) % 360;
+  return (
+    <span
+      aria-hidden
+      className="inline-block size-4 shrink-0 rounded-full align-text-bottom"
+      style={{
+        background: `linear-gradient(135deg, hsl(${h1} 70% 60%), hsl(${h2} 70% 42%))`,
+      }}
+    />
+  );
+}
+
+/** A refunded launch's record of who showed up. Its own component so it can
+ *  own the one collection-badge lookup for the eight rows it shows — the
+ *  refunded branch above is one of several early returns, where a hook
+ *  can't live. */
+function WhoWasHere({
+  addresses,
+  issuerSource,
+  amount,
+}: {
+  addresses: string[];
+  issuerSource: string;
+  amount: (source: string) => string;
+}) {
+  const collections = useAddressCollections(addresses);
+  return (
+    <ul className="mt-3 divide-y divide-gray-100 dark:divide-gray-800">
+      {addresses.map((source, i) => (
+        <li key={source} className="flex items-center justify-between gap-3 py-2 text-sm first:pt-0 last:pb-0">
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="w-4 shrink-0 text-xs text-gray-400 dark:text-gray-500 tabular-nums">{i + 1}</span>
+            <AddressHoverCard
+              source={source}
+              className="flex min-w-0 items-center gap-2 font-mono text-gray-600 dark:text-gray-400 hover:text-purple-700 dark:hover:text-purple-300"
+            >
+              <Identicon address={source} />
+              <span className="truncate">{shortAddress(source)}</span>
+            </AddressHoverCard>
+            <AddressBadges address={source} issuerSource={issuerSource} collections={collections?.get(source)} />
+          </span>
+          <span className="shrink-0 tabular-nums text-gray-500 dark:text-gray-400">{amount(source)}</span>
+        </li>
+      ))}
+    </ul>
+  );
+}

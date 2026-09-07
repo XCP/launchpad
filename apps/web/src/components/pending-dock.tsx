@@ -13,6 +13,7 @@ import {
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { useT } from "@/lib/i18n/client";
 
 const POLL_MS = 30_000;
 
@@ -50,6 +51,7 @@ const POLL_CONCURRENCY = 4;
  * sharing a corner made them read as one widget.
  */
 export function PendingDock() {
+  const t = useT();
   const { status, address } = useWallet();
   const items = useSyncExternalStore(
     subscribePending,
@@ -63,8 +65,8 @@ export function PendingDock() {
   // sweep still has work left to do.
   useEffect(() => {
     sweepResolved(RESOLVED_TTL_MS);
-    const t = setInterval(() => sweepResolved(RESOLVED_TTL_MS), 15_000);
-    return () => clearInterval(t);
+    const timer = setInterval(() => sweepResolved(RESOLVED_TTL_MS), 15_000);
+    return () => clearInterval(timer);
   }, [items]);
 
   // Poll unresolved items: orders resolve through their lifecycle; other
@@ -100,13 +102,13 @@ export function PendingDock() {
                 } | null;
               }>(await res.text()).result;
               if (!o) return;
-              if (o.status === "filled") updatePending(item.txid, { resolved: "filled" });
+              if (o.status === "filled") updatePending(item.txid, { resolved: t("filled") });
               else if (o.status === "expired")
-                updatePending(item.txid, { resolved: "expired · refunded" });
+                updatePending(item.txid, { resolved: t("expired · refunded") });
               else if (o.status === "cancelled")
-                updatePending(item.txid, { resolved: "cancelled" });
+                updatePending(item.txid, { resolved: t("cancelled") });
               else if (big(o.give_remaining) < big(o.give_quantity))
-                updatePending(item.txid, { resolved: "partially filled · resting" });
+                updatePending(item.txid, { resolved: t("partially filled · resting") });
             } else {
             // Three-state oracle: 404 = unknown, block_hash "mempool" =
             // pending, real block = confirmed. Only authoritative 404s
@@ -126,7 +128,7 @@ export function PendingDock() {
                 const misses = (item.misses ?? 0) + 1;
                 if (misses >= 3)
                   updatePending(item.txid, {
-                    resolved: "dropped — nothing was spent",
+                    resolved: t("dropped — nothing was spent"),
                     misses,
                   });
                 else updatePending(item.txid, { misses });
@@ -134,24 +136,24 @@ export function PendingDock() {
               return;
             }
             if (!res.ok) return;
-            const t = (await res.json()).result;
-            if (!t?.block_index || t.block_hash === "mempool") {
+            const tx = (await res.json()).result;
+            if (!tx?.block_index || tx.block_hash === "mempool") {
               if (item.misses) updatePending(item.txid, { misses: 0 });
               return;
             }
-            if (t?.block_index)
+            if (tx?.block_index)
               updatePending(item.txid, {
                 resolved:
                   item.kind === "mint"
-                    ? "confirmed · escrowed"
+                    ? t("confirmed · escrowed")
                     : item.kind === "dispense"
-                      ? "confirmed · XCP delivered"
+                      ? t("confirmed · XCP delivered")
                       : item.kind === "launch"
                         ? // Confirming is not opening: a launch is announced
                           // on-chain first and stays shut until its start
                           // block, which is the whole point of the standard.
-                          "confirmed · announced"
-                        : "confirmed",
+                          t("confirmed · announced")
+                        : t("confirmed"),
               });
           }
           } catch {
@@ -161,12 +163,12 @@ export function PendingDock() {
       }
     };
     poll();
-    const t = setInterval(poll, POLL_MS);
+    const timer = setInterval(poll, POLL_MS);
     return () => {
       stop = true;
-      clearInterval(t);
+      clearInterval(timer);
     };
-  }, [items]);
+  }, [items, t]);
 
   // The dock is an extension of the connected wallet: no wallet, no dock.
   // Polling above keeps running regardless, so resolutions are already
@@ -192,8 +194,8 @@ export function PendingDock() {
           <div className="flex items-center justify-between px-1 pb-2">
             <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
               {pending.length > 0
-                ? `${pending.length} pending`
-                : "Recently confirmed"}
+                ? t("{n} pending", { n: pending.length })
+                : t("Recently confirmed")}
             </span>
             <div className="flex items-center gap-1">
               {settled.length > 0 && (
@@ -202,13 +204,13 @@ export function PendingDock() {
                   onClick={() => settled.forEach((i) => dismissPending(i.txid))}
                   className="rounded px-1.5 py-0.5 text-[11px] font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
                 >
-                  Clear done
+                  {t("Clear done")}
                 </button>
               )}
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                aria-label="Collapse"
+                aria-label={t("Collapse")}
                 className="flex size-6 items-center justify-center rounded-full text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
               >
                 ✕
@@ -227,7 +229,7 @@ export function PendingDock() {
             // Not "more waiting": the hidden tail is pending-then-settled, so
             // some of it has already finished. Scroll reaches all of it.
             <p className="px-1 pt-2 text-[11px] text-gray-400 dark:text-gray-500">
-              +{overflow} more below.
+              {t("+{n} more below.", { n: overflow })}
             </p>
           )}
         </div>
@@ -240,12 +242,12 @@ export function PendingDock() {
           {pending.length > 0 ? (
             <>
               <span className="size-2 animate-pulse rounded-full bg-purple-500" />
-              {pending.length} pending
+              {t("{n} pending", { n: pending.length })}
             </>
           ) : (
             <>
               <span className="size-2 rounded-full bg-green-500" />
-              {settled.length === 1 ? "Confirmed" : `${settled.length} confirmed`}
+              {settled.length === 1 ? t("Confirmed") : t("{n} confirmed", { n: settled.length })}
             </>
           )}
         </button>
@@ -255,6 +257,7 @@ export function PendingDock() {
 }
 
 function DockRow({ item }: { item: PendingItem }) {
+  const t = useT();
   return (
     <li className="flex items-center gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 px-2.5 py-2 text-xs">
       <span
@@ -272,13 +275,13 @@ function DockRow({ item }: { item: PendingItem }) {
           rel="noreferrer"
           className="text-gray-400 dark:text-gray-500 hover:text-purple-600 dark:hover:text-purple-400 hover:underline"
         >
-          {item.resolved ?? "in the mempool — waiting for a block"}
+          {item.resolved ?? t("in the mempool — waiting for a block")}
         </a>
       </span>
       <button
         type="button"
         onClick={() => dismissPending(item.txid)}
-        aria-label="Dismiss"
+        aria-label={t("Dismiss")}
         className="flex size-5 shrink-0 items-center justify-center rounded-full text-gray-300 dark:text-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700 hover:text-gray-600 dark:hover:text-gray-400"
       >
         ✕

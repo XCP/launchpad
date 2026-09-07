@@ -3,6 +3,8 @@
 import { useCallback, useSyncExternalStore } from "react";
 import { fetchFxRates } from "@/lib/api/launchpad-api";
 import { fiat } from "@/lib/format";
+import { useLocale } from "@/lib/i18n/client";
+import { splitLocale } from "@/lib/i18n/locales";
 
 /**
  * Which currency the site's fiat figures are shown in.
@@ -95,20 +97,25 @@ function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * What the browser implies, and it only ever implies one thing: Japan.
+ * What the page and the browser imply, and they only ever imply one thing:
+ * Japan.
  *
  * Dollars are the default for everyone, and the one market the site goes
  * out of its way to meet in its own currency is Japan — so detection is a
- * single question with two signals rather than a table of every region.
- * The browser's language says what the visitor configured; `maximize()`
- * fills in the likely region for a bare "ja", so it resolves like "ja-JP".
- * The timezone says where the machine thinks it is. Either is enough: a
- * Japanese speaker abroad and an English-speaking machine in Tokyo both
- * get yen, and both can put it back to dollars in the footer, where every
- * other currency the feed can price is on offer as well.
+ * single question with three signals rather than a table of every region.
+ * First the page itself: a visitor reading the Japanese site sees yen,
+ * because the language you read in and the currency you think in are one
+ * decision to most people, and choosing 日本語 in the menu should not need
+ * a second choice. Then the browser's language — `maximize()` fills in the
+ * likely region for a bare "ja", so it resolves like "ja-JP" — and the
+ * timezone, which says where the machine thinks it is. Any one is enough,
+ * and an explicit currency choice in the menu overrides all of them.
  */
 function detect(): Currency {
   if (typeof navigator === "undefined") return "USD";
+  if (typeof location !== "undefined" && splitLocale(location.pathname).locale === "ja") {
+    return "JPY";
+  }
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const tag of tags) {
     try {
@@ -267,7 +274,8 @@ export function useCurrency(): CurrencyState {
  */
 export function useFiat(): (usd: number) => string {
   const { code, rate } = useFxRate();
-  return useCallback((usd: number) => fiat(usd * rate, code), [code, rate]);
+  const locale = useLocale();
+  return useCallback((usd: number) => fiat(usd * rate, code, locale), [code, rate, locale]);
 }
 
 /** The currency and rate a figure is actually shown in right now: the

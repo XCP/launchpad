@@ -1,4 +1,7 @@
+"use client";
+
 import { FOCUS } from "@/components/ui/tokens";
+import { useT } from "@/lib/i18n/client";
 
 export const TELEGRAM_URL = "https://t.me/xcpfun";
 
@@ -18,12 +21,13 @@ export const TELEGRAM_URL = "https://t.me/xcpfun";
  * reads as a word like the others.
  */
 export function TelegramChip({ className = "" }: { className?: string }) {
+  const t = useT();
   return (
     <a
       href={TELEGRAM_URL}
       target="_blank"
       rel="noreferrer"
-      aria-label="XCP.FUN on Telegram"
+      aria-label={t("XCP.FUN on Telegram")}
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-sky-200 dark:border-sky-800 bg-sky-50 dark:bg-sky-950/40 px-2.5 py-1 text-xs font-medium text-sky-700 dark:text-sky-300 transition-colors hover:border-sky-400 ${FOCUS} ${className}`}
     >
       <svg viewBox="0 0 24 24" aria-hidden className="size-3.5 shrink-0 fill-current">

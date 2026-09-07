@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Hint } from "@/components/ui/tooltip";
+import { useT } from "@/lib/i18n/client";
 
 const WS_BASE = "wss://launchpad-api.me-bbe.workers.dev";
 const MAX_BACKOFF_MS = 30_000;
@@ -48,6 +49,7 @@ function visitorId(): string {
  * this is ambience, not a feature anything else depends on.
  */
 export function SitePresenceBadge() {
+  const t = useT();
   const [count, setCount] = useState<number | null>(null);
   const attemptRef = useRef(0);
 
@@ -103,19 +105,16 @@ export function SitePresenceBadge() {
   return (
     <div className="fixed bottom-4 left-4 z-40">
       <Hint
-        content={
-          <>
-            People with xcp.fun open right now, including you. Several tabs
-            from the same browser count once. Closing the tab removes you.
-          </>
-        }
+        content={t(
+          "People with xcp.fun open right now, including you. Several tabs from the same browser count once. Closing the tab removes you.",
+        )}
       >
         <span
           tabIndex={0}
           className="modal-pop inline-flex cursor-default items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 shadow-lg backdrop-blur focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
         >
           <span aria-hidden className="size-2 rounded-full bg-green-500" />
-          {count} online
+          {t("{count} online", { count })}
         </span>
       </Hint>
     </div>

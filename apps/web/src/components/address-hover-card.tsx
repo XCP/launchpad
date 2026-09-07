@@ -25,6 +25,7 @@ import {
 
 import { LABEL, FOCUS } from "@/components/ui/tokens";
 import { timeAgo, daysSince, monthYear } from "@/lib/chain-time";
+import { useLocale, useT } from "@/lib/i18n/client";
 import { XCP_API_BASE } from "@/lib/constants";
 
 export function IssuerChips({
@@ -37,6 +38,7 @@ export function IssuerChips({
   /** The project's own links, flowing at the end of the same run. */
   trailing?: ReactNode;
 }) {
+  const t = useT();
   // First-timers get a different second chip: what they've issued outside
   // the standard says whether they're new on-chain or just new here.
   const { data } = useSWR(
@@ -204,7 +206,7 @@ export function IssuerChips({
         href={`/${data.latest.asset}`}
         className={`${chip} transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400`}
       >
-        latest launch {timeAgo(data.latest.at)}
+        {t("latest launch {age}", { age: timeAgo(data.latest.at, t) })}
         {/* The ticker is the widest part of this chip and the least of what
             it says — "there is a newer one, and it's recent" is the whole
             point, and the link carries you there either way. */}
@@ -349,6 +351,7 @@ export function AddressHoverCard({
   className?: string;
   children: ReactNode;
 }) {
+  const locale = useLocale();
   const [armed, setArmed] = useState(false);
   const coarse = useCoarsePointer();
   const summary = useAddressSummary(armed ? source : null);
@@ -402,7 +405,7 @@ export function AddressHoverCard({
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
           <div className={LABEL}>First seen</div>
           <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-            {firstSeen ? monthYear(firstSeen) : "—"}
+            {firstSeen ? monthYear(firstSeen, locale) : "—"}
           </div>
         </div>
       </div>

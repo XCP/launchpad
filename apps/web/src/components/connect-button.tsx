@@ -7,6 +7,7 @@ import { CTA } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { useT } from "@/lib/i18n/client";
 
 const PHONE_WIDTH = "(max-width: 639px)";
 
@@ -22,6 +23,7 @@ export function useConnectAction(): {
   onClick: () => void;
   installPrompt: ReactNode;
 } {
+  const t = useT();
   const { status } = useWallet();
   const chooser = useWalletChooser();
   const [desktopOnlyOpen, setDesktopOnlyOpen] = useState(false);
@@ -42,13 +44,13 @@ export function useConnectAction(): {
         <Dialog
           open={desktopOnlyOpen}
           onOpenChange={setDesktopOnlyOpen}
-          title="Desktop only, for now"
+          title={t("Desktop only, for now")}
         >
           <div className="px-2 pb-2">
             <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-              Connecting needs a wallet browser extension, and no mobile
-              browser can run one yet. Everything here is readable on a phone —
-              launches, prices, holders — but minting and trading need a desktop.
+              {t(
+                "Connecting needs a wallet browser extension, and no mobile browser can run one yet. Everything here is readable on a phone — launches, prices, holders — but minting and trading need a desktop.",
+              )}
             </p>
           </div>
         </Dialog>
@@ -57,13 +59,13 @@ export function useConnectAction(): {
           onOpenChange={(open) => {
             if (!open) chooser.close();
           }}
-          title={installing ? "Install a wallet" : "Choose a wallet"}
+          title={installing ? t("Install a wallet") : t("Choose a wallet")}
         >
           <div className="px-2 pb-2">
             <p className="mb-4 text-sm text-gray-600 dark:text-gray-400">
               {installing
-                ? "xcp.fun talks to Counterparty through a wallet browser extension. Install one, then come back and connect."
-                : "More than one wallet is installed. Pick the one to connect with."}
+                ? t("xcp.fun talks to Counterparty through a wallet browser extension. Install one, then come back and connect.")
+                : t("More than one wallet is installed. Pick the one to connect with.")}
             </p>
             <ul className="space-y-2">
               {chooser.candidates.map((wallet, index) => (
@@ -82,7 +84,7 @@ export function useConnectAction(): {
                     {wallet.name}
                     {index === 0 && (
                       <span className="ml-2 text-[10px] uppercase tracking-wide text-purple-600 dark:text-purple-400">
-                        Recommended
+                        {t("Recommended")}
                       </span>
                     )}
                   </span>
@@ -92,7 +94,7 @@ export function useConnectAction(): {
                       onClick={() => void chooser.choose(wallet.id)}
                       className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-purple-500"
                     >
-                      Connect
+                      {t("Connect")}
                     </button>
                   ) : (
                     <a
@@ -101,7 +103,7 @@ export function useConnectAction(): {
                       rel="noreferrer"
                       className="rounded-xl border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 transition-all hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
                     >
-                      Install ↗
+                      {t("Install ↗")}
                     </a>
                   )}
                 </li>
@@ -123,11 +125,12 @@ export function ConnectButton({
   size?: "lg" | "md";
   className?: string;
 }) {
+  const t = useT();
   const { status, onClick, installPrompt } = useConnectAction();
   return (
     <>
       <CTA variant="primary" size={size} className={className} onClick={onClick}>
-        {status === "not_detected" ? "Install XCP Wallet" : "Connect Wallet"}
+        {status === "not_detected" ? t("Install XCP Wallet") : t("Connect Wallet")}
       </CTA>
       {installPrompt}
     </>
