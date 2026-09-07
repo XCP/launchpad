@@ -33,6 +33,8 @@ export interface FairminterInscriptionParams {
   imageData: Uint8Array;
   mimeType: string;
   feeRate: number;
+  /** The Counterparty description: the hosted JSON URL, as on an ordinary launch. */
+  description: string;
 }
 
 export function buildFairminterInscriptionMetadata(params: FairminterInscriptionParams): unknown[] {
@@ -59,6 +61,14 @@ export function buildFairminterInscriptionMetadata(params: FairminterInscription
     true, // divisible
     BigInt(XCP69.POOL_QUANTITY),
     assetNameToId(params.lpAsset),
+    // Fields 19 and 20 are the description's mime type and the description itself. Core's
+    // envelope parser appends the envelope's own mime type and content after them, and the
+    // fairminter unpacker reads by position and ignores anything past field 20, so the
+    // description Counterparty records is this URL, exactly as on an ordinary launch, while
+    // the image still becomes the inscription. Core's composer never writes a description
+    // here, so this rests on the unpacker's leniency; regtest it before trusting a new Core.
+    "text/plain",
+    params.description,
   ];
 
   // The bare array, as core's own composer writes it. Core also defines a map form

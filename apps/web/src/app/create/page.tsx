@@ -368,8 +368,9 @@ export default function CreatePage() {
           : baseFeeRate;
 
       if (inscribe && isTaproot && address) {
-        // 3a. Commit/reveal inscription: the image becomes the permanent
-        //     on-chain description; the inscription output is burned.
+        // 3a. Commit/reveal inscription: the image is inscribed and the
+        //     inscription output burned; the description is the JSON URL,
+        //     as on a hosted launch.
         const { revealTxid } = await inscribeLaunch({
           asset: name,
           lpAsset: generateLpAssetName(),
@@ -378,6 +379,7 @@ export default function CreatePage() {
           imageData: new Uint8Array(await image.arrayBuffer()),
           mimeType: image.type,
           feeRate: submitFeeRate,
+          description: upload.json_url,
           address,
           signPsbt,
           broadcast: broadcastTransaction,
