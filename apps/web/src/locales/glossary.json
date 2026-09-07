@@ -2,416 +2,559 @@
   "_about": "Fixed renderings of the site's own vocabulary, per locale. The draft script hands these to the model with every batch, and a reviewer changes a term here rather than in a hundred strings. A term with no entry for a locale is the model's call. Keep the note in English: it is the reviewer's brief.",
   "terms": {
     "fairminter": {
-      "note": "Counterparty's on-chain mint contract. A proper noun on this site. ZH: BRC-20 readers know 公平铸造 (fair mint). The Counterparty contract is the 合约.",
+      "note": "Counterparty's on-chain mint contract. A proper noun on this site. ZH: BRC-20 readers know 公平铸造 (fair mint). The Counterparty contract is the 合约. ES: proper noun, lowercase, glossed once as el contrato de acuñación justa. KO: loanword, as the BRC-20 community writes 페어민트.",
       "ja": "フェアミンター",
       "zh": "公平铸造合约",
       "zh-tw": "公平鑄造合約",
-      "zh-hk": "公平鑄造合約"
+      "zh-hk": "公平鑄造合約",
+      "es": "fairminter",
+      "ko": "페어민터"
     },
     "mint": {
-      "note": "Verb and noun: paying XCP into a fairminter for tokens. ZH: UniSat and the BRC-20 community write Mint as 铸造.",
+      "note": "Verb and noun: paying XCP into a fairminter for tokens. ZH: UniSat and the BRC-20 community write Mint as 铸造. ES: acuñar is UniSat's word; the community also says mintear — use acuñar in UI and prose. KO: 민팅 (noun and 민팅하다), the NFT/inscription word; never 발행 (issuance).",
       "ja": "ミント",
       "zh": "铸造",
       "zh-tw": "鑄造",
-      "zh-hk": "鑄造"
+      "zh-hk": "鑄造",
+      "es": "acuñar",
+      "ko": "민팅"
     },
     "minter": {
       "note": "An address that has minted.",
       "ja": "ミンター",
       "zh": "铸造者",
       "zh-tw": "鑄造者",
-      "zh-hk": "鑄造者"
+      "zh-hk": "鑄造者",
+      "es": "acuñador",
+      "ko": "민터"
     },
     "launch": {
-      "note": "One XCP-69 token launch, from announcement to pool. ZH: pump.fun Chinese idiom: a token is 发射 (launched); a launchpad is 发射台. Never 发行 (issuance) or 启动. Chinese pump.fun coverage says 发射 and 发币 interchangeably and frames phases as 内盘 (bonding curve) → 外盘 (DEX); Traditional coverage uses the same characters (發射, 畢業).",
+      "note": "One XCP-69 token launch, from announcement to pool. ZH: pump.fun Chinese idiom: a token is 发射 (launched); a launchpad is 发射台. Never 发行 (issuance) or 启动. Chinese pump.fun coverage says 发射 and 发币 interchangeably and frames phases as 内盘 (bonding curve) → 外盘 (DEX); Traditional coverage uses the same characters (發射, 畢業). ES: lanzamiento (noun), lanzar (verb); a launchpad is plataforma de lanzamiento. KO: 런칭 for the act, 런치패드 for the platform, as pump.fun Korean coverage writes; never 발행 or 상장.",
       "ja": "ローンチ",
       "zh": "发射",
       "zh-tw": "發射",
-      "zh-hk": "發射"
+      "zh-hk": "發射",
+      "es": "lanzamiento",
+      "ko": "런칭"
     },
     "graduated": {
-      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses.",
+      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers.",
       "ja": "卒業",
       "zh": "毕业",
       "zh-tw": "畢業",
-      "zh-hk": "畢業"
+      "zh-hk": "畢業",
+      "es": "graduado",
+      "ko": "졸업"
     },
     "refunded": {
-      "note": "The launch missed its soft cap and everyone was repaid.",
+      "note": "The launch missed its soft cap and everyone was repaid. KO: 환불 for the refund, 환불됨 as the phase chip.",
       "ja": "返金",
       "zh": "已退款",
       "zh-tw": "已退款",
-      "zh-hk": "已退款"
+      "zh-hk": "已退款",
+      "es": "reembolsado",
+      "ko": "환불됨"
     },
     "scheduled": {
       "note": "Announced, not yet open for minting. ZH: Announced on-chain, minting not open yet.",
       "ja": "予定",
       "zh": "待开始",
       "zh-tw": "待開始",
-      "zh-hk": "待開始"
+      "zh-hk": "待開始",
+      "es": "programado",
+      "ko": "예정"
     },
     "upcoming": {
       "note": "Chip on a scheduled launch's card.",
       "ja": "近日",
       "zh": "即将开始",
       "zh-tw": "即將開始",
-      "zh-hk": "即將開始"
+      "zh-hk": "即將開始",
+      "es": "próximo",
+      "ko": "곧 시작"
     },
     "minting": {
       "note": "Open for minting right now.",
       "ja": "ミント中",
       "zh": "铸造中",
       "zh-tw": "鑄造中",
-      "zh-hk": "鑄造中"
+      "zh-hk": "鑄造中",
+      "es": "acuñando",
+      "ko": "민팅 중"
     },
     "soft cap": {
-      "note": "The 69M-token sale target. Keep the loanword.",
+      "note": "The 69M-token sale target. Keep the loanword. Both communities keep the English term.",
       "ja": "ソフトキャップ",
       "zh": "软顶",
       "zh-tw": "軟頂",
-      "zh-hk": "軟頂"
+      "zh-hk": "軟頂",
+      "es": "soft cap",
+      "ko": "소프트캡"
     },
     "hard cap": {
       "ja": "ハードキャップ",
       "zh": "硬顶",
       "zh-tw": "硬頂",
-      "zh-hk": "硬頂"
+      "zh-hk": "硬頂",
+      "es": "hard cap",
+      "ko": "하드캡"
     },
     "pool": {
-      "note": "The TOKEN/XCP AMM pool. ZH: 池 alone in tight labels. Uniswap zh-TW uses 資金池, but 流動性池 is clearer for an AMM.",
+      "note": "The TOKEN/XCP AMM pool. ZH: 池 alone in tight labels. Uniswap zh-TW uses 資金池, but 流動性池 is clearer for an AMM. ES: Uniswap keeps pool; pool de liquidez when spelled out. KO: 풀 (Uniswap), 유동성 풀 spelled out.",
       "ja": "プール",
       "zh": "流动性池",
       "zh-tw": "流動性池",
-      "zh-hk": "流動性池"
+      "zh-hk": "流動性池",
+      "es": "pool",
+      "ko": "풀"
     },
     "liquidity": {
       "ja": "流動性",
       "zh": "流动性",
       "zh-tw": "流動性",
-      "zh-hk": "流動性"
+      "zh-hk": "流動性",
+      "es": "liquidez",
+      "ko": "유동성"
     },
     "LP burned": {
       "note": "The pool's LP tokens were destroyed, so liquidity is locked forever. ZH: 销毁 is the one Chinese word for burn; there is no バーン/焼却 split.",
       "ja": "LP バーン済み",
       "zh": "LP 已销毁",
       "zh-tw": "LP 已銷毀",
-      "zh-hk": "LP 已銷毀"
+      "zh-hk": "LP 已銷毀",
+      "es": "LP quemado",
+      "ko": "LP 소각됨"
     },
     "market cap": {
       "ja": "時価総額",
       "zh": "市值",
       "zh-tw": "市值",
-      "zh-hk": "市值"
+      "zh-hk": "市值",
+      "es": "capitalización",
+      "ko": "시가총액",
+      "note": "ES: capitalización de mercado in prose, cap. de mercado on a tight label. JA: 時価総額 confirmed by CoinMarketCap Japan and Japanese X posts."
     },
     "price": {
       "ja": "価格",
       "zh": "价格",
       "zh-tw": "價格",
-      "zh-hk": "價格"
+      "zh-hk": "價格",
+      "es": "precio",
+      "ko": "가격"
     },
     "holders": {
       "ja": "ホルダー",
-      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址. MONAPARTY: Monacard writes 所有者, Monapalette 保有者, blogs ホルダー; ホルダー kept for the memecoin register.",
+      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址. MONAPARTY: Monacard writes 所有者, Monapalette 保有者, blogs ホルダー; ホルダー kept for the memecoin register. ES: the community says holders; Uniswap's titulares and UniSat's poseedores read like a bank. KO: 홀더 is what Korean crypto Twitter and Upbit communities say; Uniswap's 보유자 is the formal word.",
       "zh": "持有者",
       "zh-tw": "持有者",
-      "zh-hk": "持有者"
+      "zh-hk": "持有者",
+      "es": "holders",
+      "ko": "홀더"
     },
     "supply": {
       "ja": "発行量",
       "zh": "供应量",
       "zh-tw": "供應量",
       "zh-hk": "供應量",
-      "note": "MONAPARTY 2026-09-07: the Monaparty wiki writes 発行量ロック for locking supply and Monapalette shows 現在の発行数; 供給量 appears in no Japanese Counterparty source. Circulating supply stays 流通供給量 (CoinGecko Japan)."
+      "note": "MONAPARTY 2026-09-07: the Monaparty wiki writes 発行量ロック for locking supply and Monapalette shows 現在の発行数; 供給量 appears in no Japanese Counterparty source. Circulating supply stays 流通供給量 (CoinGecko Japan). Both wallets: suministro total / 총 공급량.",
+      "es": "suministro",
+      "ko": "공급량"
     },
     "volume": {
       "ja": "出来高",
-      "note": "The stock-market word, and what CoinMarketCap Japan uses. Zaif writes 取引高 in prose; keep 出来高 everywhere on this site. ZH: Uniswap and CMC China. UniSat writes 成交量; keep 交易量 everywhere here.",
+      "note": "The stock-market word, and what CoinMarketCap Japan uses. Zaif writes 取引高 in prose; keep 出来高 everywhere on this site. ZH: Uniswap and CMC China. UniSat writes 成交量; keep 交易量 everywhere here. JA: CoinMarketCap Japan writes 出来高 (24時間); confirms 出来高 over Zaif’s 取引高.",
       "zh": "交易量",
       "zh-tw": "交易量",
-      "zh-hk": "交易量"
+      "zh-hk": "交易量",
+      "es": "volumen",
+      "ko": "거래량"
     },
     "since mint": {
       "note": "Return measured from the mint price. ZH: Return measured from the mint price.",
       "ja": "ミント時比",
       "zh": "较铸造价",
       "zh-tw": "較鑄造價",
-      "zh-hk": "較鑄造價"
+      "zh-hk": "較鑄造價",
+      "es": "desde la acuñación",
+      "ko": "민팅가 대비"
     },
     "all-time": {
-      "note": "The whole life of the market, as a window label beside 24h. ZH: CMC/Uniswap range label. As the window beside 24h on a card, 全期 fits where space is tight.",
+      "note": "The whole life of the market, as a window label beside 24h. ZH: CMC/Uniswap range label. As the window beside 24h on a card, 全期 fits where space is tight. Uniswap's range label in both languages. On a card beside 24H: Total / 전체.",
       "ja": "全期間",
       "zh": "全部时间",
       "zh-tw": "全部時間",
-      "zh-hk": "全部時間"
+      "zh-hk": "全部時間",
+      "es": "histórico",
+      "ko": "전체 기간"
     },
     "performance": {
       "ja": "パフォーマンス",
       "zh": "涨跌幅",
       "zh-tw": "漲跌幅",
       "zh-hk": "漲跌幅",
-      "note": "Return as a percentage, the way CMC labels it."
+      "note": "Return as a percentage, the way CMC labels it.",
+      "es": "rendimiento",
+      "ko": "수익률"
     },
     "swap": {
       "ja": "スワップ",
       "zh": "兑换",
       "zh-tw": "兌換",
       "zh-hk": "兌換",
-      "note": "Uniswap and UniSat both."
+      "note": "Uniswap and UniSat both. ES: UniSat's intercambiar; Uniswap says cambiar; the noun stays swap in casual Spanish. KO: 스왑.",
+      "es": "intercambiar",
+      "ko": "스왑"
     },
     "limit": {
-      "note": "Limit orders on Counterparty's order book (the nav label).",
+      "note": "Limit orders on Counterparty's order book (the nav label). KO: 지정가 (limit) vs 시장가 (market), Korean exchange vocabulary.",
       "ja": "指値",
       "zh": "限价",
       "zh-tw": "限價",
-      "zh-hk": "限價"
+      "zh-hk": "限價",
+      "es": "límite",
+      "ko": "지정가"
     },
     "dispense": {
-      "note": "The nav label for buying XCP from Counterparty dispensers; same word as dispenser in every locale.",
+      "note": "The nav label for buying XCP from Counterparty dispensers; same word as dispenser in every locale. ES: dispensador is an ordinary Spanish word for exactly this machine. KO: 자판기, the everyday vending-machine word, on Dan's rule that a dispenser is a vending machine.",
       "ja": "自販機",
       "zh": "售货机",
       "zh-tw": "販賣機",
-      "zh-hk": "售賣機"
+      "zh-hk": "售賣機",
+      "es": "dispensador",
+      "ko": "자판기"
     },
     "dispenser": {
       "ja": "自販機",
       "zh": "售货机",
       "zh-tw": "販賣機",
       "zh-hk": "售賣機",
-      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry."
+      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry.",
+      "es": "dispensador",
+      "ko": "자판기"
     },
     "activity": {
       "ja": "アクティビティ",
       "zh": "动态",
       "zh-tw": "動態",
-      "zh-hk": "動態"
+      "zh-hk": "動態",
+      "es": "actividad",
+      "ko": "활동"
     },
     "stats": {
       "ja": "統計",
       "zh": "统计",
       "zh-tw": "統計",
-      "zh-hk": "統計"
+      "zh-hk": "統計",
+      "es": "estadísticas",
+      "ko": "통계"
     },
     "docs": {
       "ja": "ドキュメント",
       "zh": "文档",
       "zh-tw": "文件",
       "zh-hk": "文件",
-      "note": "Taiwan and Hong Kong say 文件 for documentation; the mainland says 文档."
+      "note": "Taiwan and Hong Kong say 文件 for documentation; the mainland says 文档.",
+      "es": "documentación",
+      "ko": "문서"
     },
     "rewards": {
       "note": "The XCP Rewards programme for minters.",
       "ja": "リワード",
       "zh": "奖励",
       "zh-tw": "獎勵",
-      "zh-hk": "獎勵"
+      "zh-hk": "獎勵",
+      "es": "recompensas",
+      "ko": "보상"
     },
     "mempool": {
       "ja": "メンプール",
       "zh": "内存池",
       "zh-tw": "記憶體池",
       "zh-hk": "內存池",
-      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存. MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept."
+      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存. MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept.",
+      "es": "mempool",
+      "ko": "멤풀"
     },
     "connect": {
-      "note": "Connect a wallet. ZH: Connect a wallet: 连接钱包 on Uniswap and UniSat. OpenCC turns 连接 into 連線 for Taiwan, which is the network sense; keep 連接.",
+      "note": "Connect a wallet. ZH: Connect a wallet: 连接钱包 on Uniswap and UniSat. OpenCC turns 连接 into 連線 for Taiwan, which is the network sense; keep 連接. ES: conectar billetera (billetera, UniSat's word for Latin America; never cartera). KO: 지갑 연결 (Uniswap).",
       "ja": "接続",
       "zh": "连接",
       "zh-tw": "連接",
-      "zh-hk": "連接"
+      "zh-hk": "連接",
+      "es": "conectar",
+      "ko": "지갑 연결"
     },
     "create": {
       "note": "Create a launch.",
       "ja": "作成",
       "zh": "创建",
       "zh-tw": "建立",
-      "zh-hk": "建立"
+      "zh-hk": "建立",
+      "es": "crear",
+      "ko": "만들기"
     },
     "wallet": {
       "ja": "ウォレット",
       "zh": "钱包",
       "zh-tw": "錢包",
-      "zh-hk": "錢包"
+      "zh-hk": "錢包",
+      "es": "billetera",
+      "ko": "지갑"
     },
     "address": {
       "ja": "アドレス",
       "zh": "地址",
       "zh-tw": "地址",
-      "zh-hk": "地址"
+      "zh-hk": "地址",
+      "es": "dirección",
+      "ko": "주소"
     },
     "block": {
       "note": "Bitcoin block.",
       "ja": "ブロック",
       "zh": "区块",
       "zh-tw": "區塊",
-      "zh-hk": "區塊"
+      "zh-hk": "區塊",
+      "es": "bloque",
+      "ko": "블록"
     },
     "trading data": {
       "ja": "取引データ",
       "zh": "交易数据",
       "zh-tw": "交易資料",
-      "zh-hk": "交易數據"
+      "zh-hk": "交易數據",
+      "es": "datos de mercado",
+      "ko": "거래 데이터"
     },
     "sort": {
       "ja": "並び替え",
       "zh": "排序",
       "zh-tw": "排序",
-      "zh-hk": "排序"
+      "zh-hk": "排序",
+      "es": "ordenar",
+      "ko": "정렬"
     },
     "newest": {
       "ja": "新着",
       "zh": "最新",
       "zh-tw": "最新",
-      "zh-hk": "最新"
+      "zh-hk": "最新",
+      "es": "más recientes",
+      "ko": "최신순"
     },
     "search": {
       "ja": "検索",
       "zh": "搜索",
       "zh-tw": "搜尋",
-      "zh-hk": "搜尋"
+      "zh-hk": "搜尋",
+      "es": "buscar",
+      "ko": "검색"
     },
     "all-time high": {
-      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値. ZH: CMC China writes 历史最高价; ATH is also understood but the Chinese is the norm.",
+      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値. ZH: CMC China writes 历史最高价; ATH is also understood but the Chinese is the norm. KO: Upbit and Korean press write 역대 최고가; ATH is understood too.",
       "ja": "ATH",
       "zh": "历史最高",
       "zh-tw": "歷史最高",
-      "zh-hk": "歷史最高"
+      "zh-hk": "歷史最高",
+      "es": "máximo histórico",
+      "ko": "역대 최고가"
     },
     "send": {
       "ja": "送金",
-      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents. MONAPARTY: 送金 in prose; Mpurse's button says 送信."
+      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents. MONAPARTY: 送金 in prose; Mpurse's button says 送信. KO: 전송 (Uniswap/UniSat), not 송금 which implies fiat.",
+      "es": "enviar",
+      "ko": "전송"
     },
     "miner fee": {
       "ja": "トランザクション手数料",
-      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费. MONAPARTY: both Japanese Counterparty wallets, Mpurse and Monapalette, label it トランザクション手数料; replaces マイナー手数料.",
+      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费. MONAPARTY: both Japanese Counterparty wallets, Mpurse and Monapalette, label it トランザクション手数料; replaces マイナー手数料. ES: comisión (not tarifa) is how Spanish Bitcoin users say fee; UniSat writes tarifa de red. KO: 채굴 수수료 for the Bitcoin miner fee; 네트워크 수수료 is the generic word.",
       "zh": "矿工费",
       "zh-tw": "礦工費",
-      "zh-hk": "礦工費"
+      "zh-hk": "礦工費",
+      "es": "comisión de minería",
+      "ko": "채굴 수수료"
     },
     "burn": {
       "ja": "バーン",
-      "note": "DECIDED 2026-09-07: Japanese press heads the term as バーン（焼却）everywhere (CoinPost glossary, Coincheck, CoinDesk Japan), so バーン is used for every burn on the site including LP バーン済み; 破棄 is kept only for Counterparty’s destroy message, where consensus destroys escrowed supply after a refund. Chinese is 销毁 in every sense; OpenCC emits 銷燬 and the derivation script restores 銷毀. MONAPARTY: バーン, Burn and 焼く in community text; confirms バーン.",
+      "note": "DECIDED 2026-09-07: Japanese press heads the term as バーン（焼却）everywhere (CoinPost glossary, Coincheck, CoinDesk Japan), so バーン is used for every burn on the site including LP バーン済み; 破棄 is kept only for Counterparty’s destroy message, where consensus destroys escrowed supply after a refund. Chinese is 销毁 in every sense; OpenCC emits 銷燬 and the derivation script restores 銷毀. MONAPARTY: バーン, Burn and 焼く in community text; confirms バーン. ES: quemar / quemado (UniSat). KO: 소각, the one Korean word for burn.",
       "zh": "销毁",
       "zh-tw": "銷毀",
-      "zh-hk": "銷毀"
+      "zh-hk": "銷毀",
+      "es": "quemar",
+      "ko": "소각"
     },
     "base currency": {
       "ja": "基軸通貨",
       "note": "XCP as Counterparty’s native currency. Zaif’s own wording in its asset guide.",
       "zh": "基础货币",
       "zh-tw": "基礎貨幣",
-      "zh-hk": "基礎貨幣"
+      "zh-hk": "基礎貨幣",
+      "es": "moneda base",
+      "ko": "기축통화"
     },
     "transaction": {
       "zh": "交易",
       "zh-tw": "交易",
       "zh-hk": "交易",
-      "note": "A Bitcoin transaction. A fill or trade is 成交, so the two never share a word in one sentence."
+      "note": "A Bitcoin transaction. A fill or trade is 成交, so the two never share a word in one sentence. KO: 트랜잭션 for an on-chain transaction (Uniswap); 거래 is a trade. ES: transacción vs operación for a trade.",
+      "es": "transacción",
+      "ko": "트랜잭션"
     },
     "fill": {
       "zh": "成交",
       "zh-tw": "成交",
-      "zh-hk": "成交"
+      "zh-hk": "成交",
+      "es": "ejecución",
+      "ko": "체결",
+      "note": "KO: 체결, the Korean exchange word for a fill. ES: ejecutada / ejecución."
     },
     "order book": {
       "zh": "订单簿",
       "zh-tw": "訂單簿",
       "zh-hk": "訂單簿",
       "ja": "板",
-      "note": "MONAPARTY: 板, 注文, 買い/売り, 約定 are the words in Monapalette, the Spotlight DEX guide and Ask Mona; matches."
+      "note": "MONAPARTY: 板, 注文, 買い/売り, 約定 are the words in Monapalette, the Spotlight DEX guide and Ask Mona; matches.",
+      "es": "libro de órdenes",
+      "ko": "호가창"
     },
     "limit order": {
       "zh": "限价单",
       "zh-tw": "限價單",
-      "zh-hk": "限價單"
+      "zh-hk": "限價單",
+      "es": "orden límite",
+      "ko": "지정가 주문"
     },
     "market order": {
       "zh": "市价单",
       "zh-tw": "市價單",
-      "zh-hk": "市價單"
+      "zh-hk": "市價單",
+      "es": "orden de mercado",
+      "ko": "시장가 주문"
     },
     "slippage": {
       "zh": "滑点",
       "zh-tw": "滑點",
-      "zh-hk": "滑點"
+      "zh-hk": "滑點",
+      "es": "deslizamiento",
+      "ko": "슬리피지",
+      "note": "ES: deslizamiento (Uniswap and UniSat). KO: 슬리피지 is the common spelling; Uniswap's 슬리페이지 is rarer."
     },
     "price impact": {
       "zh": "价格影响",
       "zh-tw": "價格影響",
-      "zh-hk": "價格影響"
+      "zh-hk": "價格影響",
+      "es": "impacto en el precio",
+      "ko": "가격 영향"
     },
     "escrow": {
       "zh": "托管",
       "zh-tw": "託管",
       "zh-hk": "託管",
-      "note": "XCP held by the protocol until the launch resolves."
+      "note": "XCP held by the protocol until the launch resolves. ES: en custodia del protocolo; escrow alone is not Spanish.",
+      "es": "en custodia",
+      "ko": "에스크로"
     },
     "consensus": {
       "zh": "共识",
       "zh-tw": "共識",
-      "zh-hk": "共識"
+      "zh-hk": "共識",
+      "es": "consenso",
+      "ko": "합의"
     },
     "token": {
       "zh": "代币",
       "zh-tw": "代幣",
-      "zh-hk": "代幣"
+      "zh-hk": "代幣",
+      "es": "token",
+      "ko": "토큰"
     },
     "lot": {
       "zh": "份",
       "zh-tw": "份",
       "zh-hk": "份",
-      "note": "A 1,000-token lot: 一份 1,000 枚."
+      "note": "A 1,000-token lot: 一份 1,000 枚. ES: lote de 1,000 tokens. KO: 1,000토큰 단위.",
+      "es": "lote",
+      "ko": "단위"
     },
     "dumper": {
       "zh": "砸盘者",
       "zh-tw": "砸盤者",
       "zh-hk": "砸盤者",
-      "note": "An address that sold within blocks of graduation."
+      "note": "An address that sold within blocks of graduation. Both communities use the English word; ES los dumpers, KO 덤퍼. The verb: dumpear / 덤핑.",
+      "es": "dumper",
+      "ko": "덤퍼"
     },
     "dump": {
       "zh": "砸盘",
       "zh-tw": "砸盤",
-      "zh-hk": "砸盤"
+      "zh-hk": "砸盤",
+      "es": "dump",
+      "ko": "덤핑"
     },
     "whale": {
       "zh": "巨鲸",
       "zh-tw": "巨鯨",
-      "zh-hk": "巨鯨"
+      "zh-hk": "巨鯨",
+      "es": "ballena",
+      "ko": "고래"
     },
     "rug pull": {
       "zh": "跑路",
       "zh-tw": "跑路",
       "zh-hk": "跑路",
-      "note": "The community word; 拉地毯 is a calque nobody uses."
+      "note": "The community word; 拉地毯 is a calque nobody uses. Kept in English in both; ES may gloss as estafa de salida once.",
+      "es": "rug pull",
+      "ko": "러그풀"
     },
     "premine": {
       "zh": "预挖",
       "zh-tw": "預挖",
-      "zh-hk": "預挖"
+      "zh-hk": "預挖",
+      "es": "preminado",
+      "ko": "프리마인"
     },
     "Bitcoin": {
       "zh": "比特币",
       "zh-tw": "比特幣",
       "zh-hk": "比特幣",
-      "note": "BTC stays BTC as a ticker."
+      "note": "BTC stays BTC as a ticker. ES keeps Bitcoin; KO writes 비트코인 in prose, BTC as ticker.",
+      "es": "Bitcoin",
+      "ko": "비트코인"
     },
     "Counterparty": {
       "zh": "Counterparty",
       "zh-tw": "Counterparty",
       "zh-hk": "Counterparty",
       "ja": "Counterparty",
-      "note": "Always Latin. Chinese press writes Counterparty 协议; never 交易对手 (the finance word, seen in one machine-translated Sohu piece). 合约币 was the 2014 Chinese press name for XCP (8BTC) and is not used today."
+      "note": "Always Latin. Chinese press writes Counterparty 协议; never 交易对手 (the finance word, seen in one machine-translated Sohu piece). 合约币 was the 2014 Chinese press name for XCP (8BTC) and is not used today.",
+      "es": "Counterparty",
+      "ko": "Counterparty"
     },
     "proof of burn": {
       "zh": "销毁证明",
-      "note": "Chinese press: 销毁证明 (PoB). Japanese press: プルーフ・オブ・バーン."
+      "note": "Chinese press: 销毁证明 (PoB). Japanese press: プルーフ・オブ・バーン.",
+      "es": "prueba de quema",
+      "ko": "소각 증명"
     },
     "confirmed": {
       "ja": "承認済み",
-      "note": "MONAPARTY: confirmations are 承認 (承認数, ゼロ承認 in Monapalette; 未承認トランザクション on the wiki). 確定 is kept only for a launch resolving at its deadline and for realized P&L."
+      "note": "MONAPARTY: confirmations are 承認 (承認数, ゼロ承認 in Monapalette; 未承認トランザクション on the wiki). 確定 is kept only for a launch resolving at its deadline and for realized P&L. KO: 확인 / 컨펌 for confirmations; 컨펌 is community slang, 확인 is the wallet word.",
+      "es": "confirmado",
+      "ko": "확인됨"
     },
     "description": {
       "ja": "説明文",
-      "note": "MONAPARTY: the asset description field is 説明文 (Monapalette トークンの説明文を変更する, wiki)."
+      "note": "MONAPARTY: the asset description field is 説明文 (Monapalette トークンの説明文を変更する, wiki).",
+      "es": "descripción",
+      "ko": "설명"
+    },
+    "coin (as a traded name)": {
+      "ja": "銘柄",
+      "note": "JAPANESE X 2026-09: traders call each coin a 銘柄 (コミュニティが強い銘柄); used for graduated coins on the stats page (卒業銘柄). コイン stays where the English explains what a coin is."
+    },
+    "surge": {
+      "ja": "高騰",
+      "note": "JAPANESE X: 高騰 for a price surge (XCP の高騰); 火を吹く and 億る are slang, not for UI."
     }
   }
 }
