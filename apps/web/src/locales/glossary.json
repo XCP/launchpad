@@ -23,7 +23,7 @@
       "zh-hk": "鑄造者"
     },
     "launch": {
-      "note": "One XCP-69 token launch, from announcement to pool. ZH: pump.fun Chinese idiom: a token is 发射 (launched); a launchpad is 发射台. Never 发行 (issuance) or 启动.",
+      "note": "One XCP-69 token launch, from announcement to pool. ZH: pump.fun Chinese idiom: a token is 发射 (launched); a launchpad is 发射台. Never 发行 (issuance) or 启动. Chinese pump.fun coverage says 发射 and 发币 interchangeably and frames phases as 内盘 (bonding curve) → 外盘 (DEX); Traditional coverage uses the same characters (發射, 畢業).",
       "ja": "ローンチ",
       "zh": "发射",
       "zh-tw": "發射",
@@ -175,7 +175,8 @@
       "ja": "ディスペンサー",
       "zh": "分发器",
       "zh-tw": "分發器",
-      "zh-hk": "分發器"
+      "zh-hk": "分發器",
+      "note": "Chinese press (Sohu on Counterparty NFTs) writes 分配器; the community also says 自动售货机 (vending machine). 分发器 is used here; a reviewer may prefer 分配器."
     },
     "activity": {
       "ja": "アクティビティ",
@@ -389,6 +390,17 @@
       "zh-tw": "比特幣",
       "zh-hk": "比特幣",
       "note": "BTC stays BTC as a ticker."
+    },
+    "Counterparty": {
+      "zh": "Counterparty",
+      "zh-tw": "Counterparty",
+      "zh-hk": "Counterparty",
+      "ja": "Counterparty",
+      "note": "Always Latin. Chinese press writes Counterparty 协议; never 交易对手 (the finance word, seen in one machine-translated Sohu piece). 合约币 was the 2014 Chinese press name for XCP (8BTC) and is not used today."
+    },
+    "proof of burn": {
+      "zh": "销毁证明",
+      "note": "Chinese press: 销毁证明 (PoB). Japanese press: プルーフ・オブ・バーン."
     }
   }
 }
