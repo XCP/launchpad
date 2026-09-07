@@ -26,6 +26,24 @@ export function SiteFooter() {
     <footer className="mx-auto max-w-5xl px-4 pb-24 pt-4">
       <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
         <FooterSettings />
+        {/* The reference pages, a second time. They are in the header too,
+            but the header is the one row that every language competes for,
+            and on a phone they live behind a burger. A footer link costs
+            nothing and is where a reader looks for documentation. */}
+        <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
+          <LazyLink href="/faq" className="hover:text-gray-600 dark:hover:text-gray-300">
+            {t("FAQ")}
+          </LazyLink>
+          <LazyLink href="/docs" className="hover:text-gray-600 dark:hover:text-gray-300">
+            {t("Docs")}
+          </LazyLink>
+          <LazyLink href="/stats" className="hover:text-gray-600 dark:hover:text-gray-300">
+            {t("Stats")}
+          </LazyLink>
+          <LazyLink href="/activity" className="hover:text-gray-600 dark:hover:text-gray-300">
+            {t("Activity")}
+          </LazyLink>
+        </nav>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <span>
             xcp.fun · {t("XCP-69 launches on Counterparty")}

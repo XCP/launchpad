@@ -670,7 +670,7 @@
   "Maximum-mint addresses controlled": "Адресов с максимальным минтом под контролем",
   "Mempool": "Мемпул",
   "Mempool — xcp.fun": "Мемпул — xcp.fun",
-  "Mempool@@chip": "Не подтверждено",
+  "Mempool@@chip": "Ожидают",
   "Message format": "Формат сообщений",
   "Method and limits": "Метод и ограничения",
   "Min LP · slippage {pct}%": "Мин. LP · проскальзывание {pct}%",

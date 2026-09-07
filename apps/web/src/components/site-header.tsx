@@ -140,7 +140,7 @@ export function SiteHeader() {
             child the cluster simply cannot overlap its siblings, and the worst
             case is that it sits a little off true centre when the wallet
             changes width. Drifting beats colliding. */}
-        <div className="hidden shrink-0 items-center gap-2 lg:flex">
+        <div className="hidden shrink-0 items-center gap-2 xl:flex">
           {/* Rewards is always on; mempool joins it only when something is
               queued, so the group grows and shrinks as one unit. Telegram sits
               last — the two before it are about this site's own state, and it
@@ -161,7 +161,7 @@ export function SiteHeader() {
               adds an icon's width rather than a word's. The status chip still
               takes turns beside it — that constraint was about text, and this
               does not spend any. */}
-          <span className="flex items-center gap-2 lg:hidden">
+          <span className="flex items-center gap-2 xl:hidden">
             {queued ? <MempoolChip /> : <RewardsChip />}
             <TelegramChip />
           </span>
