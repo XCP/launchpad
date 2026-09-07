@@ -64,30 +64,67 @@ export interface RewardAccount {
  * CTE: applying it first would give every address its own private 10,000-mint
  * programme. Payout history only includes rows attached to a real tx.
  */
+/**
+ * What this address earned from the programme.
+ *
+ * Read from the rollup the indexer maintains when it has been built, and
+ * derived live when it has not. The two produce the same numbers from the same
+ * fold — `indexer/reward-rollup.ts` holds that SQL, and the only difference
+ * between them is that this one names an address and that one groups by it.
+ *
+ * The live path is the expensive one: it builds the whole eligible set before
+ * selecting one address, which measured 4,830 rows read to return a single
+ * row, and it was the largest row reader on this database. Keeping it is
+ * deliberate. This is a page about what someone is owed, so an unbuilt or
+ * wiped rollup must degrade to a slow correct answer rather than an empty one.
+ *
+ * The rollup lags by at most one indexer tick, and only after a tick that
+ * ingested mints or moved a conformance verdict. Entitlement cannot change
+ * without one of those.
+ */
+async function earningsFor(db: D1Database, source: string): Promise<EarningRow | null> {
+  const built = await one<{ built_at: number }>(
+    db,
+    `SELECT built_at FROM reward_account_state WHERE id = 1`,
+  );
+
+  if (built) {
+    return one<EarningRow>(
+      db,
+      `SELECT source, earned_mints AS mints, launches, paid_quantity AS paid
+         FROM reward_accounts
+        WHERE source = ?1`,
+      source,
+    );
+  }
+
+  return one<EarningRow>(
+    db,
+    `WITH eligible AS (
+       SELECT m.tx_hash, m.launch_tx, m.block_index, m.tx_index,
+              m.source, m.paid_quantity
+         FROM launch_mints m
+         JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
+        ORDER BY m.block_index, COALESCE(m.tx_index, 0), m.tx_hash
+        LIMIT 10000
+     )
+     SELECT source,
+            COUNT(*) AS mints,
+            COUNT(DISTINCT launch_tx) AS launches,
+            CAST(SUM(CAST(paid_quantity AS INTEGER)) AS TEXT) AS paid
+       FROM eligible
+      WHERE source = ?1
+      GROUP BY source`,
+    source,
+  );
+}
+
 export async function getRewardAccount(
   db: D1Database,
   source: string,
 ): Promise<RewardAccount | null> {
   const [earned, paidRows] = await Promise.all([
-    one<EarningRow>(
-      db,
-      `WITH eligible AS (
-         SELECT m.tx_hash, m.launch_tx, m.block_index, m.tx_index,
-                m.source, m.paid_quantity
-           FROM launch_mints m
-           JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1
-          ORDER BY m.block_index, COALESCE(m.tx_index, 0), m.tx_hash
-          LIMIT 10000
-       )
-       SELECT source,
-              COUNT(*) AS mints,
-              COUNT(DISTINCT launch_tx) AS launches,
-              CAST(SUM(CAST(paid_quantity AS INTEGER)) AS TEXT) AS paid
-         FROM eligible
-        WHERE source = ?1
-        GROUP BY source`,
-      source,
-    ),
+    earningsFor(db, source),
     q<PayoutRow>(
       db,
       `SELECT p.batch_id, b.asset, b.first_mint_number, b.cutoff_mint_number,

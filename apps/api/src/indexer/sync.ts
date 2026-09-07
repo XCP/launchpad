@@ -20,6 +20,10 @@ import {
   behaviorRollupIsStale,
   refreshBehaviorRollup,
 } from "#api/indexer/behavior-rollup";
+import {
+  refreshRewardAccounts,
+  rewardAccountsAreStale,
+} from "#api/indexer/reward-rollup";
 import { fetchTxFee } from "#api/integrations/mempool";
 import {
   isXcp69,
@@ -100,6 +104,7 @@ export interface SyncResult {
   /** Materialized address/cohort rows changed this tick. The historical fold
    *  is skipped entirely when no mint, trade, graduation, or verdict moved. */
   behavior_written: number;
+  reward_accounts_written: number;
 }
 
 const FEE_BACKFILL_LIMIT = 15;
@@ -511,6 +516,18 @@ export async function syncLaunches(
   });
   const behaviorRollup = behaviorStale ? await refreshBehaviorRollup(db) : null;
 
+  // Same shape and the same reason: the programme account is a fold over every
+  // eligible mint, it does not depend on who is asking, and it was the largest
+  // row reader on this database when every asker rebuilt it. Eligibility is
+  // joined to `launches.conforming`, so a changed verdict counts as staleness
+  // alongside new mints.
+  const rewardsStale = rewardAccountsAreStale({
+    mintsIngested,
+    resolved,
+    graduations: newGraduations.size,
+  });
+  const rewardRollup = rewardsStale ? await refreshRewardAccounts(db) : null;
+
   return {
     candidates: candidates.length,
     written,
@@ -526,6 +543,9 @@ export async function syncLaunches(
       : 0,
     behavior_written: behaviorRollup
       ? behaviorRollup.wallets_written + behaviorRollup.totals_written
+      : 0,
+    reward_accounts_written: rewardRollup
+      ? rewardRollup.sources_written + rewardRollup.sources_removed
       : 0,
   };
 }
