@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useT } from "@/lib/i18n/client";
 
 /** The red inline failure notice. Renders nothing without children. */
 export function ErrorBanner({
@@ -14,6 +15,7 @@ export function ErrorBanner({
    *  themselves instead of waiting on the next submit or a state change. */
   onDismiss?: () => void;
 }) {
+  const t = useT();
   if (!children) return null;
   return (
     <p
@@ -24,7 +26,7 @@ export function ErrorBanner({
         <button
           type="button"
           onClick={onDismiss}
-          aria-label="Dismiss"
+          aria-label={t("Dismiss")}
           className="-m-1 shrink-0 rounded p-1 text-red-400 hover:text-red-600 dark:hover:text-red-400"
         >
           ×

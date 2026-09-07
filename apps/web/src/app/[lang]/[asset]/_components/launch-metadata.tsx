@@ -151,6 +151,7 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
  *  goes to /inscription, the record with the content in it, rather than
  *  /content alone. */
 export function InscriptionChip({ txHash }: { txHash: string }) {
+  const t = useT();
   return (
     <a
       href={inscriptionPageUrl(txHash)}
@@ -158,7 +159,7 @@ export function InscriptionChip({ txHash }: { txHash: string }) {
       rel="noreferrer"
       className="rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400"
     >
-      inscription ↗
+      {t("inscription")} ↗
     </a>
   );
 }

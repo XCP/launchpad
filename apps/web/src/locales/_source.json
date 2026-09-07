@@ -445,6 +445,9 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/orders-tab.tsx"
   ],
+  "{pct}% filled — the rest is resting on the book with {amount} {asset} escrowed.": [
+    "components/order-tracker.tsx"
+  ],
   "{pct}% graduated ({a}/{b})": [
     "components/address-hover-card.tsx"
   ],
@@ -1110,11 +1113,17 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
     "app/[lang]/profile/_components/orders-tab.tsx"
   ],
+  "Cancel remainder": [
+    "components/order-tracker.tsx"
+  ],
   "cancelled": [
     "components/pending-dock.tsx"
   ],
   "Cancelled": [
     "app/[lang]/activity/_components/activity-view.tsx"
+  ],
+  "Cancelled — funds refunded.": [
+    "components/order-tracker.tsx"
   ],
   "candles": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
@@ -1175,7 +1184,8 @@
     "components/pending-dock.tsx"
   ],
   "Close": [
-    "app/[lang]/_components/market-pulse.tsx"
+    "app/[lang]/_components/market-pulse.tsx",
+    "components/ui/dialog.tsx"
   ],
   "Closed": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
@@ -1259,6 +1269,9 @@
   "Confirmed": [
     "app/[lang]/rewards/page.tsx",
     "components/pending-dock.tsx"
+  ],
+  "Confirmed — resting on the book with {amount} {asset} escrowed.": [
+    "components/order-tracker.tsx"
   ],
   "confirmed · announced": [
     "components/pending-dock.tsx"
@@ -1460,7 +1473,8 @@
     "app/[lang]/[asset]/_components/trade-panel.tsx",
     "app/[lang]/swap/_components/liquidity-widget.tsx",
     "app/[lang]/swap/_components/swap-widget.tsx",
-    "components/pending-dock.tsx"
+    "components/pending-dock.tsx",
+    "components/ui/error-banner.tsx"
   ],
   "Dispense": [
     "components/site-header.tsx"
@@ -1601,6 +1615,9 @@
   "Expired": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
+  "Expired — the unfilled {amount} {asset} was refunded automatically.": [
+    "components/order-tracker.tsx"
+  ],
   "expired · refunded": [
     "components/pending-dock.tsx"
   ],
@@ -1664,7 +1681,8 @@
     "components/pending-dock.tsx"
   ],
   "Filled": [
-    "app/[lang]/activity/_components/activity-view.tsx"
+    "app/[lang]/activity/_components/activity-view.tsx",
+    "components/order-tracker.tsx"
   ],
   "Filled / expires": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -1848,6 +1866,9 @@
   "in pools": [
     "app/[lang]/stats/page.tsx"
   ],
+  "In the mempool — matching runs the moment the block lands.": [
+    "components/order-tracker.tsx"
+  ],
   "in the mempool — waiting for a block": [
     "components/pending-dock.tsx"
   ],
@@ -1856,6 +1877,9 @@
   ],
   "Inscribe the image on-chain.": [
     "app/[lang]/create/page.tsx"
+  ],
+  "inscription": [
+    "app/[lang]/[asset]/_components/launch-metadata.tsx"
   ],
   "Install ↗": [
     "components/connect-button.tsx"
@@ -1919,6 +1943,7 @@
     "app/[lang]/profile/_components/history-tab.tsx"
   ],
   "Language": [
+    "components/language-switch.tsx",
     "components/site-footer.tsx"
   ],
   "latest launch {age}": [
@@ -1972,6 +1997,9 @@
     "app/[lang]/profile/_components/rewards-card.tsx",
     "app/[lang]/profile/_components/rewards-tab.tsx"
   ],
+  "limit": [
+    "app/[lang]/[asset]/_components/asset-trade-surface.tsx"
+  ],
   "Limit": [
     "components/site-header.tsx"
   ],
@@ -1994,6 +2022,7 @@
     "app/[lang]/[asset]/_components/launch-chrome.tsx"
   ],
   "liquidity": [
+    "app/[lang]/[asset]/_components/asset-trade-surface.tsx",
     "app/[lang]/swap/_components/trade-surface.tsx"
   ],
   "Liquidity": [
@@ -2927,7 +2956,8 @@
   ],
   "Refresh": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
-    "app/[lang]/profile/_components/orders-tab.tsx"
+    "app/[lang]/profile/_components/orders-tab.tsx",
+    "components/ui/refresh-button.tsx"
   ],
   "Refresh price chart": [
     "app/[lang]/_components/market-pulse.tsx"
@@ -3246,6 +3276,7 @@
     "app/[lang]/docs/page.tsx"
   ],
   "swap": [
+    "app/[lang]/[asset]/_components/asset-trade-surface.tsx",
     "app/[lang]/swap/_components/trade-surface.tsx"
   ],
   "Swap": [

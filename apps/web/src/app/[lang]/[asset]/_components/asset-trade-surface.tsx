@@ -10,6 +10,7 @@ import {
 } from "@/app/[lang]/swap/_components/swap-settings";
 import { SwapWidget } from "@/app/[lang]/swap/_components/swap-widget";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
+import { useT } from "@/lib/i18n/client";
 import { TradePanel } from "@/app/[lang]/[asset]/_components/trade-panel";
 
 /**
@@ -28,6 +29,7 @@ export function AssetTradeSurface({
    *  tab row above — same two-row shape the dispense page uses. */
   aside?: React.ReactNode;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<"swap" | "limit" | "liquidity">("swap");
   return (
     <SwapSettingsProvider>
@@ -36,7 +38,13 @@ export function AssetTradeSurface({
           <SegmentedList className="w-full max-w-md">
             {(["swap", "limit", "liquidity"] as const).map((m) => (
               <SegmentedTrigger key={m} value={m}>
-                {m}
+                {/* Named, not printed: the mode id doubled as the label here,
+                    so these three tabs stayed English on every translated
+                    page — and because there was no t() call, the extractor
+                    had nothing to report as missing. The trigger capitalises
+                    in CSS, so the lowercase keys the swap page already uses
+                    render the same as they do there. */}
+                {m === "swap" ? t("swap") : m === "limit" ? t("limit") : t("liquidity")}
               </SegmentedTrigger>
             ))}
           </SegmentedList>

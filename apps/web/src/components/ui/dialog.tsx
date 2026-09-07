@@ -1,6 +1,7 @@
 "use client";
 
 import { Dialog as D } from "radix-ui";
+import { useT } from "@/lib/i18n/client";
 import type { ReactNode } from "react";
 
 /**
@@ -28,6 +29,7 @@ export function Dialog({
   children: ReactNode;
   variant?: "card" | "lightbox";
 }) {
+  const t = useT();
   if (variant === "lightbox") {
     return (
       <D.Root open={open} onOpenChange={onOpenChange}>
@@ -36,7 +38,7 @@ export function Dialog({
           <D.Content className="modal-pop fixed left-1/2 top-1/2 z-50 h-[85vh] w-[92vw] max-w-2xl -translate-x-1/2 -translate-y-1/2 focus:outline-none">
             <D.Title className="sr-only">{title}</D.Title>
             <D.Close
-              aria-label="Close"
+              aria-label={t("Close")}
               className="absolute -right-3 -top-3 flex size-9 items-center justify-center rounded-full bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 shadow-lg hover:bg-gray-100 dark:hover:bg-gray-800 sm:-right-4 sm:-top-4"
             >
               ✕
@@ -58,7 +60,7 @@ export function Dialog({
               {title}
             </D.Title>
             <D.Close
-              aria-label="Close"
+              aria-label={t("Close")}
               className="flex size-7 items-center justify-center rounded-full text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-400"
             >
               ✕

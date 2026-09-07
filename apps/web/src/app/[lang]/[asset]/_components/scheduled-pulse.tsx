@@ -158,7 +158,7 @@ export function ScheduledPulse({
             lands — so for a few seconds this label sits under a pill that
             still says "Scheduled". "live" is the honest word for that gap:
             the chain has opened minting, the page hasn't caught up yet. */}
-        <div className={`mb-3 text-center ${LABEL}`}>minting is live</div>
+        <div className={`mb-3 text-center ${LABEL}`}>{t("minting is live")}</div>
         {mintForm}
       </div>
     );

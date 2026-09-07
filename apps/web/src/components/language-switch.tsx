@@ -42,6 +42,7 @@ export const MENU_ITEM =
  * so thirty currencies never swallow two languages.
  */
 export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   const locale = useLocale();
   const pathname = usePathname();
   const { path } = splitLocale(pathname ?? "/");
@@ -49,7 +50,7 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
   return (
     <DM.Root>
       <DM.Trigger
-        aria-label="Language"
+        aria-label={t("Language")}
         className={`flex items-center gap-1.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 ${
           compact ? "size-9 justify-center" : "h-9 px-3"
         }`}
