@@ -49,6 +49,7 @@ export function useMempool(refreshMs: number) {
     fairminters: data?.fairminters ?? [],
     mints: data?.mints ?? [],
     orders: data?.orders ?? [],
+    dispenses: data?.dispenses ?? [],
     fetchedAt: data?.fetchedAt ?? null,
     isLoading: isLoading && !data,
     refresh: () => mutate(),

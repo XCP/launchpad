@@ -3,6 +3,7 @@
  * poller reads through here; every read route answers from D1.
  */
 import { parseJsonLossless, rawEquals, SATS_PER_UNIT } from "@launchpad/xcp69/numeric";
+import type { PendingDispense } from "@launchpad/xcp69/dispenser-price";
 import type { MempoolMint, MempoolOrder } from "@launchpad/xcp69/mempool";
 import type { CounterpartyEvent } from "@launchpad/xcp69/trades";
 
@@ -12,7 +13,16 @@ async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     signal: AbortSignal.timeout(15_000),
   });
-  if (!res.ok) throw new Error(`Counterparty ${path} -> HTTP ${res.status}`);
+  if (!res.ok) {
+    // A Worker holds six outbound connections, and a Response whose body is
+    // neither read nor cancelled keeps its slot until collection. One indexer
+    // tick makes many of these calls, so a throw that leaves the body open
+    // costs a connection that some later, unrelated request pays for: past
+    // six, the runtime cancels the OLDEST in-flight response and logs a
+    // stalled-response warning against whichever request happened to be it.
+    await res.body?.cancel().catch(() => undefined);
+    throw new Error(`Counterparty ${path} -> HTTP ${res.status}`);
+  }
   // Native res.json() rounds integers past 2^53 — exactly what XCP-69's 1e16
   // hard cap sits above. Parse losslessly so unsafe magnitudes survive as
   // strings instead of silently drifting, the same way the web app does.
@@ -152,6 +162,41 @@ export async function fetchMempoolFairmints(): Promise<MempoolMint[]> {
         paidQuantity: e.params.paid_quantity!,
         divisible: e.params.asset_info?.divisible ?? true,
       }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Unconfirmed dispenser fills.
+ *
+ * The dispense page hides any dispenser with a pending fill: another buyer is
+ * already racing that transaction and can forfeit BTC if the escrow empties
+ * first. That safety rule is live by nature, so it cannot be answered from D1
+ * on a five-minute cron — but it also does not need every browser asking
+ * Counterparty for it, which is what the page did before this: one request per
+ * open tab every ten seconds, the same shape the header chip's poll was
+ * consolidated out of.
+ *
+ * Unfiltered on purpose. The set is small, and the client matches by
+ * `dispenser_tx_hash` against whichever dispensers it is showing, so deciding
+ * here which ones matter would only let the two disagree.
+ */
+export async function fetchMempoolDispenses(): Promise<PendingDispense[]> {
+  try {
+    const data = await get<{ result: { params?: Partial<PendingDispense> }[] }>(
+      `/mempool/events/DISPENSE?limit=500`,
+    );
+    return (data.result ?? [])
+      .map((event) => event.params)
+      .filter(
+        (params): params is PendingDispense =>
+          typeof params?.dispenser_tx_hash === "string" &&
+          // Raw-unit quantities can exceed 2^53 and arrive as strings, so this
+          // is a presence check; big() in the shared matcher does the parsing.
+          params.dispense_quantity !== undefined &&
+          params.dispense_quantity !== null,
+      );
   } catch {
     return [];
   }

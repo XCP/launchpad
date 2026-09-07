@@ -139,11 +139,8 @@ describe("coalescing identical reads", () => {
   });
 
   it("does not remember a failure", async () => {
-    let attempt = 0;
     stubFetch(async () => {
-      attempt++;
-      if (attempt === 1) throw new Error("connection reset");
-      return ok({ result: null });
+      throw new Error("connection reset");
     });
     const stub = currentStub();
     const { fetchPool } = await loadClient();
@@ -151,8 +148,48 @@ describe("coalescing identical reads", () => {
     await fetchPool("AAA");
     const second = await fetchPool("AAA");
 
-    expect(stub.calls).toHaveLength(2);
+    // Three attempts each, and the second call really went and asked again
+    // rather than being handed the first call's settled failure.
+    expect(stub.calls).toHaveLength(6);
     expect(second).toBeNull();
+  });
+
+  it("retries a connection that dies rather than failing the page", async () => {
+    let attempt = 0;
+    stubFetch(async () => {
+      attempt++;
+      // What the 2MB /fairminters payload actually did: 865KB in, then the
+      // node closed the socket. One page died for a transport hiccup.
+      if (attempt === 1) throw new TypeError("terminated");
+      return ok({ result: { asset_a: "XCP", asset_b: "AAA", reserve_a: "5", reserve_b: "5" } });
+    });
+    const stub = currentStub();
+    const { fetchPool } = await loadClient();
+
+    expect((await fetchPool("AAA"))?.reserve_a).toBe("5");
+    expect(stub.calls).toHaveLength(2);
+  });
+
+  it("retries a body that dies part-way through", async () => {
+    let attempt = 0;
+    stubFetch(async () => {
+      attempt++;
+      if (attempt === 1) {
+        // A 200 whose body throws on read. The guard has to cover the read,
+        // not just the request: this is where the real failure happened.
+        const response = new Response("{}", { status: 200 });
+        Object.defineProperty(response, "text", {
+          value: () => Promise.reject(new TypeError("terminated")),
+        });
+        return response;
+      }
+      return ok({ result: null });
+    });
+    const stub = currentStub();
+    const { fetchPool } = await loadClient();
+
+    expect(await fetchPool("AAA")).toBeNull();
+    expect(stub.calls).toHaveLength(2);
   });
 });
 

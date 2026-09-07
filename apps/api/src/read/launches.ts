@@ -1,6 +1,7 @@
 import { getCandles, RESOLUTIONS } from "#api/queries/candles";
 import { isXcp69 } from "@launchpad/xcp69/xcp69";
 import {
+  fetchMempoolDispenses,
   fetchMempoolFairminters,
   fetchMempoolFairmints,
   fetchMempoolOrders,
@@ -21,6 +22,7 @@ import {
   listLaunchPage,
   listMinters,
   listSearchIndex,
+  listTradeableAssets,
   sumFees,
   tradeVolumeByDay,
 } from "#api/queries/launches";
@@ -108,6 +110,22 @@ launchesRoute.get("/v2/launches", async (c) => {
  * the one read that is deliberately unbounded by design — bounded instead by
  * the conforming set, which is the thing the site is actually about.
  */
+/**
+ * The tradeable set: graduated, conforming, with a live pool, deepest first.
+ *
+ * Registered ahead of /v2/launches/:asset so the static segment wins, the same
+ * way /v2/launches/index and /v2/launches/by/:source already rely on.
+ *
+ * Sixty seconds because that is the freshness the swap and limit pages already
+ * declared for this list, and because what it answers — which tokens exist to
+ * trade — changes only when a launch graduates. Depth ordering is a hint for
+ * the picker, not a quote: nothing is priced from this response.
+ */
+launchesRoute.get("/v2/launches/tradeable", async (c) => {
+  const result = await listTradeableAssets(c.env.DB);
+  return J(c, { result, result_count: result.length }, 60);
+});
+
 launchesRoute.get("/v2/launches/index", async (c) => {
   const result = await listSearchIndex(c.env.DB);
   return J(c, { result, result_count: result.length }, 60);
@@ -389,10 +407,13 @@ launchesRoute.get("/v2/launches/:asset/minters", async (c) => {
  * afford to be better than what it replaces.
  */
 launchesRoute.get("/v2/mempool", async (c) => {
-  const [rawFairminters, rawMints, rawOrders] = await Promise.all([
+  const [rawFairminters, rawMints, rawOrders, dispenses] = await Promise.all([
     fetchMempoolFairminters(),
     fetchMempoolFairmints(),
     fetchMempoolOrders(),
+    // Not filtered against the conforming set: these are XCP dispensers, not
+    // launches, and the covered-set test below has nothing to say about them.
+    fetchMempoolDispenses(),
   ]);
 
   // No cast. CpFairminter is structurally a Fairminter, and the indexer calls
@@ -436,8 +457,15 @@ launchesRoute.get("/v2/mempool", async (c) => {
   return J(
     c,
     {
-      result: { fairminters, mints, orders, fetched_at: Math.floor(Date.now() / 1000) },
-      result_count: fairminters.length + mints.length + orders.length,
+      result: {
+        fairminters,
+        mints,
+        orders,
+        dispenses,
+        fetched_at: Math.floor(Date.now() / 1000),
+      },
+      result_count:
+        fairminters.length + mints.length + orders.length + dispenses.length,
     },
     MEMPOOL_TTL,
   );

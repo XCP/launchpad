@@ -475,6 +475,39 @@ export function listSearchIndex(db: D1Database): Promise<SearchIndexRow[]> {
   );
 }
 
+export interface TradeableRow {
+  asset: string;
+  pool_xcp_sats: number;
+}
+
+/**
+ * The graduated, conforming launches that have a live XCP pool, deepest first.
+ *
+ * This is the same set apps/web used to rebuild from scratch on every render:
+ * the whole fairminter list, then a pool read per closed launch, then a
+ * creation-event read per launch to re-judge conformance — roughly 260
+ * requests at a public Counterparty node, repeated for each of eleven locales,
+ * for an answer this table already holds. The indexer derives `conforming`
+ * and `phase` once and refreshes `pool_xcp_sats` on its own cadence.
+ *
+ * Two columns and no paging, on the same reasoning as listSearchIndex: it is a
+ * membership set rather than a list, and it is bounded by the graduated set,
+ * which is small and grows only when a launch sells out.
+ *
+ * `pool_xcp_sats` is a Number and safely so — it is an XCP balance, and XCP's
+ * entire supply is ~2.6e14 satoshi, two orders below 2^53. A token reserve
+ * would not survive the same treatment, which is why it is not selected here.
+ */
+export function listTradeableAssets(db: D1Database): Promise<TradeableRow[]> {
+  return q<TradeableRow>(
+    db,
+    `SELECT asset, pool_xcp_sats
+       FROM launches
+      WHERE conforming = 1 AND phase = 'graduated' AND pool_xcp_sats > 0
+      ORDER BY pool_xcp_sats DESC`,
+  );
+}
+
 /** Conforming membership for a supplied candidate set.
  *
  * The mempool normally contains zero or a handful of launch assets. Reading

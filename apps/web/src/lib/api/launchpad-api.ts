@@ -8,6 +8,7 @@
  */
 import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
 import type { MempoolMint } from "@/lib/api/counterparty";
+import type { PendingDispense } from "@launchpad/xcp69/dispenser-price";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { PRICE_SCALE } from "@launchpad/xcp69/candles";
 import { discard } from "@/lib/net";
@@ -42,8 +43,42 @@ interface WorkerBinding {
  * renders. This module is also used in Client Components, so the Cloudflare
  * runtime import must stay behind the server branch.
  */
+/**
+ * Every read here carries a deadline chosen for a visitor waiting on a page.
+ * Static generation is not that: it saturates every core, and a three-second
+ * timer created on a busy worker can expire before its fetch is even issued.
+ * Observed directly, as a 0ms "operation was aborted due to timeout".
+ *
+ * The cost of that is not a missing section. Every caller in this file falls
+ * back to deriving the same answer from Counterparty, which is three reads per
+ * launch on the home page and ~260 on the swap page — so a spurious timeout
+ * does not degrade the build, it stampedes a public node in the middle of one.
+ * Twenty seconds is far past any healthy response from our own worker and well
+ * inside the 180-second page budget.
+ */
+const BUILD_DEADLINE_MS = 20_000;
+
 async function launchpadApiFetch(path: string, init: NextFetchInit = {}): Promise<Response> {
   const url = `${API_BASE}${path}`;
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    // `cache: "no-store"` is here for polled routes, so a browser re-asking
+    // every few seconds is actually re-asking. Static generation is the one
+    // context where it is not merely pointless but harmful: Next will not
+    // perform an uncached read while prerendering, so the call never happens,
+    // the helper sees a failure, and the page silently takes its live-
+    // derivation fallback instead.
+    //
+    // That is not hypothetical. It is why the home page has never once used
+    // this API during a build — measured, zero `/v2/launches?phase=` requests
+    // in a full production build — and fell back every time to three reads per
+    // launch over every launch on the chain, against a public node.
+    const rest = { ...init };
+    delete rest.cache;
+    init = { ...rest, signal: AbortSignal.timeout(BUILD_DEADLINE_MS) };
+    if (init.next?.revalidate === undefined) {
+      init.next = { ...init.next, revalidate: 60 };
+    }
+  }
 
   if (typeof window === "undefined") {
     try {
@@ -220,10 +255,55 @@ export async function fetchLaunchFees(asset: string): Promise<FeeSummary | null>
   }
 }
 
+/**
+ * The tradeable set from our own index, deepest pool first — or null.
+ *
+ * Null on any failure, like every other read in this file, so the caller falls
+ * back to deriving it live. The API is a cache with provenance, not a new
+ * source of truth.
+ *
+ * The fallback is not decoration here: it is ~260 requests at a public
+ * Counterparty node per render, which is what this read exists to avoid. It is
+ * a correctness net for a bad deploy, not a mode to run in.
+ */
+export async function fetchTradeableFromIndex(revalidate = 60): Promise<string[] | null> {
+  // Giving up here does not mean showing less, it means asking Counterparty
+  // for the same answer ~260 times, so it is worth a second try. The deadline
+  // itself is handled centrally; see BUILD_DEADLINE_MS.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await launchpadApiFetch(`/v2/launches/tradeable`, {
+        signal: AbortSignal.timeout(6_000),
+        next: { revalidate },
+      });
+      if (!res.ok) {
+        await discard(res);
+        continue;
+      }
+      const data = (await res.json()) as { result?: { asset?: unknown }[] };
+      if (!Array.isArray(data.result)) continue;
+      const assets = data.result
+        .map((row) => row.asset)
+        .filter((asset): asset is string => typeof asset === "string" && asset.length > 0);
+      // An empty index is indistinguishable from an index that has not been
+      // built yet, and "nothing has graduated" is exactly the false statement
+      // this whole change exists to stop pages from making. Fall back instead.
+      if (assets.length > 0) return assets;
+    } catch {
+      // Try once more, then let the caller derive it live.
+    }
+  }
+  return null;
+}
+
 export interface MempoolSnapshot {
   fairminters: Fairminter[];
   mints: MempoolMint[];
   orders: MempoolOrder[];
+  /** Unconfirmed dispenser fills, for the one rule on the dispense page that
+   *  has to be live: a dispenser with a pending fill is hidden, because a
+   *  second buyer racing that transaction can forfeit BTC. */
+  dispenses: PendingDispense[];
   /** Server-side fetch time, seconds. The client turns it into "updated Ns
    *  ago", and it comes from the response rather than from arrival so every
    *  tab sharing one cached answer agrees on its age. */
@@ -495,6 +575,7 @@ export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
         fairminters?: Fairminter[];
         mints?: MempoolMint[];
         orders?: MempoolOrder[];
+        dispenses?: PendingDispense[];
         fetched_at?: number;
       };
     };
@@ -503,6 +584,7 @@ export async function fetchMempoolSnapshot(): Promise<MempoolSnapshot | null> {
       fairminters: data.result.fairminters ?? [],
       mints: data.result.mints ?? [],
       orders: data.result.orders ?? [],
+      dispenses: data.result.dispenses ?? [],
       // Seconds on the wire, milliseconds here — the unit changes at this
       // boundary and nowhere else, so callers can treat it like any other
       // Date.now() value. Falls back to arrival time if the field is absent,

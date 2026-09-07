@@ -176,22 +176,48 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
   }
 }
 
+/** One request, no retry policy. Separated so the loop below can treat a
+ *  thrown transport error and a returned 429 as the same kind of setback. */
+function attemptFetch(path: string, revalidate: number): Promise<Response> {
+  return fetch(`${COUNTERPARTY_API_BASE}${path}`, {
+    // Counterparty is a third party we do not run, and this is the shared
+    // client behind every server-rendered read. Without a deadline a stalled
+    // node holds the Worker invocation open and delays the HTML for everyone
+    // on that route; the throw is what callers already handle.
+    signal: AbortSignal.timeout(8_000),
+    next: { revalidate },
+  });
+}
+
 async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     await clearance();
-    const res = await fetch(`${COUNTERPARTY_API_BASE}${path}`, {
-      // Counterparty is a third party we do not run, and this is the shared
-      // client behind every server-rendered read. Without a deadline a stalled
-      // node holds the Worker invocation open and delays the HTML for everyone
-      // on that route; the throw below is what callers already handle.
-      signal: AbortSignal.timeout(8_000),
-      next: { revalidate },
-    });
+    // A read can fail without ever producing a response: the node closes the
+    // socket mid-body, or our own deadline fires. Observed on the 2MB
+    // /fairminters payload as UND_ERR_SOCKET "other side closed" after 865KB,
+    // which failed a whole page for a transport hiccup that a second attempt
+    // would have survived. Retried on the same budget as a 429 — a dropped
+    // connection is at least as good a reason to try again as being asked to.
+    let res: Response;
+    // Read inside the same guard as the request. The observed failure was not
+    // the connection opening, it was the body dying part-way through: 865KB of
+    // a 2MB payload, then "other side closed".
+    let body: string | null = null;
+    try {
+      res = await attemptFetch(path, revalidate);
+      if (res.ok) body = await res.text();
+    } catch (error) {
+      if (attempt >= THROTTLE_RETRIES) throw error;
+      const backoff = Math.min(250 * 2 ** attempt, MAX_THROTTLE_WAIT_MS);
+      pause(backoff * (0.5 + Math.random() / 2));
+      await clearance();
+      continue;
+    }
 
-    if (res.ok) {
+    if (body !== null) {
       // Not res.json(): JSON.parse rounds integers above 2^53-1; oversized
       // integers arrive as strings instead.
-      return parseJsonLossless<T>(await res.text());
+      return parseJsonLossless<T>(body);
     }
 
     // 429 is the node asking to be retried, not a refusal, and it is the one
@@ -666,14 +692,18 @@ export async function fetchOriginalRecord(
       deadline: event?.params?.soft_cap_deadline_block ?? null,
       announceBlock: event?.block_index ?? null,
     };
-  } catch (error) {
-    // A throttle is the one case this must not absorb. The record is
-    // append-only, so a genuine miss means the launch really has no creation
-    // event; a 429 means we never looked, and returning null then marks a
-    // conforming launch non-conforming and drops it from the tradeable list.
-    if (error instanceof CounterpartyThrottled) throw error;
-    // Anything else is still conformance evidence rather than a reason to fail
-    // a whole page: the launch stays unverified until the next refresh.
+  } catch {
+    // Deliberately softer than fetchPool, and the difference is what each
+    // null claims. A missing pool row says the sale REFUNDED — a definite
+    // statement about a launch that may well have graduated, which is why a
+    // throttle must never produce one. A missing creation event only leaves a
+    // launch unverified, and this read is cached for a year because the event
+    // is append-only, so the next successful render fixes it permanently.
+    //
+    // Tried the strict version here too. It fails the whole home page on one
+    // throttled read, and since the tradeable list no longer derives from this
+    // call, the blast radius no longer justifies that. Conformance timing is
+    // evidence, not a reason to serve nothing.
     return { deadline: null, announceBlock: null };
   }
 }

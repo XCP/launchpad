@@ -16,10 +16,8 @@ import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
-import {
-  fetchPendingXcpDispenses,
-  type Dispenser,
-} from "@/lib/api/counterparty";
+import { type Dispenser } from "@/lib/api/counterparty";
+import { useMempool } from "@/hooks/use-mempool";
 import { commas, commasRaw, satsPerVb, shortAddress } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
@@ -72,18 +70,25 @@ export function XcpBridge({
 }) {
   const t = useT();
   const [direction, setDirection] = useState<"load" | "unload">("load");
-  const { data: pendingDispenses } = useSWR(
-    "mempool-dispenses",
-    fetchPendingXcpDispenses,
-    { refreshInterval: 10_000, revalidateOnFocus: true },
-  );
+  // Live, and shared. The rule below has to see the mempool, but it does not
+  // have to be this tab that asks Counterparty for it: this used to be one
+  // request per open dispense tab every ten seconds, straight at a public node
+  // — the same shape the header chip's poll was consolidated out of, still in
+  // place here. It now rides the sitewide snapshot, which is edge-cached for
+  // 15 seconds, so a thousand tabs cost roughly one upstream request per colo
+  // instead of six hundred a minute.
+  //
+  // Freshness is unchanged in any way that matters: the poll was 10s and the
+  // snapshot is at most 15s old, against a mempool entry that sits unconfirmed
+  // for minutes. What would matter is losing the rule, and it has not moved.
+  const { dispenses: pendingDispenses } = useMempool(10_000);
   // Routing is deliberately more conservative than valuation. Even when a
   // dispenser has depth behind the pending purchase, another buyer would be
   // racing that transaction and can forfeit BTC if the escrow disappears.
   // Hide the whole route until its mempool activity clears. The sitewide XCP
   // mark separately subtracts pending quantity and keeps any real remainder.
   const safeDispensers = dispensers.filter(
-    (row) => !hasPendingDispense(row, pendingDispenses ?? []),
+    (row) => !hasPendingDispense(row, pendingDispenses),
   );
   const hiddenCount = dispensers.length - safeDispensers.length;
   const settings = useSyncExternalStore(
