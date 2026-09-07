@@ -1,96 +1,141 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { composeAndBroadcast } from "@xcp/wallet-sdk";
 import { parseUnitsToRaw } from "../apps/web/src/lib/numeric";
-import { normalizeMarks, sanitizeAmount } from "../apps/web/src/components/amount-input";
-import { commas, fixed } from "../apps/web/src/lib/format";
+import { AmountInput, sanitizeAmount } from "../apps/web/src/components/amount-input";
 
 /**
- * A number someone types must compose as the number they typed.
- *
- * Not a hundred times it and not a hundredth. Everything else on the page is
- * written in the reader's language — a French page groups with spaces and
- * marks the decimal with a comma — and the danger of doing that well is that
- * a display string can find its way into a field that a parser reads back.
- * Then the amount that gets signed is not the amount that was agreed to.
- *
- * Two rules keep those apart, and these are the tests for them.
- *
- *   1. What reaches a parser is plain: digits, at most one period, no
- *      grouping, no language. `parseUnitsToRaw` enforces it and returns null
- *      on anything else, so a localized string FAILS rather than being
- *      quietly reinterpreted.
- *   2. What a person types is normalized to that shape at the input, so
- *      typing a comma for a decimal is understood rather than dropped.
+ * Contract verified against local Counterparty Core 67e10db3:
+ * api/apiserver.py prepare_args parses quantities with int(str_arg).
+ * api/compose.py declares order/fairmint/pool quantities as raw integers;
+ * config.UNIT is 100_000_000. sat_per_vbyte is a separate float.
+ * These tests reach the installed wallet SDK's actual compose query builder.
+ * The mocked HTTP error stops before signing or broadcasting anything.
  */
+afterEach(() => { vi.unstubAllGlobals(); });
 
-describe("the parser refuses anything a language wrote", () => {
-  it("takes the plain forms", () => {
-    expect(parseUnitsToRaw("1.5")).toBe(150_000_000n);
-    expect(parseUnitsToRaw("1234.56")).toBe(123_456_000_000n);
-    expect(parseUnitsToRaw("0.00000001")).toBe(1n);
-    expect(parseUnitsToRaw("21000000")).toBe(2_100_000_000_000_000n);
+function enter(value: string, inputType = "insertText", previous = "", decimals: 0 | 8 = 8, data = value.slice(-1)) {
+  const onChange = vi.fn();
+  const input = AmountInput({ value: previous, onChange, decimals });
+  input.props.onChange({ target: { value }, nativeEvent: { inputType, data } });
+  return { value: onChange.mock.calls[0]?.[0] as string | undefined, onChange };
+}
+
+function typeAmount(typed: string, decimals: 0 | 8 = 8): string {
+  let value = "";
+  for (const char of typed) {
+    const next = enter(value + char, "insertText", value, decimals);
+    expect(next.onChange, `keystroke ${JSON.stringify(char)} after ${value}`).toHaveBeenCalledOnce();
+    value = next.value!;
+  }
+  return value;
+}
+
+describe("an accepted amount retains its value", () => {
+  it.each([
+    ["0.001", 100_000n],
+    ["1.234", 123_400_000n],
+    ["0.00000001", 1n],
+    ["100000000.00000001", 10_000_000_000_000_001n],
+  ] as const)("types %s without treating its third decimal as grouping", (typed, raw) => {
+    expect(typeAmount(typed)).toBe(typed);
+    expect(parseUnitsToRaw(typeAmount(typed))).toBe(raw);
   });
 
-  /**
-   * The property that matters. A grouped or comma-decimal string is not a
-   * number this accepts, so there is no reading of it to get wrong: it is
-   * null, and every caller already treats null as "no amount yet".
-   */
-  it("returns null rather than a wrong number for every localized form", () => {
-    const localized = [
-      "1,5", // French, Portuguese, Russian: one and a half
-      "1234,56",
-      "1 234,56", // grouped with a space
-      "1.234,56", // grouped with a period
-      "1,234.56", // grouped with a comma
-      "1 234,56", // the no-break space CLDR actually emits
-      "1 234,56", // and the narrow one French uses
-    ];
-    for (const input of localized) expect(parseUnitsToRaw(input)).toBeNull();
+  it("normalizes a decimal keyboard comma before it reaches state", () => {
+    expect(typeAmount("0,001")).toBe("0.001");
+    expect(parseUnitsToRaw(typeAmount("0,00000001"))).toBe(1n);
+    expect(typeAmount("1,234")).toBe("1.234");
+    expect(enter("1,234", "insertText", "", 8, "1,234").onChange).not.toHaveBeenCalled();
   });
 
-  it("in particular never turns a decimal comma into a hundredfold", () => {
-    // The failure this file exists to prevent, stated as the assertion.
-    expect(parseUnitsToRaw("1234,56")).not.toBe(parseUnitsToRaw("123456"));
-    expect(parseUnitsToRaw("1234,56")).toBeNull();
-  });
-});
-
-describe("the input normalizes to that shape before anything parses it", () => {
-  it("reads a typed decimal comma as a decimal", () => {
-    expect(sanitizeAmount("0,5")).toBe("0.5");
-    expect(parseUnitsToRaw(sanitizeAmount("0,5")!)).toBe(50_000_000n);
+  it("keeps editable decimal states", () => {
+    expect(sanitizeAmount("")).toBe("");
+    expect(sanitizeAmount(".")).toBe("0.");
+    expect(sanitizeAmount("5.")).toBe("5.");
+    expect(sanitizeAmount(".5")).toBe(".5");
   });
 
-  it("reads a pasted grouped number in either convention", () => {
-    expect(normalizeMarks("1,234.56")).toBe("1234.56");
-    expect(normalizeMarks("1.234,56")).toBe("1234.56");
-    expect(parseUnitsToRaw(normalizeMarks("1.234,56"))).toBe(123_456_000_000n);
-  });
-
-  it("hands the parser something it accepts, for every shape a person types", () => {
-    for (const typed of ["0,5", "0.5", "1.234,56", "1,234.56", "100", "0.00000001"]) {
-      const value = sanitizeAmount(typed);
-      expect(value).not.toBeNull();
-      expect(parseUnitsToRaw(value!)).not.toBeNull();
-    }
-  });
-});
-
-describe("display formatting never produces a composable amount", () => {
-  /**
-   * The guard against the two being confused later. A display formatter's
-   * output is not something the parser accepts, in any locale that writes
-   * numbers differently — so wiring one into a field cannot silently work.
-   */
-  it("is rejected by the parser wherever the language differs from English", () => {
-    for (const locale of ["pt", "fr", "ru", "uk"]) {
-      expect(parseUnitsToRaw(commas(1234.56, locale))).toBeNull();
-      expect(parseUnitsToRaw(fixed(1234.56, 2, locale))).toBeNull();
+  it.each([
+    "1,234", "1,234.56", "1.234,56", "1.234.567", "1,234,567",
+    "1 234.56", "1\u00a0234,56", "1\u202f234,56", "0,5", " 1.5 ",
+    "-1", "+1", "1e5", "1e-8", "NaN", "Infinity", "$12", "12 XCP", "1.2.3", "１.５", "١.٥",
+  ])("rejects ambiguous or unsupported paste %s", (text) => {
+    expect(sanitizeAmount(text)).toBeNull();
+    for (const inputType of ["insertFromPaste", "insertFromDrop"]) {
+      expect(enter(text, inputType, "2").onChange).not.toHaveBeenCalled();
     }
   });
 
-  it("and English display grouping is refused too, rather than half-read", () => {
-    expect(commas(1234.56, "en")).toBe("1,234.56");
-    expect(parseUnitsToRaw(commas(1234.56, "en"))).toBeNull();
+  it("accepts exact plain paste and rejects a ninth decimal", () => {
+    expect(enter("100000000.00000001", "insertFromPaste").value).toBe("100000000.00000001");
+    expect(enter("0.000000001", "insertText", "0.00000000").onChange).not.toHaveBeenCalled();
+    expect(sanitizeAmount("1.999999999")).toBeNull();
+  });
+
+  it("rejects an overlong paste as a whole instead of letting the browser truncate its value", () => {
+    const input = AmountInput({ value: "2", onChange: vi.fn() });
+    expect(input.props.maxLength).toBeUndefined();
+    const text = `${"0".repeat(26)}1`;
+    expect(parseUnitsToRaw(text)).toBe(100_000_000n);
+    expect(enter(text, "insertFromPaste", "2").onChange).not.toHaveBeenCalled();
+  });
+
+  it.each(["1\n234", "1\r234", "1\r\n234", "1,234", "1.234,56", "1e5"])(
+    "rejects the original clipboard/drop text %j before the browser can sanitize it", (text) => {
+      const input = AmountInput({ value: "2", onChange: vi.fn() });
+      const preventPaste = vi.fn();
+      const preventDrop = vi.fn();
+      input.props.onPaste({ clipboardData: { getData: () => text }, preventDefault: preventPaste });
+      input.props.onDrop({ dataTransfer: { getData: () => text }, preventDefault: preventDrop });
+      expect(preventPaste).toHaveBeenCalledOnce();
+      expect(preventDrop).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("lets a plain decimal paste reach the normal exact-input validation", () => {
+    const input = AmountInput({ value: "", onChange: vi.fn() });
+    const preventDefault = vi.fn();
+    input.props.onPaste({ clipboardData: { getData: () => "0.00000001" }, preventDefault });
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(enter("0.00000001", "insertFromPaste").value).toBe("0.00000001");
+  });
+
+  it("keeps raw satoshi fields integral", () => {
+    expect(typeAmount("1234", 0)).toBe("1234");
+    expect(parseUnitsToRaw(typeAmount("1234", 0), 0)).toBe(1234n);
+    expect(sanitizeAmount("1.5", 0)).toBeNull();
+    expect(enter("1,", "insertText", "1", 0).onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("the actual compose HTTP parameters", () => {
+  it.each([
+    ["0.001", "100000"],
+    ["0.00000001", "1"],
+    ["100000000.00000001", "10000000000000001"],
+  ])("sends the exact raw digits for %s, with fractional fees separate", async (typed, expected) => {
+    const fetch = vi.fn<typeof globalThis.fetch>(async () => new Response(JSON.stringify({ error: "test boundary reached" }), { status: 400 }));
+    vi.stubGlobal("fetch", fetch);
+    const signer = {
+      address: "1CounterpartyXXXXXXXXXXXXXXXUWLpVr",
+      signTransaction: vi.fn(),
+      broadcastTransaction: vi.fn(),
+    } as unknown as Parameters<typeof composeAndBroadcast>[0];
+    await expect(composeAndBroadcast(signer, "order", {
+      give_asset: "XCP",
+      give_quantity: parseUnitsToRaw(typeAmount(typed))!,
+      get_asset: "TOKEN",
+      get_quantity: 1n,
+      expiration: 100,
+      fee_required: 0,
+    }, { feeRate: 0.1 })).rejects.toThrow("test boundary reached");
+    expect(fetch).toHaveBeenCalledOnce();
+    const url = new URL(String(fetch.mock.calls[0]![0]));
+    expect(url.pathname).toContain("/compose/order");
+    expect(url.searchParams.get("give_quantity")).toBe(expected);
+    expect(url.searchParams.get("get_quantity")).toBe("1");
+    expect(url.searchParams.get("sat_per_vbyte")).toBe("0.1");
+    expect(signer.signTransaction).not.toHaveBeenCalled();
+    expect(signer.broadcastTransaction).not.toHaveBeenCalled();
   });
 });

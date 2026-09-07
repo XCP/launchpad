@@ -4,50 +4,18 @@
  * The industry-consensus money input (every major DEX ships this shape):
  * type="text" + inputMode="decimal" — never type="number", which accepts
  * e/+/-, renders spinners, and blanks invalid intermediate states. State is
- * the raw string so trailing "5." survives; invalid keystrokes are rejected
- * before entering state so the cursor never jumps. State is always a period
- * decimal, whatever the page's language writes — the field is a machine
- * amount on its way to a bigint, not a display.
+ * the raw string so trailing "5." survives. Every locale uses Counterparty
+ * notation here: ASCII digits and at most eight places after a period.
+ * Reject unsupported input instead of removing characters or guessing at
+ * grouping: a valid-looking result can represent a different amount.
  */
-const AMOUNT_REGEX = /^\d*\.?\d*$/;
+const AMOUNT_REGEX = /^\d*(?:\.\d{0,8})?$/;
+const MAX_AMOUNT_LENGTH = 26;
 
-/** A whole number written with group separators, in either convention. */
-const GROUPED = /^\d{1,3}(?:\.\d{3})+$|^\d{1,3}(?:,\d{3})+$/;
-
-/**
- * Which of "." and "," the writer meant as the decimal mark.
- *
- * A person on a Portuguese or French page types "0,5", and pastes figures
- * grouped the way their language groups them: "1.234,56" there, "1,234.56"
- * here. Both marks appear in both roles, so the string decides rather than
- * the locale — the LAST of the two distinct marks is the decimal one and
- * anything before it groups. A mark that repeats can only be grouping, and
- * a lone mark is the decimal, which is what lets a typed "0," become "0."
- * mid-keystroke.
- */
-export function normalizeMarks(raw: string): string {
-  const lastDot = raw.lastIndexOf(".");
-  const lastComma = raw.lastIndexOf(",");
-  if (lastDot >= 0 && lastComma >= 0) {
-    const dotIsDecimal = lastDot > lastComma;
-    const group = dotIsDecimal ? /,/g : /\./g;
-    const at = dotIsDecimal ? lastDot : lastComma;
-    return `${raw.slice(0, at).replace(group, "")}.${raw.slice(at + 1).replace(group, "")}`;
-  }
-  // The same mark twice reads as grouping, but only when the groups are
-  // actually groups — "1.234.567" is a pasted number, "1.2.3" is a slip of
-  // the finger and falls through to the cleanup below.
-  if (GROUPED.test(raw)) return raw.replace(/[.,]/g, "");
-  return raw.replace(/,/g, ".");
-}
-
-export function sanitizeAmount(raw: string): string | null {
-  const s = normalizeMarks(raw);
-  if (s === "" || AMOUNT_REGEX.test(s)) return s === "." ? "0." : s;
-  // Paste path: strip whatever is left that is neither digit nor mark.
-  const cleaned = s.replace(/[^\d.]/g, "").replace(/(\..*)\./g, "$1");
-  if (cleaned !== "" && AMOUNT_REGEX.test(cleaned)) return cleaned;
-  return null;
+/** Raw satoshi fields use zero places; token-unit fields use eight. */
+export function sanitizeAmount(raw: string, decimals: 0 | 8 = 8): string | null {
+  if (raw.length > MAX_AMOUNT_LENGTH || !(decimals === 0 ? /^\d*$/ : AMOUNT_REGEX).test(raw)) return null;
+  return raw === "." ? "0." : raw;
 }
 
 export function AmountInput({
@@ -59,6 +27,7 @@ export function AmountInput({
   className,
   style,
   disabled,
+  decimals = 8,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -69,20 +38,36 @@ export function AmountInput({
   /** For transient visual states (e.g. graying a derived value while stale). */
   style?: React.CSSProperties;
   disabled?: boolean;
+  decimals?: 0 | 8;
 }) {
   return (
     <input
       id={id}
       type="text"
-      inputMode="decimal"
+      inputMode={decimals === 0 ? "numeric" : "decimal"}
       autoComplete="off"
       autoCorrect="off"
       spellCheck={false}
-      maxLength={26}
       value={value}
       onChange={(e) => {
-        const next = sanitizeAmount(e.target.value);
+        // A regional decimal keyboard can emit a comma. Translate that one
+        // keystroke to our period notation; pasted/dropped text must already
+        // use the plain format, since "1,234" could be a grouped integer.
+        const event = e.nativeEvent as InputEvent;
+        const decimalKey = event.inputType === "insertText" && event.data === ",";
+        const raw = decimalKey ? e.target.value.replace(",", ".") : e.target.value;
+        // Validate length here too. Native maxLength truncates pasted text
+        // before onChange, potentially removing significant digits.
+        const next = sanitizeAmount(raw, decimals);
         if (next !== null) onChange(next);
+      }}
+      onPaste={(e) => {
+        // Text inputs strip line breaks before onChange. Inspect the original
+        // clipboard text so "1\n234" cannot silently become "1234".
+        if (sanitizeAmount(e.clipboardData.getData("text"), decimals) === null) e.preventDefault();
+      }}
+      onDrop={(e) => {
+        if (sanitizeAmount(e.dataTransfer.getData("text"), decimals) === null) e.preventDefault();
       }}
       placeholder={placeholder}
       aria-label={ariaLabel}

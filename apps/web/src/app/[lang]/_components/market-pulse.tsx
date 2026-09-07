@@ -309,7 +309,7 @@ function MarketModal({
                 {isBtc ? t("Bitcoin Price") : t("XCP Price")}
               </D.Title>
               <D.Description className="text-xs text-gray-500 dark:text-gray-400">
-                {isBtc ? t("Bitcoin market price in USD") : t("Counterparty market price in USD")}
+                {isBtc ? t("Bitcoin market price in {currency}", { currency: code }) : t("Counterparty market price in {currency}", { currency: code })}
               </D.Description>
             </div>
             <div className="flex items-center gap-1">

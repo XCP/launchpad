@@ -1072,6 +1072,7 @@ function UnloadCard({
         >
           <AmountInput
             value={price}
+            decimals={0}
             onChange={setPrice}
             placeholder={undercutSats !== null ? String(undercutSats) : "0"}
             ariaLabel={t("Price in sats per XCP")}

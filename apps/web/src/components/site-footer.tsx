@@ -20,6 +20,7 @@ import { LOCALE_INFO, LOCALES, type Locale, localePath, splitLocale } from "@/li
  */
 export function SiteFooter() {
   const t = useT();
+  const pathname = usePathname();
   const machine = useMachineDrafted();
   const { code, date } = useCurrency();
   return (
@@ -52,7 +53,14 @@ export function SiteFooter() {
                 {" · "}
                 {t("Translated automatically")}
                 {" · "}
-                <LazyLink href="/" locale="en" className="underline underline-offset-2">
+                <LazyLink
+                  href={splitLocale(pathname).path}
+                  locale="en"
+                  lang="en"
+                  hrefLang="en"
+                  onClick={() => rememberLocale("en")}
+                  className="underline underline-offset-2"
+                >
                   English
                 </LazyLink>
               </>

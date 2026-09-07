@@ -65,5 +65,15 @@
   "liquidity": "Tab beside swap: add or remove pool liquidity. Lowercase; the tab capitalises it in CSS.",
   "Filled": "An order status: the whole order executed. Not \"full\".",
   "inscription": "Chip on a launch whose image is inscribed on-chain, linking to the ordinals record. Lowercase, inside a pill beside an arrow.",
-  "Dismiss": "Accessible name for the × that closes an error banner."
+  "Dismiss": "Accessible name for the × that closes an error banner.",
+  "Holds {count} token": "Address hover card: count of distinct token types held by this address, not token units or a balance. The count may be an em dash while loading.",
+  "Holds {count} tokens": "Address hover card: count of distinct token types held by this address, not token units or a balance. The count may be an em dash while loading.",
+  "Issued {count} token": "Address hover card: count of distinct assets ever issued by this address, not token units or issuance transactions. The count may end in + when the result is capped, or be an em dash while loading.",
+  "Issued {count} tokens": "Address hover card: count of distinct assets ever issued by this address, not token units or issuance transactions. The count may end in + when the result is capped, or be an em dash while loading.",
+  "open@@bounty": "Rewards badge: the bounty has not been claimed yet and remains available. Not a market opening time or an open order.",
+  "Launch #{n}": "Issuer chip: this is the creator’s nth launch, not the launch’s rank across the whole site. The placeholder is a plain localized number; any ordinal grammar belongs in the translated sentence.",
+  "Positions, open mints, history, and launches for {address} on xcp.fun.": "Address profile search description. Open mints are ongoing token sales the address has participated in. Keep the address and xcp.fun unchanged.",
+  "Show amounts in {currency}": "Chart or stats control: show fiat amounts in the separately selected display currency. The placeholder is an ISO currency code such as USD, EUR, or JPY and must remain unchanged.",
+  "Bitcoin market price in {currency}": "Market price tooltip in the selected display currency. The placeholder is an ISO currency code such as USD, EUR, or JPY, independent of the page language.",
+  "Counterparty market price in {currency}": "Market price tooltip in the selected display currency. The placeholder is an ISO currency code such as USD, EUR, or JPY, independent of the page language."
 }

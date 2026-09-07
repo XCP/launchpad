@@ -432,9 +432,6 @@
   "{name} is yours — this launch reuses your registered name (no registration fee). If the launch fails, the name locks at zero supply forever.": [
     "app/[lang]/create/page.tsx"
   ],
-  "{ordinal} launch": [
-    "components/address-hover-card.tsx"
-  ],
   "{pct} held by dumpers": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
@@ -952,7 +949,7 @@
     "app/[lang]/dispense/_components/bridge.tsx",
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
-  "Bitcoin market price in USD": [
+  "Bitcoin market price in {currency}": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
   "Bitcoin Price": [
@@ -1367,7 +1364,7 @@
   "Counterparty": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
-  "Counterparty market price in USD": [
+  "Counterparty market price in {currency}": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
   "Counterparty's canonical unspendable burn address": [
@@ -1805,6 +1802,12 @@
   "Holding": [
     "app/[lang]/profile/_components/positions-tab.tsx"
   ],
+  "Holds {count} token": [
+    "components/address-hover-card.tsx"
+  ],
+  "Holds {count} tokens": [
+    "components/address-hover-card.tsx"
+  ],
   "hour": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
   ],
@@ -1913,6 +1916,12 @@
   "Is the {mult}× opening premium a price guarantee?": [
     "app/[lang]/faq/page.tsx"
   ],
+  "Issued {count} token": [
+    "components/address-hover-card.tsx"
+  ],
+  "Issued {count} tokens": [
+    "components/address-hover-card.tsx"
+  ],
   "It can still sell until {when}, then the remaining {amount} returns automatically.": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
@@ -1955,7 +1964,11 @@
   "Launch {name}": [
     "app/[lang]/create/page.tsx"
   ],
+  "Launch #{n}": [
+    "components/address-hover-card.tsx"
+  ],
   "Launch a token": [
+    "app/[lang]/create/layout.tsx",
     "app/[lang]/create/page.tsx"
   ],
   "Launch dynamics": [
@@ -2335,6 +2348,7 @@
     "app/[lang]/create/page.tsx"
   ],
   "Name, image, description. Everything else is the standard.": [
+    "app/[lang]/create/layout.tsx",
     "app/[lang]/create/page.tsx"
   ],
   "named assets only, divisible": [
@@ -2632,8 +2646,7 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "open": [
-    "app/[lang]/[asset]/_components/scheduled-pulse.tsx",
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
   ],
   "Open": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -2652,6 +2665,9 @@
   ],
   "Open XCP price": [
     "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "open@@bounty": [
+    "app/[lang]/rewards/page.tsx"
   ],
   "open@@pool slider": [
     "app/[lang]/faq/_components/explainer.tsx"
@@ -2835,6 +2851,9 @@
   ],
   "Positions you fully exited, with the profit or loss actually taken. A dash means the focused mint-and-trade history does not explain the live zero balance, so no P&L is claimed. Basis is average-cost, so a partial sale realizes its share and leaves the rest with the tokens still held.": [
     "app/[lang]/profile/_components/history-tab.tsx"
+  ],
+  "Positions, open mints, history, and launches for {address} on xcp.fun.": [
+    "app/[lang]/profile/[address]/page.tsx"
   ],
   "Premine / commission": [
     "app/[lang]/faq/page.tsx"
@@ -3173,7 +3192,7 @@
   "Share unavailable": [
     "app/[lang]/profile/_components/pools-tab.tsx"
   ],
-  "Show amounts in US dollars": [
+  "Show amounts in {currency}": [
     "app/[lang]/[asset]/_components/launch-stats.tsx"
   ],
   "Show amounts in XCP": [

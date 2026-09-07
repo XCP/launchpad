@@ -117,7 +117,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
       5000,
       Math.max(1, Math.round(parseFloat(customExpiration)) || MARKET_EXPIRATION),
     );
-    const customFee = Math.min(Math.round(parseFloat(customFeeRate) || 0), 500);
+    const customFee = Math.min(parseFloat(customFeeRate) || 0, 500);
     const lqCustomSlip = Math.min(parseFloat(lqCustomSlippage) || 0, 50);
     const lqSlippage = lqCustomSlip > 0 ? lqCustomSlip : lqSlippagePreset;
     return {
@@ -254,6 +254,7 @@ export function SwapSettingsGear() {
         >
           <AmountInput
             value={s.customExpiration}
+            decimals={0}
             onChange={s.setCustomExpiration}
             placeholder={String(MARKET_EXPIRATION)}
             ariaLabel={t("Order expiration in blocks")}

@@ -9,14 +9,11 @@ import {
   percent,
   price,
 } from "../apps/web/src/lib/format";
-import { normalizeMarks, sanitizeAmount } from "../apps/web/src/components/amount-input";
 import { LOCALES } from "../apps/web/src/lib/i18n/locales";
 
 /**
- * A number is not language-neutral. These lock the two things that broke in
- * production before the formatters took a locale: a French page grouping in
- * English commas, and a Brazilian typing "0,5" into an amount field and
- * getting zero.
+ * Display formatting follows the locale. Input-to-compose preservation is
+ * tested separately in compose-amount-safety.test.ts.
  */
 
 describe("grouping and decimal marks follow the page", () => {
@@ -122,34 +119,14 @@ describe("bindNumbers", () => {
   });
 });
 
-describe("amount fields accept either decimal mark", () => {
-  it("normalizes a typed comma so a Brazilian does not send zero", () => {
-    expect(sanitizeAmount("0,5")).toBe("0.5");
-    expect(sanitizeAmount("0,")).toBe("0.");
-    expect(sanitizeAmount("12,345678")).toBe("12.345678");
-  });
-
-  it("reads a pasted grouped number in either convention", () => {
-    expect(normalizeMarks("1,234.56")).toBe("1234.56");
-    expect(normalizeMarks("1.234,56")).toBe("1234.56");
-    expect(normalizeMarks("1 234,56".replace(/ /g, ""))).toBe("1234.56");
-    expect(sanitizeAmount("1.234.567")).toBe("1234567");
-    expect(sanitizeAmount("1,234,567")).toBe("1234567");
-  });
-
-  it("still lets a period amount through untouched", () => {
-    expect(sanitizeAmount("")).toBe("");
-    expect(sanitizeAmount("5.")).toBe("5.");
-    expect(sanitizeAmount(".5")).toBe(".5");
-    expect(sanitizeAmount("100")).toBe("100");
-  });
-
-  it("treats a mistyped second mark as a slip, not as grouping", () => {
-    expect(sanitizeAmount("1.2.3")).toBe("1.23");
-  });
-
-  it("rejects what is not a number at all", () => {
-    expect(sanitizeAmount("abc")).toBe(null);
-    expect(sanitizeAmount("1e5")).toBe("15");
+describe("small fiat amounts", () => {
+  it("uses the same decimal mark below and above one unit", () => {
+    for (const locale of ["fr", "pt", "ru", "uk"]) {
+      expect(fiat(12.34, "EUR", locale)).toContain("12,34");
+      expect(fiat(1, "EUR", locale)).toContain("1,00");
+      expect(fiat(0.12, "EUR", locale)).toContain("0,12");
+    }
+    expect(fiat(12.34, "USD", "en")).toBe("$12.34");
+    expect(fiat(12.34, "JPY", "ja")).toBe("￥12");
   });
 });

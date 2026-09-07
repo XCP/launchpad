@@ -976,6 +976,7 @@ function ScheduleGear({
           >
             <AmountInput
               value={customBlock}
+              decimals={0}
               onChange={onCustomBlockChange}
               placeholder={minBlock ? String(minBlock) : t("block height")}
               ariaLabel={t("Target start block")}

@@ -231,7 +231,10 @@ export function fiat(n: number, code: string, locale = "en"): string {
   }
   if (n >= 1000) return wrap(compact(n, locale));
   if (n >= 100 || (n >= 1 && minor === 0)) return wrap(String(Math.round(n)));
-  if (n >= 1) return wrap(n.toFixed(2));
+  if (n >= 1) return wrap(n.toLocaleString(intlLocale(locale), {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }));
   return wrap(n.toLocaleString(intlLocale(locale), { maximumSignificantDigits: 2 }));
 }
 
