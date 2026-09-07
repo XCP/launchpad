@@ -3,7 +3,8 @@
 import { LazyLink } from "@/components/lazy-link";
 import { useState } from "react";
 import { TokenImage } from "@/components/token-image";
-import { fromSats, tokenQty, usd } from "@/lib/format";
+import { fromSats, tokenQty } from "@/lib/format";
+import { useFiat, useFxRate } from "@/lib/currency";
 import useSWR from "swr";
 import { buildPortfolioSeries, rateLookup, timeLookup, type DailyRate, type TimeAnchor } from "@/lib/portfolio-chart";
 import { PortfolioChart, WindowPicker, WINDOW_BLOCKS, type Window } from "@/app/profile/_components/portfolio-chart";
@@ -81,6 +82,8 @@ function ValueOverWindow({ values, format }: { values: number[]; format: (v: num
 }
 
 export function PositionsTab({ address }: { address: string }) {
+  const usd = useFiat();
+  const { code } = useFxRate();
   const { portfolio, isLoading } = usePortfolio(address);
   const [denom, setDenom] = useState<Denom>("usd");
   const [windowKey, setWindowKey] = useState<Window>("7D");
@@ -157,7 +160,7 @@ export function PositionsTab({ address }: { address: string }) {
                   showing === d ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"
                 }`}
               >
-                {d === "usd" ? "USD" : "XCP"}
+                {d === "usd" ? code : "XCP"}
               </button>
             ))}
           </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useFxRate } from "@/lib/currency";
 import {
   btcSatsToXcp,
   continuousThresholds,
@@ -13,11 +14,13 @@ import {
 const money = (value: number, signed = false) =>
   `${signed && value >= 0 ? "+" : ""}${value.toFixed(2)} XCP`;
 
-const dollars = (value: number, signed = false) => {
+/** A dollar figure in the visitor's currency, to that currency's own minor
+ *  units, with an explicit sign when the caller asks for one. */
+const inCurrency = (value: number, code: string, rate: number, signed = false) => {
   const sign = signed && value >= 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}$${Math.abs(value).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+  return `${sign}${(Math.abs(value) * rate).toLocaleString("en-US", {
+    style: "currency",
+    currency: code,
   })}`;
 };
 
@@ -30,6 +33,7 @@ export function ExitRaceSimulator({
   btcUsd: number;
   priceContext: string;
 }) {
+  const { code, rate } = useFxRate();
   const [addresses, setAddresses] = useState(20);
   const [priorState, setPriorState] = useState(0);
   const [sellPct, setSellPct] = useState(100);
@@ -102,7 +106,7 @@ export function ExitRaceSimulator({
         </div>
 
         <p className="mt-4 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
-          USD context: 1 XCP = {dollars(xcpUsd)} · 1 BTC = {dollars(btcUsd)} · {priceContext}.
+          {code} context: 1 XCP = {inCurrency(xcpUsd, code, rate)} · 1 BTC = {inCurrency(btcUsd, code, rate)} · {priceContext}.
           The 700-sat default is an illustrative low-fee lifecycle, not a
           measured all-in cost. Observed mint-only median: 232 sats; P90: 697.
         </p>
@@ -139,12 +143,12 @@ export function ExitRaceSimulator({
           <Metric
             label="Cash sale proceeds"
             value={money(scenario.proceedsXcp)}
-            hint={dollars(scenario.proceedsXcp * xcpUsd)}
+            hint={inCurrency(scenario.proceedsXcp * xcpUsd, code, rate)}
           />
           <Metric
             label="Net cash P/L"
             value={`${scenario.pnlXcpEquivalent >= 0 ? "+" : ""}${scenario.pnlXcpEquivalent.toFixed(2)} XCP-eq`}
-            hint={dollars(scenario.pnlXcpEquivalent * xcpUsd, true)}
+            hint={inCurrency(scenario.pnlXcpEquivalent * xcpUsd, code, rate, true)}
             negative={scenario.pnlXcpEquivalent < 0}
           />
         </div>

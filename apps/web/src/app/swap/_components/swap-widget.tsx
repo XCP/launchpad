@@ -16,7 +16,8 @@ import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchJson } from "@/lib/client";
-import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
+import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb } from "@/lib/format";
+import { useFiat, useFxRate } from "@/lib/currency";
 import {
   approx,
   big,
@@ -94,6 +95,8 @@ export function SwapWidget({
   /** Tight-rail mode (asset-page sidebar): wells stack the chip below. */
   compact?: boolean;
 }) {
+  const usdFmt = useFiat();
+  const { code } = useFxRate();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [giveAsset, setGiveAsset] = useState("XCP");
@@ -578,12 +581,12 @@ export function SwapWidget({
         footer={
           compact ? (
             <span>
-              {giveUsd === null ? "USD unavailable" : `≈ ${usdFmt(giveUsd)}`}
+              {giveUsd === null ? `${code} unavailable` : `≈ ${usdFmt(giveUsd)}`}
             </span>
           ) : (
             <>
               <span>
-                {giveUsd === null ? "USD unavailable" : `≈ ${usdFmt(giveUsd)}`}
+                {giveUsd === null ? `${code} unavailable` : `≈ ${usdFmt(giveUsd)}`}
               </span>
               {balanceLabel}
             </>
@@ -615,12 +618,12 @@ export function SwapWidget({
         footer={
           compact ? (
             <span>
-              {getUsd === null ? "USD unavailable" : `≈ ${usdFmt(getUsd)}`}
+              {getUsd === null ? `${code} unavailable` : `≈ ${usdFmt(getUsd)}`}
             </span>
           ) : (
             <>
               <span>
-                {getUsd === null ? "USD unavailable" : `≈ ${usdFmt(getUsd)}`}
+                {getUsd === null ? `${code} unavailable` : `≈ ${usdFmt(getUsd)}`}
               </span>
               {slippageControl}
             </>

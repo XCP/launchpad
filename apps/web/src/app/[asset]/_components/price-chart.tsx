@@ -4,7 +4,8 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import type { ChartCandle } from "@/lib/api/launchpad-api";
 import type { ChartResolution } from "@/lib/candles";
-import { commas, compact, fromSats, usd } from "@/lib/format";
+import { commas, compact, fromSats } from "@/lib/format";
+import { useFiat, useFxRate } from "@/lib/currency";
 import { big } from "@/lib/numeric";
 import { XCP69 } from "@/lib/xcp69";
 
@@ -119,6 +120,8 @@ export function PriceChart({
   launchXcpUsd?: number | null;
   devTrades?: DevTrade[];
 }) {
+  const usd = useFiat();
+  const { code } = useFxRate();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Plotted | null>(null);
   const [range, setRange] = useState<ChartRange>(() => defaultRange(candles));
@@ -403,7 +406,7 @@ export function PriceChart({
               }
               className={`${control} disabled:cursor-wait disabled:text-gray-300 dark:disabled:text-gray-600 ${inUsd ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800"}`}
             >
-              {inUsd ? "USD" : "XCP"}
+              {inUsd ? code : "XCP"}
             </button>
           )}
           <button
@@ -429,7 +432,7 @@ export function PriceChart({
           onMouseMove={onMove}
           onMouseLeave={() => setHover(null)}
           role="img"
-          aria-label={`${asset} price against ${inUsd ? "USD" : "XCP"}, ${points.length} ${bucketLabel} ${mode === "line" ? "points" : "candles"}`}
+          aria-label={`${asset} price against ${inUsd ? code : "XCP"}, ${points.length} ${bucketLabel} ${mode === "line" ? "points" : "candles"}`}
         >
           {yTicks.map((t) => (
             <g key={t.v}>

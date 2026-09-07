@@ -8,9 +8,9 @@ import {
   commasRaw,
   compact,
   fromSats,
-  usd,
 } from "@/lib/format";
 import type { Raw } from "@/lib/numeric";
+import { useFiat } from "@/lib/currency";
 import {
   XCP69,
   XCP69_RAISE_SATS,
@@ -22,6 +22,7 @@ import { SATS } from "@/lib/numeric";
 import { XCP_API_BASE } from "@/lib/constants";
 
 export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
+  const usd = useFiat();
   const denom = useDenomination();
   const usdMode = denom === "USD" && !!xcpUsd;
   const rate = xcpUsd ?? 0;
@@ -188,6 +189,7 @@ export function RaisedStat({
   /** Sale progress in [0, 1] — a share of the raise, not of the wallet. */
   progress: number;
 }) {
+  const usd = useFiat();
   const denom = useDenomination();
   const usdMode = denom === "USD" && xcpUsd !== null;
   return (
@@ -214,6 +216,7 @@ export function TxFeesStat({
   totalFeeSats: number;
   btcUsd: number | null;
 }) {
+  const usd = useFiat();
   const denom = useDenomination();
   const usdMode = denom === "USD" && btcUsd !== null;
   return (

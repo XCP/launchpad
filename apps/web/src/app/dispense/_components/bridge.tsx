@@ -20,7 +20,8 @@ import {
   fetchPendingXcpDispenses,
   type Dispenser,
 } from "@/lib/api/counterparty";
-import { commas, commasRaw, satsPerVb, shortAddress, usd as usdFmt } from "@/lib/format";
+import { commas, commasRaw, satsPerVb, shortAddress } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import {
   approx,
   big,
@@ -229,6 +230,7 @@ function LoadCard({
   customFee: number;
   hiddenCount: number;
 }) {
+  const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const { data: btcBalanceSats } = useSWR(
     address ? [address, "btc-balance"] : null,
@@ -773,6 +775,7 @@ function UnloadCard({
   flips: number;
   customFee: number;
 }) {
+  const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
 

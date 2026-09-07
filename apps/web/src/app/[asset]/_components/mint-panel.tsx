@@ -14,7 +14,8 @@ import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
 import { fetchAddressFairmints } from "@/lib/client";
 import { fetchMempoolSnapshot } from "@/lib/api/launchpad-api";
-import { commas, commasRaw, satsPerVb, usd as usdFmt } from "@/lib/format";
+import { commas, commasRaw, satsPerVb } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
 import {
@@ -45,6 +46,7 @@ export function MintPanel({
   asset: string;
   xcpUsd?: number | null;
 }) {
+  const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [tokens, setTokens] = useState("10000");

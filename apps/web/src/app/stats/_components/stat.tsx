@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { LABEL } from "@/components/ui/tokens";
 
 export function Stat({
@@ -9,8 +10,10 @@ export function Stat({
 }: {
   label: string;
   value: string;
-  hint: string;
-  mobileHint?: string;
+  /** Nodes rather than strings so a fiat figure inside can be a client leaf
+   *  that follows the visitor's currency while the tile stays server-rendered. */
+  hint: ReactNode;
+  mobileHint?: ReactNode;
   /** Ordering only. Two columns read as three rows of pairs, and the pairs
    *  that belong together are not the ones source order produces. */
   className?: string;

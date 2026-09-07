@@ -11,7 +11,8 @@ import { trackTx } from "@/lib/analytics";
 import { fileIsAnimatedWebp } from "@/lib/animated-webp";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
-import { fromSats, commas, usd } from "@/lib/format";
+import { fromSats, commas } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { launchCostSats } from "@/lib/launch-cost";
 import { metadataJsonUrl } from "@/lib/metadata";
@@ -202,6 +203,7 @@ const inputClass =
   "mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-sm outline-none transition-colors focus:border-purple-500 focus:bg-white dark:focus:bg-gray-900";
 
 export default function CreatePage() {
+  const usd = useFiat();
   const { address, status: walletStatus, signPsbt, broadcastTransaction } = useWallet();
   const compose = useCompose();
   const isTaproot = address?.startsWith("bc1p") ?? false;

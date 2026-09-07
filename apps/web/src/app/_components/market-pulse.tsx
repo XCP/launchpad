@@ -7,6 +7,7 @@ import { TokenImage } from "@/components/token-image";
 import { trackEvent } from "@/lib/analytics";
 import { priceChangePercent } from "@/lib/market";
 import { approx } from "@/lib/numeric";
+import { useFxRate } from "@/lib/currency";
 
 type Market = "btc" | "xcp";
 type Range = "1d" | "7d" | "30d" | "1y";
@@ -23,14 +24,23 @@ const RANGES: { id: Range; label: string; days: number }[] = [
   { id: "1y", label: "1Y", days: 365 },
 ];
 
-const price = (market: Market, value: number | null) => {
+/** The mark in the visitor's currency. Bitcoin drops the minor units — at
+ *  five figures they are noise — and XCP keeps whatever the currency has,
+ *  which is two for most and none for yen. Past a million, as bitcoin is in
+ *  yen or rupees, the chip cannot hold every digit, so it compacts to
+ *  "¥12.44M" the way the cards' market caps already do. */
+const price = (market: Market, value: number | null, code: string, rate: number) => {
   if (value === null) return "—";
-  return value.toLocaleString("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: market === "xcp" ? 2 : 0,
-    maximumFractionDigits: market === "xcp" ? 2 : 0,
-  });
+  const converted = value * rate;
+  const options: Intl.NumberFormatOptions = { style: "currency", currency: code };
+  if (converted >= 1_000_000) {
+    options.notation = "compact";
+    options.maximumFractionDigits = 2;
+  } else if (market === "btc") {
+    options.minimumFractionDigits = 0;
+    options.maximumFractionDigits = 0;
+  }
+  return converted.toLocaleString("en-US", options);
 };
 
 const percent = (value: number) =>
@@ -126,6 +136,7 @@ function TickerButton({
   change30d: number | null;
   onClick: () => void;
 }) {
+  const { code, rate } = useFxRate();
   const isBtc = market === "btc";
   return (
     <button
@@ -135,7 +146,7 @@ function TickerButton({
         onClick();
       }}
       aria-label={`Open ${isBtc ? "Bitcoin" : "XCP"} price`}
-      className={`group h-9 min-w-0 items-center gap-2 rounded-full border bg-white dark:bg-gray-900 px-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 sm:w-44 ${isBtc ? "hidden sm:flex" : "flex"} ${
+      className={`group h-9 min-w-0 items-center gap-2 rounded-full border bg-white dark:bg-gray-900 px-3 text-left shadow-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 sm:min-w-44 ${isBtc ? "hidden sm:flex" : "flex"} ${
         isBtc
           ? "border-orange-100 dark:border-orange-950/70 hover:border-orange-300 dark:hover:border-orange-800 hover:bg-orange-50/60 dark:hover:bg-orange-950/20"
           : "border-blue-100 dark:border-blue-950/70 hover:border-blue-300 dark:hover:border-blue-800 hover:bg-blue-50/60 dark:hover:bg-blue-950/20"
@@ -144,7 +155,7 @@ function TickerButton({
       {isBtc ? <BtcMark /> : <XcpMark />}
       <span className="flex min-w-0 flex-1 items-baseline gap-1.5">
         <span className="min-w-0 truncate text-sm font-bold tabular-nums text-gray-900 dark:text-gray-100">
-          {price(market, value)}
+          {price(market, value, code, rate)}
         </span>
         {change30d !== null && (
           <span
@@ -198,6 +209,7 @@ function MarketModal({
   btcChange30d: number | null;
   xcpChange30d: number | null;
 }) {
+  const { code, rate } = useFxRate();
   const [points, setPoints] = useState<PricePoint[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -332,12 +344,12 @@ function MarketModal({
                 {isBtc ? <BtcMark large /> : <XcpMark large />}
                 <div>
                   <p className="text-xl font-bold text-gray-900 dark:text-gray-100">{isBtc ? "BTC" : "XCP"}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">{isBtc ? "Bitcoin" : "Counterparty"} (USD)</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{isBtc ? "Bitcoin" : "Counterparty"} ({code})</p>
                 </div>
               </div>
               <div className="text-right">
                 <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-3xl">
-                  {price(market, spot)}
+                  {price(market, spot, code, rate)}
                 </p>
                 {change !== null && (
                   <p className={`text-sm font-semibold tabular-nums ${change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>

@@ -712,6 +712,25 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
   };
 }
 
+/** USD → other currencies from the API's ECB mirror; the browser's currency
+ *  switch is the only caller. Null means dollars for this page view. */
+export interface FxRates {
+  base: "USD";
+  date: string;
+  rates: Record<string, number>;
+}
+
+export async function fetchFxRates(): Promise<FxRates | null> {
+  try {
+    const res = await launchpadApiFetch("/v2/fx", { signal: AbortSignal.timeout(6_000) });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { result?: FxRates };
+    return data.result && data.result.rates ? data.result : null;
+  } catch {
+    return null;
+  }
+}
+
 /** One indexed launch, including its full mirrored creator description. */
 export async function fetchIndexedLaunch(asset: string): Promise<IndexedLaunch | null> {
   try {

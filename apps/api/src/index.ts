@@ -7,6 +7,7 @@ import { syncLaunches } from "#api/indexer/sync";
 import { activityRoute } from "#api/read/activity";
 import { listMarketAssets } from "#api/queries/activity";
 import { launchesRoute } from "#api/read/launches";
+import { fxRoute } from "#api/read/fx";
 import { communitiesRoute } from "#api/read/communities";
 import { syncCommunities } from "#api/indexer/communities";
 import { mintClosed } from "#api/telegram/format";
@@ -75,6 +76,7 @@ app.use("*", async (c, next) => {
 app.get("/", (c) => c.text("launchpad-api ok"));
 app.get("/health", (c) => c.text("ok"));
 app.route("/", launchesRoute);
+app.route("/", fxRoute);
 app.route("/", communitiesRoute);
 app.route("/", activityRoute);
 

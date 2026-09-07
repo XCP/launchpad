@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { ActivityWindow, PairActivity } from "@/lib/api/counterparty";
-import { commas, compact, fromSats, usd } from "@/lib/format";
+import { commas, compact, fromSats } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import { big } from "@/lib/numeric";
 
 /**
@@ -31,6 +32,7 @@ export function PressurePanel({
   activity: PairActivity;
   xcpUsd: number | null;
 }) {
+  const usd = useFiat();
   const [window, setWindow] = useState<ActivityWindow>("24h");
   const volume = activity[window];
   // Nothing has ever traded — not a window worth offering tabs for.

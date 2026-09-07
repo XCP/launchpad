@@ -2,7 +2,8 @@
 
 import { LazyLink } from "@/components/lazy-link";
 import { TokenImage } from "@/components/token-image";
-import { compact, fromSats, usd } from "@/lib/format";
+import { compact, fromSats } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import { usePortfolio } from "@/app/profile/_lib/use-portfolio";
 import { WITHHELD_COPY } from "@/lib/withheld-copy";
 
@@ -79,6 +80,7 @@ function Realized({
   xcpUsd: number | null;
   large?: boolean;
 }) {
+  const usd = useFiat();
   if (sats === null) return <span className="text-gray-400 dark:text-gray-500" title="Unexplained balance movement">—</span>;
   const up = sats >= 0n;
   // Magnitude in integer space; the sign is carried by the label.

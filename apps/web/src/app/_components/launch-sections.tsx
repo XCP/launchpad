@@ -8,7 +8,8 @@ import { TokenImage } from "@/components/token-image";
 import { PendingDot } from "@/components/pending-dot";
 import { useMempool } from "@/hooks/use-mempool";
 import { LABEL } from "@/components/ui/tokens";
-import { blocksEta, commas, compact, fromSats, shortAddress, usd } from "@/lib/format";
+import { blocksEta, commas, compact, fromSats, shortAddress } from "@/lib/format";
+import { useFiat, useFxRate } from "@/lib/currency";
 import { fetchHolderCount, type MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
@@ -368,6 +369,7 @@ function Section({
   /** Connected wallet eligible for the live-launch filter. Null hides it. */
   walletAddress: string | null;
 }) {
+  const { code } = useFxRate();
   const options = SORTS[phase] ?? SORTS.scheduled!;
   const defaultSort = options[0]!.id;
   const [sortId, setSortId] = useState(defaultSort);
@@ -621,7 +623,7 @@ function Section({
                         : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
                     }`}
                   >
-                    {d.toUpperCase()}
+                    {d === "usd" ? code : "XCP"}
                   </button>
                 ))}
               </div>
@@ -1035,6 +1037,7 @@ function LaunchTable({
   xcpUsdDayAgo?: number | null;
   denomination?: Denomination;
 }) {
+  const usd = useFiat();
   const graduated = phase === "graduated";
   const scheduled = phase === "scheduled";
   // The graduated columns follow the section's USD/XCP switch: cap and price
@@ -1226,6 +1229,7 @@ function Card({
   /** This is the section's front slot — see the pin in Section. */
   fresh: boolean;
 }) {
+  const usd = useFiat();
   const { fm, phase, conforming } = row;
   const deadline = fm.soft_cap_deadline_block || fm.end_block;
   const returns =
@@ -1439,49 +1443,6 @@ function Card({
         )}
       </div>
 
-      {/* The market's numbers, off the art, market cap first. The returns used
-          to be a pill over the image — one number, no label, and nothing to
-          say how it had been trading lately, which made +5,000% read as a
-          claim rather than a market — and for a while they were the row's
-          two cells, which made a percentage the card's biggest fact and the
-          cap a footnote. Cap leads now; the two returns are its context, in
-          the right half: "All" from the mint price, and the window that has
-          actually elapsed ("24h", or "6h" on a market younger than a day —
-          see windowLabel).
-
-          Two renderings of that right half, by breakpoint. On a wide card
-          they are two caption/value lines. A phone card is 158px wide, and
-          79px cannot hold "ALL +5,161.6%" as caption plus value, so there
-          the returns are two tinted pills that carry their label inside —
-          the colour does the reading from arm's length. */}
-      {phase === "graduated" && (
-        <div className="grid grid-cols-2 divide-x divide-gray-100 border-b border-gray-100 dark:divide-gray-800 dark:border-gray-800">
-          <div className="px-2 py-2 sm:px-3">
-            <div className={STAT_CAPTION}>Market cap</div>
-            <div className="text-[15px] font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-base">
-              {capLabel}
-            </div>
-          </div>
-          <div className="flex flex-col justify-center gap-0.5 px-2 py-2 sm:px-3">
-            <StatLine
-              label="All"
-              value={performanceLabel}
-              up={performance !== null && performance >= 0}
-              title={`${denomination === "usd" ? "USD" : "XCP"} return from the mint price at launch`}
-              pillLabel={false}
-            />
-            <StatLine
-              label={windowLabel}
-              value={dayChangeLabel}
-              up={dayChange !== null && dayChange >= 0}
-              title={`Change in ${denomination === "usd" ? "USD" : "XCP"} over the last ${
-                windowLabel === "24h" ? "24 hours" : `${windowLabel}, since the pool opened`
-              }`}
-            />
-          </div>
-        </div>
-      )}
-
       <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center justify-between gap-2">
           <span
@@ -1529,6 +1490,49 @@ function Card({
           )}
         </div>
       </div>
+
+      {/* The market's numbers, under the card's identity block, market cap first. The returns used
+          to be a pill over the image — one number, no label, and nothing to
+          say how it had been trading lately, which made +5,000% read as a
+          claim rather than a market — and for a while they were the row's
+          two cells, which made a percentage the card's biggest fact and the
+          cap a footnote. Cap leads now; the two returns are its context, in
+          the right half: "All" from the mint price, and the window that has
+          actually elapsed ("24h", or "6h" on a market younger than a day —
+          see windowLabel).
+
+          Two renderings of that right half, by breakpoint. On a wide card
+          they are two caption/value lines. A phone card is 158px wide, and
+          79px cannot hold "ALL +5,161.6%" as caption plus value, so there
+          the returns are two tinted pills that carry their label inside —
+          the colour does the reading from arm's length. */}
+      {phase === "graduated" && (
+        <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 dark:divide-gray-800 dark:border-gray-800">
+          <div className="px-2 py-2 sm:px-3">
+            <div className={STAT_CAPTION}>Market cap</div>
+            <div className="text-[13px] font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-base">
+              {capLabel}
+            </div>
+          </div>
+          <div className="flex flex-col justify-center gap-0.5 px-2 py-2 sm:px-3">
+            <StatLine
+              label="All"
+              value={performanceLabel}
+              up={performance !== null && performance >= 0}
+              title={`${denomination === "usd" ? "USD" : "XCP"} return from the mint price at launch`}
+              pillLabel={false}
+            />
+            <StatLine
+              label={windowLabel}
+              value={dayChangeLabel}
+              up={dayChange !== null && dayChange >= 0}
+              title={`Change in ${denomination === "usd" ? "USD" : "XCP"} over the last ${
+                windowLabel === "24h" ? "24 hours" : `${windowLabel}, since the pool opened`
+              }`}
+            />
+          </div>
+        </div>
+      )}
     </LazyLink>
   );
 }

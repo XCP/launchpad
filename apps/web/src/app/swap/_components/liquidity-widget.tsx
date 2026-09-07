@@ -12,7 +12,8 @@ import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
-import { commasRaw, price as formatPrice, satsPerVb, usd as usdFmt } from "@/lib/format";
+import { commasRaw, price as formatPrice, satsPerVb } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import {
   approx,
   big,
@@ -81,6 +82,7 @@ export function LiquidityWidget({
   assets: string[];
   xcpUsd: number | null;
 }) {
+  const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
   const [asset, setAsset] = useState(() => defaultTradeAsset(assets));

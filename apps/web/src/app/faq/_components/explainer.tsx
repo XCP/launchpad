@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { commas, compact, price as priceFmt, usd as usdFmt } from "@/lib/format";
+import { commas, compact, price as priceFmt } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import { XCP69, XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
 
 /**
@@ -88,7 +89,7 @@ export function StandardPlayground({
   );
 }
 
-function withUsd(xcp: number, xcpUsd: number | null): string {
+function withUsd(xcp: number, xcpUsd: number | null, usdFmt: (n: number) => string): string {
   return xcpUsd ? ` (≈${usdFmt(xcp * xcpUsd)})` : "";
 }
 
@@ -99,6 +100,7 @@ function LaunchMeter({
   xcpUsd: number | null;
   onSoldOut: () => void;
 }) {
+  const usdFmt = useFiat();
   // Slider travel maps 1:1 onto the supply bar below it: the track spans the
   // full 100M, but the thumb CLAMPS at the 69% finish line — you can feel
   // the edge of what can be minted; the last 31% belongs to the pool.
@@ -169,7 +171,7 @@ function LaunchMeter({
         {soldOut ? (
           <span className="font-medium text-green-700 dark:text-green-400">
             ✓ Graduated — pool created with {commas(RAISE)} XCP
-            {withUsd(RAISE, xcpUsd)} + 31M tokens, LP burned.
+            {withUsd(RAISE, xcpUsd, usdFmt)} + 31M tokens, LP burned.
           </span>
         ) : pos === 0 ? (
           <span className="font-medium text-blue-700 dark:text-blue-300">
@@ -178,7 +180,7 @@ function LaunchMeter({
         ) : (
           <span className="font-medium text-amber-700 dark:text-amber-400">
             ↩ Minting — {commas(Math.round(committed))} XCP
-            {withUsd(committed, xcpUsd)} raised so far, all of it returned
+            {withUsd(committed, xcpUsd, usdFmt)} raised so far, all of it returned
             automatically if the launch doesn&apos;t sell out.
           </span>
         )}
@@ -204,6 +206,7 @@ function LaunchMeter({
 }
 
 function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
+  const usdFmt = useFiat();
   // t ∈ [-100, 100]; quadratic magnitude keeps small trades readable while
   // the extremes still fit on the same track.
   const [t, setT] = useState(0);
@@ -240,8 +243,8 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
     price = xcpReserve / tokenReserve;
     line =
       t === 100
-        ? `It took ${commas(Math.round(xcpIn))} XCP${withUsd(xcpIn, xcpUsd)} of buying — and every satoshi of it is locked liquidity now, backing the new price.`
-        : `${commas(Math.round(xcpIn))} XCP${withUsd(xcpIn, xcpUsd)} of net buying — and all of it joins the locked reserve.`;
+        ? `It took ${commas(Math.round(xcpIn))} XCP${withUsd(xcpIn, xcpUsd, usdFmt)} of buying — and every satoshi of it is locked liquidity now, backing the new price.`
+        : `${commas(Math.round(xcpIn))} XCP${withUsd(xcpIn, xcpUsd, usdFmt)} of net buying — and all of it joins the locked reserve.`;
   }
 
   const multiple = price / MINT_PRICE;
@@ -299,7 +302,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
             <span className="font-semibold text-gray-900 dark:text-gray-100">
               {commas(Math.round(xcpReserve))}
               <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
-                {withUsd(xcpReserve, xcpUsd)}
+                {withUsd(xcpReserve, xcpUsd, usdFmt)}
               </span>
             </span>
           </div>

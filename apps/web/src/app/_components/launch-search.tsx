@@ -5,7 +5,8 @@ import { Dialog as D } from "radix-ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { trackEvent } from "@/lib/analytics";
-import { blocksEta, commas, compact, shortAddress, usd } from "@/lib/format";
+import { blocksEta, commas, compact, shortAddress } from "@/lib/format";
+import { useFiat } from "@/lib/currency";
 import { fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { type SearchRow, toSearchRow } from "@/lib/launch-row";
 import { NO_MATCH, hiddenAsRefunded, relevance } from "@/lib/search-rank";
@@ -51,7 +52,13 @@ const ORDER: Record<SearchPhase, (a: SearchRow, b: SearchRow) => number> = {
  * every launch has at every point in its life, because a column that changes
  * meaning row by row is a column nobody can compare down.
  */
-function metric(row: SearchRow, phase: SearchPhase, height: number, xcpUsd: number | null): string {
+function metric(
+  row: SearchRow,
+  phase: SearchPhase,
+  height: number,
+  xcpUsd: number | null,
+  usd: (n: number) => string,
+): string {
   const shown = phase === "all" ? "minters" : row.phase;
   if (shown === "graduated") {
     if (row.marketCapXcp <= 0) return `${commas(row.minters)} minters`;
@@ -91,6 +98,7 @@ export function LaunchSearch({
   height: number;
   xcpUsd: number | null;
 }) {
+  const usd = useFiat();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -278,7 +286,7 @@ export function LaunchSearch({
                       </span>
                     </span>
                     <span className="shrink-0 text-xs font-medium tabular-nums text-gray-600 dark:text-gray-400">
-                      {metric(r, phase, height, xcpUsd)}
+                      {metric(r, phase, height, xcpUsd, usd)}
                     </span>
                   </button>
                 </li>

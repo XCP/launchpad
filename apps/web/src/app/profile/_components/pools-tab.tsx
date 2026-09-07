@@ -9,7 +9,8 @@ import {
   type AddressPoolPosition,
 } from "@/lib/api/counterparty";
 import { fetchXcpUsd } from "@/lib/api/price";
-import { fromSats, tokenQty, usd } from "@/lib/format";
+import { fromSats, tokenQty } from "@/lib/format";
+import { useFiat, useFxRate } from "@/lib/currency";
 import { big, ratio } from "@/lib/numeric";
 
 type Denom = "usd" | "xcp";
@@ -91,6 +92,8 @@ export function PoolsTab({
   pools: AddressPoolPosition[];
   xcp69Assets: Set<string>;
 }) {
+  const usd = useFiat();
+  const { code } = useFxRate();
   const [denom, setDenom] = useState<Denom>("usd");
   const { data: xcpUsd } = useSWR("xcp-usd", fetchXcpUsd, {
     refreshInterval: 60_000,
@@ -160,7 +163,7 @@ export function PoolsTab({
                     : "text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-800"
                 }`}
               >
-                {value === "usd" ? "USD" : "XCP"}
+                {value === "usd" ? code : "XCP"}
               </button>
             ))}
           </div>

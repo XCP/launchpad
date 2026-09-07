@@ -5,7 +5,8 @@ import { fetchCommunities, fetchLaunchStats } from "@/lib/api/launchpad-api";
 import { CommunitiesSection } from "@/app/stats/_components/communities";
 import { Stat } from "@/app/stats/_components/stat";
 import { fetchXcpUsd, fetchXcpUsdHistory } from "@/lib/api/price";
-import { commas, fromSats, usd } from "@/lib/format";
+import { commas, fromSats } from "@/lib/format";
+import { Fiat } from "@/components/fiat";
 import { historicalUsdAt } from "@/lib/market";
 import { LABEL } from "@/components/ui/tokens";
 
@@ -114,8 +115,8 @@ export default async function StatsPage() {
           className="order-1 sm:order-none"
           label="Market cap"
           value={`${formatXcp(marketCapXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(marketCapXcp * xcpUsd)} · graduated coins` : "graduated coins"}
-          mobileHint={xcpUsd ? `≈ ${usd(marketCapXcp * xcpUsd)} · graduated` : "graduated"}
+          hint={xcpUsd ? <>≈ <Fiat usd={marketCapXcp * xcpUsd} /> · graduated coins</> : "graduated coins"}
+          mobileHint={xcpUsd ? <>≈ <Fiat usd={marketCapXcp * xcpUsd} /> · graduated</> : "graduated"}
         />
         <Stat
           className="order-2 sm:order-none"
@@ -124,7 +125,7 @@ export default async function StatsPage() {
           // also carries pools whose liquidity is not locked, and calling all
           // of it locked promised something this figure cannot back.
           value={`${formatXcp(poolXcp)} XCP`}
-          hint={xcpUsd ? `≈ ${usd(poolXcp * xcpUsd)} in pools` : "in pools"}
+          hint={xcpUsd ? <>≈ <Fiat usd={poolXcp * xcpUsd} /> in pools</> : "in pools"}
         />
         <Stat
           className="order-6 sm:order-none"
@@ -136,9 +137,11 @@ export default async function StatsPage() {
           // number to produce and the one worth showing on its own.
           value={`${formatXcp(tradeXcp)} XCP`}
           hint={
-            historicalTradeUsd > 0
-              ? `≈ ${usd(historicalTradeUsd)} traded, all time`
-              : "traded, all time"
+            historicalTradeUsd > 0 ? (
+              <>≈ <Fiat usd={historicalTradeUsd} /> traded, all time</>
+            ) : (
+              "traded, all time"
+            )
           }
         />
         <Stat
@@ -158,11 +161,13 @@ export default async function StatsPage() {
           label="Active escrow"
           value={`${formatXcp(activeXcp)} XCP`}
           hint={
-            xcpUsd
-              ? `≈ ${usd(activeXcp * xcpUsd)} committed to open mints`
-              : "committed to open mints"
+            xcpUsd ? (
+              <>≈ <Fiat usd={activeXcp * xcpUsd} /> committed to open mints</>
+            ) : (
+              "committed to open mints"
+            )
           }
-          mobileHint={xcpUsd ? `≈ ${usd(activeXcp * xcpUsd)} committed` : "committed"}
+          mobileHint={xcpUsd ? <>≈ <Fiat usd={activeXcp * xcpUsd} /> committed</> : "committed"}
         />
       </section>
 

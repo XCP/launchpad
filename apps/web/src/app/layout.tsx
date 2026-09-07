@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import type { ReactNode } from "react";
 import { PendingDock } from "@/components/pending-dock";
+import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SitePresenceBadge } from "@/components/site-presence";
 import { SessionProvider } from "@/providers/session-context";
@@ -38,9 +39,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <WalletProvider>
         <SessionProvider>
         <SiteHeader />
-        {/* Bottom padding clears the fixed corner overlays — without it the
-            last line of any page sits under the presence badge or the dock. */}
-        <main className="mx-auto max-w-5xl px-4 pb-24 pt-8">{children}</main>
+        <main className="mx-auto max-w-5xl px-4 pb-8 pt-8">{children}</main>
+        {/* The footer carries the bottom padding that clears the fixed corner
+            overlays — without it its own line, the last on any page, sits
+            under the presence badge or the dock. */}
+        <SiteFooter />
         {/* Corner overlays: the site's pulse bottom-left, your own money
             moving bottom-right. */}
         <SitePresenceBadge />

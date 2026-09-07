@@ -90,12 +90,65 @@ export function satsPerVb(n: number): string {
   return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
 }
 
-/** USD display: compact for big figures, cents only where they matter. */
+/**
+ * How a currency is written: what goes before the number, what goes after,
+ * and whether it has minor units at all. Read once per currency from Intl,
+ * so "CHF 1.00" and "¥1" and "$1.00" all come out the way Intl would write
+ * them, with our own compaction of the number in the middle.
+ */
+interface CurrencyShape {
+  prefix: string;
+  suffix: string;
+  /** 0 for yen and won; 2 for almost everything else. */
+  minor: number;
+}
+
+const SHAPES = new Map<string, CurrencyShape>();
+
+function currencyShape(code: string): CurrencyShape {
+  const cached = SHAPES.get(code);
+  if (cached) return cached;
+  let shape: CurrencyShape;
+  try {
+    const formatter = new Intl.NumberFormat("en-US", { style: "currency", currency: code });
+    const parts = formatter.formatToParts(1234.5);
+    const first = parts.findIndex((p) => p.type === "integer");
+    let last = parts.length - 1;
+    while (last > first && !["integer", "group", "decimal", "fraction"].includes(parts[last]!.type)) {
+      last -= 1;
+    }
+    shape = {
+      prefix: parts.slice(0, first).map((p) => p.value).join(""),
+      suffix: parts.slice(last + 1).map((p) => p.value).join(""),
+      minor: formatter.resolvedOptions().maximumFractionDigits ?? 2,
+    };
+  } catch {
+    shape = { prefix: `${code} `, suffix: "", minor: 2 };
+  }
+  SHAPES.set(code, shape);
+  return shape;
+}
+
+/**
+ * Money display in any currency: compact for big figures, minor units only
+ * where they matter, and none at all for currencies that have none. The
+ * amount is already in `code` — conversion happens before this, in
+ * `useFiat` — so this is purely how the number is written.
+ */
+export function fiat(n: number, code: string): string {
+  const { prefix, suffix, minor } = currencyShape(code);
+  const wrap = (body: string) => `${prefix}${body}${suffix}`;
+  if (n >= 1000) return wrap(compact(n));
+  if (n >= 100 || (n >= 1 && minor === 0)) return wrap(String(Math.round(n)));
+  if (n >= 1) return wrap(n.toFixed(2));
+  return wrap(n.toLocaleString("en-US", { maximumSignificantDigits: 2 }));
+}
+
+/** USD display: compact for big figures, cents only where they matter.
+ *  `fiat` fixed at dollars; components that should follow the visitor's
+ *  currency use `useFiat` from lib/currency instead. */
 export function usd(n: number): string {
-  if (n >= 1000) return `$${compact(n)}`;
-  if (n >= 100) return `$${Math.round(n)}`;
-  if (n >= 1) return `$${n.toFixed(2)}`;
-  return `$${n.toLocaleString("en-US", { maximumSignificantDigits: 2 })}`;
+  return fiat(n, "USD");
 }
 
 export function shortAddress(addr: string): string {

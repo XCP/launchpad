@@ -28,9 +28,9 @@ import {
   price as formatPrice,
   shortAddress,
   tokenQty,
-  usd,
 } from "@/lib/format";
 import { big, rawEquals } from "@/lib/numeric";
+import { useFiat } from "@/lib/currency";
 import { usdPriceChangePercent } from "@/lib/market";
 import {
   circulatingSupplyRaw,
@@ -98,6 +98,7 @@ export function LaunchView({
   displayDescription: string | null;
   burnedQuantity: string;
 }) {
+  const usd = useFiat();
   const progress = saleProgress(fm);
   // An inscribed launch's description IS its content (hex-encoded on the
   // wire) rather than our hosted JSON URL — mime_type is the only signal
