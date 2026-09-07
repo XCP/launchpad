@@ -708,6 +708,9 @@
   "A launch moves through four phases:": [
     "app/[lang]/docs/page.tsx"
   ],
+  "A mint locks your XCP until the launch resolves. If it graduates, your XCP funds the pool and you receive tokens, which can lose value. If it refunds, your XCP is returned. The Bitcoin network fee is paid in either case; rewards do not guarantee that every cost is covered.": [
+    "app/[lang]/rewards/_components/rewards-content.tsx"
+  ],
   "A new way to launch a coin on Counterparty — every launch identical, enforced by consensus.": [
     "app/[lang]/faq/page.tsx"
   ],
@@ -1605,7 +1608,7 @@
   "everyone dumps": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
-  "Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, what it costs (nothing), and how to integrate.": [
+  "Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, fees, and how to integrate.": [
     "app/[lang]/docs/page.tsx"
   ],
   "Everything about XCP-69, in one place. The first half explains how launches work for anyone. The second half is for developers who want to read or build on the same on-chain data this site does.": [
@@ -1762,7 +1765,7 @@
   "Graduated tokens trade against a constant-product TOKEN/XCP pool. The price is simply the ratio of the pool's reserves; every swap moves it. A fixed {fee} fee on each swap is paid to the pool itself — and since the LP is burned, fees deepen the locked liquidity rather than paying anyone out.": [
     "app/[lang]/docs/page.tsx"
   ],
-  "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses, at which point the pool is created and its liquidity is burned. A launch that misses its target refunds every satoshi by consensus and does not count. {link}": [
+  "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses. The pool is created and its initial LP tokens go to an unspendable address, permanently locking that liquidity. A launch that misses its target returns the contributed XCP by consensus and does not count. {link}": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Graduation": [
@@ -2397,9 +2400,6 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
-  "No — a mint escrows XCP against the launch. If it graduates you hold the tokens; if it refunds you get every satoshi back. The only thing a mint actually costs you is the Bitcoin fee — which is the part this programme covers.": [
-    "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
   "No — and that's the point. The fairminter protocol allows enormous variation: no soft cap, no refunds, creator commissions up to 99%, premines, no pool at all. XCP-69 pins one configuration of it, and this site lists only launches that match the standard exactly, checked field-by-field against the on-chain record. Here, every launch behaves identically and you never audit the parameters yourself. A fairminter you encounter anywhere else carries no such guarantee — read its fields before you mint.": [
     "app/[lang]/faq/page.tsx"
   ],
@@ -2842,6 +2842,9 @@
     "app/[lang]/swap/_components/liquidity-widget.tsx"
   ],
   "Pool price × circulating supply (issued minus burned). A convention, not a promise — the pool could not pay it out.": [
+    "app/[lang]/docs/page.tsx"
+  ],
+  "Pool price is XCP reserve ÷ token reserve. Swaps change this ratio. Limit orders can also trade on Counterparty's order book.": [
     "app/[lang]/docs/page.tsx"
   ],
   "Pool reserve": [
@@ -3810,9 +3813,6 @@
   ],
   "XCP Price": [
     "app/[lang]/_components/market-pulse.tsx"
-  ],
-  "XCP reserve ÷ token reserve. Moves with every swap; there is no order book and no market maker.": [
-    "app/[lang]/docs/page.tsx"
   ],
   "XCP Rewards": [
     "components/rewards-chip.tsx",

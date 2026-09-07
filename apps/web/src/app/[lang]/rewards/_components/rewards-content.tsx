@@ -90,7 +90,7 @@ export function RewardsContent({ stats, earners, graduates, mintsPool, xcpUsd, b
         <p className="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
           {rich(
             t,
-            "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses, at which point the pool is created and its liquidity is burned. A launch that misses its target refunds every satoshi by consensus and does not count. {link}",
+            "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses. The pool is created and its initial LP tokens go to an unspendable address, permanently locking that liquidity. A launch that misses its target returns the contributed XCP by consensus and does not count. {link}",
             {
               xcp: num.commas(raiseXcp),
               n: XCP69_MIN_PARTICIPANTS,
@@ -263,7 +263,7 @@ export function RewardsContent({ stats, earners, graduates, mintsPool, xcpUsd, b
           </Faq>
           <Faq q={t("Doesn't minting cost me the XCP?")}>
             {t(
-              "No — a mint escrows XCP against the launch. If it graduates you hold the tokens; if it refunds you get every satoshi back. The only thing a mint actually costs you is the Bitcoin fee — which is the part this programme covers.",
+              "A mint locks your XCP until the launch resolves. If it graduates, your XCP funds the pool and you receive tokens, which can lose value. If it refunds, your XCP is returned. The Bitcoin network fee is paid in either case; rewards do not guarantee that every cost is covered.",
             )}
           </Faq>
         </div>

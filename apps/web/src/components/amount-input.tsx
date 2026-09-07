@@ -69,7 +69,7 @@ export function AmountInput({
         style={style}
         disabled={disabled}
       />
-      {message && <span id={`${inputId}-error`} role="status" className="block basis-full text-xs text-red-600 dark:text-red-400">{message}</span>}
+      {message && <span id={`${inputId}-error`} role="status" className="order-last block w-full basis-full whitespace-normal break-words text-left text-xs text-red-600 dark:text-red-400">{message}</span>}
     </>
   );
 }

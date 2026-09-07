@@ -23,11 +23,11 @@ import {
   updateSettings,
 } from "@/app/[lang]/swap/_lib/trade-settings-store";
 
-/** Market orders live one block: match at confirmation or refund next block. */
+/** Shortest configured order lifetime; protocol expiry returns unfilled amounts. */
 export const MARKET_EXPIRATION = 1;
 const SLIPPAGE_PRESETS = [0.5, 1, 2];
-/** Liquidity slippage is looser by convention — deposits drift with every
- *  pool trade, and a breach is benign (void tx, nothing debited). */
+/** Deposits drift with every pool trade. A breached limit invalidates the
+ *  liquidity operation; the Bitcoin network fee is still paid. */
 const LQ_SLIPPAGE_PRESETS = [0.5, 1, 2.5];
 /** Resting-order lifetimes, in blocks. */
 export const LIMIT_EXPIRATIONS = [
@@ -178,7 +178,7 @@ export function SwapSettingsGear() {
       label={t("Swap settings")}
     >
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Max slippage")}</div>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           onClick={() => {
@@ -212,7 +212,7 @@ export function SwapSettingsGear() {
           </button>
         ))}
         <div
-          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+          className={`flex min-w-0 items-center rounded-lg border px-2 py-1 has-[[aria-invalid=true]]:basis-full has-[[aria-invalid=true]]:flex-wrap transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             !s.slippageAuto && s.customSlippage !== ""
               ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40"
               : "border-gray-200 dark:border-gray-800"
@@ -232,7 +232,7 @@ export function SwapSettingsGear() {
           <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
         </div>
       </div>
-      {s.slippageAuto ? (
+      {!parseBoundedSetting(s.customSlippage, 50).valid ? null : s.slippageAuto ? (
         <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
           {t("Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.", { pct: num.commas(s.autoValue) })}
         </p>
@@ -253,10 +253,10 @@ export function SwapSettingsGear() {
           {t("Higher than this trade needs (~{pct}%).", { pct: num.commas(s.autoValue) })}
         </p>
       ) : null}
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-y-2">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Expiration")}</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 has-[[aria-invalid=true]]:w-full has-[[aria-invalid=true]]:flex-wrap transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.expiration !== MARKET_EXPIRATION
               ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40"
               : "border-gray-200 dark:border-gray-800"
@@ -278,10 +278,10 @@ export function SwapSettingsGear() {
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         {t("How many blocks an unfilled remainder stays open before expiry. {n} is the shortest setting.", { n: MARKET_EXPIRATION })}
       </p>
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-y-2">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 has-[[aria-invalid=true]]:w-full has-[[aria-invalid=true]]:flex-wrap transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.customFee !== null ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
@@ -313,7 +313,7 @@ export function LimitSettingsGear() {
       label={t("Limit order settings")}
     >
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Expiration")}</div>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {LIMIT_EXPIRATIONS.map((x) => (
           <button
             key={x.blocks}
@@ -332,10 +332,10 @@ export function LimitSettingsGear() {
       <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         {t("How long the order rests unfilled before the remainder auto-refunds.")}
       </p>
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-y-2">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 has-[[aria-invalid=true]]:w-full has-[[aria-invalid=true]]:flex-wrap transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.customFee !== null ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
@@ -371,7 +371,7 @@ export function LiquiditySettingsGear() {
       label={t("Liquidity settings")}
     >
       <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Max slippage")}</div>
-      <div className="mt-2 flex items-center gap-1.5">
+      <div className="mt-2 flex flex-wrap items-center gap-1.5">
         {LQ_SLIPPAGE_PRESETS.map((p) => (
           <button
             key={p}
@@ -390,7 +390,7 @@ export function LiquiditySettingsGear() {
           </button>
         ))}
         <div
-          className={`flex items-center rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+          className={`flex min-w-0 items-center rounded-lg border px-2 py-1 has-[[aria-invalid=true]]:basis-full has-[[aria-invalid=true]]:flex-wrap transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.lqCustomSlippage !== ""
               ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40"
               : "border-gray-200 dark:border-gray-800"
@@ -410,10 +410,10 @@ export function LiquiditySettingsGear() {
       <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
         {t("If these limits cannot be met at confirmation, the liquidity operation is invalid. Pool assets are not debited; the Bitcoin network fee is still paid.")}
       </p>
-      <div className="mt-3 flex items-center justify-between">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-y-2">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
-          className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
+          className={`flex items-center gap-1 rounded-lg border px-2 py-1 has-[[aria-invalid=true]]:w-full has-[[aria-invalid=true]]:flex-wrap transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.customFee !== null ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
