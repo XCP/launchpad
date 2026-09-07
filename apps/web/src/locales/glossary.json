@@ -165,18 +165,18 @@
       "zh-hk": "限價"
     },
     "dispense": {
-      "note": "Buying XCP from Counterparty dispensers (the nav label). ZH: The nav label for buying XCP from Counterparty dispensers.",
-      "ja": "ディスペンス",
-      "zh": "分发器",
-      "zh-tw": "分發器",
-      "zh-hk": "分發器"
+      "note": "The nav label for buying XCP from Counterparty dispensers; same word as dispenser in every locale.",
+      "ja": "自販機",
+      "zh": "售货机",
+      "zh-tw": "販賣機",
+      "zh-hk": "售賣機"
     },
     "dispenser": {
-      "ja": "ディスペンサー",
-      "zh": "分发器",
-      "zh-tw": "分發器",
-      "zh-hk": "分發器",
-      "note": "DECIDED 2026-09-07: 分发器. No Chinese Counterparty community text uses any one word; press wrote 分配器 once (Sohu) and vending-machine explainers say 自动售货机. 分发器 (distributor) reads correctly for “send BTC, receive XCP” and fits a nav label; 分配器 means an allocator in Chinese software."
+      "ja": "自販機",
+      "zh": "售货机",
+      "zh-tw": "販賣機",
+      "zh-hk": "售賣機",
+      "note": "DECIDED 2026-09-07 (Dan): a dispenser is a vending machine in any language where the literal word is awkward. Japanese 自販機 (everyday word, instantly understood; ディスペンサー was a bare loanword); Simplified 售货机; Taiwan 販賣機; Hong Kong 售賣機. The verb sense, send BTC and receive XCP, is what the word has to carry."
     },
     "activity": {
       "ja": "アクティビティ",
