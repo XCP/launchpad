@@ -122,7 +122,7 @@
       "fr": "hard cap"
     },
     "pool": {
-      "note": "The TOKEN/XCP AMM pool. ZH: 池 alone in tight labels. Uniswap zh-TW uses 資金池, but 流動性池 is clearer for an AMM. ES: Uniswap keeps pool; pool de liquidez when spelled out. KO: 풀 (Uniswap), 유동성 풀 spelled out. Both keep pool (Uniswap pt-BR and fr-FR); pool de liquidez / pool de liquidité when spelled out.",
+      "note": "The TOKEN/XCP AMM pool. ZH: 池 alone in tight labels. 資金池 is Uniswap zh-CN (创建资金池); Uniswap zh-TW writes 建立流動性池, so 流動性池 is attested in both. ES: Uniswap keeps pool; pool de liquidez when spelled out. KO: 풀 (Uniswap), 유동성 풀 spelled out. Both keep pool (Uniswap pt-BR and fr-FR); pool de liquidez / pool de liquidité when spelled out.",
       "ja": "プール",
       "zh": "流动性池",
       "zh-tw": "流動性池",
@@ -330,8 +330,8 @@
       "ja": "メンプール",
       "zh": "内存池",
       "zh-tw": "記憶體池",
-      "zh-hk": "內存池",
-      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存. MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it.",
+      "zh-hk": "記憶池",
+      "note": "Taiwan says 記憶體池 (CoinGlass zh-TW); Hong Kong says 記憶池 (OSL HK academy) — 內存 is the mainland computing word; the mainland says 内存池 (Foresight). MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it.",
       "es": "mempool",
       "ko": "멤풀",
       "pt": "mempool",
@@ -432,11 +432,11 @@
       "fr": "rechercher"
     },
     "all-time high": {
-      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値. ZH: CMC China writes 历史最高价; ATH is also understood but the Chinese is the norm. KO: Upbit and Korean press write 역대 최고가; ATH is understood too. PT: máxima histórica (ATH). FR: ATH is what French crypto media write; plus haut historique is the gloss.",
+      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値. ZH QA 2026-09-07: 历史高点 (CoinMarketCap zh label; Uniswap zh-TW 歷史高點); 历史最高 was a truncation nobody writes. KO: Upbit and Korean press write 역대 최고가; ATH is understood too. PT: máxima histórica (ATH). FR: ATH is what French crypto media write; plus haut historique is the gloss.",
       "ja": "ATH",
-      "zh": "历史最高",
-      "zh-tw": "歷史最高",
-      "zh-hk": "歷史最高",
+      "zh": "历史高点",
+      "zh-tw": "歷史高點",
+      "zh-hk": "歷史高點",
       "es": "máximo histórico",
       "ko": "역대 최고가",
       "pt": "máxima histórica",
@@ -444,11 +444,14 @@
     },
     "send": {
       "ja": "送金",
-      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents. MONAPARTY: 送金 in prose; Mpurse's button says 送信. KO: 전송 (Uniswap/UniSat), not 송금 which implies fiat.",
+      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents. MONAPARTY: 送金 in prose; Mpurse's button says 送信. KO: 전송 (Uniswap/UniSat), not 송금 which implies fiat. ZH: 发送 / 發送 (UniSat zh_CN and zh_TW); Uniswap zh-TW says 傳送.",
       "es": "enviar",
       "ko": "전송",
       "pt": "enviar",
-      "fr": "envoyer"
+      "fr": "envoyer",
+      "zh": "发送",
+      "zh-tw": "發送",
+      "zh-hk": "發送"
     },
     "miner fee": {
       "ja": "トランザクション手数料",
@@ -669,11 +672,14 @@
     },
     "confirmed": {
       "ja": "承認済み",
-      "note": "MONAPARTY: confirmations are 承認 (承認数, ゼロ承認 in Monapalette; 未承認トランザクション on the wiki). 確定 is kept only for a launch resolving at its deadline and for realized P&L. KO: 확인 / 컨펌 for confirmations; 컨펌 is community slang, 확인 is the wallet word.",
+      "note": "MONAPARTY: confirmations are 承認 (承認数, ゼロ承認 in Monapalette; 未承認トランザクション on the wiki). 確定 is kept only for a launch resolving at its deadline and for realized P&L. KO: 확인 / 컨펌 for confirmations; 컨펌 is community slang, 확인 is the wallet word. ZH: 已确认 / 已確認 (UniSat); OSL HK 確認.",
       "es": "confirmado",
       "ko": "확인됨",
       "pt": "confirmado",
-      "fr": "confirmé"
+      "fr": "confirmé",
+      "zh": "已确认",
+      "zh-tw": "已確認",
+      "zh-hk": "已確認"
     },
     "description": {
       "ja": "説明文",
@@ -681,7 +687,10 @@
       "es": "descripción",
       "ko": "설명",
       "pt": "descrição",
-      "fr": "description"
+      "fr": "description",
+      "zh": "描述",
+      "zh-tw": "描述",
+      "zh-hk": "描述"
     },
     "coin (as a traded name)": {
       "ja": "銘柄",
@@ -698,6 +707,18 @@
     "portfolio": {
       "es": "portafolio",
       "note": "ES QA: portafolio in Latin America; never cartera."
+    },
+    "meme coin": {
+      "zh": "Meme 币",
+      "zh-tw": "迷因幣",
+      "zh-hk": "Meme 幣",
+      "note": "ZH QA 2026-09-07: mainland press writes Meme 币; Taiwan press (BlockTempo, ABMedia, BlockCast) writes 迷因幣 exclusively; Hong Kong (Planto) uses both, Meme 幣 kept."
+    },
+    "launchpad": {
+      "zh": "发射台",
+      "zh-tw": "發射台",
+      "zh-hk": "發射台",
+      "note": "ZH QA 2026-09-07: 发射台 / 发射平台 (CSDN, TechFlow); Taiwan press writes 發射平台 with 台, never the MOE-formal 臺; Hong Kong 發射平台 (Planto)."
     }
   }
 }
