@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { ComposeError } from "@/components/compose-error";
+
+import { parseRawInteger, rawToInput } from "@xcp/wallet-sdk/amounts";
+import { parseAmountRaw } from "@/lib/amount-draft";
+import { validateSwapQuote } from "@/lib/quote-validation";
+
+import { useEffect, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { AssetChip } from "@/components/asset-chip";
@@ -23,10 +29,9 @@ import { rich } from "@/lib/i18n/rich";
 import {
   approx,
   big,
-  parseUnitsToRaw,
+  maxRaw,
   percentOf,
   type Raw,
-  ratio,
   reduceByPercent,
   SATS,
 } from "@/lib/numeric";
@@ -85,7 +90,6 @@ const AUTO_SLIPPAGE_CAP = 5;
  *  trade is not a market order any more, and the button says so. */
 const AUTO_SLIPPAGE_MEMPOOL_CAP = 20;
 
-const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
 export function SwapWidget({
   assets,
@@ -103,6 +107,11 @@ export function SwapWidget({
   const { code } = useFxRate();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
+  const submittedTrade = useRef<{
+    pending: Omit<Parameters<typeof registerPending>[0], "txid">;
+    action: string;
+    usd: number | null;
+  } | null>(null);
   const [giveAsset, setGiveAsset] = useState("XCP");
   const [getAsset, setGetAsset] = useState(() => defaultTradeAsset(assets));
   const [amount, setAmount] = useState("");
@@ -110,6 +119,9 @@ export function SwapWidget({
   const [rateInverted, setRateInverted] = useState(false);
   const [flips, setFlips] = useState(0);
   const [priceMoved, setPriceMoved] = useState(false);
+  const [quoteRefreshError, setQuoteRefreshError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const submitting = useRef(false);
   const [lastQuoteAt, setLastQuoteAt] = useState<number | null>(null);
 
   // Settings live beside the mode tabs; the widget consumes the values
@@ -117,9 +129,9 @@ export function SwapWidget({
   const {
     slippage,
     slippageAuto,
-    customSlip,
     expiration,
     customFee,
+    swapSettingsValid,
     medianFeeRate,
     setAutoValue,
   } = useSwapSettings();
@@ -132,7 +144,7 @@ export function SwapWidget({
     fetchBtcUsd,
     { refreshInterval: 60_000 },
   );
-  const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
+  const feeRate = customFee ?? medianFeeRate ?? null;
 
   const action =
     giveAsset === "XCP" ? "buy" : getAsset === "XCP" ? "sell" : "swap";
@@ -144,12 +156,12 @@ export function SwapWidget({
   ];
   // Parse the typed digits exactly (a full XCP-69 bag is 10^16 raw, past
   // double precision); the double beside it feeds UI-only paths.
-  const amountExact = parseUnitsToRaw(amount) ?? 0n;
+  const amountExact = parseAmountRaw(amount) ?? 0n;
   const amountRaw = approx(amountExact);
-  const debouncedRaw = useDebounced(amountRaw, 250);
+  const debouncedRaw = useDebounced(amountExact.toString(), 250);
 
   const quoteUrl =
-    giveAsset && getAsset && giveAsset !== getAsset && debouncedRaw > 0
+    swapSettingsValid && amountExact > 0n && amountExact.toString() === debouncedRaw && giveAsset && getAsset && giveAsset !== getAsset
       ? `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(giveAsset)}/${encodeURIComponent(getAsset)}/quote?quantity=${debouncedRaw}`
       : null;
   const {
@@ -159,7 +171,7 @@ export function SwapWidget({
     mutate: mutateQuote,
   } = useSWR<Quote>(
     quoteUrl,
-    (url: string) => fetchJson(url).then((d) => d.result),
+    (url: string) => fetchJson(url).then((d) => validateSwapQuote(d.result)),
     {
       refreshInterval: QUOTE_REFRESH_MS,
       onSuccess: () => setLastQuoteAt(Date.now()),
@@ -257,7 +269,7 @@ export function SwapWidget({
     { refreshInterval: 60_000 },
   );
 
-  const staleQuote = isValidating || amountRaw !== debouncedRaw;
+  const staleQuote = isValidating || amountExact.toString() !== debouncedRaw;
   const outRaw: Raw = quote && amountRaw > 0 ? quote.estimated_output : 0;
   const out = approx(outRaw) / SATS;
   const amountHuman = amountRaw / SATS;
@@ -265,8 +277,8 @@ export function SwapWidget({
   const minReceivedRaw = reduceByPercent(outRaw, slippage);
   const impact = quote?.price_impact ?? 0;
   const insufficient =
-    effBalance !== undefined && amountRaw > 0 && amountRaw > effBalance;
-  const busy = isBusy(compose.status);
+    effBalance !== undefined && amountExact > 0n && amountExact > effBalance;
+  const busy = isBusy(compose.status) || refreshing;
 
   // The quote once the pending orders have gone first, as a fraction of the
   // quote against the confirmed state. Null while the inputs are loading or
@@ -334,36 +346,20 @@ export function SwapWidget({
   }, [neededSlippage, setAutoValue]);
 
   useEffect(() => {
-    if (compose.status === "confirmed") {
-      const label =
-        action === "buy"
-          ? t("Buy {asset} — market order", { asset: getAsset })
-          : action === "sell"
-            ? t("Sell {asset} — market order", { asset: giveAsset })
-            : t("Swap {give} for {get} — market order", { give: giveAsset, get: getAsset });
-      registerPending({
-        txid: compose.txid,
-        kind: "order",
-        label,
-        address: address ?? undefined,
-        spends: [{ asset: giveAsset, raw: amountExact.toString() }],
-      });
+    if (compose.status === "error") submittedTrade.current = null;
+    if (compose.status === "confirmed" && submittedTrade.current) {
+      const submitted = submittedTrade.current;
+      submittedTrade.current = null;
+      registerPending({ ...submitted.pending, txid: compose.txid });
+      trackTx(compose.txid, submitted.action, submitted.usd);
     }
-  }, [
-    t,
-    compose.status,
-    compose.txid,
-    action,
-    giveAsset,
-    getAsset,
-    amountExact,
-    address,
-  ]);
+  }, [compose.status, compose.txid]);
 
   // A failed balance read does not hold the trade — see useSpendableBalance's
   // balanceUnavailable. Only a read still in flight does, and briefly.
   const balanceSettled = effBalance !== undefined || balanceUnavailable;
   const ready =
+    swapSettingsValid &&
     balanceSettled &&
     amountRaw > 0 &&
     approx(outRaw) > 0 &&
@@ -378,15 +374,6 @@ export function SwapWidget({
     xcpUsd !== null && xcpLeg !== null ? xcpLeg * xcpUsd : null;
   const giveUsd = tradeUsd;
   const getUsd = tradeUsd;
-
-  // Reported here rather than alongside registerPending above, because the
-  // trade's USD value isn't computed until this point. trackTx dedupes on the
-  // txid, so this effect re-running as the rate refreshes costs nothing.
-  useEffect(() => {
-    if (compose.status === "confirmed") {
-      trackTx(compose.txid, action, tradeUsd);
-    }
-  }, [compose.status, compose.txid, action, tradeUsd]);
 
   // Rate line: 1 <base> = <rate> <quote asset>, tap to invert.
   const rate = out > 0 && amountHuman > 0 ? out / amountHuman : null;
@@ -414,34 +401,65 @@ export function SwapWidget({
       : null;
   const rateBaseUsd = rateInverted ? getUnitUsd : giveUnitUsd;
 
+  const intentKey = JSON.stringify([amount, giveAsset, getAsset, address, slippage, expiration, customFee, swapSettingsValid]);
+  const currentIntent = useRef(intentKey);
+  useEffect(() => { currentIntent.current = intentKey; }, [intentKey]);
+
   const submit = async () => {
-    if (!ready || !quote || !quoteUrl) return;
+    if (!ready || !quote || !quoteUrl || submitting.current) return;
+    submitting.current = true;
+    setRefreshing(true);
+    const submittedIntent = intentKey;
+    setQuoteRefreshError(false);
     let fresh = quote;
     try {
-      fresh = (await fetchJson(quoteUrl)).result as Quote;
+      fresh = validateSwapQuote((await fetchJson(quoteUrl)).result as Quote);
+      if (currentIntent.current !== submittedIntent) return;
+      parseRawInteger(fresh.estimated_output, { min: 1n });
       mutateQuote(fresh, { revalidate: false });
+      // eslint-disable-next-line react-hooks/purity -- This runs after a user's click and awaited quote fetch, never during render.
       setLastQuoteAt(Date.now());
-      if (ratio(fresh.estimated_output, quote.estimated_output) < 0.99) {
+      if (big(fresh.estimated_output) < minReceivedRaw) {
         setPriceMoved(true);
         return;
       }
-    } catch {
-      // fall back to the polled quote
-    }
     setPriceMoved(false);
-    compose.composeOrder({
+    if (submittedTrade.current) return;
+    // The form and wallet can change while signing. Reserve only the spend
+    // submitted to this compose call, and consume it once on confirmation.
+    submittedTrade.current = {
+      pending: {
+        kind: "order",
+        label: action === "buy"
+          ? t("Buy {asset} — market order", { asset: getAsset })
+          : action === "sell"
+            ? t("Sell {asset} — market order", { asset: giveAsset })
+            : t("Swap {give} for {get} — market order", { give: giveAsset, get: getAsset }),
+        address: address ?? undefined,
+        spends: [{ asset: giveAsset, raw: amountExact.toString() }],
+      },
+      action,
+      usd: tradeUsd,
+    };
+    await compose.composeOrder({
       give_asset: giveAsset,
       give_quantity: amountExact,
       get_asset: getAsset,
-      get_quantity: reduceByPercent(fresh.estimated_output, slippage),
+      get_quantity: maxRaw(minReceivedRaw, reduceByPercent(fresh.estimated_output, slippage)),
       expiration,
-      fee_rate: customFee > 0 ? customFee : undefined,
+      fee_rate: customFee ?? undefined,
     });
+    } catch {
+      setQuoteRefreshError(true);
+    } finally {
+      submitting.current = false;
+      setRefreshing(false);
+    }
   };
 
   const flip = () => {
     setFlips((f) => f + 1);
-    if (out > 0) setAmount(fmtAmount(out));
+    if (out > 0) setAmount(rawToInput(outRaw, 8));
     setGiveAsset(getAsset);
     setGetAsset(giveAsset);
     setRateInverted(false);
@@ -484,7 +502,7 @@ export function SwapWidget({
           key={p}
           type="button"
           onClick={() =>
-            setAmount(fmtAmount(approx(percentOf(effBalance, p)) / SATS))
+            setAmount(rawToInput(percentOf(effBalance, p), 8))
           }
           className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
         >
@@ -514,7 +532,7 @@ export function SwapWidget({
     <button
       type="button"
       className="min-w-0 truncate text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
-      onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
+      onClick={() => setAmount(rawToInput(effBalance, 8))}
     >
       {t("Balance: {n}", { n: num.commasRaw(effBalance) })}
       {pendingOutgoing > 0n && (
@@ -527,7 +545,9 @@ export function SwapWidget({
   );
 
   const buttonLabel = busy
-    ? compose.status === "composing"
+    ? refreshing && !isBusy(compose.status)
+      ? t("Fetching quote…")
+      : compose.status === "composing"
       ? t("Composing…")
       : compose.status === "signing"
         ? t("Confirm in wallet…")
@@ -563,7 +583,7 @@ export function SwapWidget({
   const slippageControl = (
     <span
       className={
-        !slippageAuto && customSlip > 0
+        !slippageAuto
           ? "font-medium text-purple-600 dark:text-purple-400"
           : "text-gray-500 dark:text-gray-400"
       }
@@ -762,7 +782,7 @@ export function SwapWidget({
             {feeRate !== null && (
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
-                <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
+                <dd className={customFee !== null ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {num.satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
                     <span className="text-gray-400 dark:text-gray-500">
@@ -798,9 +818,10 @@ export function SwapWidget({
         )}
 
         {compose.status === "error" && (
-          <ErrorBanner className="mb-2" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2" onDismiss={compose.reset}><ComposeError {...compose} /></ErrorBanner>
         )}
 
+        {quoteRefreshError && <ErrorBanner>{t("Could not refresh the quote. Try again.")}</ErrorBanner>}
         {walletStatus !== "connected" ? (
           <ConnectButton />
         ) : (

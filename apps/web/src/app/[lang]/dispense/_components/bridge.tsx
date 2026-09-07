@@ -1,5 +1,9 @@
 "use client";
 
+import { ComposeError } from "@/components/compose-error";
+
+import { parseAmountRaw, parseBoundedSetting, parseWholeTokenRaw } from "@/lib/amount-draft";
+
 import { useState, useSyncExternalStore } from "react";
 import useSWR from "swr";
 import {
@@ -26,7 +30,6 @@ import { rich } from "@/lib/i18n/rich";
 import {
   approx,
   big,
-  parseUnitsToRaw,
   percentOf,
   ratio,
   SATS,
@@ -101,7 +104,8 @@ export function XcpBridge({
   // Not rounded: a typed 1.5 sat/vB is a rate Counterparty accepts and prices
   // from, so rounding it to 2 would overrule the number the user chose in the
   // one place they went out of their way to choose it.
-  const customFee = Math.min(parseFloat(settings.customFeeRate) || 0, 500);
+  const feeDraft = parseBoundedSetting(settings.customFeeRate, 500);
+  const customFee = feeDraft.value;
   const [flips, setFlips] = useState(0);
   const flip = () => {
     setFlips((f) => f + 1);
@@ -136,6 +140,7 @@ export function XcpBridge({
             onFlip={flip}
             flips={flips}
             customFee={customFee}
+            feeValid={feeDraft.valid}
           />
         ) : (
           <UnloadCard
@@ -145,6 +150,7 @@ export function XcpBridge({
             onFlip={flip}
             flips={flips}
             customFee={customFee}
+            feeValid={feeDraft.valid}
           />
         )}
       </div>
@@ -193,18 +199,20 @@ function DispenseSettingsGear() {
   // Not rounded: a typed 1.5 sat/vB is a rate Counterparty accepts and prices
   // from, so rounding it to 2 would overrule the number the user chose in the
   // one place they went out of their way to choose it.
-  const customFee = Math.min(parseFloat(settings.customFeeRate) || 0, 500);
+  const feeDraft = parseBoundedSetting(settings.customFeeRate, 500);
+  const customFee = feeDraft.value;
   return (
-    <GearPopover active={customFee > 0} label={t("Dispense settings")}>
+    <GearPopover active={customFee !== null} label={t("Dispense settings")}>
       <div className="flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
           className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
-            customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
+            customFee !== null ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
           }`}
         >
           <AmountInput
             value={settings.customFeeRate}
+            max={500}
             onChange={(v) => updateSettings({ customFeeRate: v })}
             placeholder={medianFeeRate ? String(medianFeeRate) : "…"}
             ariaLabel={t("Bitcoin fee rate in sats per vbyte")}
@@ -231,6 +239,7 @@ function LoadCard({
   onFlip,
   flips,
   customFee,
+  feeValid,
   hiddenCount,
 }: {
   dispensers: Dispenser[];
@@ -238,7 +247,8 @@ function LoadCard({
   xcpUsd: number | null;
   onFlip: () => void;
   flips: number;
-  customFee: number;
+  customFee: number | null;
+  feeValid: boolean;
   hiddenCount: number;
 }) {
   const num = useNumbers();
@@ -294,12 +304,9 @@ function LoadCard({
     .sort((a, b) => b - a)
     .slice(0, MAX_LEGS)
     .reduce((s, c) => s + c, 0);
-  // Typed amounts become raw units through the same parser every other input
-  // in this app uses, rather than parseFloat. It truncates past 8 decimals
-  // instead of rounding, which is the right direction for a field that
-  // decides what to send: never more than the user wrote.
-  const typedXcpRaw = parseUnitsToRaw(xcpAmount) ?? 0n;
-  const typedBtcSatsRaw = parseUnitsToRaw(btcAmount) ?? 0n;
+  // Preserve the exact draft; the XCP side requires whole-token lots.
+  const typedXcpRaw = parseWholeTokenRaw(xcpAmount) ?? 0n;
+  const typedBtcSatsRaw = parseAmountRaw(btcAmount) ?? 0n;
   // BTC side floors against cheapest-first fill, as the protocol prices a
   // payment (get_must_give floors — overpay is kept). Approximate inverse;
   // the plan below recomputes exactly from the unit count.
@@ -607,6 +614,8 @@ function LoadCard({
         }
       >
         <AmountInput
+          decimals={0}
+          max={92233720368}
           value={
             lastEdited === "xcp" ? xcpAmount : snapped > 0 ? String(snapped) : ""
           }
@@ -739,14 +748,15 @@ function LoadCard({
               </div>
             )}
             <CTA
-              disabled={busy || n === 0}
+              disabled={busy || n === 0 || !feeValid}
               onClick={() => {
+                if (busy || n === 0 || !feeValid) return;
                 if (plan.length > 1 && !armed) {
                   setArmed(true);
                   return;
                 }
                 setArmed(false);
-                router.start(plan, customFee > 0 ? customFee : undefined);
+                router.start(plan, customFee ?? undefined);
               }}
             >
               {buttonLabel}
@@ -783,13 +793,15 @@ function UnloadCard({
   onFlip,
   flips,
   customFee,
+  feeValid,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
   xcpUsd: number | null;
   onFlip: () => void;
   flips: number;
-  customFee: number;
+  customFee: number | null;
+  feeValid: boolean;
 }) {
   const num = useNumbers();
   const t = useT();
@@ -833,19 +845,20 @@ function UnloadCard({
 
   // A price field in sats is a whole number of satoshi, so it parses as an
   // integer rather than through the 8-decimal unit parser the amount fields
-  // use — `parseUnitsToRaw(v, 0)` is that same parser told this field has no
+  // use — `parseAmountRaw(v, 0)` is that same parser told this field has no
   // decimals, which keeps one parser for every input in the app.
   // Defaults to the undercut rather than the USD market rate. The USD rate was
   // never a price anyone could sell at here — the book sits well above it — so
   // an untouched field that meant "market" was proposing a price that would
   // have jumped the whole queue by 30%. The floor is the neutral opening
   // position: the cheapest place that actually vends.
-  const priceSats = approx(parseUnitsToRaw(price, 0) ?? 0n) || (undercutSats ?? 0);
+  const priceDraft = parseBoundedSetting(price, 2_100_000_000_000_000, 1, 0);
+  const priceSats = priceDraft.empty ? (undercutSats ?? 0) : (priceDraft.value ?? 0);
   // Whole XCP only: these dispensers vend 1 XCP at a time, so a fractional
   // remainder could never vend — it would just sit until close. Truncated in
   // raw units, so the escrow is exact and the fraction is dropped rather than
   // rounded up into an amount the wallet does not hold.
-  const typedEscrowRaw = parseUnitsToRaw(escrow) ?? 0n;
+  const typedEscrowRaw = parseWholeTokenRaw(escrow) ?? 0n;
   const escrowRawBig = (typedEscrowRaw / SATS_PER_UNIT) * SATS_PER_UNIT;
   const wholeEscrow = approx(typedEscrowRaw / SATS_PER_UNIT);
   const escrowRaw = approx(escrowRawBig);
@@ -863,6 +876,7 @@ function UnloadCard({
 
   const busy = isBusy(compose.status);
   const ready =
+    feeValid && priceDraft.valid && typedEscrowRaw === escrowRawBig &&
     balance !== undefined &&
     escrowRaw >= SATS &&
     priceSats > 0 &&
@@ -880,17 +894,19 @@ function UnloadCard({
   const { data: medianFeeRate } = useSWR("btc-feerate", fetchFeeRate, {
     refreshInterval: 30_000,
   });
-  const sellFeeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
+  const sellFeeRate = customFee ?? medianFeeRate ?? null;
 
-  const openDispenser = () =>
+  const openDispenser = () => {
+    if (!ready) return;
     compose.composeDispenser({
       asset: "XCP",
       give_quantity: SATS, // 1 XCP per vend — matches the load list's filter
-      escrow_quantity: escrowRaw,
+      escrow_quantity: escrowRawBig,
       mainchainrate: priceSats,
       status: 0,
-      fee_rate: customFee > 0 ? customFee : undefined,
+      fee_rate: customFee ?? undefined,
     });
+  };
 
   const close = () =>
     compose.composeDispenser({
@@ -955,7 +971,7 @@ function UnloadCard({
           })}
         </p>
         {compose.status === "error" && (
-          <ErrorBanner className="mt-3" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
+          <ErrorBanner className="mt-3" onDismiss={compose.reset}><ComposeError {...compose} /></ErrorBanner>
         )}
         <button
           type="button"
@@ -1073,6 +1089,8 @@ function UnloadCard({
           <AmountInput
             value={price}
             decimals={0}
+            min={1}
+            max={2_100_000_000_000_000}
             onChange={setPrice}
             placeholder={undercutSats !== null ? String(undercutSats) : "0"}
             ariaLabel={t("Price in sats per XCP")}
@@ -1093,7 +1111,7 @@ function UnloadCard({
                   key={p}
                   type="button"
                   onClick={() =>
-                    setEscrow(String(Math.floor((approx(balance) / SATS) * (p / 100))))
+                    setEscrow((big(balance) * BigInt(p) / (100n * SATS_PER_UNIT)).toString())
                   }
                   className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
@@ -1123,7 +1141,7 @@ function UnloadCard({
                 className={`min-w-0 truncate hover:text-purple-600 dark:hover:text-purple-400 ${
                   insufficient ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-gray-400"
                 }`}
-                onClick={() => setEscrow(String(Math.floor(approx(balance) / SATS)))}
+                onClick={() => setEscrow((big(balance) / SATS_PER_UNIT).toString())}
               >
                 {t("Balance: {n}", { n: num.commasRaw(balance) })}
               </button>
@@ -1132,6 +1150,8 @@ function UnloadCard({
         }
       >
         <AmountInput
+          decimals={0}
+          max={92233720368}
           value={escrow}
           onChange={setEscrow}
           ariaLabel={t("XCP to unload")}
@@ -1182,7 +1202,7 @@ function UnloadCard({
             {sellFeeRate !== null && (
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
-                <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
+                <dd className={customFee !== null ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {num.satsPerVb(sellFeeRate)} sat/vB
                   {btcUsd !== null && (
                     <span className="text-gray-400 dark:text-gray-500">
@@ -1199,7 +1219,7 @@ function UnloadCard({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
-          <ErrorBanner className="mb-2" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2" onDismiss={compose.reset}><ComposeError {...compose} /></ErrorBanner>
         )}
 
         {walletStatus !== "connected" ? (
@@ -1216,7 +1236,7 @@ function UnloadCard({
       open={dispensers}
       yourPriceSats={priceSats}
       yourEscrowXcp={escrowRaw / SATS}
-      active={escrowRaw > 0 || (parseUnitsToRaw(price, 0) ?? 0n) > 0n}
+      active={escrowRaw > 0 || (parseAmountRaw(price, 0) ?? 0n) > 0n}
       onPick={(sats) => setPrice(String(sats))}
     />
     </div>

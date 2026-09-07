@@ -10,7 +10,8 @@ import { monthDay } from "@/lib/chain-time";
 import { priceChangePercent } from "@/lib/market";
 import { approx } from "@/lib/numeric";
 import { useFxRate } from "@/lib/currency";
-import { useT, useLocale } from "@/lib/i18n/client";
+import { useT } from "@/lib/i18n/client";
+import { useNumberLocale } from "@/lib/number-preference";
 import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 
 type Market = "btc" | "xcp";
@@ -152,7 +153,7 @@ function TickerButton({
   const t = useT();
   const num = useNumbers();
   const { code, rate } = useFxRate();
-  const locale = useLocale();
+  const locale = useNumberLocale();
   const isBtc = market === "btc";
   return (
     <button
@@ -228,7 +229,7 @@ function MarketModal({
   const t = useT();
   const num = useNumbers();
   const { code, rate } = useFxRate();
-  const locale = useLocale();
+  const locale = useNumberLocale();
   const [points, setPoints] = useState<PricePoint[] | null>(null);
   const [failed, setFailed] = useState(false);
   const [refresh, setRefresh] = useState(0);
@@ -426,7 +427,7 @@ function MarketModal({
                 <button type="button" onClick={retry} className="rounded-full border border-gray-200 dark:border-gray-700 px-3 py-1.5 text-xs font-semibold">{t("Try again")}</button>
               </div>
             ) : (
-              <MarketLineChart market={market} points={points} />
+              <div><p className="text-right text-xs text-gray-500">USD</p><MarketLineChart market={market} points={points} /></div>
             )}
           </div>
 
@@ -479,7 +480,7 @@ function MarketLineChart({ market, points }: { market: Market; points: PricePoin
   const end = monthDay(points[points.length - 1]!.timestamp, num.intl);
 
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" role="img" aria-label={t("{market} price history with {n} points", { market: market.toUpperCase(), n: points.length })}>
+    <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" role="img" aria-label={`${t("{market} price history with {n} points", { market: market.toUpperCase(), n: points.length })} (USD)`}>
       <defs>
         <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.22" />

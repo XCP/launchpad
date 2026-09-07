@@ -1,6 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { ComposeError } from "@/components/compose-error";
+
+import { COUNTERPARTY_MAX_INT, rawToInput } from "@xcp/wallet-sdk/amounts";
+import { parseAmountRaw } from "@/lib/amount-draft";
+import { deriveLimitAmounts } from "@/lib/limit-amounts";
+
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { AssetChip } from "@/components/asset-chip";
@@ -17,11 +23,9 @@ import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
 import {
   approx,
-  parseUnitsToRaw,
   percentOf,
   type Raw,
   ratio,
-  SATS_PER_UNIT,
   SATS,
 } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
@@ -51,7 +55,6 @@ const ORDER_VBYTES = 250;
  *  three near-identical buttons cost more attention than they saved. */
 const PRICE_PRESETS = [10];
 const fmtPriceInput = (x: number) => x.toFixed(8).replace(/\.?0+$/, "");
-const fmtAmount = (n: number) => n.toFixed(8).replace(/\.?0+$/, "");
 
 interface PoolInfo {
   asset_a: string;
@@ -88,6 +91,10 @@ export function TradePanel({
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
+  const submittedTrade = useRef<{
+    pending: Omit<Parameters<typeof registerPending>[0], "txid">;
+    usd: number | null;
+  } | null>(null);
   const [sideState, setSideState] = useState<"buy" | "sell">("buy");
   const side = sideProp ?? sideState;
   const [limitPrice, setLimitPrice] = useState(""); // XCP per token
@@ -97,8 +104,8 @@ export function TradePanel({
   const [totalStr, setTotalStr] = useState(""); // XCP
   const [editField, setEditField] = useState<"amount" | "total">("amount");
 
-  const { customFee, medianFeeRate, limitExpiration } = useSwapSettings();
-  const feeRate = customFee > 0 ? customFee : (medianFeeRate ?? null);
+  const { customFee, medianFeeRate, limitExpiration, limitSettingsValid } = useSwapSettings();
+  const feeRate = customFee ?? medianFeeRate ?? null;
   const { data: btcUsd } = useSWR(
     "btc-usd",
     fetchBtcUsd,
@@ -162,62 +169,41 @@ export function TradePanel({
 
   const busy = isBusy(compose.status);
 
-  const limitPriceNum = parseFloat(limitPrice) || 0;
-  // Exact integers end to end: price at 8 places is itself an integer, so
-  // Amount × Price ÷ 1e8 rounds nothing, and these two values ARE the
-  // give/get quantities consensus enforces.
-  const priceExact = parseUnitsToRaw(limitPrice) ?? 0n;
-  const typedAmountExact = parseUnitsToRaw(amountStr) ?? 0n;
-  const typedTotalExact = parseUnitsToRaw(totalStr) ?? 0n;
-  const limitAmountExact =
-    editField === "amount"
-      ? typedAmountExact
-      : priceExact > 0n
-        ? (typedTotalExact * SATS_PER_UNIT) / priceExact
-        : 0n;
-  const limitTotalExact =
-    editField === "total"
-      ? typedTotalExact
-      : (limitAmountExact * priceExact) / SATS_PER_UNIT;
+  const limitPriceNum = approx(parseAmountRaw(limitPrice) ?? 0n) / SATS;
+  // Quantize only the derived leg, in the direction that preserves the
+  // user's maximum buy price or minimum sell price.
+  const priceExact = parseAmountRaw(limitPrice) ?? 0n;
+  const typedAmountExact = parseAmountRaw(amountStr) ?? 0n;
+  const typedTotalExact = parseAmountRaw(totalStr) ?? 0n;
+  const limitAmounts = deriveLimitAmounts(side, editField,
+    editField === "amount" ? typedAmountExact : typedTotalExact, priceExact);
+  const limitAmountExact = limitAmounts?.amount ?? 0n;
+  const limitTotalExact = limitAmounts?.total ?? 0n;
   const limitAmountRaw = approx(limitAmountExact);
   const limitTotalRaw = approx(limitTotalExact);
   const giveAsset = side === "buy" ? "XCP" : asset;
   const giveRaw = side === "buy" ? limitTotalExact : limitAmountExact;
 
   useEffect(() => {
-    if (compose.status === "confirmed") {
-      registerPending({
-        txid: compose.txid,
-        kind: "order",
-        label:
-          side === "buy"
-            ? t("Buy {asset} — limit order", { asset })
-            : t("Sell {asset} — limit order", { asset }),
-        address: address ?? undefined,
-        spends: [{ asset: giveAsset, raw: giveRaw.toString() }],
-      });
+    if (compose.status === "error") submittedTrade.current = null;
+    if (compose.status === "confirmed" && submittedTrade.current) {
+      const submitted = submittedTrade.current;
+      submittedTrade.current = null;
+      registerPending({ ...submitted.pending, txid: compose.txid });
+      trackTx(compose.txid, "limit order", submitted.usd);
     }
-  }, [
-    compose.status,
-    compose.txid,
-    side,
-    asset,
-    address,
-    giveAsset,
-    giveRaw,
-    t,
-  ]);
+  }, [compose.status, compose.txid]);
   // The give side must be covered: XCP (Total) for a buy, tokens for a sell.
   const insufficientToken =
     side === "sell" &&
     tokenBalance !== undefined &&
     limitAmountRaw > 0 &&
-    limitAmountRaw > tokenBalance;
+    limitAmountExact > tokenBalance;
   const insufficientXcp =
     side === "buy" &&
     xcpBalance !== undefined &&
     limitTotalRaw > 0 &&
-    limitTotalRaw > xcpBalance;
+    limitTotalExact > xcpBalance;
   const insufficient = insufficientToken || insufficientXcp;
   const spendBalance = side === "buy" ? xcpBalance : tokenBalance;
   // A failed read does not hold the order — see useSpendableBalance's
@@ -226,19 +212,8 @@ export function TradePanel({
     spendBalance !== undefined ||
     (side === "buy" ? xcpBalanceUnavailable : tokenBalanceUnavailable);
 
-  // A limit order is a stated intent, not a fill — but placing one is the
-  // conversion this surface exists for, and its XCP total is what the user
-  // committed. Placed here because limitTotalRaw isn't known any earlier.
-  useEffect(() => {
-    if (compose.status === "confirmed") {
-      trackTx(
-        compose.txid,
-        "limit order",
-        xcpUsd && limitTotalRaw > 0 ? (limitTotalRaw / SATS) * xcpUsd : null,
-      );
-    }
-  }, [compose.status, compose.txid, limitTotalRaw, xcpUsd]);
   const limitReady =
+    limitSettingsValid && limitAmounts !== null &&
     limitPriceNum > 0 &&
     limitAmountRaw > 0 &&
     limitTotalRaw > 0 &&
@@ -309,7 +284,19 @@ export function TradePanel({
       : null;
 
   const submitLimit = () => {
-    if (!limitReady) return;
+    if (!limitReady || submittedTrade.current) return;
+    // Keep the submitted account, side and exact debit through later edits.
+    submittedTrade.current = {
+      pending: {
+        kind: "order",
+        label: side === "buy"
+          ? t("Buy {asset} — limit order", { asset })
+          : t("Sell {asset} — limit order", { asset }),
+        address: address ?? undefined,
+        spends: [{ asset: giveAsset, raw: giveRaw.toString() }],
+      },
+      usd: xcpUsd && limitTotalRaw > 0 ? (limitTotalRaw / SATS) * xcpUsd : null,
+    };
     compose.composeOrder(
       side === "buy"
         ? {
@@ -318,7 +305,7 @@ export function TradePanel({
             get_asset: asset,
             get_quantity: limitAmountExact,
             expiration: limitExpiration,
-            fee_rate: customFee > 0 ? customFee : undefined,
+            fee_rate: customFee ?? undefined,
           }
         : {
             give_asset: asset,
@@ -326,7 +313,7 @@ export function TradePanel({
             get_asset: "XCP",
             get_quantity: limitTotalExact,
             expiration: limitExpiration,
-            fee_rate: customFee > 0 ? customFee : undefined,
+            fee_rate: customFee ?? undefined,
           },
     );
   };
@@ -460,12 +447,13 @@ export function TradePanel({
           balance; buying, % of the tokens your XCP affords at the
           current price. */}
       {(() => {
-        const basisPrice = limitPriceNum > 0 ? limitPriceNum : (spot ?? 0);
+        const basisPrice = priceExact;
         const maxAffordableRaw =
           side === "sell"
             ? (tokenBalance ?? 0n)
-            : basisPrice > 0
-              ? BigInt(Math.floor(approx(xcpBalance ?? 0n) / basisPrice))
+            : basisPrice > 0n
+              ? ((xcpBalance ?? 0n) * 100000000n / basisPrice > COUNTERPARTY_MAX_INT
+                ? COUNTERPARTY_MAX_INT : (xcpBalance ?? 0n) * 100000000n / basisPrice)
               : 0n;
         return (
           <>
@@ -483,9 +471,7 @@ export function TradePanel({
                           onClick={() => {
                             setEditField("amount");
                             setAmountStr(
-                              fmtAmount(
-                                approx(percentOf(maxAffordableRaw, p)) / SATS,
-                              ),
+                              rawToInput(percentOf(maxAffordableRaw, p), 8),
                             );
                           }}
                           className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
@@ -515,7 +501,7 @@ export function TradePanel({
                         }`}
                         onClick={() => {
                           setEditField("amount");
-                          setAmountStr(fmtAmount(approx(tokenBalance) / SATS));
+                          setAmountStr(rawToInput(tokenBalance, 8));
                         }}
                       >
                         {t("Balance:")} {num.commasRaw(tokenBalance)}
@@ -530,7 +516,7 @@ export function TradePanel({
                     editField === "amount"
                       ? amountStr
                       : limitAmountRaw > 0
-                        ? fmtAmount(limitAmountRaw / SATS)
+                        ? rawToInput(limitAmountExact, 8)
                         : ""
                   }
                   onChange={(v) => {
@@ -567,7 +553,7 @@ export function TradePanel({
                         }`}
                         onClick={() => {
                           setEditField("total");
-                          setTotalStr(fmtAmount(approx(xcpBalance) / SATS));
+                          setTotalStr(rawToInput(xcpBalance, 8));
                         }}
                       >
                         {t("Balance:")} {num.commasRaw(xcpBalance)}
@@ -582,7 +568,7 @@ export function TradePanel({
                     editField === "total"
                       ? totalStr
                       : limitTotalRaw > 0
-                        ? fmtAmount(limitTotalRaw / SATS)
+                        ? rawToInput(limitTotalExact, 8)
                         : ""
                   }
                   onChange={(v) => {
@@ -636,7 +622,7 @@ export function TradePanel({
             {feeRate !== null && (
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
-                <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
+                <dd className={customFee !== null ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {num.satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
                     <span className="text-gray-400 dark:text-gray-500">
@@ -653,7 +639,7 @@ export function TradePanel({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
-          <ErrorBanner className="mb-2" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2" onDismiss={compose.reset}><ComposeError {...compose} /></ErrorBanner>
         )}
         {walletStatus !== "connected" ? (
           <ConnectButton />

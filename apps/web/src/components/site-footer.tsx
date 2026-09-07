@@ -2,6 +2,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { Globe, rememberLocale } from "@/components/language-switch";
+import { NumberPreference } from "@/components/number-preference";
 import { LazyLink } from "@/components/lazy-link";
 import { CURRENCIES, type Currency, setCurrency, useCurrency } from "@/lib/currency";
 import { useLocale, useMachineDrafted, useT } from "@/lib/i18n/client";
@@ -27,6 +28,7 @@ export function SiteFooter() {
     <footer className="mx-auto max-w-5xl px-4 pb-24 pt-4">
       <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
         <FooterSettings />
+        <NumberPreference />
         {/* The reference pages, a second time. They are in the header too,
             but the header is the one row that every language competes for,
             and on a phone they live behind a burger. A footer link costs

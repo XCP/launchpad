@@ -8,6 +8,7 @@ import {
   SATS,
 } from "@/lib/numeric";
 import { isLocale, LOCALE_INFO } from "@/lib/i18n/locales";
+import { isNumberLocale } from "@/lib/i18n/number-locales";
 import { makeT, type T } from "@/lib/i18n/t";
 
 /** `t` for callers that have no locale: the English source text itself. */
@@ -116,7 +117,7 @@ export function price(n: number, locale = "en"): string {
  * whole — 2, not 2.00.
  */
 export function satsPerVb(n: number, locale = "en"): string {
-  return n.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 });
+  return n.toLocaleString(intlLocale(locale), { maximumFractionDigits: 8 });
 }
 
 /**
@@ -171,6 +172,7 @@ const SHAPES = new Map<string, CurrencyShape>();
  *  conventions — Japan's fullwidth ￥ and 万/億 groupings, Hong Kong's HK$ —
  *  and the English ones for everything else, so a page never mixes two. */
 export function intlLocale(locale: string): string {
+  if (!isLocale(locale) && isNumberLocale(locale)) return locale;
   return isLocale(locale) ? LOCALE_INFO[locale].intl : "en-US";
 }
 

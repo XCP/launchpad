@@ -1,5 +1,9 @@
 "use client";
 
+import { ComposeError } from "@/components/compose-error";
+
+import { parseBoundedSetting } from "@/lib/amount-draft";
+
 import { LazyLink } from "@/components/lazy-link";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
@@ -267,7 +271,7 @@ export default function CreatePage() {
   // clears it.
   const registrationFeeXcp = nameCheck === "owned" ? 0 : REGISTRATION_FEE_XCP;
 
-  const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
+  const customBlockNum = parseBoundedSetting(customBlockInput, 0x7fffffff, 1, 0).value ?? 0;
   const minCustomBlock =
     blockHeight !== undefined ? blockHeight + CUSTOM_FLOOR_BLOCKS : undefined;
   const scheduleValid =
@@ -747,13 +751,13 @@ export default function CreatePage() {
           </div>
 
           {uploadError && (
-            <p className="mt-4 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-700 dark:text-red-400">
+            <div role="alert" className="mt-4 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-700 dark:text-red-400">
               {uploadError}
-            </p>
+            </div>
           )}
           {compose.status === "error" && (
             <p className="mt-4 rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-3 text-sm text-red-700 dark:text-red-400">
-              {compose.error}
+              <ComposeError {...compose} />
             </p>
           )}
 
@@ -812,7 +816,7 @@ function PreviewCard({
 }) {
   const num = useNumbers();
   const t = useT();
-  const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
+  const customBlockNum = parseBoundedSetting(customBlockInput, 0x7fffffff, 1, 0).value ?? 0;
   const priceXcp = XCP69.PRICE / SATS;
   const lot = XCP69.QUANTITY_BY_PRICE / SATS;
   const targetXcp = fromSats(XCP69_RAISE_SATS);
@@ -921,7 +925,7 @@ function ScheduleGear({
 }) {
   const num = useNumbers();
   const t = useT();
-  const customNum = Math.round(parseFloat(customBlock)) || 0;
+  const customNum = parseBoundedSetting(customBlock, 0x7fffffff, 1, 0).value ?? 0;
   const minBlock =
     blockHeight !== undefined ? blockHeight + CUSTOM_FLOOR_BLOCKS : undefined;
   const tooSoon =
@@ -977,6 +981,8 @@ function ScheduleGear({
             <AmountInput
               value={customBlock}
               decimals={0}
+              min={1}
+              max={0x7fffffff}
               onChange={onCustomBlockChange}
               placeholder={minBlock ? String(minBlock) : t("block height")}
               ariaLabel={t("Target start block")}

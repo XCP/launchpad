@@ -1,7 +1,12 @@
 "use client";
 
+import { ComposeError } from "@/components/compose-error";
+
+import { AmountInput } from "@/components/amount-input";
+import { parseBoundedSetting } from "@/lib/amount-draft";
+
 import { LazyLink } from "@/components/lazy-link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { AssetChip } from "@/components/asset-chip";
 import { ConnectButton } from "@/components/connect-button";
@@ -52,6 +57,10 @@ export function MintPanel({
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
+  const submittedMint = useRef<{
+    pending: Omit<Parameters<typeof registerPending>[0], "txid">;
+    usd: number | null;
+  } | null>(null);
   const [tokens, setTokens] = useState("10000");
 
   // The conforming fairminter for this ticker, read once and shared by both
@@ -128,7 +137,8 @@ export function MintPanel({
   const addressCapped =
     alreadyMintedRaw !== undefined && alreadyMintedRaw !== null && addressLots === 0;
 
-  const typedTokens = parseFloat(tokens) || 0;
+  const tokenDraft = parseBoundedSetting(tokens, maxLots * TOKENS_PER_LOT, 0, 0);
+  const typedTokens = tokenDraft.value ?? 0;
   const lots = Math.max(0, Math.min(maxLots, Math.floor(typedTokens / TOKENS_PER_LOT)));
   const mintTokens = lots * TOKENS_PER_LOT;
   const adjusted = typedTokens > 0 && mintTokens !== typedTokens;
@@ -155,35 +165,20 @@ export function MintPanel({
   const busy = isBusy(compose.status);
 
   useEffect(() => {
-    if (compose.status === "confirmed") {
-      registerPending({
-        txid: compose.txid,
-        kind: "mint",
-        label: t("Mint {amount} {asset}", { amount: num.commas(mintTokens), asset }),
-        address: address ?? undefined,
-        spends: [{ asset: "XCP", raw: costRaw.toString() }],
-      });
-      // The XCP escrowed, valued at the rate the panel just quoted.
-      trackTx(compose.txid, "mint", xcpUsd ? costXcp * xcpUsd : null);
+    if (compose.status === "error") submittedMint.current = null;
+    if (compose.status === "confirmed" && submittedMint.current) {
+      const submitted = submittedMint.current;
+      submittedMint.current = null;
+      registerPending({ ...submitted.pending, txid: compose.txid });
+      trackTx(compose.txid, "mint", submitted.usd);
     }
-  }, [
-    compose.status,
-    compose.txid,
-    mintTokens,
-    asset,
-    address,
-    costRaw,
-    costXcp,
-    xcpUsd,
-    t,
-    num,
-  ]);
+  }, [compose.status, compose.txid]);
 
   // A balance that could not be read does not block the mint — see
   // useSpendableBalance's balanceUnavailable. Only a read still in flight
   // holds the button, and only briefly.
   const balanceSettled = xcpBalance !== undefined || balanceUnavailable;
-  const ready = balanceSettled && lots > 0 && !busy && !insufficient;
+  const ready = tokenDraft.valid && !tokenDraft.empty && !adjusted && balanceSettled && lots > 0 && !busy && !insufficient;
   const buttonLabel = busy
     ? compose.status === "composing"
       ? t("Composing…")
@@ -249,18 +244,14 @@ export function MintPanel({
           </>
         }
       >
-        {/* Integer-only, so the input can carry real digit grouping — in the
-            page's own separator, since every non-digit is stripped straight
-            back out on the way into state. Decimal AmountInputs cannot do
-            this: there a comma has to stay available as a decimal point. */}
-        <input
-          type="text"
-          inputMode="numeric"
-          autoComplete="off"
-          value={typedTokens > 0 ? num.commas(typedTokens) : tokens}
-          onChange={(e) => setTokens(e.target.value.replace(/[^0-9]/g, ""))}
+        <AmountInput
+          decimals={0}
+          max={maxLots * TOKENS_PER_LOT}
+          value={tokens}
+          onChange={setTokens}
+          error={adjusted ? t("Enter a multiple of {n}.", { n: num.commas(TOKENS_PER_LOT) }) : undefined}
           placeholder="0"
-          aria-label={t("{asset} to mint", { asset })}
+          ariaLabel={t("{asset} to mint", { asset })}
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
         />
       </Well>
@@ -348,19 +339,29 @@ export function MintPanel({
 
       <div className="px-0.5 pb-0.5 pt-3">
         {compose.status === "error" && (
-          <ErrorBanner className="mb-2" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
+          <ErrorBanner className="mb-2" onDismiss={compose.reset}><ComposeError {...compose} /></ErrorBanner>
         )}
         {walletStatus !== "connected" ? (
           <ConnectButton />
         ) : (
           <CTA
             disabled={!ready}
-            onClick={() =>
+            onClick={() => {
+              if (!ready || submittedMint.current) return;
+              submittedMint.current = {
+                pending: {
+                  kind: "mint",
+                  label: t("Mint {amount} {asset}", { amount: num.commas(mintTokens), asset }),
+                  address: address ?? undefined,
+                  spends: [{ asset: "XCP", raw: costRaw.toString() }],
+                },
+                usd: xcpUsd ? costXcp * xcpUsd : null,
+              };
               compose.composeFairmint({
                 asset,
                 quantity: lots * XCP69.QUANTITY_BY_PRICE,
-              })
-            }
+              });
+            }}
           >
             {buttonLabel}
           </CTA>

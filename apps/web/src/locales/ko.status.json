@@ -1205,6 +1205,22 @@
     "Launch #{n}",
     "Positions, open mints, history, and launches for {address} on xcp.fun.",
     "Show amounts in {currency}",
-    "open@@bounty"
+    "open@@bounty",
+    "Check the amount, units, and decimal places.",
+    "Copy diagnostics",
+    "Could not refresh the quote. Try again.",
+    "Enter a multiple of {n}.",
+    "Enter a value from {min} to {max}.",
+    "Follow language",
+    "Number format",
+    "Quote changed or could not be refreshed. Review the amounts and try again.",
+    "Reconnect your wallet and try again.",
+    "Request declined in wallet.",
+    "Technical details",
+    "The service is busy or unavailable. Try again shortly.",
+    "The transaction did not match the verified request. It was blocked.",
+    "Use digits and a dot, with up to {n} decimal places.",
+    "Use whole numbers only.",
+    "Your wallet could not complete this request. Check the details."
   ]
 }

@@ -1,7 +1,10 @@
+"use client";
+
 import { CollectionChip } from "@/components/collection-chip";
 import { collectionByTag } from "@/lib/collections";
 import type { Communities } from "@/lib/api/launchpad-api";
-import { getNumbers, getT } from "@/lib/i18n/server";
+import { useNumbers } from "@/lib/i18n/numbers";
+import { useT } from "@/lib/i18n/client";
 import { big } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
 import { Stat } from "@/app/[lang]/stats/_components/stat";
@@ -21,9 +24,9 @@ function percent(part: string | undefined, whole: string | undefined): number | 
  * collection: creators, collectors, the share of all minters that is either,
  * and the share of all XCP minted that its members put in.
  */
-export async function CommunitiesSection({ data }: { data: Communities }) {
-  const num = await getNumbers();
-  const t = await getT();
+export function CommunitiesSection({ data }: { data: Communities }) {
+  const num = useNumbers();
+  const t = useT();
   const rows = data.communities.filter((row) => row.members > 0);
   if (rows.length === 0 || data.minters === 0) return null;
   const widest = rows[0]?.members ?? 1;

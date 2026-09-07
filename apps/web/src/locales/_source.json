@@ -199,10 +199,10 @@
     "components/pending-dock.tsx"
   ],
   "{n} conforming launch · chain tip {height}": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} conforming launches · chain tip {height}": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} fill": [
     "components/address-hover-card.tsx"
@@ -211,7 +211,7 @@
     "components/address-hover-card.tsx"
   ],
   "{n} graduated · {pct}%": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} held": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
@@ -223,7 +223,7 @@
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "{n} in the last {days} days": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} launch": [
     "app/[lang]/profile/_components/rewards-card.tsx",
@@ -238,7 +238,7 @@
     "components/address-hover-card.tsx"
   ],
   "{n} mint · about {when}": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} minted": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
@@ -260,10 +260,10 @@
     "components/address-hover-card.tsx"
   ],
   "{n} mints · about {when}": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} MINTS for every mint": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "{n} MINTS per mint · all-time program total, not your wallet balance.": [
     "app/[lang]/profile/_components/rewards-card.tsx"
@@ -272,7 +272,7 @@
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "{n} of {cap}": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "{n} of {min} minters": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -293,16 +293,16 @@
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "{n} refund · {xcp} XCP returned · about {when}": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} refunded · {pct}%": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} refunded hidden": [
     "app/[lang]/_components/launch-search.tsx"
   ],
   "{n} refunds · {xcp} XCP returned · about {when}": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} routes → {n} wallet signatures": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -320,7 +320,7 @@
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "{n} still to claim": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "{n} tokens": [
     "app/[lang]/[asset]/_components/mint-panel.tsx",
@@ -396,7 +396,7 @@
     "lib/format.ts"
   ],
   "{n}d ago": [
-    "app/[lang]/stats/page.tsx",
+    "app/[lang]/stats/_components/stats-content.tsx",
     "lib/chain-time.ts"
   ],
   "{n}h": [
@@ -480,7 +480,7 @@
     "app/[lang]/docs/page.tsx"
   ],
   "{recipients} recipients · {mints} mint transactions": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "{resolve} All-or-nothing at the 69M soft cap. The soft cap equals the entire public sale, so reaching it {is} selling out — there is no partial success. Sell out and the pool seeds; miss the deadline and the protocol refunds every minter automatically and destroys the escrowed supply. Resolution happens at end-of-block even on a hard-cap fill, so nobody can trade the pool in the transaction that creates it.": [
     "app/[lang]/docs/page.tsx"
@@ -587,10 +587,10 @@
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
   "~{xcp} XCP · {n}-mint median": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "~{xcp} XCP · estimate": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "~1 day": [
     "app/[lang]/create/page.tsx",
@@ -615,22 +615,22 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "≈ {amount} · graduated": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "≈ {amount} · graduated coins": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "≈ {amount} committed": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "≈ {amount} committed to open mints": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "≈ {amount} in pools": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "≈ {amount} traded, all time": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "≈ {eta} from now — an estimate, not a guarantee; block time isn't exact.": [
     "app/[lang]/create/page.tsx"
@@ -715,7 +715,7 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "A refunded launch is not money lost. XCP-69 is all-or-nothing: one that misses its soft cap returns every satoshi by consensus, with no decision by us and no way for anyone to keep it.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "A resting order refunds in full at expiry — the price you set is enforced by the order itself.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -751,7 +751,7 @@
     "app/[lang]/profile/_components/pools-tab.tsx"
   ],
   "Active escrow": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Activity": [
     "app/[lang]/profile/_components/profile-view.tsx",
@@ -802,7 +802,7 @@
     "app/[lang]/docs/page.tsx"
   ],
   "All three bounties have been claimed.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "All-time": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -862,7 +862,7 @@
     "app/[lang]/faq/page.tsx"
   ],
   "announced, not open": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Any future block, {floor} — tighter than the presets go. Under ~2 hours pays double the network fee.": [
     "app/[lang]/create/page.tsx"
@@ -895,7 +895,7 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "at the live pool price": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Auto": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -1149,6 +1149,9 @@
   "Change in {currency} over the last 24 hours": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
+  "Check the amount, units, and decimal places.": [
+    "components/compose-error.tsx"
+  ],
   "Checking availability…": [
     "app/[lang]/create/page.tsx"
   ],
@@ -1175,7 +1178,7 @@
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
   "claimed": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Clear done": [
     "components/pending-dock.tsx"
@@ -1210,13 +1213,13 @@
     "app/[lang]/stats/_components/communities.tsx"
   ],
   "committed": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Committed": [
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
   "committed to open mints": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Communities": [
     "app/[lang]/stats/_components/communities.tsx"
@@ -1225,7 +1228,7 @@
     "app/[lang]/stats/_components/communities.tsx"
   ],
   "Completed and confirming reward batches, linked to the transactions that sent them.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Compose failed ({status})": [
     "app/[lang]/dispense/_lib/use-dispense-router.ts"
@@ -1264,7 +1267,7 @@
     "components/pending-dock.tsx"
   ],
   "Confirmed": [
-    "app/[lang]/rewards/page.tsx",
+    "app/[lang]/rewards/_components/rewards-content.tsx",
     "components/pending-dock.tsx"
   ],
   "Confirmed — resting on the book with {amount} {asset} escrowed.": [
@@ -1281,7 +1284,7 @@
   ],
   "Confirming": [
     "app/[lang]/profile/_components/rewards-tab.tsx",
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Conformance": [
     "app/[lang]/docs/page.tsx"
@@ -1313,6 +1316,7 @@
   ],
   "Copied": [
     "app/[lang]/profile/_components/profile-view.tsx",
+    "components/compose-error.tsx",
     "components/header-wallet.tsx"
   ],
   "Copied ✓": [
@@ -1324,6 +1328,9 @@
   ],
   "Copy as Markdown": [
     "app/[lang]/docs/_components/copy-button.tsx"
+  ],
+  "Copy diagnostics": [
+    "components/compose-error.tsx"
   ],
   "Copy failed": [
     "app/[lang]/docs/_components/copy-button.tsx"
@@ -1342,6 +1349,10 @@
   ],
   "Corrections": [
     "app/[lang]/research/page.tsx"
+  ],
+  "Could not refresh the quote. Try again.": [
+    "app/[lang]/dispense/_lib/use-dispense-router.ts",
+    "app/[lang]/swap/_components/swap-widget.tsx"
   ],
   "Couldn't check the {give}/{get} pool. Quotes may still use the order book.": [
     "app/[lang]/swap/_components/swap-widget.tsx"
@@ -1377,7 +1388,7 @@
     "app/[lang]/research/page.tsx"
   ],
   "Covered": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Create": [
     "app/[lang]/_components/home-toolbar.tsx"
@@ -1480,13 +1491,13 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "distinct addresses": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Distribution": [
     "app/[lang]/profile/_components/rewards-tab.tsx"
   ],
   "Distributions": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Docs": [
     "app/[lang]/docs/page.tsx",
@@ -1500,7 +1511,7 @@
     "app/[lang]/faq/page.tsx"
   ],
   "Doesn't minting cost me the XCP?": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Done": [
     "app/[lang]/create/page.tsx",
@@ -1531,7 +1542,7 @@
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
   "Earned so far": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Edit token info": [
     "app/[lang]/[asset]/_components/edit-panel.tsx"
@@ -1539,8 +1550,14 @@
   "Editing is locked for this session": [
     "app/[lang]/[asset]/_components/edit-panel.tsx"
   ],
+  "Enter a multiple of {n}.": [
+    "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
   "Enter a price": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Enter a value from {min} to {max}.": [
+    "components/amount-input.tsx"
   ],
   "Enter an amount": [
     "app/[lang]/[asset]/_components/mint-panel.tsx",
@@ -1565,13 +1582,13 @@
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
   "Every launch that conforms to XCP-69, and what has actually been minted.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Every LP token is burned — this liquidity can never be withdrawn.": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "Every mint on a conforming launch, counted. Ranked by mints, because that is the unit the reward is paid in.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Every minted token dumped in one trade — the pool still quotes a bid with {left} XCP left, and sellers exit at {mult}× mint ({paid}% of what they paid). Those {left} XCP can never be withdrawn: every launch is a permanent sink for XCP itself.": [
     "app/[lang]/faq/_components/explainer.tsx"
@@ -1657,7 +1674,7 @@
   ],
   "FAQ": [
     "app/[lang]/faq/page.tsx",
-    "app/[lang]/rewards/page.tsx",
+    "app/[lang]/rewards/_components/rewards-content.tsx",
     "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
@@ -1705,6 +1722,9 @@
   "Floor: {n}": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
+  "Follow language": [
+    "components/number-preference.tsx"
+  ],
   "Full 1M bags sold before yours": [
     "app/[lang]/research/_components/exit-race-simulator.tsx"
   ],
@@ -1729,7 +1749,7 @@
   "graduated": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
     "app/[lang]/_components/launch-search.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Graduated": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx",
@@ -1737,16 +1757,16 @@
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "graduated coins": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Graduated tokens trade against a constant-product TOKEN/XCP pool. The price is simply the ratio of the pool's reserves; every swap moves it. A fixed {fee} fee on each swap is paid to the pool itself — and since the LP is burned, fees deepen the locked liquidity rather than paying anyone out.": [
     "app/[lang]/docs/page.tsx"
   ],
   "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses, at which point the pool is created and its liquidity is burned. A launch that misses its target refunds every satoshi by consensus and does not count. {link}": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Graduation": [
     "app/[lang]/docs/page.tsx"
@@ -1764,7 +1784,7 @@
     "app/[lang]/_components/launch-sections.tsx"
   ],
   "Grouped by 144 blocks — a Bitcoin day. Exact against the chain, and approximate against a wall clock, which is the right way round for a chain this page is describing.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "guaranteed by consensus, not this website": [
     "app/[lang]/faq/page.tsx"
@@ -1833,8 +1853,8 @@
     "app/[lang]/docs/page.tsx"
   ],
   "How that works": [
-    "app/[lang]/rewards/page.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx",
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "How XCP-69 works": [
     "app/[lang]/research/page.tsx"
@@ -1867,7 +1887,7 @@
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "in pools": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "In the mempool — matching runs the moment the block lands.": [
     "components/order-tracker.tsx"
@@ -1998,7 +2018,7 @@
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
   "Launches by phase": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Launches use the {fairminter} message (ID 90) with the pool fields {poolQuantity} and {lpAsset} set. Mints are ordinary fairmint messages in whole-lot multiples of {quantityByPrice}.": [
     "app/[lang]/docs/page.tsx"
@@ -2150,7 +2170,7 @@
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/docs/page.tsx",
     "app/[lang]/faq/_components/explainer.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "market order": [
     "app/[lang]/docs/page.tsx"
@@ -2217,7 +2237,7 @@
     "app/[lang]/[asset]/_components/mint-panel.tsx"
   ],
   "Mint any XCP-69 launch and earn {n} MINTS. It doesn't matter which launch, and it doesn't matter how much you mint — one transaction, one reward (valid for the first {cap} mint transactions).": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Mint broadcast": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
@@ -2233,7 +2253,7 @@
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "mint transactions": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Mint window": [
     "app/[lang]/faq/page.tsx"
@@ -2268,7 +2288,7 @@
   "Minters": [
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/research/_components/live-behavior-dashboard.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "minting": [
     "app/[lang]/_components/launch-search.tsx"
@@ -2280,10 +2300,10 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/profile/_components/profile-view.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Minting activity": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "minting is live": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
@@ -2317,11 +2337,11 @@
     "app/[lang]/profile/_components/minting-tab.tsx",
     "app/[lang]/profile/_components/rewards-tab.tsx",
     "app/[lang]/rewards/_components/earners-table.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Mints {from}–{to}": [
     "app/[lang]/profile/_components/rewards-tab.tsx",
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Mints must be whole-lot multiples of {quantityByPrice}, within the per-transaction cap, and within the address's remaining allowance — a partially used cap can be topped up across multiple transactions. The minter needs the XCP {onBalance}; a funded BTC wallet with no XCP will compose-fail with {error}.": [
     "app/[lang]/docs/page.tsx"
@@ -2333,13 +2353,13 @@
     "app/[lang]/faq/page.tsx"
   ],
   "Mints so far": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.": [
     "app/[lang]/profile/_components/activity-tab.tsx"
   ],
   "missed the cap, paid back": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "More than one wallet is installed. Pick the one to connect with.": [
     "components/connect-button.tsx"
@@ -2387,7 +2407,7 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "No — a mint escrows XCP against the launch. If it graduates you hold the tokens; if it refunds you get every satoshi back. The only thing a mint actually costs you is the Bitcoin fee — which is the part this programme covers.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "No — and that's the point. The fairminter protocol allows enormous variation: no soft cap, no refunds, creator commissions up to 99%, premines, no pool at all. XCP-69 pins one configuration of it, and this site lists only launches that match the standard exactly, checked field-by-field against the on-chain record. Here, every launch behaves identically and you never audit the parameters yourself. A fairminter you encounter anywhere else carries no such guarantee — read its fields before you mint.": [
     "app/[lang]/faq/page.tsx"
@@ -2421,7 +2441,7 @@
     "app/[lang]/mempool/_components/mempool-view.tsx"
   ],
   "No launches refunded in this window.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "No launches yet.": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -2442,7 +2462,7 @@
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
   "No mints in this window.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "No mints yet — be the first.": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -2511,7 +2531,7 @@
     "app/[lang]/profile/_components/minting-tab.tsx"
   ],
   "No XCP-69 launch has graduated yet. The first three to do it earn a bounty.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "No XCP-69 tokens have been sent to the Counterparty burn address yet.": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -2529,7 +2549,7 @@
     "app/[lang]/create/page.tsx"
   ],
   "None have finished yet — nothing to score.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Not enough history to chart yet.": [
     "app/[lang]/profile/_components/portfolio-chart.tsx"
@@ -2576,14 +2596,17 @@
   ],
   "now": [
     "app/[lang]/[asset]/_components/price-chart.tsx",
-    "app/[lang]/stats/page.tsx",
+    "app/[lang]/stats/_components/stats-content.tsx",
     "lib/format.ts"
+  ],
+  "Number format": [
+    "components/number-preference.tsx"
   ],
   "Observed address behavior, not identity or intent. Not investment advice.": [
     "app/[lang]/research/page.tsx"
   ],
   "of {n} in the batch": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "of {n} minters, {pct}%": [
     "app/[lang]/stats/_components/communities.tsx"
@@ -2598,10 +2621,10 @@
     "app/[lang]/[asset]/_components/mint-panel.tsx"
   ],
   "Of the launches that finished": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "of the typical mint fee": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "of which {amount} realized": [
     "app/[lang]/profile/_components/positions-tab.tsx"
@@ -2628,7 +2651,7 @@
     "app/[lang]/docs/page.tsx"
   ],
   "One bounty is claimed — two are still open for the next launches to graduate.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "One fixed parameter set for token launches on Counterparty: the launch sells out and liquidity locks forever, or everyone is refunded. Zero creator take, enforced by consensus.": [
     "app/[lang]/faq/page.tsx"
@@ -2640,7 +2663,7 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "one transaction": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "One wallet confirmation per route — keep this tab open.": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -2661,13 +2684,13 @@
     "components/site-header.tsx"
   ],
   "open right now": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Open XCP price": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
   "open@@bounty": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "open@@pool slider": [
     "app/[lang]/faq/_components/explainer.tsx"
@@ -2750,7 +2773,7 @@
     "components/pending-dock.tsx"
   ],
   "Partially sent": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Partially. The 10 XCP per-address cap makes a fake crowd cost at least 69 funded addresses — it raises the price of the act, it cannot prevent it. Sybil-resistant in cost, not in principle. The mint tape, address histories, and holder spread are all public, so a manufactured crowd has to fake those too.": [
     "app/[lang]/faq/page.tsx"
@@ -2772,7 +2795,7 @@
     "app/[lang]/[asset]/_components/launch-stats.tsx"
   ],
   "Per mint": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Per-address cap": [
     "app/[lang]/faq/page.tsx"
@@ -2919,6 +2942,9 @@
   "Queue": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
+  "Quote changed or could not be refreshed. Review the amounts and try again.": [
+    "app/[lang]/swap/_components/liquidity-widget.tsx"
+  ],
   "Quote moved — the numbers above are updated. Press again to swap at the new price.": [
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
@@ -2973,6 +2999,9 @@
   "Recommended": [
     "components/connect-button.tsx"
   ],
+  "Reconnect your wallet and try again.": [
+    "components/compose-error.tsx"
+  ],
   "redeployed": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
@@ -2988,7 +3017,7 @@
     "app/[lang]/_components/market-pulse.tsx"
   ],
   "Refund activity": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "refunded": [
     "app/[lang]/_components/launch-search.tsx",
@@ -2999,7 +3028,7 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/activity-tab.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Refunds are not a support process. They are automatic protocol behavior: at the deadline, every minter's XCP is returned and the escrowed supply is destroyed in the same block. Failed launches move to the graveyard, where their history is preserved — the mint tape, the participant count, and the on-chain proof: a destruction record tagged {tag}.": [
     "app/[lang]/docs/page.tsx"
@@ -3025,6 +3054,9 @@
   "Represented": [
     "app/[lang]/stats/_components/communities.tsx"
   ],
+  "Request declined in wallet.": [
+    "components/compose-error.tsx"
+  ],
   "Resolve.": [
     "app/[lang]/docs/page.tsx"
   ],
@@ -3039,7 +3071,7 @@
     "components/rewards-chip.tsx"
   ],
   "Rewards accrue as you mint and are sent in batches. Once yours is sent, its transaction appears on your profile. Lifetime earned is an all-time total, not your wallet balance.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "rewritten": [
     "app/[lang]/docs/page.tsx"
@@ -3092,7 +3124,7 @@
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Search asset name": [
     "app/[lang]/_components/launch-search.tsx"
@@ -3163,7 +3195,7 @@
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "Send": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Settles when it confirms — usually the next block.": [
     "app/[lang]/swap/_components/liquidity-widget.tsx"
@@ -3246,7 +3278,7 @@
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "sold out, pool locked": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Something went wrong": [
     "app/[lang]/[asset]/_components/edit-panel.tsx",
@@ -3268,7 +3300,7 @@
     "app/[lang]/faq/page.tsx"
   ],
   "Stats": [
-    "app/[lang]/stats/page.tsx",
+    "app/[lang]/stats/_components/stats-content.tsx",
     "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
@@ -3276,7 +3308,7 @@
     "app/[lang]/stats/page.tsx"
   ],
   "Stats are unavailable right now.": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Status": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -3343,6 +3375,9 @@
   "Target start block": [
     "app/[lang]/create/page.tsx"
   ],
+  "Technical details": [
+    "components/compose-error.tsx"
+  ],
   "Telegram": [
     "app/[lang]/create/page.tsx"
   ],
@@ -3356,7 +3391,7 @@
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
   "The Bitcoin fee you pay is per transaction, so the reward is too. Minting one lot and minting the full 1% cost you the same fee and earn the same {n} MINTS — there is nothing to gain by splitting a mint into smaller pieces.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "The Bitcoin miner fee. Default tracks the next-block median.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -3386,7 +3421,7 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "The first fairminter ever created on Counterparty — block 866,297, before any other, and it minted out free to 1,376 addresses. The supply is 100,000,000, locked forever; no more can ever be issued. The live MINTS/XCP pool prices the reward: right now 1 MINTS trades at {price} XCP, so {n} MINTS is {worth} XCP.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "The first XCP-69 launch in history hasn't happened yet. All-or-nothing mints, at least {n} participants required, every raised XCP locked into the pool forever — enforced by consensus, not by this website.": [
     "app/[lang]/page.tsx"
@@ -3395,7 +3430,7 @@
     "app/[lang]/docs/page.tsx"
   ],
   "The graduation bounty": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "The graveyard is unavailable right now.": [
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
@@ -3421,11 +3456,17 @@
   "The sale line sits at 69M of the 100M supply; the other 31M is reserved for the pool and only ever exists if the line is crossed — 69 + 31 = 100, locked, nowhere else for supply to be. Below the line, every escrowed satoshi refunds at the deadline: there is no partial launch to be bag-held. The {perAddress} XCP per-address cap means crossing takes at least {n} distinct addresses — more if people mint below the cap. A floor on the crowd, not a count.": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
+  "The service is busy or unavailable. Try again shortly.": [
+    "components/compose-error.tsx"
+  ],
   "The standard removes the rug pull and the premine. It does not remove risk, and we won't pretend otherwise:": [
     "app/[lang]/docs/page.tsx"
   ],
   "The timing clauses are the two deliberate inequalities. Consensus does not require a future start — a launch confirming late simply opens instantly — so the pre-announcement guarantee lives here: {startBlock} must exceed the confirmation block. Without that clause, a creator could broadcast a nominal 1,000-block sale late, confirm just before its own deadline, and run a near-instant insider mint behind thousand-block metadata. And on the fairminter row the window check relaxes to {lte} once closed because core rewrites the deadline on early sell-out — for closed launches this site restores exact equality from the immutable {event} event (see the trap in Reading state). Everything else is exact equality on the row.": [
     "app/[lang]/docs/page.tsx"
+  ],
+  "The transaction did not match the verified request. It was blocked.": [
+    "components/compose-error.tsx"
   ],
   "The whole standard, hands-on — starting, like every launch, with the mint.": [
     "app/[lang]/faq/page.tsx"
@@ -3455,7 +3496,7 @@
     "app/[lang]/profile/_components/minting-tab.tsx"
   ],
   "today": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "token": [
     "app/[lang]/create/page.tsx"
@@ -3513,13 +3554,13 @@
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "Trade volume": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Trade.": [
     "app/[lang]/docs/page.tsx"
   ],
   "traded, all time": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Trader": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -3550,7 +3591,7 @@
     "app/[lang]/_components/market-pulse.tsx"
   ],
   "Two bounties are claimed — one is still open for the next launch to graduate.": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every round trip leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": [
     "app/[lang]/faq/_components/explainer.tsx"
@@ -3617,6 +3658,12 @@
   "Upload token image": [
     "app/[lang]/create/page.tsx"
   ],
+  "Use digits and a dot, with up to {n} decimal places.": [
+    "components/amount-input.tsx"
+  ],
+  "Use whole numbers only.": [
+    "components/amount-input.tsx"
+  ],
   "Value": [
     "app/[lang]/profile/_components/positions-tab.tsx"
   ],
@@ -3675,7 +3722,7 @@
     "app/[lang]/faq/page.tsx"
   ],
   "What is MINTS?": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "What is this?": [
     "app/[lang]/create/page.tsx"
@@ -3694,7 +3741,7 @@
     "app/[lang]/profile/_components/activity-tab.tsx"
   ],
   "When do I get paid?": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Where do I get the XCP to mint with?": [
     "app/[lang]/faq/page.tsx"
@@ -3709,7 +3756,7 @@
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "Why per transaction, not per token?": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "window closes {n}": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
@@ -3728,7 +3775,7 @@
     "app/[lang]/swap/_components/liquidity-widget.tsx"
   ],
   "Worth": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "X profile": [
     "app/[lang]/[asset]/_components/edit-panel.tsx",
@@ -3747,7 +3794,7 @@
     "app/[lang]/_components/market-pulse.tsx"
   ],
   "XCP in pools": [
-    "app/[lang]/stats/page.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "XCP in the pool": [
     "app/[lang]/faq/_components/explainer.tsx"
@@ -3857,7 +3904,7 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "Your fee": [
-    "app/[lang]/rewards/page.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "Your lifetime earnings": [
     "app/[lang]/profile/_components/rewards-card.tsx"
@@ -3873,6 +3920,9 @@
   ],
   "Your profile": [
     "components/header-wallet.tsx"
+  ],
+  "Your wallet could not complete this request. Check the details.": [
+    "components/compose-error.tsx"
   ],
   "Your wallet supplied a connection signature that didn't verify, so editing is locked for this session. Disconnect and reconnect to try again.": [
     "app/[lang]/profile/_components/profile-view.tsx"

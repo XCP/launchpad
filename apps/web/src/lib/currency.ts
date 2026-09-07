@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { fetchFxRates } from "@/lib/api/launchpad-api";
 import { fiat } from "@/lib/format";
-import { useLocale } from "@/lib/i18n/client";
+import { useNumberLocale } from "@/lib/number-preference";
 
 /**
  * Which currency the site's fiat figures are shown in.
@@ -332,7 +332,7 @@ export function useCurrency(): CurrencyState {
  */
 export function useFiat(): (usd: number) => string {
   const { code, rate } = useFxRate();
-  const locale = useLocale();
+  const locale = useNumberLocale();
   return useCallback((usd: number) => fiat(usd * rate, code, locale), [code, rate, locale]);
 }
 
