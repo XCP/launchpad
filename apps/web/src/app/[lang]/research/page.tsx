@@ -1,15 +1,15 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
-import { getMessages } from "@/lib/i18n/server";
+import { getMessages, getT } from "@/lib/i18n/server";
 import { makeT, msg } from "@/lib/i18n/t";
 import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { LiveBehaviorDashboard } from "@/app/[lang]/research/_components/live-behavior-dashboard";
 import { METADATA_ORIGIN } from "@/lib/metadata";
 
-const title = "Launch dynamics — xcp.fun";
+const title = msg("Launch dynamics — xcp.fun");
 const description =
-  "See what sellers do next, where known dumpers are minting, and how much seller inventory remains.";
+  msg("See what sellers do next, where known dumpers are minting, and how much seller inventory remains.");
 
 const PAGE_METADATA: Metadata = {
   metadataBase: new URL(METADATA_ORIGIN),
@@ -44,14 +44,15 @@ export async function generateMetadata({
   };
 }
 
-export default function ResearchPage() {
+export default async function ResearchPage() {
+  const t = await getT();
   return (
     <article className="mx-auto max-w-6xl space-y-7 sm:space-y-8">
       <header className="max-w-3xl">
         <p className="text-xs font-semibold uppercase tracking-wide text-purple-600 dark:text-purple-400">XCP-69</p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">Launch dynamics</h1>
+        <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">{t("Launch dynamics")}</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-gray-600 dark:text-gray-400 sm:text-base">
-          What sellers do next, where known dumpers are minting, and how much seller inventory remains.
+          {t("What sellers do next, where known dumpers are minting, and how much seller inventory remains.")}
         </p>
       </header>
 
@@ -59,29 +60,28 @@ export default function ResearchPage() {
 
       <details className="group overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-4 marker:hidden sm:px-5">
-          <span className="text-sm font-semibold">Method and limits</span>
+          <span className="text-sm font-semibold">{t("Method and limits")}</span>
           <span className="text-lg text-gray-400 dark:text-gray-500 transition group-open:rotate-45" aria-hidden="true">+</span>
         </summary>
         <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400 sm:px-5">
           <p>
-            Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each
-            graduated launch. Held means no sale and a meaningful current balance; moved means no sale and
-            no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.
+            {t(
+              "Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each graduated launch. Held means no sale and a meaningful current balance; moved means no sale and no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.",
+            )}
           </p>
           <p className="mt-2">
-            Dump means the first sale landed within six blocks of graduation. Repeat dump means that happened
-            on more than one earlier launch. Balances come from Counterparty and may include tokens obtained
-            outside the mint. Pending mempool orders can disappear without confirming or filling. Addresses
-            are not necessarily people.
+            {t(
+              "Dump means the first sale landed within six blocks of graduation. Repeat dump means that happened on more than one earlier launch. Balances come from Counterparty and may include tokens obtained outside the mint. Pending mempool orders can disappear without confirming or filling. Addresses are not necessarily people.",
+            )}
           </p>
         </div>
       </details>
 
       <footer className="flex flex-col gap-3 border-t border-gray-200 dark:border-gray-800 pt-5 text-xs text-gray-400 dark:text-gray-500 sm:flex-row sm:items-center sm:justify-between">
-        <p>Observed address behavior, not identity or intent. Not investment advice.</p>
+        <p>{t("Observed address behavior, not identity or intent. Not investment advice.")}</p>
         <div className="flex gap-3">
-          <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">How XCP-69 works</LazyLink>
-          <a href="https://t.me/xcpfun" target="_blank" rel="noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">Corrections</a>
+          <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">{t("How XCP-69 works")}</LazyLink>
+          <a href="https://t.me/xcpfun" target="_blank" rel="noreferrer" className="text-purple-600 dark:text-purple-400 hover:underline">{t("Corrections")}</a>
         </div>
       </footer>
     </article>

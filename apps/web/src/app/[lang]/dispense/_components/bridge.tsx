@@ -22,6 +22,8 @@ import {
 } from "@/lib/api/counterparty";
 import { commas, commasRaw, satsPerVb, shortAddress } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
+import { useT } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
 import {
   approx,
   big,
@@ -68,6 +70,7 @@ export function XcpBridge({
   btcUsd: number | null;
   xcpUsd: number | null;
 }) {
+  const t = useT();
   const [direction, setDirection] = useState<"load" | "unload">("load");
   const { data: pendingDispenses } = useSWR(
     "mempool-dispenses",
@@ -109,8 +112,8 @@ export function XcpBridge({
             }}
           >
             <SegmentedList className="w-64">
-              <SegmentedTrigger value="load">Buy XCP</SegmentedTrigger>
-              <SegmentedTrigger value="unload">Sell XCP</SegmentedTrigger>
+              <SegmentedTrigger value="load">{t("Buy XCP")}</SegmentedTrigger>
+              <SegmentedTrigger value="unload">{t("Sell XCP")}</SegmentedTrigger>
             </SegmentedList>
           </Tabs>
           <DispenseSettingsGear />
@@ -144,12 +147,13 @@ export function XcpBridge({
 
 /** External link to a dispenser's page on the explorer. */
 function ExplorerLink({ txHash }: { txHash: string }) {
+  const t = useT();
   return (
     <a
       href={`https://xcp.io/tx/${txHash}`}
       target="_blank"
       rel="noreferrer"
-      aria-label="View dispenser on xcp.io"
+      aria-label={t("View dispenser on xcp.io")}
       onClick={(e) => e.stopPropagation()}
       className="relative z-10 shrink-0 text-gray-300 dark:text-gray-600 transition-colors hover:text-purple-600 dark:hover:text-purple-400"
     >
@@ -170,6 +174,7 @@ function ExplorerLink({ txHash }: { txHash: string }) {
 
 /** TX fee for both directions — routing budgets it, composes pay it. */
 function DispenseSettingsGear() {
+  const t = useT();
   const settings = useSyncExternalStore(
     subscribeSettings,
     readSettings,
@@ -183,9 +188,9 @@ function DispenseSettingsGear() {
   // one place they went out of their way to choose it.
   const customFee = Math.min(parseFloat(settings.customFeeRate) || 0, 500);
   return (
-    <GearPopover active={customFee > 0} label="Dispense settings">
+    <GearPopover active={customFee > 0} label={t("Dispense settings")}>
       <div className="flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
           className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
@@ -195,15 +200,14 @@ function DispenseSettingsGear() {
             value={settings.customFeeRate}
             onChange={(v) => updateSettings({ customFeeRate: v })}
             placeholder={medianFeeRate ? String(medianFeeRate) : "…"}
-            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            ariaLabel={t("Bitcoin fee rate in sats per vbyte")}
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
           <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        The Bitcoin miner fee. Default tracks the next-block priority rate —
-        dispense purchases should confirm promptly.
+        {t("The Bitcoin miner fee. Default tracks the next-block priority rate — dispense purchases should confirm promptly.")}
       </p>
     </GearPopover>
   );
@@ -230,6 +234,7 @@ function LoadCard({
   customFee: number;
   hiddenCount: number;
 }) {
+  const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const { data: btcBalanceSats } = useSWR(
@@ -423,10 +428,10 @@ function LoadCard({
       <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {allDone
-            ? `${commas(totalXcp)} XCP incoming`
-            : `Buying ${commas(totalXcp)} XCP · ${router.legs.length} route${
-                router.legs.length === 1 ? "" : "s"
-              }`}
+            ? t("{n} XCP incoming", { n: commas(totalXcp) })
+            : router.legs.length === 1
+              ? t("Buying {n} XCP · {routes} route", { n: commas(totalXcp), routes: router.legs.length })
+              : t("Buying {n} XCP · {routes} routes", { n: commas(totalXcp), routes: router.legs.length })}
         </div>
         <ul className="mt-3 space-y-2">
           {router.legs.map((leg, i) => (
@@ -451,7 +456,7 @@ function LoadCard({
                     rel="noreferrer"
                     className="font-medium text-green-700 dark:text-green-400 underline"
                   >
-                    ✓ broadcast
+                    {t("✓ broadcast")}
                   </a>
                 ) : leg.status === "error" ? (
                   <>
@@ -466,17 +471,19 @@ function LoadCard({
                       onClick={() => router.retry(i)}
                       className="rounded-md border border-gray-300 dark:border-gray-700 px-2 py-0.5 font-medium text-gray-700 dark:text-gray-300 hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400"
                     >
-                      Retry
+                      {t("Retry")}
                     </button>
                   </>
                 ) : leg.status === "pending" ? (
-                  <span className="text-gray-400 dark:text-gray-500">waiting</span>
+                  <span className="text-gray-400 dark:text-gray-500">{t("waiting")}</span>
                 ) : (
                   <span className="flex items-center gap-1.5 text-purple-600 dark:text-purple-400">
                     <span className="size-1.5 animate-pulse rounded-full bg-purple-500" />
                     {leg.status === "signing"
-                      ? `confirm in wallet (${i + 1} of ${router.legs.length})`
-                      : `${leg.status}…`}
+                      ? t("confirm in wallet ({i} of {n})", { i: i + 1, n: router.legs.length })
+                      : leg.status === "composing"
+                        ? t("composing…")
+                        : t("broadcasting…")}
                   </span>
                 )}
               </span>
@@ -489,8 +496,7 @@ function LoadCard({
         {allDone ? (
           <>
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              {commas(doneXcp)} XCP lands on your Counterparty balance as each
-              payment confirms — ready to mint with.
+              {t("{n} XCP lands on your Counterparty balance as each payment confirms — ready to mint with.", { n: commas(doneXcp) })}
             </p>
             <button
               type="button"
@@ -501,17 +507,16 @@ function LoadCard({
               }}
               className="mt-2 text-sm font-medium text-purple-700 dark:text-purple-300 underline"
             >
-              Load more
+              {t("Load more")}
             </button>
           </>
         ) : busy ? (
           <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-            One wallet confirmation per route — keep this tab open.
+            {t("One wallet confirmation per route — keep this tab open.")}
           </p>
         ) : (
           <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            Broadcast legs are final — each is its own transaction. Failed
-            legs can be retried.
+            {t("Broadcast legs are final — each is its own transaction. Failed legs can be retried.")}
           </p>
         )}
       </div>
@@ -523,8 +528,8 @@ function LoadCard({
       <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6">
         <p className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-6 text-center text-sm text-gray-500 dark:text-gray-400">
           {dispensers.length > 0
-            ? "Every route has a purchase pending in the mempool — check back in a few minutes."
-            : "No open XCP dispensers right now — check the DEX or try again later."}
+            ? t("Every route has a purchase pending in the mempool — check back in a few minutes.")
+            : t("No open XCP dispensers right now — check the DEX or try again later.")}
         </p>
       </div>
     );
@@ -532,10 +537,12 @@ function LoadCard({
 
   const buttonLabel =
     n === 0
-      ? "Enter an amount"
+      ? t("Enter an amount")
       : armed && plan.length > 1
-        ? `Sign ${plan.length} transactions`
-        : `Buy ${commas(snapped)} XCP${plan.length > 1 ? ` · ${plan.length} routes` : ""}`;
+        ? t("Sign {n} transactions", { n: plan.length })
+        : plan.length > 1
+          ? t("Buy {n} XCP · {routes} routes", { n: commas(snapped), routes: plan.length })
+          : t("Buy {n} XCP", { n: commas(snapped) });
 
   return (
     <div className="contents">
@@ -543,7 +550,7 @@ function LoadCard({
       {/* You receive · Counterparty — XCP always first */}
       <Well
         focusable
-        label="You receive"
+        label={t("You receive")}
         topRight={
           <span className="flex items-center gap-1">
             {presets.map((p) => (
@@ -579,13 +586,13 @@ function LoadCard({
                 snappedRaw !== typedXcpRaw && (
                   <span className="text-amber-600 dark:text-amber-400">
                     {" "}
-                    · adjusts to {commas(snapped)}
+                    {t("· adjusts to {n}", { n: commas(snapped) })}
                   </span>
                 )}
             </span>
             {xcpBalance !== undefined && (
               <span className="text-gray-500 dark:text-gray-400">
-                Balance: {commasRaw(xcpBalance)}
+                {t("Balance: {n}", { n: commasRaw(xcpBalance) })}
               </span>
             )}
           </>
@@ -600,7 +607,7 @@ function LoadCard({
             setLastEdited("xcp");
             setArmed(false);
           }}
-          ariaLabel="XCP to receive"
+          ariaLabel={t("XCP to receive")}
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
         />
       </Well>
@@ -610,7 +617,7 @@ function LoadCard({
       {/* You send · Bitcoin */}
       <Well
         focusable
-        label="You send"
+        label={t("You send")}
         chip={<BtcChip />}
         footer={
           <>
@@ -619,12 +626,12 @@ function LoadCard({
               {lastEdited === "btc" &&
                 typedBtcSatsRaw > 0n &&
                 typedBtcSatsRaw !== big(btcSats) && (
-                  <span className="text-amber-600 dark:text-amber-400"> · exact cost {fmtBtc(btcSats)}</span>
+                  <span className="text-amber-600 dark:text-amber-400"> {t("· exact cost {btc}", { btc: fmtBtc(btcSats) })}</span>
                 )}
             </span>
             {btcBalanceSats !== undefined && (
               <span className="text-gray-500 dark:text-gray-400">
-                Balance: {fmtBtc(btcBalanceSats)}
+                {t("Balance: {n}", { n: fmtBtc(btcBalanceSats) })}
               </span>
             )}
           </>
@@ -637,7 +644,7 @@ function LoadCard({
             setLastEdited("btc");
             setArmed(false);
           }}
-          ariaLabel="BTC to send"
+          ariaLabel={t("BTC to send")}
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
         />
       </Well>
@@ -651,7 +658,7 @@ function LoadCard({
             {vsFloor !== null && vsFloor >= 1 && (
               <span className="font-medium text-amber-600 dark:text-amber-400">
                 {" "}
-                · {vsFloor.toFixed(0)}% over floor
+                {t("· {pct}% over floor", { pct: vsFloor.toFixed(0) })}
               </span>
             )}
           </span>
@@ -659,24 +666,27 @@ function LoadCard({
         {plan.length > 0 && snapped > 0 && (
           <dl className="mt-2 space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
-              <dt>Routes</dt>
+              <dt>{t("Routes")}</dt>
               <dd>
                 {plan.length > 1 ? (
-                  `${plan.length} txs · ${plan
-                    .map((leg) =>
-                      commas(leg.units * (leg.dispenser.give_quantity / SATS)),
-                    )
-                    .join(" + ")} XCP`
+                  t("{n} txs · {amounts} XCP", {
+                    n: plan.length,
+                    amounts: plan
+                      .map((leg) =>
+                        commas(leg.units * (leg.dispenser.give_quantity / SATS)),
+                      )
+                      .join(" + "),
+                  })
                 ) : (
                   <span>
-                    {shortAddress(plan[0]!.dispenser.source)} · cheapest of{" "}
-                    {open.length}
+                    {shortAddress(plan[0]!.dispenser.source)}{" "}
+                    {t("· cheapest of {n}", { n: open.length })}
                   </span>
                 )}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt>TX fees{plan.length > 1 ? ` · ${plan.length} txs` : ""}</dt>
+              <dt>{plan.length > 1 ? t("TX fees · {n} txs", { n: plan.length }) : t("TX fees")}</dt>
               <dd>
                 ~{(plan.length * legFeeSats).toLocaleString()} sats
                 {btcUsd
@@ -685,8 +695,8 @@ function LoadCard({
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt>Arrival</dt>
-              <dd>next block after BTC confirms</dd>
+              <dt>{t("Arrival")}</dt>
+              <dd>{t("next block after BTC confirms")}</dd>
             </div>
           </dl>
         )}
@@ -704,7 +714,7 @@ function LoadCard({
             {armed && plan.length > 1 && (
               <div className="mb-2 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-3 py-2.5 text-xs text-purple-900 dark:text-purple-200">
                 <div className="font-semibold">
-                  {plan.length} routes → {plan.length} wallet signatures
+                  {t("{n} routes → {n} wallet signatures", { n: plan.length })}
                 </div>
                 <ul className="mt-1 space-y-0.5">
                   {plan.map((leg, i) => (
@@ -716,8 +726,7 @@ function LoadCard({
                   ))}
                 </ul>
                 <div className="mt-1 text-purple-700 dark:text-purple-300">
-                  Your wallet will ask once per route, in order — each popup is
-                  one route, nothing more.
+                  {t("Your wallet will ask once per route, in order — each popup is one route, nothing more.")}
                 </div>
               </div>
             )}
@@ -737,8 +746,7 @@ function LoadCard({
           </>
         )}
         <p className="mt-2 px-1.5 text-center text-[11px] text-gray-400 dark:text-gray-500">
-          XCP arrives automatically when your BTC confirms. Purchases are
-          final.
+          {t("XCP arrives automatically when your BTC confirms. Purchases are final.")}
         </p>
       </div>
 
@@ -775,6 +783,7 @@ function UnloadCard({
   flips: number;
   customFee: number;
 }) {
+  const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
@@ -886,15 +895,15 @@ function UnloadCard({
   if (compose.status === "confirmed") {
     return (
       <ConfirmCard
-        title="Broadcast"
+        title={t("Broadcast")}
         onReset={() => {
           compose.reset();
           refreshExisting();
         }}
-        resetLabel="Done"
+        resetLabel={t("Done")}
       >
         <p className="mt-1 text-green-700 dark:text-green-400">
-          Takes effect when it confirms. <TxLink txid={compose.txid} />
+          {rich(t, "Takes effect when it confirms. {tx}", { tx: <TxLink txid={compose.txid} /> })}
         </p>
       </ConfirmCard>
     );
@@ -905,18 +914,19 @@ function UnloadCard({
       <div className="rounded-3xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 p-6 text-sm text-gray-700 dark:text-gray-300">
         <p className="flex items-center gap-2">
           <span className="size-2 animate-pulse rounded-full bg-amber-500" />
-          <span className="font-semibold">Sale closing</span>
+          <span className="font-semibold">{t("Sale closing")}</span>
         </p>
         <p className="mt-2">
-          It can still sell until{" "}
-          {existing.close_block_index
-            ? `block ${existing.close_block_index.toLocaleString()}`
-            : "the close settles (~5 blocks)"}
-          , then the remaining{" "}
-          <span className="font-semibold">
-            {commas(existing.give_remaining / SATS)} XCP
-          </span>{" "}
-          returns automatically.
+          {rich(t, "It can still sell until {when}, then the remaining {amount} returns automatically.", {
+            when: existing.close_block_index
+              ? t("block {n}", { n: existing.close_block_index.toLocaleString() })
+              : t("the close settles (~5 blocks)"),
+            amount: (
+              <span className="font-semibold">
+                {commas(existing.give_remaining / SATS)} XCP
+              </span>
+            ),
+          })}
         </p>
       </div>
     );
@@ -926,13 +936,13 @@ function UnloadCard({
     return (
       <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 text-sm text-gray-700 dark:text-gray-300">
         <p>
-          <span className="font-semibold">Currently unloading:</span>{" "}
-          {commas(existing.give_remaining / SATS)} XCP left at{" "}
-          {Math.round(
-            (existing.satoshirate / existing.give_quantity) * SATS,
-          ).toLocaleString()}{" "}
-          sats/XCP. BTC lands with every sale. Closing settles ~5 blocks after
-          it confirms and returns the rest.
+          {rich(t, "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles ~5 blocks after it confirms and returns the rest.", {
+            lead: <span className="font-semibold">{t("Currently unloading:")}</span>,
+            n: commas(existing.give_remaining / SATS),
+            sats: Math.round(
+              (existing.satoshirate / existing.give_quantity) * SATS,
+            ).toLocaleString(),
+          })}
         </p>
         {compose.status === "error" && (
           <ErrorBanner className="mt-3" onDismiss={compose.reset}>{compose.error}</ErrorBanner>
@@ -943,7 +953,7 @@ function UnloadCard({
           onClick={close}
           className="mt-3 w-full rounded-2xl border border-gray-300 dark:border-gray-700 px-5 py-2.5 font-medium text-gray-700 dark:text-gray-300 transition-all hover:border-red-400 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 active:scale-[0.99] disabled:opacity-50"
         >
-          {busy ? "Working…" : "Stop unloading & reclaim"}
+          {busy ? t("Working…") : t("Stop unloading & reclaim")}
         </button>
       </div>
     );
@@ -951,19 +961,19 @@ function UnloadCard({
 
   const buttonLabel = busy
     ? compose.status === "signing"
-      ? "Confirm in wallet…"
-      : "Working…"
+      ? t("Confirm in wallet…")
+      : t("Working…")
     : escrowRaw === 0
-      ? "Enter an amount"
+      ? t("Enter an amount")
       : balance === undefined
         ? balanceError
-          ? "Balance unavailable"
-          : "Checking balance…"
+          ? t("Balance unavailable")
+          : t("Checking balance…")
       : insufficient
-        ? "Insufficient XCP balance"
+        ? t("Insufficient XCP balance")
         : escrowRaw < SATS
-          ? "Minimum 1 XCP"
-          : `Sell ${commas(escrowRaw / SATS)} XCP`;
+          ? t("Minimum 1 XCP")
+          : t("Sell {n} XCP", { n: commas(escrowRaw / SATS) });
 
   return (
     <div className="contents">
@@ -972,7 +982,7 @@ function UnloadCard({
       <div>
         <Well
           focusable
-          label="Price · sats per XCP"
+          label={t("Price · sats per XCP")}
           topRight={
             undercutSats !== null && floorSats !== null ? (
               // Both buttons read off the BOOK, not off the USD market rate.
@@ -989,7 +999,7 @@ function UnloadCard({
                 <button
                   type="button"
                   onClick={() => setPrice(String(percentOf(floorSats, 110)))}
-                  title="Ten percent above the cheapest open dispenser"
+                  title={t("Ten percent above the cheapest open dispenser")}
                   className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
                   +10%
@@ -997,10 +1007,10 @@ function UnloadCard({
                 <button
                   type="button"
                   onClick={() => setPrice(String(undercutSats))}
-                  title="One satoshi under the cheapest open dispenser"
+                  title={t("One satoshi under the cheapest open dispenser")}
                   className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
-                  Floor
+                  {t("Floor")}
                 </button>
               </span>
             ) : undefined
@@ -1025,11 +1035,11 @@ function UnloadCard({
                     }
                   >
                     {vsFloor > 0
-                      ? `+${vsFloor.toFixed(0)}% over floor · waits`
-                      : `−${Math.abs(vsFloor).toFixed(0)}% under floor · sells first`}
+                      ? t("+{pct}% over floor · waits", { pct: vsFloor.toFixed(0) })
+                      : t("−{pct}% under floor · sells first", { pct: Math.abs(vsFloor).toFixed(0) })}
                   </span>
                 ) : vsFloor !== null ? (
-                  <span>at the floor</span>
+                  <span>{t("at the floor")}</span>
                 ) : (
                   <span>&nbsp;</span>
                 )}
@@ -1044,7 +1054,7 @@ function UnloadCard({
                       it. Naming it for the number it reports rather than the
                       one it writes, because the reported number is the fact —
                       the undercut is just how you beat it. */}
-                  Floor: {floorSats.toLocaleString()}
+                  {t("Floor: {n}", { n: floorSats.toLocaleString() })}
                 </button>
               )}
             </>
@@ -1054,7 +1064,7 @@ function UnloadCard({
             value={price}
             onChange={setPrice}
             placeholder={undercutSats !== null ? String(undercutSats) : "0"}
-            ariaLabel="Price in sats per XCP"
+            ariaLabel={t("Price in sats per XCP")}
             className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           />
         </Well>
@@ -1063,7 +1073,7 @@ function UnloadCard({
       {/* You send · Counterparty */}
       <Well
         focusable
-        label="You sell"
+        label={t("You sell")}
         topRight={
           balance !== undefined && balance > 0 ? (
             <span className="flex items-center gap-1">
@@ -1076,7 +1086,7 @@ function UnloadCard({
                   }
                   className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
-                  {p === 100 ? "Max" : `${p}%`}
+                  {p === 100 ? t("Max") : `${p}%`}
                 </button>
               ))}
             </span>
@@ -1092,7 +1102,7 @@ function UnloadCard({
               {typedEscrowRaw > 0n && escrowRawBig !== typedEscrowRaw && wholeEscrow >= 1 && (
                 <span className="text-amber-600 dark:text-amber-400">
                   {" "}
-                  · adjusts to {wholeEscrow} (sells whole XCP)
+                  {t("· adjusts to {n} (sells whole XCP)", { n: wholeEscrow })}
                 </span>
               )}
             </span>
@@ -1104,7 +1114,7 @@ function UnloadCard({
                 }`}
                 onClick={() => setEscrow(String(Math.floor(approx(balance) / SATS)))}
               >
-                Balance: {commasRaw(balance)}
+                {t("Balance: {n}", { n: commasRaw(balance) })}
               </button>
             )}
           </>
@@ -1113,7 +1123,7 @@ function UnloadCard({
         <AmountInput
           value={escrow}
           onChange={setEscrow}
-          ariaLabel="XCP to unload"
+          ariaLabel={t("XCP to unload")}
           className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
             insufficient ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
           }`}
@@ -1124,12 +1134,12 @@ function UnloadCard({
 
       {/* You receive · Bitcoin */}
       <Well
-        label="You receive"
-        topRight={<span>paid as it sells</span>}
+        label={t("You receive")}
+        topRight={<span>{t("paid as it sells")}</span>}
         chip={<BtcChip />}
         footer={
           <span>
-            {btcUsd && btcIfSold > 0 && `≈ ${usdFmt(btcIfSold * btcUsd)} if fully sold`}
+            {btcUsd && btcIfSold > 0 && t("≈ {usd} if fully sold", { usd: usdFmt(btcIfSold * btcUsd) })}
           </span>
         }
       >
@@ -1149,20 +1159,20 @@ function UnloadCard({
         <div className="px-2 pt-2">
           <dl className="space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
-              <dt>Queue</dt>
+              <dt>{t("Queue")}</dt>
               <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                 {queueAheadXcp > 0
-                  ? `${queueAheadXcp.toLocaleString()} XCP ahead of you`
-                  : "first at this price"}
+                  ? t("{n} XCP ahead of you", { n: queueAheadXcp.toLocaleString() })
+                  : t("first at this price")}
               </dd>
             </div>
             <div className="flex justify-between">
-              <dt>Vends</dt>
-              <dd>{wholeEscrow.toLocaleString()} × 1 XCP</dd>
+              <dt>{t("Vends")}</dt>
+              <dd>{t("{n} × 1 XCP", { n: wholeEscrow.toLocaleString() })}</dd>
             </div>
             {sellFeeRate !== null && (
               <div className="flex justify-between">
-                <dt>TX fee</dt>
+                <dt>{t("TX fee")}</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {satsPerVb(sellFeeRate)} sat/vB
                   {btcUsd !== null && (
@@ -1217,28 +1227,29 @@ function RouteBook({
   plan: PlannedLeg[];
   hiddenCount: number;
 }) {
+  const t = useT();
   const rows = open.slice(0, 10);
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
   const taken = new Map(plan.map((l) => [l.dispenser.source, l.units]));
   return (
     <aside className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
       <div className="px-1 pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-        Dispensers · cheapest first
+        {t("Dispensers · cheapest first")}
       </div>
       <ul className="space-y-1">
         {rows.map((r) => {
-          const t = taken.get(r.source);
+          const units = taken.get(r.source);
           return (
             <li
               key={r.source}
               className={`relative overflow-hidden rounded-lg border px-2.5 py-1.5 text-xs transition-colors ${
-                t ? "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40" : "border-transparent"
+                units ? "border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40" : "border-transparent"
               }`}
             >
               <span
                 aria-hidden
                 className={`absolute inset-y-0 left-0 ${
-                  t ? "bg-purple-100/70 dark:bg-purple-900/50" : "bg-gray-100/80 dark:bg-gray-800/80"
+                  units ? "bg-purple-100/70 dark:bg-purple-900/50" : "bg-gray-100/80 dark:bg-gray-800/80"
                 }`}
                 style={{
                   width: `${Math.max(6, (r.give_remaining / maxDepth) * 100)}%`,
@@ -1251,12 +1262,16 @@ function RouteBook({
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="text-gray-500 dark:text-gray-400">
-                    {t ? (
-                      <span className="font-semibold text-purple-700 dark:text-purple-300">
-                        {commas(t * (r.give_quantity / SATS))} of{" "}
-                      </span>
-                    ) : null}
-                    {commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP
+                    {units
+                      ? rich(t, "{taken} of {total} XCP", {
+                          taken: (
+                            <span className="font-semibold text-purple-700 dark:text-purple-300">
+                              {commas(units * (r.give_quantity / SATS))}
+                            </span>
+                          ),
+                          total: commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0),
+                        })
+                      : `${commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP`}
                   </span>
                   <ExplorerLink txHash={r.tx_hash} />
                 </span>
@@ -1267,12 +1282,11 @@ function RouteBook({
       </ul>
       {hiddenCount > 0 && (
         <p className="px-1 pt-2 text-[11px] text-gray-400 dark:text-gray-500">
-          +{hiddenCount} hidden — purchase pending in mempool
+          {t("+{n} hidden — purchase pending in mempool", { n: hiddenCount })}
         </p>
       )}
       <p className="px-1 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        Routing includes miner fees — a deep route can beat a cheaper,
-        shallower one.
+        {t("Routing includes miner fees — a deep route can beat a cheaper, shallower one.")}
       </p>
     </aside>
   );
@@ -1296,6 +1310,7 @@ function SellBook({
   active: boolean;
   onPick: (sats: number) => void;
 }) {
+  const t = useT();
   const rows = open.slice(0, 10);
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
   // Equal prices sell before you (earlier tx_index vends first), so a
@@ -1313,7 +1328,7 @@ function SellBook({
           <span className="font-normal text-amber-600 dark:text-amber-400">sats</span>
         </span>
         <span className="font-medium text-amber-700 dark:text-amber-400">
-          {yourEscrowXcp > 0 ? `you · ${commas(yourEscrowXcp)} XCP` : "you"}
+          {yourEscrowXcp > 0 ? t("you · {n} XCP", { n: commas(yourEscrowXcp) }) : t("you")}
         </span>
       </span>
     </li>
@@ -1321,7 +1336,7 @@ function SellBook({
   return (
     <aside className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
       <div className="px-1 pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-        The competition · cheapest first
+        {t("The competition · cheapest first")}
       </div>
       <ul className="space-y-1">
         {rows.slice(0, markerAt).map((r) => (
@@ -1333,8 +1348,7 @@ function SellBook({
         ))}
       </ul>
       <p className="px-1 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        Buyers fill cheapest first — the closer to the top, the faster you
-        sell. Tap a row to match its price.
+        {t("Buyers fill cheapest first — the closer to the top, the faster you sell. Tap a row to match its price.")}
       </p>
     </aside>
   );

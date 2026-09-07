@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useT } from "@/lib/i18n/client";
 
 
 export type Window = "1D" | "7D" | "30D";
@@ -63,6 +64,7 @@ export function PortfolioChart({
   format: (v: number) => string;
   height?: number;
 }) {
+  const t = useT();
   const [hover, setHover] = useState<number | null>(null);
 
   if (values.length < 2) {
@@ -71,7 +73,7 @@ export function PortfolioChart({
         style={{ height }}
         className="flex items-center justify-center rounded-lg border border-dashed border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
       >
-        Not enough history to chart yet.
+        {t("Not enough history to chart yet.")}
       </div>
     );
   }
@@ -101,7 +103,7 @@ export function PortfolioChart({
         style={{ height }}
         className="w-full"
         role="img"
-        aria-label={`Portfolio value over time, currently ${format(values[values.length - 1]!)}`}
+        aria-label={t("Portfolio value over time, currently {value}", { value: format(values[values.length - 1]!) })}
         onMouseLeave={() => setHover(null)}
         onMouseMove={(e) => {
           const box = e.currentTarget.getBoundingClientRect();

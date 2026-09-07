@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFxRate } from "@/lib/currency";
+import { useT } from "@/lib/i18n/client";
 import {
   btcSatsToXcp,
   continuousThresholds,
@@ -33,6 +34,7 @@ export function ExitRaceSimulator({
   btcUsd: number;
   priceContext: string;
 }) {
+  const t = useT();
   const { code, rate } = useFxRate();
   const [addresses, setAddresses] = useState(20);
   const [priorState, setPriorState] = useState(0);
@@ -53,19 +55,18 @@ export function ExitRaceSimulator({
   return (
     <section id="simulator" className="scroll-mt-6 space-y-5">
       <div>
-        <h2 className="text-xl font-bold">Stress-test the exit race</h2>
+        <h2 className="text-xl font-bold">{t("Stress-test the exit race")}</h2>
         <p className="mt-1 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-          “Coordinated first exit” is an optimistic upper bound. “Random order”
-          is the expected result if all 69 full bags sell and these wallets are
-          interleaved uniformly among them. Neither line asserts how many people
-          actually participated.
+          {t(
+            "“Coordinated first exit” is an optimistic upper bound. “Random order” is the expected result if all 69 full bags sell and these wallets are interleaved uniformly among them. Neither line asserts how many people actually participated.",
+          )}
         </p>
       </div>
 
       <div className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-5">
         <div className="grid gap-x-5 gap-y-4 sm:grid-cols-2">
           <Slider
-            label="Maximum-mint addresses controlled"
+            label={t("Maximum-mint addresses controlled")}
             valueLabel={String(addresses)}
             value={addresses}
             min={1}
@@ -77,7 +78,7 @@ export function ExitRaceSimulator({
             }}
           />
           <Slider
-            label="Full 1M bags sold before yours"
+            label={t("Full 1M bags sold before yours")}
             valueLabel={`${prior}M`}
             value={prior}
             min={0}
@@ -86,7 +87,7 @@ export function ExitRaceSimulator({
             onChange={setPriorState}
           />
           <Slider
-            label="Share of controlled holdings sold"
+            label={t("Share of controlled holdings sold")}
             valueLabel={`${sellPct}%`}
             value={sellPct}
             min={0}
@@ -95,7 +96,7 @@ export function ExitRaceSimulator({
             onChange={setSellPct}
           />
           <Slider
-            label="BTC overhead per address"
+            label={t("BTC overhead per address")}
             valueLabel={`${overheadSats.toLocaleString()} sats`}
             value={overheadSats}
             min={0}
@@ -106,14 +107,20 @@ export function ExitRaceSimulator({
         </div>
 
         <p className="mt-4 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
-          {code} context: 1 XCP = {inCurrency(xcpUsd, code, rate)} · 1 BTC = {inCurrency(btcUsd, code, rate)} · {priceContext}.
-          The 700-sat default is an illustrative low-fee lifecycle, not a
-          measured all-in cost. Observed mint-only median: 232 sats; P90: 697.
+          {t(
+            "{code} context: 1 XCP = {xcp} · 1 BTC = {btc} · {priceContext}. The 700-sat default is an illustrative low-fee lifecycle, not a measured all-in cost. Observed mint-only median: 232 sats; P90: 697.",
+            {
+              code,
+              xcp: inCurrency(xcpUsd, code, rate),
+              btc: inCurrency(btcUsd, code, rate),
+              priceContext,
+            },
+          )}
         </p>
 
         <div className="mt-5">
           <div className="flex items-baseline justify-between gap-3 text-xs">
-            <span className="font-medium text-gray-600 dark:text-gray-400">Public allocation captured</span>
+            <span className="font-medium text-gray-600 dark:text-gray-400">{t("Public allocation captured")}</span>
             <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {addresses}M / 69M · {capturedPct.toFixed(1)}%
             </span>
@@ -121,7 +128,7 @@ export function ExitRaceSimulator({
           <div
             className="mt-1.5 h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800"
             role="progressbar"
-            aria-label="Share of public mint captured"
+            aria-label={t("Share of public mint captured")}
             aria-valuenow={capturedPct}
             aria-valuemin={0}
             aria-valuemax={100}
@@ -129,24 +136,26 @@ export function ExitRaceSimulator({
             <div className="h-full bg-purple-600" style={{ width: `${capturedPct}%` }} />
           </div>
           <p className="mt-1.5 text-xs text-gray-400 dark:text-gray-500">
-            Up to {addresses} full-cap allocations displaced only if demand
-            would otherwise exceed the 69M sale.
+            {t(
+              "Up to {n} full-cap allocations displaced only if demand would otherwise exceed the 69M sale.",
+              { n: addresses },
+            )}
           </p>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Metric
-            label="Capital + BTC overhead"
+            label={t("Capital + BTC overhead")}
             value={`${(scenario.capitalXcp + scenario.overheadXcp).toFixed(2)} XCP-eq`}
             hint={`${scenario.capitalXcp.toFixed(0)} XCP + ${totalOverheadSats.toLocaleString()} sats`}
           />
           <Metric
-            label="Cash sale proceeds"
+            label={t("Cash sale proceeds")}
             value={money(scenario.proceedsXcp)}
             hint={inCurrency(scenario.proceedsXcp * xcpUsd, code, rate)}
           />
           <Metric
-            label="Net cash P/L"
+            label={t("Net cash P/L")}
             value={`${scenario.pnlXcpEquivalent >= 0 ? "+" : ""}${scenario.pnlXcpEquivalent.toFixed(2)} XCP-eq`}
             hint={inCurrency(scenario.pnlXcpEquivalent * xcpUsd, code, rate, true)}
             negative={scenario.pnlXcpEquivalent < 0}
@@ -154,9 +163,10 @@ export function ExitRaceSimulator({
         </div>
 
         <p className="mt-3 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
-          Cash accounting values the {scenario.retainedMillions.toFixed(2)}M
-          unsold tokens at zero. It is intentionally not a mark-to-market
-          portfolio return.
+          {t(
+            "Cash accounting values the {n}M unsold tokens at zero. It is intentionally not a mark-to-market portfolio return.",
+            { n: scenario.retainedMillions.toFixed(2) },
+          )}
         </p>
 
         <ExitRaceChart
@@ -238,6 +248,7 @@ function ExitRaceChart({
   selectedPnl: number;
   overheadXcpPerAddress: number;
 }) {
+  const t = useT();
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(680);
 
@@ -295,15 +306,15 @@ function ExitRaceChart({
       <div className="mb-2 flex flex-wrap gap-x-5 gap-y-1 text-xs text-gray-600 dark:text-gray-400">
         <span className="inline-flex items-center gap-1.5">
           <span className="h-0.5 w-5 bg-purple-600" aria-hidden />
-          Coordinated first exit
+          {t("Coordinated first exit")}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="w-5 border-t-2 border-dashed border-orange-500" aria-hidden />
-          Random position among 69 sellers
+          {t("Random position among 69 sellers")}
         </span>
         <span className="inline-flex items-center gap-1.5">
           <span className="size-2.5 rounded-full bg-green-500" aria-hidden />
-          Selected scenario
+          {t("Selected scenario")}
         </span>
       </div>
       <div ref={container} className="w-full">
@@ -311,7 +322,7 @@ function ExitRaceChart({
           className="block w-full"
           viewBox={`0 0 ${width} ${height}`}
           role="img"
-          aria-label="Net cash profit or loss by number of controlled maximum-mint addresses"
+          aria-label={t("Net cash profit or loss by number of controlled maximum-mint addresses")}
         >
           <rect
             x={margin.left}
@@ -398,7 +409,7 @@ function ExitRaceChart({
               fontWeight="600"
               className="fill-gray-900 dark:fill-gray-100"
             >
-              coordinated break-even ≈ {thresholds.breakEven.toFixed(1)}
+              {t("coordinated break-even ≈ {n}", { n: thresholds.breakEven.toFixed(1) })}
             </text>
           )}
           <text
@@ -408,7 +419,7 @@ function ExitRaceChart({
             fontSize="11"
             className="fill-gray-700 dark:fill-gray-300"
           >
-            maximum-mint addresses controlled
+            {t("maximum-mint addresses controlled")}
           </text>
           <text
             x="14"
@@ -418,7 +429,7 @@ function ExitRaceChart({
             fontSize="11"
             className="fill-gray-700 dark:fill-gray-300"
           >
-            cash P/L (XCP-equivalent)
+            {t("cash P/L (XCP-equivalent)")}
           </text>
         </svg>
       </div>

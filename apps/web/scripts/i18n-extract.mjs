@@ -17,7 +17,7 @@ const check = process.argv.includes("--check");
 // t("text"), t('text'), t(`text`) with no ${}, optionally followed by
 // `, {vars}` or `, "context"`. Multi-line calls are matched because the
 // argument is the first thing after the paren.
-const CALL = /\b(?:t|msg)\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`([^`$]*)`)\s*(?:,\s*(?:"([^"]*)"|'([^']*)'))?/g;
+const CALL = /\b(?:t\(|msg\(|rich\(\s*t\s*,)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`([^`$]*)`)\s*(?:,\s*(?:"([^"]*)"|'([^']*)'))?/g;
 
 function* files(dir) {
   for (const name of readdirSync(dir)) {

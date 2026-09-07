@@ -61,7 +61,7 @@ export function GraveyardList({
     <div className="mx-auto max-w-5xl space-y-6">
       <header className="max-w-2xl">
         <div className="flex items-baseline gap-2.5">
-          <h1 className="text-2xl font-bold">Graveyard</h1>
+          <h1 className="text-2xl font-bold">{t("Graveyard")}</h1>
           {total > 0 && (
             <span className="text-sm font-medium tabular-nums text-gray-400 dark:text-gray-500">
               {commas(total)}
@@ -69,9 +69,7 @@ export function GraveyardList({
           )}
         </div>
         <p className="mt-2 text-sm leading-6 text-gray-600 dark:text-gray-400">
-          XCP-69 launches that closed below their soft cap. Their temporary
-          token supply was destroyed and every participant&apos;s escrowed XCP
-          was repaid by the protocol.
+          {t("XCP-69 launches that closed below their soft cap. Their temporary token supply was destroyed and every participant's escrowed XCP was repaid by the protocol.")}
         </p>
       </header>
 
@@ -80,11 +78,11 @@ export function GraveyardList({
           role="status"
           className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400"
         >
-          {isLoading ? "Opening the graveyard…" : "The graveyard is unavailable right now."}
+          {isLoading ? t("Opening the graveyard…") : t("The graveyard is unavailable right now.")}
         </p>
       ) : shown.total === 0 ? (
         <p className="rounded-xl border border-dashed border-gray-300 p-8 text-center text-sm text-gray-500 dark:border-gray-700 dark:text-gray-400">
-          Nothing here. That&apos;s good.
+          {t("Nothing here. That's good.")}
         </p>
       ) : (
         <div
@@ -139,7 +137,7 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
           className="size-full object-cover grayscale transition duration-300 group-hover:scale-105 group-hover:grayscale-0"
         />
         <span className="absolute left-2 top-2 rounded-full bg-black/65 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
-          <span aria-hidden>💀</span> RIP
+          <span aria-hidden>💀</span> {t("RIP")}
         </span>
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/35 to-transparent p-3 pt-10">
           <div className="flex items-baseline justify-between gap-2">
@@ -156,7 +154,7 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
       <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center justify-between gap-2">
           <span className="min-w-0 truncate tabular-nums">
-            {refunded > 0 ? `${compact(refunded)} XCP repaid` : "No XCP committed"}
+            {refunded > 0 ? t("{amount} XCP repaid", { amount: compact(refunded) }) : t("No XCP committed")}
           </span>
           <span className="shrink-0 tabular-nums">{minters}</span>
         </div>
@@ -165,7 +163,7 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
             {shortAddress(fm.source)}
           </span>
           <span className="shrink-0 tabular-nums">
-            {elapsed ? `failed ${elapsed === "now" ? "now" : `${elapsed} ago`}` : "failed"}
+            {elapsed ? t("failed {age} ago", { age: elapsed }) : t("failed")}
           </span>
         </div>
       </div>
@@ -182,6 +180,7 @@ function Pager({
   pages: number;
   onGo: (page: number) => void;
 }) {
+  const t = useT();
   const candidates = new Set([0, pages - 1, page - 1, page, page + 1]);
   const numbers = [...candidates]
     .filter((candidate) => candidate >= 0 && candidate < pages)
@@ -189,7 +188,7 @@ function Pager({
   const button = "min-w-8 rounded-lg px-2 py-1 text-xs font-medium transition-colors";
 
   return (
-    <nav aria-label="Graveyard pages" className="flex items-center justify-center gap-1">
+    <nav aria-label={t("Graveyard pages")} className="flex items-center justify-center gap-1">
       <button
         type="button"
         disabled={page === 0}

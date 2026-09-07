@@ -7,12 +7,14 @@ import { TokenImage } from "@/components/token-image";
 import { fetchMempoolFairminters } from "@/lib/api/counterparty";
 import { fetchLaunchesBySource, type MyLaunch } from "@/lib/api/launchpad-api";
 import type { LaunchPhase } from "@/lib/xcp69";
+import { useT } from "@/lib/i18n/client";
+import { msg } from "@/lib/i18n/t";
 
 const PHASE_LABEL: Record<LaunchPhase, string> = {
-  scheduled: "Scheduled",
-  minting: "Minting",
-  graduated: "Graduated",
-  refunded: "Refunded",
+  scheduled: msg("Scheduled"),
+  minting: msg("Minting"),
+  graduated: msg("Graduated"),
+  refunded: msg("Refunded"),
 };
 
 const PHASE_TONE: Record<LaunchPhase, string> = {
@@ -23,17 +25,19 @@ const PHASE_TONE: Record<LaunchPhase, string> = {
 };
 
 function ConformingBadge({ conforming }: { conforming: boolean | null }) {
+  const t = useT();
   if (conforming === null) {
-    return <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">Verdict pending</span>;
+    return <span className="rounded-full bg-gray-100 dark:bg-gray-800 px-2 py-0.5 text-xs font-medium text-gray-500 dark:text-gray-400">{t("Verdict pending")}</span>;
   }
   return conforming ? (
     <span className="rounded-full bg-purple-100 dark:bg-purple-900/50 px-2 py-0.5 text-xs font-medium text-purple-700 dark:text-purple-300">XCP-69</span>
   ) : (
-    <span className="rounded-full bg-red-100 dark:bg-red-900/50 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">Non-conforming</span>
+    <span className="rounded-full bg-red-100 dark:bg-red-900/50 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">{t("Non-conforming")}</span>
   );
 }
 
 function LaunchCard({ launch }: { launch: MyLaunch }) {
+  const t = useT();
   return (
     <div className="flex gap-4 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
       <LazyLink href={`/${launch.asset}`} className="shrink-0">
@@ -50,7 +54,7 @@ function LaunchCard({ launch }: { launch: MyLaunch }) {
           <div className="flex shrink-0 items-center gap-2">
             <ConformingBadge conforming={launch.conforming} />
             <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_TONE[launch.phase]}`}>
-              {PHASE_LABEL[launch.phase]}
+              {t(PHASE_LABEL[launch.phase])}
             </span>
           </div>
         </div>
@@ -66,6 +70,7 @@ function LaunchCard({ launch }: { launch: MyLaunch }) {
  *  an asset acquired rather than created is editable from its own page
  *  without ever appearing here. */
 export function LaunchesTab({ address }: { address: string }) {
+  const t = useT();
   const { data: launches, isLoading } = useSWR(
     ["my-launches", address],
     () => fetchLaunchesBySource(address),
@@ -90,7 +95,7 @@ export function LaunchesTab({ address }: { address: string }) {
 
   return (
     <div className="space-y-4">
-      {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">Loading…</p>}
+      {isLoading && <p className="text-sm text-gray-500 dark:text-gray-400">{t("Loading…")}</p>}
 
       {unconfirmed.map((fm) => (
         <div
@@ -102,24 +107,23 @@ export function LaunchesTab({ address }: { address: string }) {
             <div className="flex items-center justify-between gap-3">
               <span className="truncate font-semibold text-gray-900 dark:text-gray-100">{fm.asset}</span>
               <span className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
-                In mempool
+                {t("In mempool")}
               </span>
             </div>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Broadcast, waiting to confirm. Its page and editing open up once
-              it lands in a block.
+              {t("Broadcast, waiting to confirm. Its page and editing open up once it lands in a block.")}
             </p>
           </div>
         </div>
       ))}
       {launches !== null && launches !== undefined && launches.length === 0 && unconfirmed.length === 0 && (
         <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          This wallet hasn&apos;t launched anything yet.
+          {t("This wallet hasn't launched anything yet.")}
         </p>
       )}
       {launches === null && (
         <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          Couldn&apos;t reach the launch index — try again shortly.
+          {t("Couldn't reach the launch index — try again shortly.")}
         </p>
       )}
       {launches?.map((launch) => (

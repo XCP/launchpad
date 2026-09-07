@@ -9,6 +9,7 @@ import {
 } from "@/lib/api/launchpad-api";
 import { commasRaw } from "@/lib/format";
 import { big } from "@/lib/numeric";
+import { useT } from "@/lib/i18n/client";
 
 interface OpenMint {
   asset: string;
@@ -22,6 +23,7 @@ interface OpenMint {
 }
 
 export function MintingTab({ address }: { address: string }) {
+  const t = useT();
   const { data: mints, isLoading } = useSWR(
     ["open-mints", address],
     () => fetchMintsBySource(address),
@@ -68,13 +70,13 @@ export function MintingTab({ address }: { address: string }) {
   const pending = rows.reduce((sum, row) => sum + row.pendingPaid, 0n);
 
   if (isLoading) {
-    return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading open mints…</p>;
+    return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("Loading open mints…")}</p>;
   }
 
   if (mints === null) {
     return (
       <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        Couldn&apos;t reach the mint index—try again shortly.
+        {t("Couldn't reach the mint index—try again shortly.")}
       </p>
     );
   }
@@ -82,7 +84,7 @@ export function MintingTab({ address }: { address: string }) {
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        No XCP committed to open mints right now.
+        {t("No XCP committed to open mints right now.")}
       </p>
     );
   }
@@ -91,36 +93,35 @@ export function MintingTab({ address }: { address: string }) {
     <div className="space-y-4">
       <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4">
         <p className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">
-          XCP committed
+          {t("XCP committed")}
         </p>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
             {commasRaw(committed)} XCP
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            across {rows.filter((row) => row.paid > 0n).length}{" "}
-            open {rows.filter((row) => row.paid > 0n).length === 1 ? "launch" : "launches"}
+            {rows.filter((row) => row.paid > 0n).length === 1
+              ? t("across {n} open launch", { n: rows.filter((row) => row.paid > 0n).length })
+              : t("across {n} open launches", { n: rows.filter((row) => row.paid > 0n).length })}
           </p>
         </div>
         {pending > 0n && (
           <p className="mt-1 text-xs tabular-nums text-amber-700 dark:text-amber-400">
-            + {commasRaw(pending)} XCP waiting to confirm
+            {t("+ {amount} XCP waiting to confirm", { amount: commasRaw(pending) })}
           </p>
         )}
         <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
-          This XCP is escrowed by consensus. It returns automatically if a
-          launch misses its soft cap; if the launch graduates, you receive the
-          tokens shown below instead.
+          {t("This XCP is escrowed by consensus. It returns automatically if a launch misses its soft cap; if the launch graduates, you receive the tokens shown below instead.")}
         </p>
       </div>
 
       <div className="overflow-x-auto">
         <div className="min-w-[34rem]">
           <div className="grid grid-cols-[minmax(0,1fr)_5rem_8rem_8rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            <span>Token</span>
-            <span className="text-right">Mints</span>
-            <span className="text-right">If launched</span>
-            <span className="text-right">XCP committed</span>
+            <span>{t("Token")}</span>
+            <span className="text-right">{t("Mints")}</span>
+            <span className="text-right">{t("If launched")}</span>
+            <span className="text-right">{t("XCP committed")}</span>
           </div>
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {rows.map((row) => (
@@ -136,7 +137,7 @@ export function MintingTab({ address }: { address: string }) {
                   <span className="truncate font-medium">{row.asset}</span>
                   {row.pendingMints > 0 && (
                     <span className="shrink-0 rounded-full bg-amber-100 dark:bg-amber-900/50 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
-                      pending
+                      {t("pending")}
                     </span>
                   )}
                 </LazyLink>
@@ -154,7 +155,7 @@ export function MintingTab({ address }: { address: string }) {
                   {commasRaw(row.paid)}
                   {row.pendingPaid > 0n && (
                     <span className="block text-[10px] text-amber-600 dark:text-amber-400">
-                      +{commasRaw(row.pendingPaid)} pending
+                      {t("+{amount} pending", { amount: commasRaw(row.pendingPaid) })}
                     </span>
                   )}
                 </span>

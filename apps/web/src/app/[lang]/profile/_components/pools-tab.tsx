@@ -12,6 +12,7 @@ import { fetchXcpUsd } from "@/lib/api/price";
 import { fromSats, tokenQty } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { big, ratio } from "@/lib/numeric";
+import { useT } from "@/lib/i18n/client";
 
 type Denom = "usd" | "xcp";
 
@@ -92,6 +93,7 @@ export function PoolsTab({
   pools: AddressPoolPosition[];
   xcp69Assets: Set<string>;
 }) {
+  const t = useT();
   const usd = useFiat();
   const { code } = useFxRate();
   const [denom, setDenom] = useState<Denom>("usd");
@@ -119,7 +121,7 @@ export function PoolsTab({
   if (isLoading || !positions) {
     return (
       <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">
-        Loading pools…
+        {t("Loading pools…")}
       </p>
     );
   }
@@ -139,14 +141,19 @@ export function PoolsTab({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            {hasKnownValue ? (incomplete ? "Known LP value" : "LP value") : "LP positions"}
+            {hasKnownValue ? (incomplete ? t("Known LP value") : t("LP value")) : t("LP positions")}
           </p>
           <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
             {hasKnownValue ? money(total) : positions.length.toLocaleString("en-US")}
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {hasKnownValue ? "Across " : "In "}
-            {positions.length} {positions.length === 1 ? "pool" : "pools"}
+            {hasKnownValue
+              ? positions.length === 1
+                ? t("Across {n} pool", { n: positions.length })
+                : t("Across {n} pools", { n: positions.length })
+              : positions.length === 1
+                ? t("In {n} pool", { n: positions.length })
+                : t("In {n} pools", { n: positions.length })}
           </p>
         </div>
         {xcpUsd && hasKnownValue && (
@@ -189,7 +196,7 @@ export function PoolsTab({
               <p className="mt-1 truncate pl-9 text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 {position.amountA !== null && position.amountB !== null
                   ? `${holding(tokenQty(position.amountA, position.divisibleA))} ${position.assetA} + ${holding(tokenQty(position.amountB, position.divisibleB))} ${position.assetB}`
-                  : "Underlying amounts unavailable"}
+                  : t("Underlying amounts unavailable")}
               </p>
             </div>
             <div className="text-right">
@@ -198,10 +205,10 @@ export function PoolsTab({
               </p>
               <p className="mt-1 text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 {position.poolSharePct === null
-                  ? "Share unavailable"
+                  ? t("Share unavailable")
                   : position.poolSharePct >= 0.01
-                    ? `${position.poolSharePct.toFixed(2)}% of pool`
-                    : "<0.01% of pool"}
+                    ? t("{pct}% of pool", { pct: position.poolSharePct.toFixed(2) })
+                    : t("<0.01% of pool")}
               </p>
             </div>
           </li>
@@ -209,9 +216,7 @@ export function PoolsTab({
       </ul>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        Value and underlying amounts are what withdrawing the LP tokens now
-        would return. XCP value is available when XCP is one side of the pair.
-        LP profit and loss is not estimated.
+        {t("Value and underlying amounts are what withdrawing the LP tokens now would return. XCP value is available when XCP is one side of the pair. LP profit and loss is not estimated.")}
       </p>
     </div>
   );

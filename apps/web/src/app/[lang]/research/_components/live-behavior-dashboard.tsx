@@ -11,6 +11,8 @@ import {
   type ResearchBehaviorSnapshot,
 } from "@/lib/api/launchpad-api";
 import { compact, fromSats } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n/t";
 import { big, ratio } from "@/lib/numeric";
 import { circulatingSupplyRaw } from "@/lib/xcp69";
 
@@ -23,6 +25,7 @@ const EMPTY_PENDING: PendingPressure = {
 };
 
 export function LiveBehaviorDashboard() {
+  const t = useT();
   const { data, isLoading } = useSWR("research:behavior", fetchResearchBehavior, {
     refreshInterval: 300_000,
     dedupingInterval: 300_000,
@@ -48,7 +51,7 @@ export function LiveBehaviorDashboard() {
   if (isLoading && !data) {
     return (
       <section className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 text-sm text-gray-500 dark:text-gray-400">
-        Loading launch dynamics…
+        {t("Loading launch dynamics…")}
       </section>
     );
   }
@@ -56,7 +59,7 @@ export function LiveBehaviorDashboard() {
   if (!data) {
     return (
       <section className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-5 text-sm text-amber-900 dark:text-amber-200">
-        Launch dynamics are temporarily unavailable.
+        {t("Launch dynamics are temporarily unavailable.")}
       </section>
     );
   }
@@ -69,24 +72,25 @@ export function LiveBehaviorDashboard() {
 
       <LaunchTable
         mode="minting"
-        title="Minting now"
-        subtitle="Ranked by progress"
+        title={t("Minting now")}
+        subtitle={t("Ranked by progress")}
         rows={data.launches.filter((row) => row.phase === "minting")}
         pending={pending}
       />
 
       <LaunchTable
         mode="graduated"
-        title="After graduation"
-        subtitle="Ranked by market cap"
+        title={t("After graduation")}
+        subtitle={t("Ranked by market cap")}
         rows={data.launches.filter((row) => row.phase === "graduated")}
         pending={pending}
       />
 
       <p className="text-xs leading-relaxed text-gray-400 dark:text-gray-500">
-        Each number counts unique addresses. A sale is a pool or order-book sale captured by xcp.fun.
-        Dump means the address sold within {data.fastExitBlocks} blocks of graduation. A meaningful
-        balance is more than one token and more than 1% of the address&apos;s acquired amount.
+        {t(
+          "Each number counts unique addresses. A sale is a pool or order-book sale captured by xcp.fun. Dump means the address sold within {blocks} blocks of graduation. A meaningful balance is more than one token and more than 1% of the address's acquired amount.",
+          { blocks: data.fastExitBlocks },
+        )}
       </p>
     </section>
   );
@@ -97,6 +101,7 @@ export function SellerSummary({
 }: {
   cohorts: ResearchBehaviorSnapshot["cohorts"];
 }) {
+  const t = useT();
   const redeployed = cohorts.redeployAndHold + cohorts.redeployAndExit;
 
   return (
@@ -104,14 +109,14 @@ export function SellerSummary({
       <div className="border-b border-gray-100 dark:border-gray-800 px-4 py-4 sm:px-5">
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div>
-            <h2 className="font-semibold">What sellers did next</h2>
+            <h2 className="font-semibold">{t("What sellers did next")}</h2>
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              {cohorts.sellerAddresses} unique minter addresses made a sale. Each appears once below.
+              {t("{n} unique minter addresses made a sale. Each appears once below.", { n: cohorts.sellerAddresses })}
             </p>
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-right">
-            <strong className="text-gray-900 dark:text-gray-100">{redeployed}</strong> minted again ·{" "}
-            <strong className="text-gray-900 dark:text-gray-100">{compact(fromSats(cohorts.redeployedPaid))} XCP</strong> redeployed
+            <strong className="text-gray-900 dark:text-gray-100">{redeployed}</strong> {t("minted again")} ·{" "}
+            <strong className="text-gray-900 dark:text-gray-100">{compact(fromSats(cohorts.redeployedPaid))} XCP</strong> {t("redeployed")}
           </p>
         </div>
       </div>
@@ -119,17 +124,17 @@ export function SellerSummary({
       <div className="grid grid-cols-[minmax(7.5rem,1fr)_1fr_1fr] text-sm">
         <div className="border-b border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3" />
         <div className="border-b border-r border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
-          Still holds
+          {t("Still holds")}
         </div>
         <div className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400">
-          No meaningful balance
+          {t("No meaningful balance")}
         </div>
 
-        <MatrixLabel label="Minted again" />
+        <MatrixLabel label={t("Minted again")} />
         <MatrixValue value={cohorts.redeployAndHold} />
         <MatrixValue value={cohorts.redeployAndExit} />
 
-        <MatrixLabel label="Did not mint again" last />
+        <MatrixLabel label={t("Did not mint again")} last />
         <MatrixValue value={cohorts.holdWithoutRedeploy} last />
         <MatrixValue value={cohorts.exitWithoutRedeploy} last lastColumn />
       </div>
@@ -154,17 +159,19 @@ function MatrixValue({
   last?: boolean;
   lastColumn?: boolean;
 }) {
+  const t = useT();
   return (
     <div
       className={`${last ? "" : "border-b"} ${lastColumn ? "" : "border-r"} border-gray-100 dark:border-gray-800 p-3 text-center sm:p-4`}
     >
       <strong className="text-xl tabular-nums text-gray-900 dark:text-gray-100">{value}</strong>
-      <div className="text-[11px] text-gray-400 dark:text-gray-500">addresses</div>
+      <div className="text-[11px] text-gray-400 dark:text-gray-500">{t("addresses")}</div>
     </div>
   );
 }
 
 function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
+  const t = useT();
   const transactions = rows.reduce((sum, [, row]) => sum + row.sellTransactions, 0);
   const wallets = rows.reduce((sum, [, row]) => sum + row.sellWallets, 0);
 
@@ -172,7 +179,7 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
     return (
       <div className="flex items-center gap-2 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-4 py-3 text-xs text-gray-500 dark:text-gray-400">
         <span className="h-2 w-2 rounded-full bg-green-500" aria-hidden="true" />
-        No sells waiting in the mempool.
+        {t("No sells waiting in the mempool.")}
       </div>
     );
   }
@@ -180,9 +187,13 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
   return (
     <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-red-950 dark:text-red-200">Dumping now</h2>
+        <h2 className="text-sm font-semibold text-red-950 dark:text-red-200">{t("Dumping now")}</h2>
         <span className="text-xs font-semibold text-red-700 dark:text-red-400">
-          {transactions} pending {transactions === 1 ? "transaction" : "transactions"} · {wallets} {wallets === 1 ? "wallet" : "wallets"}
+          {transactions === 1
+            ? t("{n} pending transaction", { n: transactions })
+            : t("{n} pending transactions", { n: transactions })}
+          {" · "}
+          {wallets === 1 ? t("{n} wallet", { n: wallets }) : t("{n} wallets", { n: wallets })}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -193,8 +204,12 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
             className="rounded-lg border border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 px-3 py-2 text-xs hover:border-red-400 dark:hover:border-red-500"
           >
             <strong className="text-gray-900 dark:text-gray-100">{asset}</strong>
-            <span className="ml-2 font-semibold text-red-700 dark:text-red-400">{compact(fromSats(row.sellQuantity))} tokens</span>
-            <span className="ml-1 text-gray-500 dark:text-gray-400">· {row.sellWallets} wallets · {row.sellTransactions} txs</span>
+            <span className="ml-2 font-semibold text-red-700 dark:text-red-400">
+              {t("{n} tokens", { n: compact(fromSats(row.sellQuantity)) })}
+            </span>
+            <span className="ml-1 text-gray-500 dark:text-gray-400">
+              {t("· {wallets} wallets · {txs} txs", { wallets: row.sellWallets, txs: row.sellTransactions })}
+            </span>
           </LazyLink>
         ))}
       </div>
@@ -215,6 +230,7 @@ export function LaunchTable({
   rows: ResearchLaunchBehavior[];
   pending: Map<string, PendingPressure>;
 }) {
+  const t = useT();
   const visibleRows = rows;
 
   return (
@@ -225,7 +241,7 @@ export function LaunchTable({
       </div>
 
       {rows.length === 0 ? (
-        <p className="px-4 py-5 text-sm text-gray-500 dark:text-gray-400">No launches in this phase.</p>
+        <p className="px-4 py-5 text-sm text-gray-500 dark:text-gray-400">{t("No launches in this phase.")}</p>
       ) : (
         <>
           <div className="divide-y divide-gray-100 dark:divide-gray-800 md:hidden">
@@ -245,17 +261,17 @@ export function LaunchTable({
               <thead className="border-b border-gray-100 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500">
                 {mode === "minting" ? (
                   <tr>
-                    <th className="px-5 py-2 font-medium">Launch</th>
-                    <th className="px-3 py-2 font-medium">Minters</th>
-                    <th className="px-3 py-2 font-medium">Dumpers</th>
-                    <th className="px-5 py-2 font-medium">Repeat dumpers</th>
+                    <th className="px-5 py-2 font-medium">{t("Launch")}</th>
+                    <th className="px-3 py-2 font-medium">{t("Minters")}</th>
+                    <th className="px-3 py-2 font-medium">{t("Dumpers")}</th>
+                    <th className="px-5 py-2 font-medium">{t("Repeat dumpers")}</th>
                   </tr>
                 ) : (
                   <tr>
-                    <th className="px-5 py-2 font-medium">Launch</th>
-                    <th className="px-3 py-2 font-medium">Minter outcomes</th>
-                    <th className="px-3 py-2 font-medium">Seller inventory</th>
-                    <th className="px-5 py-2 font-medium">New buyers</th>
+                    <th className="px-5 py-2 font-medium">{t("Launch")}</th>
+                    <th className="px-3 py-2 font-medium">{t("Minter outcomes")}</th>
+                    <th className="px-3 py-2 font-medium">{t("Seller inventory")}</th>
+                    <th className="px-5 py-2 font-medium">{t("New buyers")}</th>
                   </tr>
                 )}
               </thead>
@@ -290,6 +306,7 @@ function LaunchRow({
   rank: number;
   pending: PendingPressure;
 }) {
+  const t = useT();
   const behavior = row.behavior;
 
   return (
@@ -301,7 +318,7 @@ function LaunchRow({
         <>
           <td className="px-3 py-3 align-top">
             <strong className="tabular-nums">{behavior.trackedMinters}</strong>
-            <div className="text-xs text-gray-400 dark:text-gray-500">unique addresses</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">{t("unique addresses")}</div>
           </td>
           <td className="px-3 py-3 align-top">
             <Allocation count={behavior.knownFastMinters} quantity={behavior.knownFastInventory} total={row.earnedQuantity} />
@@ -320,7 +337,7 @@ function LaunchRow({
           </td>
           <td className="px-5 py-3 align-top">
             <strong className="tabular-nums">{behavior.buyerOnly}</strong>
-            <div className="text-xs text-gray-400 dark:text-gray-500">bought without minting</div>
+            <div className="text-xs text-gray-400 dark:text-gray-500">{t("bought without minting")}</div>
           </td>
         </>
       )}
@@ -339,6 +356,7 @@ function LaunchCard({
   rank: number;
   pending: PendingPressure;
 }) {
+  const t = useT();
   const behavior = row.behavior;
 
   return (
@@ -346,30 +364,30 @@ function LaunchCard({
       <LaunchName row={row} rank={rank} pending={pending} />
       {mode === "minting" ? (
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <MobileStat label="Minters" value={String(behavior.trackedMinters)} detail="unique addresses" />
+          <MobileStat label={t("Minters")} value={String(behavior.trackedMinters)} detail={t("unique addresses")} />
           <MobileStat
-            label="Dumpers"
+            label={t("Dumpers")}
             value={allocationShare(behavior.knownFastInventory, row.earnedQuantity)}
-            detail={`${behavior.knownFastMinters} addresses`}
+            detail={t("{n} addresses", { n: behavior.knownFastMinters })}
           />
           <MobileStat
-            label="Repeat dumpers"
+            label={t("Repeat dumpers")}
             value={allocationShare(behavior.repeatDumpInventory, row.earnedQuantity)}
-            detail={`${behavior.repeatDumpMinters} addresses`}
+            detail={t("{n} addresses", { n: behavior.repeatDumpMinters })}
           />
         </div>
       ) : (
         <div className="mt-4 space-y-3">
           <div>
-            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Minter outcomes</div>
+            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t("Minter outcomes")}</div>
             <OutcomeLine row={row} />
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-lg bg-gray-50 dark:bg-gray-800/60 p-3">
-              <div className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">Seller inventory</div>
+              <div className="text-[11px] font-semibold text-gray-400 dark:text-gray-500">{t("Seller inventory")}</div>
               <Inventory row={row} />
             </div>
-            <MobileStat label="New buyers" value={String(behavior.buyerOnly)} detail="bought without minting" />
+            <MobileStat label={t("New buyers")} value={String(behavior.buyerOnly)} detail={t("bought without minting")} />
           </div>
         </div>
       )}
@@ -386,6 +404,7 @@ function LaunchName({
   rank: number;
   pending: PendingPressure;
 }) {
+  const t = useT();
   return (
     <div>
       <div className="flex flex-wrap items-baseline gap-2">
@@ -394,10 +413,14 @@ function LaunchName({
           {row.asset}
         </LazyLink>
       </div>
-      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{rankSignal(row)}</div>
+      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{rankSignal(row, t)}</div>
       {pending.sellTransactions > 0 && (
         <div className="mt-1 text-xs font-semibold text-red-700 dark:text-red-400">
-          {pending.sellTransactions} pending sells · {pending.sellWallets} wallets · {compact(fromSats(pending.sellQuantity))} tokens
+          {t("{sells} pending sells · {wallets} wallets · {tokens} tokens", {
+            sells: pending.sellTransactions,
+            wallets: pending.sellWallets,
+            tokens: compact(fromSats(pending.sellQuantity)),
+          })}
         </div>
       )}
     </div>
@@ -405,46 +428,57 @@ function LaunchName({
 }
 
 function Allocation({ count, quantity, total }: { count: number; quantity: string; total: string | null }) {
+  const t = useT();
   return (
     <div>
       <strong className="tabular-nums text-red-600 dark:text-red-400">{allocationShare(quantity, total)}</strong>
-      <div className="text-xs text-gray-500 dark:text-gray-400">{count} unique addresses</div>
-      <div className="text-xs text-gray-400 dark:text-gray-500">{compact(fromSats(quantity))} tokens</div>
+      <div className="text-xs text-gray-500 dark:text-gray-400">{t("{n} unique addresses", { n: count })}</div>
+      <div className="text-xs text-gray-400 dark:text-gray-500">{t("{n} tokens", { n: compact(fromSats(quantity)) })}</div>
     </div>
   );
 }
 
 function OutcomeLine({ row }: { row: ResearchLaunchBehavior }) {
+  const t = useT();
   const behavior = row.behavior;
   const sold = Math.max(0, behavior.trackedMinters - behavior.heldWithoutSale - behavior.movedWithoutSale);
 
   return (
     <div className="text-xs leading-relaxed">
-      <strong className="text-green-700 dark:text-green-400">{behavior.heldWithoutSale} held</strong>
+      <strong className="text-green-700 dark:text-green-400">{t("{n} held", { n: behavior.heldWithoutSale })}</strong>
       <span className="text-gray-300 dark:text-gray-600"> · </span>
-      <strong className="text-amber-700 dark:text-amber-400">{behavior.movedWithoutSale} moved</strong>
+      <strong className="text-amber-700 dark:text-amber-400">{t("{n} moved", { n: behavior.movedWithoutSale })}</strong>
       <span className="text-gray-300 dark:text-gray-600"> · </span>
-      <strong className="text-red-600 dark:text-red-400">{sold} sold</strong>
-      <div className="text-gray-400 dark:text-gray-500">{behavior.trackedMinters} unique minters · exclusive outcomes</div>
+      <strong className="text-red-600 dark:text-red-400">{t("{n} sold", { n: sold })}</strong>
+      <div className="text-gray-400 dark:text-gray-500">
+        {t("{n} unique minters · exclusive outcomes", { n: behavior.trackedMinters })}
+      </div>
     </div>
   );
 }
 
 function Inventory({ row }: { row: ResearchLaunchBehavior }) {
+  const t = useT();
   const behavior = row.behavior;
   if (big(behavior.sellerBalance) <= 0n) {
-    return <div className="mt-1 text-xs font-semibold text-green-700 dark:text-green-400">Seller inventory cleared</div>;
+    return <div className="mt-1 text-xs font-semibold text-green-700 dark:text-green-400">{t("Seller inventory cleared")}</div>;
   }
 
   return (
     <div className="mt-1 text-xs leading-relaxed">
-      <strong className="text-amber-700 dark:text-amber-400">{allocationShare(behavior.sellerBalance, row.hardCap)} of supply</strong>
-      <div className="text-gray-500 dark:text-gray-400">held by {behavior.sellersHolding} sellers</div>
+      <strong className="text-amber-700 dark:text-amber-400">
+        {t("{pct} of supply", { pct: allocationShare(behavior.sellerBalance, row.hardCap) })}
+      </strong>
+      <div className="text-gray-500 dark:text-gray-400">{t("held by {n} sellers", { n: behavior.sellersHolding })}</div>
       {big(behavior.dumperBalance) > 0n && (
-        <div className="text-gray-400 dark:text-gray-500">{allocationShare(behavior.dumperBalance, row.hardCap)} held by dumpers</div>
+        <div className="text-gray-400 dark:text-gray-500">
+          {t("{pct} held by dumpers", { pct: allocationShare(behavior.dumperBalance, row.hardCap) })}
+        </div>
       )}
       {behavior.dispenserSellers > 0 && (
-        <div className="text-gray-400 dark:text-gray-500">{behavior.dispenserSellers} also used a dispenser</div>
+        <div className="text-gray-400 dark:text-gray-500">
+          {t("{n} also used a dispenser", { n: behavior.dispenserSellers })}
+        </div>
       )}
     </div>
   );
@@ -460,16 +494,16 @@ function MobileStat({ label, value, detail }: { label: string; value: string; de
   );
 }
 
-function rankSignal(row: ResearchLaunchBehavior): string {
+function rankSignal(row: ResearchLaunchBehavior, t: T): string {
   if (row.phase === "minting") {
-    return `${Math.min(100, ratio(row.earnedQuantity, row.softCap) * 100).toFixed(1)}% minted`;
+    return t("{pct}% minted", { pct: Math.min(100, ratio(row.earnedQuantity, row.softCap) * 100).toFixed(1) });
   }
   const tokenReserve = big(row.poolTokenReserve);
   if (tokenReserve <= 0n) return "—";
   const marketCapRaw =
     (circulatingSupplyRaw(row.hardCap, row.burnedQuantity) * big(row.poolXcpReserve)) /
     tokenReserve;
-  return `${compact(fromSats(marketCapRaw))} XCP market cap`;
+  return t("{cap} XCP market cap", { cap: compact(fromSats(marketCapRaw)) });
 }
 
 function allocationShare(part: string, whole: string | null): string {

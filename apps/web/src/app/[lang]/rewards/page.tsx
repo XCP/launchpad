@@ -1,7 +1,8 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
-import { getMessages } from "@/lib/i18n/server";
-import { makeT, msg } from "@/lib/i18n/t";
+import { getMessages, getT } from "@/lib/i18n/server";
+import { makeT, msg, type T } from "@/lib/i18n/t";
+import { rich } from "@/lib/i18n/rich";
 import type { Metadata } from "next";
 import { LazyLink } from "@/components/lazy-link";
 import { fetchBlockHeight, fetchPool } from "@/lib/api/counterparty";
@@ -60,6 +61,7 @@ const raiseXcp = XCP69_RAISE_SATS / 1e8;
  * this page, beside the mempool chip.
  */
 export default async function RewardsPage() {
+  const t = await getT();
   const height = await fetchBlockHeight().catch(() => 0);
   const [stats, earners, graduates, mintsPool, xcpUsd, btcUsd, rewardBatches] = await Promise.all([
     fetchLaunchStats(height).catch(() => null),
@@ -106,27 +108,33 @@ export default async function RewardsPage() {
           Rewards, and the bounty section opens the page. */}
       {/* ---------------- the bounty ---------------- */}
       <section>
-        <h2 className="text-lg font-bold">The graduation bounty</h2>
+        <h2 className="text-lg font-bold">{t("The graduation bounty")}</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
           {graduated === 0
-            ? "No XCP-69 launch has graduated yet. The first three to do it earn a bounty."
+            ? t("No XCP-69 launch has graduated yet. The first three to do it earn a bounty.")
             : graduated === 1
-              ? "One bounty is claimed — two are still open for the next launches to graduate."
+              ? t("One bounty is claimed — two are still open for the next launches to graduate.")
               : graduated === 2
-                ? "Two bounties are claimed — one is still open for the next launch to graduate."
-                : "All three bounties have been claimed."}
+                ? t("Two bounties are claimed — one is still open for the next launch to graduate.")
+                : t("All three bounties have been claimed.")}
         </p>
 
-        <Podium graduated={graduated} winners={graduates?.rows.map((r) => r.fm.asset) ?? []} />
+        <Podium t={t} graduated={graduated} winners={graduates?.rows.map((r) => r.fm.asset) ?? []} />
 
         <p className="mt-4 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-          Graduating means selling out: {commas(raiseXcp)} XCP raised from at
-          least {XCP69_MIN_PARTICIPANTS} different addresses, at which point
-          the pool is created and its liquidity is burned. A launch that misses
-          its target refunds every satoshi by consensus and does not count.{" "}
-          <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
-            How that works
-          </LazyLink>
+          {rich(
+            t,
+            "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses, at which point the pool is created and its liquidity is burned. A launch that misses its target refunds every satoshi by consensus and does not count. {link}",
+            {
+              xcp: commas(raiseXcp),
+              n: XCP69_MIN_PARTICIPANTS,
+              link: (
+                <LazyLink href="/faq" className="text-purple-600 dark:text-purple-400 hover:underline">
+                  {t("How that works")}
+                </LazyLink>
+              ),
+            },
+          )}
         </p>
       </section>
 
@@ -138,40 +146,44 @@ export default async function RewardsPage() {
             className="size-10 shrink-0 rounded-lg object-cover"
           />
           <h2 className="text-lg font-bold">
-            {commas(MINTS_PER_MINT)} MINTS for every mint
+            {t("{n} MINTS for every mint", { n: commas(MINTS_PER_MINT) })}
           </h2>
         </div>
         <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-          Mint any XCP-69 launch and earn {commas(MINTS_PER_MINT)} MINTS. It
-          doesn&apos;t matter which launch, and it doesn&apos;t matter how much
-          you mint — one transaction, one reward (valid for the first{" "}
-          {commas(MINT_CAP)} mint transactions).
+          {t(
+            "Mint any XCP-69 launch and earn {n} MINTS. It doesn't matter which launch, and it doesn't matter how much you mint — one transaction, one reward (valid for the first {cap} mint transactions).",
+            { n: commas(MINTS_PER_MINT), cap: commas(MINT_CAP) },
+          )}
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Per mint" value={`${commas(MINTS_PER_MINT)} MINTS`} hint="one transaction" />
+          <Stat label={t("Per mint")} value={`${commas(MINTS_PER_MINT)} MINTS`} hint={t("one transaction")} />
           <Stat
-            label="Worth"
+            label={t("Worth")}
             value={`${rewardXcp.toFixed(2)} XCP`}
-            hint="at the live pool price"
+            hint={t("at the live pool price")}
           />
           <Stat
-            label="Your fee"
+            label={t("Your fee")}
             value={`~${commas(typicalMintFeeSats)} sats`}
-            hint={`~${feeXcp.toFixed(2)} XCP · ${measuredFee > 0 ? `${commas(feeSamples)}-mint median` : "estimate"}`}
+            hint={
+              measuredFee > 0
+                ? t("~{xcp} XCP · {n}-mint median", { xcp: feeXcp.toFixed(2), n: commas(feeSamples) })
+                : t("~{xcp} XCP · estimate", { xcp: feeXcp.toFixed(2) })
+            }
           />
           <Stat
-            label="Covered"
+            label={t("Covered")}
             value={`${Math.round((rewardXcp / feeXcp) * 100)}%`}
-            hint="of the typical mint fee"
+            hint={t("of the typical mint fee")}
           />
         </div>
 
         <div className="mt-4 rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
           <div className="flex items-baseline justify-between gap-3">
-            <span className={LABEL}>Mints so far</span>
+            <span className={LABEL}>{t("Mints so far")}</span>
             <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-              {commas(mintsSoFar)} of {commas(MINT_CAP)}
+              {t("{n} of {cap}", { n: commas(mintsSoFar), cap: commas(MINT_CAP) })}
             </span>
           </div>
           <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
@@ -181,33 +193,38 @@ export default async function RewardsPage() {
             />
           </div>
           <p className="mt-2 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-            {commas(remaining)} still to claim
+            {t("{n} still to claim", { n: commas(remaining) })}
           </p>
         </div>
       </section>
 
       {rewardBatches.length > 0 && (
         <section>
-          <h2 className="text-lg font-bold">Distributions</h2>
+          <h2 className="text-lg font-bold">{t("Distributions")}</h2>
           <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-            Completed and confirming reward batches, linked to the transactions
-            that sent them.
+            {t("Completed and confirming reward batches, linked to the transactions that sent them.")}
           </p>
           <div className="mt-4 space-y-3">
             {rewardBatches.map((batch) => {
               const fullyLinked = batch.sentRecipientCount === batch.recipientCount;
               const confirmed =
                 fullyLinked && batch.transactions.every((tx) => tx.status === "confirmed");
-              const state = confirmed ? "Confirmed" : fullyLinked ? "Confirming" : "Partially sent";
+              const state = confirmed ? t("Confirmed") : fullyLinked ? t("Confirming") : t("Partially sent");
               return (
                 <div key={batch.id} className="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-medium text-gray-900 dark:text-gray-100">
-                        Mints {commas(batch.firstMintNumber)}–{commas(batch.cutoffMintNumber)}
+                        {t("Mints {from}–{to}", {
+                          from: commas(batch.firstMintNumber),
+                          to: commas(batch.cutoffMintNumber),
+                        })}
                       </p>
                       <p className="mt-0.5 text-xs text-gray-400 dark:text-gray-500">
-                        {commas(batch.recipientCount)} recipients · {commas(batch.eligibleMints)} mint transactions
+                        {t("{recipients} recipients · {mints} mint transactions", {
+                          recipients: commas(batch.recipientCount),
+                          mints: commas(batch.eligibleMints),
+                        })}
                       </p>
                     </div>
                     <div className="text-right">
@@ -216,7 +233,7 @@ export default async function RewardsPage() {
                       </p>
                       {!fullyLinked && (
                         <p className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
-                          of {commasRaw(batch.totalQuantity)} in the batch
+                          {t("of {n} in the batch", { n: commasRaw(batch.totalQuantity) })}
                         </p>
                       )}
                       <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
@@ -236,7 +253,7 @@ export default async function RewardsPage() {
                         className="font-mono text-purple-600 dark:text-purple-400 hover:underline"
                         title={tx.txHash}
                       >
-                        {tx.method === "mpma" ? "MPMA" : "Send"} {shortAddress(tx.txHash)} ↗
+                        {tx.method === "mpma" ? "MPMA" : t("Send")} {shortAddress(tx.txHash)} ↗
                       </a>
                     ))}
                   </div>
@@ -249,10 +266,9 @@ export default async function RewardsPage() {
 
       {/* ---------------- who has earned what ---------------- */}
       <section>
-        <h2 className="text-lg font-bold">Earned so far</h2>
+        <h2 className="text-lg font-bold">{t("Earned so far")}</h2>
         <p className="mt-2 text-sm leading-relaxed text-gray-600 dark:text-gray-400">
-          Every mint on a conforming launch, counted. Ranked by mints, because
-          that is the unit the reward is paid in.
+          {t("Every mint on a conforming launch, counted. Ranked by mints, because that is the unit the reward is paid in.")}
         </p>
 
         <EarnersTable initial={earners} />
@@ -260,32 +276,29 @@ export default async function RewardsPage() {
 
       {/* ---------------- the small print, in the site's FAQ grammar ---------------- */}
       <section>
-        <h2 className="text-lg font-bold">FAQ</h2>
+        <h2 className="text-lg font-bold">{t("FAQ")}</h2>
         <div className="mt-3 divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-          <Faq q="What is MINTS?" open>
-            The first fairminter ever created on Counterparty — block 866,297,
-            before any other, and it minted out free to 1,376 addresses. The
-            supply is 100,000,000, locked forever; no more can ever be issued.
-            The live MINTS/XCP pool prices the reward: right now 1 MINTS
-            trades at {priceFmt(mintsPriceXcp)} XCP, so{" "}
-            {commas(MINTS_PER_MINT)} MINTS is {rewardXcp.toFixed(2)} XCP.
+          <Faq q={t("What is MINTS?")} open>
+            {t(
+              "The first fairminter ever created on Counterparty — block 866,297, before any other, and it minted out free to 1,376 addresses. The supply is 100,000,000, locked forever; no more can ever be issued. The live MINTS/XCP pool prices the reward: right now 1 MINTS trades at {price} XCP, so {n} MINTS is {worth} XCP.",
+              { price: priceFmt(mintsPriceXcp), n: commas(MINTS_PER_MINT), worth: rewardXcp.toFixed(2) },
+            )}
           </Faq>
-          <Faq q="Why per transaction, not per token?">
-            The Bitcoin fee you pay is per transaction, so the reward is too.
-            Minting one lot and minting the full 1% cost you the same fee and
-            earn the same {commas(MINTS_PER_MINT)} MINTS — there is nothing to
-            gain by splitting a mint into smaller pieces.
+          <Faq q={t("Why per transaction, not per token?")}>
+            {t(
+              "The Bitcoin fee you pay is per transaction, so the reward is too. Minting one lot and minting the full 1% cost you the same fee and earn the same {n} MINTS — there is nothing to gain by splitting a mint into smaller pieces.",
+              { n: commas(MINTS_PER_MINT) },
+            )}
           </Faq>
-          <Faq q="When do I get paid?">
-            Rewards accrue as you mint and are sent in batches. Once yours is
-            sent, its transaction appears on your profile. Lifetime earned is
-            an all-time total, not your wallet balance.
+          <Faq q={t("When do I get paid?")}>
+            {t(
+              "Rewards accrue as you mint and are sent in batches. Once yours is sent, its transaction appears on your profile. Lifetime earned is an all-time total, not your wallet balance.",
+            )}
           </Faq>
-          <Faq q="Doesn't minting cost me the XCP?">
-            No — a mint escrows XCP against the launch. If it graduates you
-            hold the tokens; if it refunds you get every satoshi back. The
-            only thing a mint actually costs you is the Bitcoin fee — which is
-            the part this programme covers.
+          <Faq q={t("Doesn't minting cost me the XCP?")}>
+            {t(
+              "No — a mint escrows XCP against the launch. If it graduates you hold the tokens; if it refunds you get every satoshi back. The only thing a mint actually costs you is the Bitcoin fee — which is the part this programme covers.",
+            )}
           </Faq>
         </div>
       </section>
@@ -301,7 +314,7 @@ export default async function RewardsPage() {
  * price list — which is the point while bounties are open: the whole thing
  * is an invitation to take the next step.
  */
-function Podium({ graduated, winners }: { graduated: number; winners: string[] }) {
+function Podium({ t, graduated, winners }: { t: T; graduated: number; winners: string[] }) {
   // Visual order, not rank order.
   const layout = [
     { i: 1, height: "h-20", accent: "from-gray-300 dark:from-gray-700 to-gray-200 dark:to-gray-800", ring: "ring-gray-300 dark:ring-gray-700" },
@@ -337,11 +350,11 @@ function Podium({ graduated, winners }: { graduated: number; winners: string[] }
                     <span className="truncate">{winner}</span>
                   </LazyLink>
                 ) : (
-                  <span className="rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:text-green-400">claimed</span>
+                  <span className="rounded-full bg-white/90 dark:bg-gray-900/90 px-2 py-0.5 text-[10px] font-semibold text-green-700 dark:text-green-400">{t("claimed")}</span>
                 )
               ) : (
                 <span className="rounded-full bg-white/70 dark:bg-gray-900/70 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:text-gray-400">
-                  open
+                  {t("open", undefined, "bounty")}
                 </span>
               )}
             </div>

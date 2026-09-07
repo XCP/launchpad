@@ -18,18 +18,20 @@ import { PoolsTab } from "@/app/[lang]/profile/_components/pools-tab";
 import { RewardsTab } from "@/app/[lang]/profile/_components/rewards-tab";
 import { fetchAddressPoolPositions } from "@/lib/api/counterparty";
 import { fetchRewardAccount, fetchSearchIndex } from "@/lib/api/launchpad-api";
+import { useT } from "@/lib/i18n/client";
+import { msg } from "@/lib/i18n/t";
 
 type Tab = "positions" | "pools" | "orders" | "history" | "activity" | "rewards" | "minting" | "launches";
 
 const BASE_TABS: { id: Tab; label: string }[] = [
-  { id: "positions", label: "Positions" },
+  { id: "positions", label: msg("Positions") },
   // Open orders sit between what you hold and what you have closed, because
   // that is what they are: a position you have committed to but not yet taken.
-  { id: "orders", label: "Orders" },
-  { id: "history", label: "Closed" },
-  { id: "activity", label: "Activity" },
-  { id: "minting", label: "Minting" },
-  { id: "launches", label: "Launches" },
+  { id: "orders", label: msg("Orders") },
+  { id: "history", label: msg("Closed") },
+  { id: "activity", label: msg("Activity") },
+  { id: "minting", label: msg("Minting") },
+  { id: "launches", label: msg("Launches") },
 ];
 
 /**
@@ -43,6 +45,7 @@ const BASE_TABS: { id: Tab; label: string }[] = [
  * genuinely own — which is the correct answer, not a special case.
  */
 export function ProfileView({ viewing }: { viewing?: string }) {
+  const t = useT();
   const { status, address: connectedAddress, proofStatus, disconnect } = useWallet();
   const [tab, setTab] = useState<Tab>("positions");
   const [copied, setCopied] = useState(false);
@@ -89,14 +92,14 @@ export function ProfileView({ viewing }: { viewing?: string }) {
   const tabs = (() => {
     const visible = [...BASE_TABS];
     if (hasPools) {
-      visible.splice(1, 0, { id: "pools", label: "Pools" });
+      visible.splice(1, 0, { id: "pools", label: msg("Pools") });
     }
     if (rewardAccount?.hasRewardTx) {
         // Anchored to the tab it follows, not to an index: the previous
         // slice(0, 3) silently moved Rewards the moment a tab was inserted
         // above it.
       const after = visible.findIndex((item) => item.id === "activity") + 1;
-      visible.splice(after, 0, { id: "rewards", label: "Rewards" });
+      visible.splice(after, 0, { id: "rewards", label: msg("Rewards") });
     }
     return visible;
   })();
@@ -105,7 +108,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
     return (
       <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-10 text-center">
         <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">
-          Connect your wallet to see your positions and launches.
+          {t("Connect your wallet to see your positions and launches.")}
         </p>
         <ConnectButton size="md" />
       </div>
@@ -123,7 +126,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
                 {shortAddress(address)}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                {isSelf ? "Your xcp.fun profile" : "xcp.fun profile"}
+                {isSelf ? t("Your xcp.fun profile") : t("xcp.fun profile")}
               </p>
             </div>
           </div>
@@ -141,7 +144,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
               }}
               className="rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
             >
-              {copied ? "Copied" : "Copy address"}
+              {copied ? t("Copied") : t("Copy address")}
             </button>
             <a
               href={`https://xcp.io/address/${address}`}
@@ -149,7 +152,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
               rel="noreferrer"
               className="rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:border-gray-300 dark:hover:border-gray-700"
             >
-              Explorer ↗
+              {t("Explorer ↗")}
             </a>
             {isSelf && (
               <button
@@ -157,7 +160,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
                 onClick={() => disconnect()}
                 className="rounded-full border border-gray-200 dark:border-gray-800 px-3 py-1.5 text-sm text-red-600 dark:text-red-400 hover:border-red-300 dark:hover:border-red-700"
               >
-                Disconnect
+                {t("Disconnect")}
               </button>
             )}
           </div>
@@ -166,9 +169,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
 
       {isSelf && proofStatus === "failed" && (
         <p className="rounded-md border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 p-2.5 text-xs text-red-800 dark:text-red-300">
-          Your wallet supplied a connection signature that didn&apos;t verify, so
-          editing is locked for this session. Disconnect and reconnect to try
-          again.
+          {t("Your wallet supplied a connection signature that didn't verify, so editing is locked for this session. Disconnect and reconnect to try again.")}
         </p>
       )}
 
@@ -185,9 +186,9 @@ export function ProfileView({ viewing }: { viewing?: string }) {
               variant="card"
               className="!flex-nowrap overflow-x-auto text-xs sm:text-sm [&_[role=tab]]:!px-2"
             >
-              {tabs.map((t) => (
-                <SegmentedTrigger key={t.id} value={t.id} variant="card" grow={false}>
-                  {t.label}
+              {tabs.map((item) => (
+                <SegmentedTrigger key={item.id} value={item.id} variant="card" grow={false}>
+                  {t(item.label)}
                 </SegmentedTrigger>
               ))}
             </SegmentedList>

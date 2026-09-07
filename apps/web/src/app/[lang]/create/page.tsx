@@ -13,6 +13,9 @@ import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fromSats, commas } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
+import { useT } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
+import { msg, type T } from "@/lib/i18n/t";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
 import { launchCostSats } from "@/lib/launch-cost";
 import { metadataJsonUrl } from "@/lib/metadata";
@@ -53,6 +56,7 @@ const MAX_ASSET_NAME_LENGTH = 12;
  * does.
  */
 function ViewLaunchLink({ asset }: { asset: string }) {
+  const t = useT();
   const { data: visible } = useSWR(
     ["launch-visible", asset],
     async () => {
@@ -89,7 +93,7 @@ function ViewLaunchLink({ asset }: { asset: string }) {
         {/* A spinner, so the wait reads as work rather than as a dead
             button someone should give up on. */}
         <span className="size-3.5 animate-spin rounded-full border-2 border-gray-300 dark:border-gray-700 border-t-gray-500" />
-        Waiting for the network…
+        {t("Waiting for the network…")}
       </span>
     );
   }
@@ -99,7 +103,7 @@ function ViewLaunchLink({ asset }: { asset: string }) {
       href={`/${asset}`}
       className="mt-6 inline-block rounded-md bg-gray-900 dark:bg-gray-100 px-5 py-2.5 font-medium text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-300"
     >
-      View launch page
+      {t("View launch page")}
     </a>
   );
 }
@@ -155,9 +159,9 @@ type NameCheck =
  */
 const PREANNOUNCE_FLOOR_BLOCKS = 36;
 const PREANNOUNCE_PRESETS = [
-  { id: "short", blocks: 36, label: "~6 hours" },
-  { id: "day", blocks: 144, label: "~1 day" },
-  { id: "week", blocks: 1008, label: "~7 days" },
+  { id: "short", blocks: 36, label: msg("~6 hours") },
+  { id: "day", blocks: 144, label: msg("~1 day") },
+  { id: "week", blocks: 1008, label: msg("~7 days") },
 ] as const;
 type PreannounceOption = (typeof PREANNOUNCE_PRESETS)[number]["id"] | "custom";
 
@@ -181,28 +185,29 @@ const TIGHT_LEAD_FEE_MULTIPLIER = 2;
 
 /** ~10 min/block, the same average the rest of the app assumes. Rough on
  *  purpose — the UI beside this always says "estimate," never "at". */
-function estimateFromBlocks(blocksFromNow: number): string {
-  if (blocksFromNow <= 0) return "not far enough in the future";
+function estimateFromBlocks(blocksFromNow: number, t: T): string {
+  if (blocksFromNow <= 0) return t("not far enough in the future");
   const minutes = blocksFromNow * 10;
-  if (minutes < 90) return `~${minutes} minutes`;
+  if (minutes < 90) return t("~{n} minutes", { n: minutes });
   const hours = minutes / 60;
-  if (hours < 48) return `~${Math.round(hours)} hours`;
-  return `~${Math.round(hours / 24)} days`;
+  if (hours < 48) return t("~{n} hours", { n: Math.round(hours) });
+  return t("~{n} days", { n: Math.round(hours / 24) });
 }
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
-  preparing: "Preparing inscription…",
-  "sign-commit": "Confirm commit in wallet…",
-  "broadcast-commit": "Broadcasting commit…",
-  "sign-reveal": "Confirm reveal in wallet…",
-  "broadcast-reveal": "Broadcasting reveal…",
-  done: "Done",
+  preparing: msg("Preparing inscription…"),
+  "sign-commit": msg("Confirm commit in wallet…"),
+  "broadcast-commit": msg("Broadcasting commit…"),
+  "sign-reveal": msg("Confirm reveal in wallet…"),
+  "broadcast-reveal": msg("Broadcasting reveal…"),
+  done: msg("Done"),
 };
 
 const inputClass =
   "mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-sm outline-none transition-colors focus:border-purple-500 focus:bg-white dark:focus:bg-gray-900";
 
 export default function CreatePage() {
+  const t = useT();
   const usd = useFiat();
   const { address, status: walletStatus, signPsbt, broadcastTransaction } = useWallet();
   const compose = useCompose();
@@ -285,15 +290,15 @@ export default function CreatePage() {
       } else if (address && a.owner === address) {
         if (a.locked) {
           setNameCheck("ineligible");
-          setIneligibleReason("its issuance is locked, which can never be undone");
+          setIneligibleReason(t("its issuance is locked, which can never be undone"));
         } else if ((a.supply ?? 0) > 0) {
           setNameCheck("ineligible");
           setIneligibleReason(
-            "it has circulating supply — every unit must be destroyed first",
+            t("it has circulating supply — every unit must be destroyed first"),
           );
         } else if (a.divisible === false) {
           setNameCheck("ineligible");
-          setIneligibleReason("it is indivisible; XCP-69 assets are divisible");
+          setIneligibleReason(t("it is indivisible; XCP-69 assets are divisible"));
         } else {
           setNameCheck("owned");
         }
@@ -340,7 +345,7 @@ export default function CreatePage() {
       form.set("image", image);
       const uploadRes = await fetch("/api/launches", { method: "POST", body: form });
       const upload = await uploadRes.json();
-      if (!uploadRes.ok) throw new Error(upload.error ?? "Upload failed");
+      if (!uploadRes.ok) throw new Error(upload.error ?? t("Upload failed"));
 
       // 2. Schedule: minting opens after the pre-announcement lead (a preset
       //    from now, or an exact future block for Custom), and the window is
@@ -353,7 +358,7 @@ export default function CreatePage() {
           ? customBlockNum
           : height + (preset?.blocks ?? PREANNOUNCE_FLOOR_BLOCKS);
       setScheduledStart(startBlock);
-      setScheduledLabel(preset ? preset.label : estimateFromBlocks(startBlock - height));
+      setScheduledLabel(preset ? t(preset.label) : estimateFromBlocks(startBlock - height, t));
 
       // Next-block rate: this is a single small transaction, always worth
       // paying to confirm promptly rather than risk it lingering.
@@ -426,7 +431,7 @@ export default function CreatePage() {
         fee_rate: submitFeeRate,
       });
     } catch (e) {
-      setUploadError(e instanceof Error ? e.message : "Something went wrong");
+      setUploadError(e instanceof Error ? e.message : t("Something went wrong"));
       setInscribeStep(null);
     } finally {
       setSubmitting(false);
@@ -448,7 +453,7 @@ export default function CreatePage() {
     registerPending({
       txid: launchTxid,
       kind: "launch",
-      label: `Launch ${name}`,
+      label: t("Launch {name}", { name }),
       address: address ?? undefined,
     });
     // What the launch actually cost: the name registration. Zero when the
@@ -459,30 +464,36 @@ export default function CreatePage() {
       "launch created",
       xcpUsd && registrationFeeXcp > 0 ? registrationFeeXcp * xcpUsd : null,
     );
-  }, [launchTxid, registrationFeeXcp, xcpUsd, name, address]);
+  }, [launchTxid, registrationFeeXcp, xcpUsd, name, address, t]);
 
   if (launchTxid) {
     return (
       <div className="mx-auto max-w-lg space-y-4 text-center">
         <div className="holo-border rounded-xl p-8">
-          <h1 className="text-2xl font-bold">{name} is scheduled.</h1>
+          <h1 className="text-2xl font-bold">{t("{name} is scheduled.", { name })}</h1>
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-            Broadcast as{" "}
-            <a
-              href={`https://xcp.io/tx/${launchTxid}`}
-              className="font-mono text-purple-600 dark:text-purple-400 underline"
-              target="_blank"
-              rel="noreferrer"
-            >
-              {launchTxid.slice(0, 12)}…
-            </a>
-            . Minting opens at block{" "}
-            <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
-              {scheduledStart?.toLocaleString()}
-            </span>{" "}
-            ({scheduledLabel}) — until then the launch is announced on-chain and
-            nobody, you included, can mint. Then it runs for 1,000 blocks (~7
-            days): it sells out, or everyone is refunded.
+            {rich(
+              t,
+              "Broadcast as {tx}. Minting opens at block {block} ({when}) — until then the launch is announced on-chain and nobody, you included, can mint. Then it runs for 1,000 blocks (~7 days): it sells out, or everyone is refunded.",
+              {
+                tx: (
+                  <a
+                    href={`https://xcp.io/tx/${launchTxid}`}
+                    className="font-mono text-purple-600 dark:text-purple-400 underline"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {launchTxid.slice(0, 12)}…
+                  </a>
+                ),
+                block: (
+                  <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
+                    {scheduledStart?.toLocaleString()}
+                  </span>
+                ),
+                when: scheduledLabel ?? "",
+              },
+            )}
           </p>
           <ViewLaunchLink asset={name} />
         </div>
@@ -492,14 +503,14 @@ export default function CreatePage() {
 
   const buttonLabel =
     inscribeStep && inscribeStep !== "done"
-      ? INSCRIBE_STEP_LABELS[inscribeStep]
+      ? t(INSCRIBE_STEP_LABELS[inscribeStep])
       : compose.status === "composing"
-        ? "Composing…"
+        ? t("Composing…")
         : compose.status === "signing"
-          ? "Confirm in wallet…"
+          ? t("Confirm in wallet…")
           : compose.status === "broadcasting"
-            ? "Broadcasting…"
-            : `Launch ${name || "token"}`;
+            ? t("Broadcasting…")
+            : t("Launch {name}", { name: name || t("token") });
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -515,15 +526,15 @@ export default function CreatePage() {
             room to travel and settle at the viewport's vertical center as
             you scroll — with items-start it has nowhere to go. */}
         <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
-          <h1 className="text-2xl font-bold">Launch a token</h1>
+          <h1 className="text-2xl font-bold">{t("Launch a token")}</h1>
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
-            Name, image, description. Everything else is the standard.
+            {t("Name, image, description. Everything else is the standard.")}
           </p>
 
           {/* Name — on Counterparty the asset name is the ticker; one identity */}
           <div className="mt-6">
             <label htmlFor="asset-name" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Name <span className="text-red-500">*</span>
+              {t("Name")} <span className="text-red-500">*</span>
             </label>
             <input
               id="asset-name"
@@ -537,45 +548,49 @@ export default function CreatePage() {
             />
             <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
               {nameCheck === "invalid" &&
-                "4-12 letters A-Z, cannot start with A (named assets only)."}
-              {nameCheck === "checking" && "Checking availability…"}
+                t("4-12 letters A-Z, cannot start with A (named assets only).")}
+              {nameCheck === "checking" && t("Checking availability…")}
               {nameCheck === "available" && (
                 <span className="text-green-600 dark:text-green-400">
-                  {name} is available (0.5 XCP registration fee applies —{" "}
-                  <LazyLink href="/dispense" className="underline">
-                    need XCP?
-                  </LazyLink>
-                  ).
+                  {rich(t, "{name} is available (0.5 XCP registration fee applies — {link}).", {
+                    name,
+                    link: (
+                      <LazyLink href="/dispense" className="underline">
+                        {t("need XCP?")}
+                      </LazyLink>
+                    ),
+                  })}
                 </span>
               )}
               {nameCheck === "owned" && (
                 <span className="text-green-700 dark:text-green-400">
-                  {name} is yours — this launch reuses your registered name (no
-                  registration fee). If the launch fails, the name locks at zero
-                  supply forever.
+                  {t(
+                    "{name} is yours — this launch reuses your registered name (no registration fee). If the launch fails, the name locks at zero supply forever.",
+                    { name },
+                  )}
                 </span>
               )}
               {nameCheck === "ineligible" && (
                 <span className="text-red-600 dark:text-red-400">
-                  You own {name}, but {ineligibleReason}.
+                  {t("You own {name}, but {reason}.", { name, reason: ineligibleReason ?? "" })}
                 </span>
               )}
               {nameCheck === "taken" && (
                 <span className="text-red-600 dark:text-red-400">
-                  {name} is already registered.
+                  {t("{name} is already registered.", { name })}
                   {walletStatus !== "connected" &&
-                    " If it's yours, connect that wallet to launch with it."}
+                    ` ${t("If it's yours, connect that wallet to launch with it.")}`}
                 </span>
               )}
               {nameCheck === "idle" &&
-                "The on-chain asset name — universally unique, can never change."}
+                t("The on-chain asset name — universally unique, can never change.")}
             </p>
           </div>
 
           {/* Image */}
           <div className="mt-5">
             <label htmlFor="token-image" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Image <span className="text-red-500">*</span>
+              {t("Image")} <span className="text-red-500">*</span>
             </label>
             <div className="relative mt-1 flex min-h-32 items-center justify-center rounded-xl border-2 border-dashed border-gray-300 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 p-4 hover:border-purple-400 dark:hover:border-purple-500">
               <input
@@ -588,7 +603,7 @@ export default function CreatePage() {
                   setAnimatedWebp(file ? await fileIsAnimatedWebp(file) : false);
                 }}
                 className="absolute inset-0 cursor-pointer opacity-0"
-                aria-label="Upload token image"
+                aria-label={t("Upload token image")}
               />
               {image ? (
                 <div className="flex items-center gap-3 text-sm">
@@ -601,29 +616,28 @@ export default function CreatePage() {
                   <div>
                     <div className="font-medium">{image.name}</div>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {(image.size / 1024).toFixed(0)} KB · click to replace
+                      {t("{kb} KB · click to replace", { kb: (image.size / 1024).toFixed(0) })}
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="text-center text-sm text-gray-500 dark:text-gray-400">
                   <div className="font-medium text-gray-700 dark:text-gray-300">
-                    Select an image or drag and drop it here
+                    {t("Select an image or drag and drop it here")}
                   </div>
                   <div className="mt-1 text-xs">
-                    PNG, JPEG, WEBP or GIF ·{" "}
-                    {inscribe ? "max 385 KB (inscribing)" : `max ${HOSTED_MAX_MB} MB`} · square
-                    (1:1) recommended
+                    {t("PNG, JPEG, WEBP or GIF · {limit} · square (1:1) recommended", {
+                      limit: inscribe ? t("max 385 KB (inscribing)") : t("max {n} MB", { n: HOSTED_MAX_MB }),
+                    })}
                   </div>
                 </div>
               )}
             </div>
             {animatedWebp && (
               <p className="mt-2 rounded-md border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-2 text-xs text-amber-800 dark:text-amber-300">
-                This WEBP is animated. It will move on the site, but the announce
-                channel can only post a still frame of it — Telegram has no way to
-                play an animated WEBP. Upload the same art as a GIF and it moves
-                there too.
+                {t(
+                  "This WEBP is animated. It will move on the site, but the announce channel can only post a still frame of it — Telegram has no way to play an animated WEBP. Upload the same art as a GIF and it moves there too.",
+                )}
               </p>
             )}
             {isTaproot && (
@@ -635,17 +649,18 @@ export default function CreatePage() {
                   className="mt-0.5"
                 />
                 <span>
-                  <span className="font-medium">Inscribe the image on-chain.</span>{" "}
+                  <span className="font-medium">{t("Inscribe the image on-chain.")}</span>{" "}
                   <span className="text-xs text-gray-500 dark:text-gray-400">
-                    The image itself becomes the permanent on-chain description
-                    (commit + reveal, two signatures, higher fees scale with image
-                    size; the inscription is burned so it belongs to the asset
-                    forever). Max 385 KB. Taproot wallets only.
+                    {t(
+                      "The image itself becomes the permanent on-chain description (commit + reveal, two signatures, higher fees scale with image size; the inscription is burned so it belongs to the asset forever). Max 385 KB. Taproot wallets only.",
+                    )}
                   </span>
                   {imageTooBigToInscribe && (
                     <span className="mt-1 block text-xs text-red-600 dark:text-red-400">
-                      This image is {(image!.size / 1024).toFixed(0)} KB — inscribing
-                      caps at 385 KB. Use a smaller file or uncheck to host it instead.
+                      {t(
+                        "This image is {kb} KB — inscribing caps at 385 KB. Use a smaller file or uncheck to host it instead.",
+                        { kb: (image!.size / 1024).toFixed(0) },
+                      )}
                     </span>
                   )}
                 </span>
@@ -656,7 +671,7 @@ export default function CreatePage() {
           {/* Description */}
           <div className="mt-5">
             <label htmlFor="token-description" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              Description
+              {t("Description")}
             </label>
             <textarea
               id="token-description"
@@ -664,7 +679,7 @@ export default function CreatePage() {
               onChange={(e) => setDescription(e.target.value)}
               rows={3}
               maxLength={2000}
-              placeholder="What is this?"
+              placeholder={t("What is this?")}
               className={inputClass}
             />
           </div>
@@ -674,7 +689,7 @@ export default function CreatePage() {
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <SocialInput
               id="x-profile"
-              label="X profile"
+              label={t("X profile")}
               placeholder="https://x.com/yourtoken"
               value={xProfile}
               onChange={setXProfile}
@@ -682,7 +697,7 @@ export default function CreatePage() {
             />
             <SocialInput
               id="telegram"
-              label="Telegram"
+              label={t("Telegram")}
               placeholder="https://t.me/yourtoken"
               value={telegram}
               onChange={setTelegram}
@@ -702,13 +717,13 @@ export default function CreatePage() {
                         xcpUsd ? ` (${usd(registrationFeeXcp * xcpUsd)})` : ""
                       }`
                     : nameCheck === "owned"
-                      ? "none — you already own this name"
+                      ? t("none — you already own this name")
                       : "—"}
                 </dd>
               </div>
               {feeRate !== undefined && (
                 <div className="flex justify-between">
-                  <dt>Bitcoin tx fee</dt>
+                  <dt>{t("Bitcoin tx fee")}</dt>
                   <dd className="tabular-nums text-gray-700 dark:text-gray-300">
                     {commas(launchCostSats(feeRate, launchDescription))}{" "}
                     sats
@@ -793,20 +808,22 @@ function PreviewCard({
   onCustomBlockChange: (v: string) => void;
   blockHeight: number | undefined;
 }) {
+  const t = useT();
   const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
   const priceXcp = XCP69.PRICE / SATS;
   const lot = XCP69.QUANTITY_BY_PRICE / SATS;
   const targetXcp = fromSats(XCP69_RAISE_SATS);
   const supplyTokens = fromSats(XCP69.HARD_CAP);
   const statusLabel: Record<NameCheck, string> = {
-    idle: "on-chain asset name",
-    checking: "checking…",
-    available: "available",
-    owned: "yours — reused, no fee",
-    taken: "already registered",
-    ineligible: "not launchable",
-    invalid: "4-12 letters, A-Z",
+    idle: msg("on-chain asset name"),
+    checking: msg("checking…"),
+    available: msg("available"),
+    owned: msg("yours — reused, no fee"),
+    taken: msg("already registered"),
+    ineligible: msg("not launchable"),
+    invalid: msg("4-12 letters, A-Z"),
   };
+  const presetLabel = PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)?.label;
   const statusTone: Record<NameCheck, string> = {
     idle: "text-gray-400 dark:text-gray-500",
     checking: "text-gray-400 dark:text-gray-500",
@@ -838,7 +855,7 @@ function PreviewCard({
               {name || "YOURTOKEN"}
             </div>
             <div className={`text-xs font-medium ${statusTone[nameCheck]}`}>
-              {statusLabel[nameCheck]}
+              {t(statusLabel[nameCheck])}
             </div>
           </div>
         </div>
@@ -862,19 +879,20 @@ function PreviewCard({
           length, and the minimum-community floor are all true but not
           decision-relevant the way these four are; they live in the docs. */}
       <dl className="mt-4 space-y-2 border-t border-gray-200 dark:border-gray-800 pt-4 text-xs">
-        <Row k="Supply" v={commas(supplyTokens)} />
-        <Row k="Price" v={`${priceXcp} XCP / ${commas(lot)}`} />
-        <Row k="Target" v={`${commas(targetXcp)} XCP or refund`} />
-        <Row k="Liquidity" v="locked forever, LP burned" />
+        <Row k={t("Supply")} v={commas(supplyTokens)} />
+        <Row k={t("Price")} v={`${priceXcp} XCP / ${commas(lot)}`} />
+        <Row k={t("Target")} v={t("{xcp} XCP or refund", { xcp: commas(targetXcp) })} />
+        <Row k={t("Liquidity")} v={t("locked forever, LP burned")} />
         <Row
-          k="Minting opens"
+          k={t("Minting opens")}
           v={
             preannounceOption === "custom"
               ? customBlockInput
-                ? `block ${commas(customBlockNum)}`
-                : "custom block"
-              : (PREANNOUNCE_PRESETS.find((p) => p.id === preannounceOption)
-                  ?.label ?? "")
+                ? t("block {n}", { n: commas(customBlockNum) })
+                : t("custom block")
+              : presetLabel
+                ? t(presetLabel)
+                : ""
           }
         />
       </dl>
@@ -898,6 +916,7 @@ function ScheduleGear({
   onCustomBlockChange: (v: string) => void;
   blockHeight: number | undefined;
 }) {
+  const t = useT();
   const customNum = Math.round(parseFloat(customBlock)) || 0;
   const minBlock =
     blockHeight !== undefined ? blockHeight + CUSTOM_FLOOR_BLOCKS : undefined;
@@ -915,8 +934,8 @@ function ScheduleGear({
     customNum - blockHeight <= TIGHT_LEAD_BLOCKS;
 
   return (
-    <GearPopover active={option !== "short"} label="Launch timing" small>
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Minting opens</div>
+    <GearPopover active={option !== "short"} label={t("Launch timing")} small>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Minting opens")}</div>
       <div className="mt-2 flex items-center gap-1.5">
         {PREANNOUNCE_PRESETS.map((p) => (
           <button
@@ -929,7 +948,7 @@ function ScheduleGear({
                 : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
-            {p.label}
+            {t(p.label)}
           </button>
         ))}
         <button
@@ -941,7 +960,7 @@ function ScheduleGear({
               : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
           }`}
         >
-          Custom
+          {t("Custom")}
         </button>
       </div>
       {option === "custom" && (
@@ -954,34 +973,38 @@ function ScheduleGear({
             <AmountInput
               value={customBlock}
               onChange={onCustomBlockChange}
-              placeholder={minBlock ? String(minBlock) : "block height"}
-              ariaLabel="Target start block"
+              placeholder={minBlock ? String(minBlock) : t("block height")}
+              ariaLabel={t("Target start block")}
               className="w-full bg-transparent text-xs font-medium outline-none"
             />
-            <span className="text-xs text-gray-400 dark:text-gray-500">block</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{t("block")}</span>
           </div>
           {customBlock === "" ? (
             <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-              Any future block, {minBlock ? `${commas(minBlock)} or later` : "at least ~1 hour out"} —
-              tighter than the presets go. Under ~2 hours pays double the
-              network fee.
+              {t(
+                "Any future block, {floor} — tighter than the presets go. Under ~2 hours pays double the network fee.",
+                { floor: minBlock ? t("{n} or later", { n: commas(minBlock) }) : t("at least ~1 hour out") },
+              )}
             </p>
           ) : tooSoon ? (
             <p className="mt-1.5 text-[11px] font-medium text-red-600 dark:text-red-400">
-              Too soon — needs to be block {minBlock ? commas(minBlock) : "…"} or
-              later (~1 hour out). The launch has to confirm before it opens.
+              {t(
+                "Too soon — needs to be block {n} or later (~1 hour out). The launch has to confirm before it opens.",
+                { n: minBlock ? commas(minBlock) : "…" },
+              )}
             </p>
           ) : (
             <>
               <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-                ≈ {estimateFromBlocks(customNum - (blockHeight ?? customNum))} from
-                now — an estimate, not a guarantee; block time isn&apos;t exact.
+                {t("≈ {eta} from now — an estimate, not a guarantee; block time isn't exact.", {
+                  eta: estimateFromBlocks(customNum - (blockHeight ?? customNum), t),
+                })}
               </p>
               {tightLead && (
                 <p className="mt-1.5 text-[11px] font-medium leading-relaxed text-amber-700 dark:text-amber-400">
-                  Double network fee at this lead — there aren&apos;t enough
-                  blocks to re-fee if the estimate comes in low, and a launch
-                  that confirms after it opens fails the standard.
+                  {t(
+                    "Double network fee at this lead — there aren't enough blocks to re-fee if the estimate comes in low, and a launch that confirms after it opens fails the standard.",
+                  )}
                 </p>
               )}
             </>
@@ -1007,6 +1030,7 @@ function SocialInput({
   onChange: (v: string) => void;
   validate: (v: string) => boolean;
 }) {
+  const t = useT();
   const [touched, setTouched] = useState(false);
   const valid = validate(value);
   const showError = touched && !valid;
@@ -1026,7 +1050,7 @@ function SocialInput({
       />
       {showError && (
         <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-          Paste the profile URL or enter the handle.
+          {t("Paste the profile URL or enter the handle.")}
         </p>
       )}
     </div>

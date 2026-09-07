@@ -2,6 +2,7 @@ import { CollectionChip } from "@/components/collection-chip";
 import { collectionByTag } from "@/lib/collections";
 import type { Communities } from "@/lib/api/launchpad-api";
 import { commas } from "@/lib/format";
+import { getT } from "@/lib/i18n/server";
 import { big } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
 import { Stat } from "@/app/[lang]/stats/_components/stat";
@@ -21,38 +22,45 @@ function percent(part: string | undefined, whole: string | undefined): number | 
  * collection: creators, collectors, the share of all minters that is either,
  * and the share of all XCP minted that its members put in.
  */
-export function CommunitiesSection({ data }: { data: Communities }) {
+export async function CommunitiesSection({ data }: { data: Communities }) {
+  const t = await getT();
   const rows = data.communities.filter((row) => row.members > 0);
   if (rows.length === 0 || data.minters === 0) return null;
   const widest = rows[0]?.members ?? 1;
   return (
     <section>
-      <h2 className={`mb-1 ${LABEL}`}>Communities</h2>
+      <h2 className={`mb-1 ${LABEL}`}>{t("Communities")}</h2>
       <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-        Which Counterparty collections the minters come from. Creators made a card there; collectors hold one.
+        {t("Which Counterparty collections the minters come from. Creators made a card there; collectors hold one.")}
       </p>
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
-          label="Represented"
+          label={t("Represented")}
           value={commas(data.represented)}
-          hint={`of ${commas(data.minters)} minters, ${Math.round((data.represented / data.minters) * 100)}%`}
+          hint={t("of {n} minters, {pct}%", {
+            n: commas(data.minters),
+            pct: Math.round((data.represented / data.minters) * 100),
+          })}
         />
-        <Stat label="Communities" value={commas(rows.length)} hint="collections with a minter in them" />
-        <Stat label="Creators" value={commas(data.creators ?? 0)} hint="made a card in one" />
-        <Stat label="Collectors" value={commas(data.collectors ?? 0)} hint="hold one, made none" />
+        <Stat label={t("Communities")} value={commas(rows.length)} hint={t("collections with a minter in them")} />
+        <Stat label={t("Creators")} value={commas(data.creators ?? 0)} hint={t("made a card in one")} />
+        <Stat label={t("Collectors")} value={commas(data.collectors ?? 0)} hint={t("hold one, made none")} />
       </div>
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-gray-100 dark:border-gray-800 text-left">
               <th className={`${TH} pl-4`} colSpan={2}>
-                Community
+                {t("Community")}
               </th>
-              <th className={`${TH} text-right`}>Creators</th>
-              <th className={`${TH} text-right`}>Collectors</th>
-              <th className={TH}>Of minters</th>
-              <th className={`${TH} pr-4 text-right`} title="Share of all XCP committed to mints that came from this community's members">
-                Of XCP minted
+              <th className={`${TH} text-right`}>{t("Creators")}</th>
+              <th className={`${TH} text-right`}>{t("Collectors")}</th>
+              <th className={TH}>{t("Of minters")}</th>
+              <th
+                className={`${TH} pr-4 text-right`}
+                title={t("Share of all XCP committed to mints that came from this community's members")}
+              >
+                {t("Of XCP minted")}
               </th>
             </tr>
           </thead>
@@ -76,7 +84,7 @@ export function CommunitiesSection({ data }: { data: Communities }) {
                     <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                       <span
                         className="h-1.5 w-24 shrink-0 rounded-full bg-gray-100 dark:bg-gray-800"
-                        title={`${row.members} of ${data.minters} minters`}
+                        title={t("{n} of {total} minters", { n: row.members, total: data.minters })}
                       >
                         <span
                           className="block h-1.5 rounded-full bg-purple-400 dark:bg-purple-500"

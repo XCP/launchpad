@@ -5,6 +5,7 @@ import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { fetchBalance } from "@/lib/client";
+import { useT } from "@/lib/i18n/client";
 import { commasRaw } from "@/lib/format";
 
 async function fetchBalances(
@@ -78,6 +79,7 @@ function ModalBody({
   rowLabel?: (asset: string) => string;
   onPick: (asset: string) => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
 
   const { data: balances } = useSWR(
@@ -96,7 +98,7 @@ function ModalBody({
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder="Search name"
+        placeholder={t("Search name")}
         autoComplete="off"
         spellCheck={false}
         className="block w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-3 py-2.5 text-sm outline-none transition-colors focus:border-purple-400 dark:focus:border-purple-500 focus:bg-white dark:focus:bg-gray-900"
@@ -106,7 +108,7 @@ function ModalBody({
       />
       <div className="mt-2 max-h-[45vh] overflow-y-auto">
         {shown.length === 0 ? (
-          <p className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">No matches</p>
+          <p className="p-4 text-center text-sm text-gray-400 dark:text-gray-500">{t("No matches")}</p>
         ) : (
           shown.map((a) => {
             const bal = balances?.[a];

@@ -14,6 +14,8 @@ import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
 import { commasRaw, price as formatPrice, satsPerVb } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
+import { useT } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
 import {
   approx,
   big,
@@ -82,6 +84,7 @@ export function LiquidityWidget({
   assets: string[];
   xcpUsd: number | null;
 }) {
+  const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
   const compose = useCompose();
@@ -233,7 +236,10 @@ export function LiquidityWidget({
       registerPending({
         txid: compose.txid,
         kind: "pool",
-        label: `${tab === "add" ? "Add" : "Remove"} ${asset}/XCP liquidity`,
+        label:
+          tab === "add"
+            ? t("Add {asset}/XCP liquidity", { asset })
+            : t("Remove {asset}/XCP liquidity", { asset }),
         address: address ?? undefined,
         spends:
           tab === "add"
@@ -250,6 +256,7 @@ export function LiquidityWidget({
       });
     }
   }, [
+    t,
     compose.status,
     compose.txid,
     tab,
@@ -322,21 +329,21 @@ export function LiquidityWidget({
 
   const addLabel = busy
     ? compose.status === "signing"
-      ? "Confirm in wallet…"
-      : "Working…"
+      ? t("Confirm in wallet…")
+      : t("Working…")
     : amountRaw === 0
-      ? "Enter an amount"
+      ? t("Enter an amount")
       : !balancesSettled
-        ? "Checking balance…"
+        ? t("Checking balance…")
       : insufficientToken
-        ? `Insufficient ${asset} balance`
+        ? t("Insufficient {asset} balance", { asset })
         : insufficientXcp
-          ? "Insufficient XCP balance"
+          ? t("Insufficient XCP balance")
           : depositQuote?.first_deposit
-            ? "Pool is empty"
+            ? t("Pool is empty")
             : depStale && depXcpNum === 0
-              ? "Fetching quote…"
-              : "Add liquidity";
+              ? t("Fetching quote…")
+              : t("Add liquidity");
 
   // Both legs are worth the same by construction; USD comes off the XCP leg.
   const legUsd = xcpUsd && depXcpNum > 0 ? (depXcpNum / SATS) * xcpUsd : null;
@@ -358,7 +365,7 @@ export function LiquidityWidget({
 
   const txFeeRow = feeRate !== null && (
     <div className="flex justify-between">
-      <dt>TX fee</dt>
+      <dt>{t("TX fee")}</dt>
       <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
         {satsPerVb(feeRate)} sat/vB
         {btcUsd != null && (
@@ -373,7 +380,7 @@ export function LiquidityWidget({
 
   const gasRow = (gasFee ?? 0) > 0 && (
     <div className="flex justify-between">
-      <dt>Protocol gas fee</dt>
+      <dt>{t("Protocol gas fee")}</dt>
       <dd>{commasRaw(gasFee ?? 0)} XCP</dd>
     </div>
   );
@@ -381,18 +388,18 @@ export function LiquidityWidget({
   return (
     <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
       <div className="flex items-center gap-1 rounded-xl bg-gray-100 dark:bg-gray-800 p-1 text-sm font-medium">
-        {(["add", "remove"] as const).map((t) => (
+        {(["add", "remove"] as const).map((k) => (
           <button
-            key={t}
+            key={k}
             type="button"
-            onClick={() => setTab(t)}
+            onClick={() => setTab(k)}
             className={`flex-1 rounded-lg px-3 py-1.5 capitalize ${
-              tab === t
+              tab === k
                 ? "bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 shadow-sm"
                 : "text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
             }`}
           >
-            {t}
+            {k === "add" ? t("add") : t("remove")}
           </button>
         ))}
       </div>
@@ -402,7 +409,7 @@ export function LiquidityWidget({
           {/* Token well — corner grammar: presets top-right, balance bottom-right */}
           <Well
             focusable
-            label="Deposit"
+            label={t("Deposit")}
             topRight={
               maxDepositRaw > 0 ? (
                 <span className="flex items-center gap-1">
@@ -418,7 +425,7 @@ export function LiquidityWidget({
                       }}
                       className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                     >
-                      {p === 100 ? "Max" : `${p}%`}
+                      {p === 100 ? t("Max") : `${p}%`}
                     </button>
                   ))}
                 </span>
@@ -445,7 +452,7 @@ export function LiquidityWidget({
                       setTokenAmount(fmtAmount(approx(maxDepositRaw) / SATS));
                     }}
                   >
-                    Balance: {commasRaw(tokenBalance)}
+                    {t("Balance: {n}", { n: commasRaw(tokenBalance) })}
                   </button>
                 )}
                 {tokenBalance === undefined && <BalanceUnavailable error={tokenBalanceError} />}
@@ -464,7 +471,7 @@ export function LiquidityWidget({
                 setEditSide("token");
                 setTokenAmount(v);
               }}
-              ariaLabel={`Amount of ${asset} to deposit`}
+              ariaLabel={t("Amount of {asset} to deposit", { asset })}
               className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
                 insufficientToken ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
               }`}
@@ -480,7 +487,7 @@ export function LiquidityWidget({
           <div className="mt-1">
             <Well
               focusable
-              label="Paired XCP"
+              label={t("Paired XCP")}
               chip={<AssetChip asset="XCP" />}
               footer={
                 <>
@@ -510,7 +517,7 @@ export function LiquidityWidget({
                         );
                       }}
                     >
-                      Balance: {commasRaw(xcpBalance)}
+                      {t("Balance: {n}", { n: commasRaw(xcpBalance) })}
                     </button>
                   )}
                   {xcpBalance === undefined && <BalanceUnavailable error={xcpBalanceError} />}
@@ -529,7 +536,7 @@ export function LiquidityWidget({
                   setEditSide("xcp");
                   setXcpAmount(v);
                 }}
-                ariaLabel="Amount of XCP to deposit"
+                ariaLabel={t("Amount of XCP to deposit")}
                 className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
                   insufficientXcp ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
                 }`}
@@ -548,7 +555,7 @@ export function LiquidityWidget({
               <button
                 type="button"
                 onClick={() => setRateInverted((v) => !v)}
-                aria-label="Invert rate"
+                aria-label={t("Invert rate")}
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               >
                 {rateInverted
@@ -569,13 +576,13 @@ export function LiquidityWidget({
             <div className="px-2">
               <dl className="space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
                 <div className="flex justify-between">
-                  <dt>LP minted (est.)</dt>
+                  <dt>{t("LP minted (est.)")}</dt>
                   <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                     {commasRaw(depositQuote.quantity_minted_estimate)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Min LP · slippage {lqSlippage}%</dt>
+                  <dt>{t("Min LP · slippage {pct}%", { pct: lqSlippage })}</dt>
                   <dd className="tabular-nums">
                     {commasRaw(
                       reduceByPercent(
@@ -587,7 +594,7 @@ export function LiquidityWidget({
                 </div>
                 {lpSupply > 0n && (
                   <div className="flex justify-between">
-                    <dt>Share of pool</dt>
+                    <dt>{t("Share of pool")}</dt>
                     <dd className="tabular-nums">
                       {pctFmt(
                         ratio(
@@ -607,15 +614,18 @@ export function LiquidityWidget({
           {/* Your position — context while adding to an existing stake */}
           {(lpBalance ?? 0) > 0 && lpSupply > 0n && (
             <p className="px-2 pt-2 text-xs text-gray-500 dark:text-gray-400">
-              Your position:{" "}
-              <span className="font-medium text-gray-700 dark:text-gray-300">
-                {commasRaw((big(lpBalance ?? 0) * reserveToken) / lpSupply)}{" "}
-                {asset}
-                {" + "}
-                {commasRaw((big(lpBalance ?? 0) * reserveXcp) / lpSupply)}{" "}
-                XCP
-              </span>{" "}
-              · {pctFmt(ratio(lpBalance ?? 0, lpSupply) * 100)} of the pool
+              {rich(t, "Your position: {position} · {pct} of the pool", {
+                position: (
+                  <span className="font-medium text-gray-700 dark:text-gray-300">
+                    {commasRaw((big(lpBalance ?? 0) * reserveToken) / lpSupply)}{" "}
+                    {asset}
+                    {" + "}
+                    {commasRaw((big(lpBalance ?? 0) * reserveXcp) / lpSupply)}{" "}
+                    XCP
+                  </span>
+                ),
+                pct: pctFmt(ratio(lpBalance ?? 0, lpSupply) * 100),
+              })}
             </p>
           )}
         </div>
@@ -623,7 +633,7 @@ export function LiquidityWidget({
         <div className="mt-2 space-y-2">
           <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4">
             <div className="flex items-baseline justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Amount to remove</span>
+              <span>{t("Amount to remove")}</span>
               <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{pct}%</span>
             </div>
             <input
@@ -633,7 +643,7 @@ export function LiquidityWidget({
               value={pct}
               onChange={(e) => setPct(Number(e.target.value))}
               className="ui-slider mt-2 w-full"
-              aria-label="Percent of LP to remove"
+              aria-label={t("Percent of LP to remove")}
             />
             <div className="mt-2 flex items-center gap-2">
               {PRESETS.map((p) => (
@@ -647,7 +657,7 @@ export function LiquidityWidget({
                       : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-600"
                   }`}
                 >
-                  {p === 100 ? "Max" : `${p}%`}
+                  {p === 100 ? t("Max") : `${p}%`}
                 </button>
               ))}
             </div>
@@ -655,13 +665,13 @@ export function LiquidityWidget({
           <div className="px-2">
             <dl className="space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
               <div className="flex justify-between">
-                <dt>Your LP balance</dt>
+                <dt>{t("Your LP balance")}</dt>
                 <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                   {commasRaw(lpBalance ?? 0)}
                 </dd>
               </div>
               <div className="flex justify-between">
-                <dt>You receive (est.)</dt>
+                <dt>{t("You receive (est.)")}</dt>
                 <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                   {commasRaw(outTokenRaw)} {asset} + {commasRaw(outXcpRaw)} XCP
                   {xcpUsd && approx(outXcpRaw) > 0 ? (
@@ -674,7 +684,7 @@ export function LiquidityWidget({
               </div>
               {approx(outTokenRaw) > 0 && (
                 <div className="flex justify-between">
-                  <dt>Min received · slippage {lqSlippage}%</dt>
+                  <dt>{t("Min received · slippage {pct}%", { pct: lqSlippage })}</dt>
                   <dd className="tabular-nums">
                     {commasRaw(reduceByPercent(outTokenRaw, lqSlippage))}{" "}
                     {asset} +{" "}
@@ -705,36 +715,37 @@ export function LiquidityWidget({
               ? addLabel
               : busy
                 ? compose.status === "signing"
-                  ? "Confirm in wallet…"
-                  : "Working…"
+                  ? t("Confirm in wallet…")
+                  : t("Working…")
                 : lpToRemove === 0n
                   ? lpBalance === undefined
                     ? lpBalanceError
-                      ? "Balance unavailable"
-                      : "Checking balance…"
+                      ? t("Balance unavailable")
+                      : t("Checking balance…")
                     : lpBalance === 0n
-                    ? "No LP in this pool"
-                    : "Choose an amount"
-                  : "Remove liquidity"}
+                    ? t("No LP in this pool")
+                    : t("Choose an amount")
+                  : t("Remove liquidity")}
           </CTA>
         )}
         {compose.status === "confirmed" && (
           <div className="mt-2 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-green-800 dark:text-green-300">
-                {tab === "add" ? "Deposit" : "Withdrawal"} broadcast —{" "}
-                <TxLink txid={compose.txid} />
+                {tab === "add"
+                  ? rich(t, "Deposit broadcast — {tx}", { tx: <TxLink txid={compose.txid} /> })
+                  : rich(t, "Withdrawal broadcast — {tx}", { tx: <TxLink txid={compose.txid} /> })}
               </span>
               <button
                 type="button"
                 onClick={compose.reset}
                 className="text-xs text-green-800 dark:text-green-300 underline"
               >
-                Dismiss
+                {t("Dismiss")}
               </button>
             </div>
             <p className="mt-1 text-xs text-green-700 dark:text-green-400">
-              Settles when it confirms — usually the next block.
+              {t("Settles when it confirms — usually the next block.")}
             </p>
           </div>
         )}
@@ -746,7 +757,7 @@ export function LiquidityWidget({
         assets={assets}
         selected={asset}
         address={address}
-        title="Select a pool"
+        title={t("Select a pool")}
         rowLabel={(a) => `${a} / XCP`}
         onSelect={(a) => {
           setAsset(a);

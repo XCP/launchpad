@@ -6,11 +6,13 @@ import { compact, fromSats } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { usePortfolio } from "@/app/[lang]/profile/_lib/use-portfolio";
 import { WITHHELD_COPY } from "@/lib/withheld-copy";
+import { useT } from "@/lib/i18n/client";
 
 export function HistoryTab({ address }: { address: string }) {
+  const t = useT();
   const { portfolio, isLoading } = usePortfolio(address);
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading history…</p>;
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("Loading history…")}</p>;
 
   const closed = portfolio?.closed ?? [];
   const xcpUsd = portfolio?.xcpUsd ?? null;
@@ -18,7 +20,7 @@ export function HistoryTab({ address }: { address: string }) {
   if (closed.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        No closed positions yet.
+        {t("No closed positions yet.")}
       </p>
     );
   }
@@ -30,11 +32,13 @@ export function HistoryTab({ address }: { address: string }) {
     <div className="space-y-4">
       <div>
         <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">
-          {incomplete ? "Known realized PnL" : "Realized PnL"}
+          {incomplete ? t("Known realized PnL") : t("Realized PnL")}
         </p>
         <Realized sats={total} xcpUsd={xcpUsd} large />
         <p className="text-sm text-gray-500 dark:text-gray-400">
-          Across {closed.length} fully exited {closed.length === 1 ? "position" : "positions"}
+          {closed.length === 1
+            ? t("Across {n} fully exited position", { n: closed.length })
+            : t("Across {n} fully exited positions", { n: closed.length })}
         </p>
       </div>
       <ul className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -61,11 +65,7 @@ export function HistoryTab({ address }: { address: string }) {
         ))}
       </ul>
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        Positions you fully exited, with the profit or loss actually taken.
-        A dash means the focused mint-and-trade history does not explain the
-        live zero balance, so no P&amp;L is claimed.
-        Basis is average-cost, so a partial sale realizes its share and leaves
-        the rest with the tokens still held.
+        {t("Positions you fully exited, with the profit or loss actually taken. A dash means the focused mint-and-trade history does not explain the live zero balance, so no P&L is claimed. Basis is average-cost, so a partial sale realizes its share and leaves the rest with the tokens still held.")}
       </p>
     </div>
   );
@@ -81,7 +81,8 @@ function Realized({
   large?: boolean;
 }) {
   const usd = useFiat();
-  if (sats === null) return <span className="text-gray-400 dark:text-gray-500" title="Unexplained balance movement">—</span>;
+  const t = useT();
+  if (sats === null) return <span className="text-gray-400 dark:text-gray-500" title={t("Unexplained balance movement")}>—</span>;
   const up = sats >= 0n;
   // Magnitude in integer space; the sign is carried by the label.
   const xcp = fromSats((up ? sats : -sats).toString());

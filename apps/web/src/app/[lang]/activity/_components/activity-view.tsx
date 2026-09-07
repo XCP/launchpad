@@ -2,6 +2,7 @@
 
 import { LazyLink } from "@/components/lazy-link";
 import { useT } from "@/lib/i18n/client";
+import { msg } from "@/lib/i18n/t";
 import { useState } from "react";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
@@ -49,12 +50,12 @@ type Tab = "mints" | "trades" | "burns" | "orders" | "pools" | "launches";
 // rather than about a launch, and the pair reads as "what is on offer" then
 // "what is backing it".
 const TABS: { id: Tab; label: string }[] = [
-  { id: "mints", label: "Mints" },
-  { id: "trades", label: "Trades" },
-  { id: "burns", label: "Burns" },
-  { id: "orders", label: "Orders" },
-  { id: "pools", label: "Pools" },
-  { id: "launches", label: "Launches" },
+  { id: "mints", label: msg("Mints") },
+  { id: "trades", label: msg("Trades") },
+  { id: "burns", label: msg("Burns") },
+  { id: "orders", label: msg("Orders") },
+  { id: "pools", label: msg("Pools") },
+  { id: "launches", label: msg("Launches") },
 ];
 
 /**
@@ -84,6 +85,7 @@ const TABS: { id: Tab; label: string }[] = [
  * makes both halves possible.
  */
 export function ActivityView() {
+  const t = useT();
   const [tab, setTab] = useState<Tab>("mints");
   const [tradePage, setTradePage] = useState(1);
   // Orders only. Part of the SWR key below, so toggling it refetches the
@@ -137,26 +139,26 @@ export function ActivityView() {
             defaults to min-width:auto and refuses to shrink below its content,
             so max-w-full alone would have done nothing. */}
         <SegmentedList className="w-fit min-w-0 max-w-full flex-wrap">
-          {TABS.map((t) => {
+          {TABS.map((item) => {
             // Orders is the live book's size and arrives with that feed; the
             // other three are cumulative and arrive together. A count that is
             // not known yet is simply absent — a tab reading "Orders 0" before
             // the book loads is worse than one that reads "Orders".
             const n =
-              t.id === "orders"
+              item.id === "orders"
                 ? (orders.data?.total ?? null)
-                : t.id === "pools"
+                : item.id === "pools"
                   ? (pools.data?.total ?? null)
-                  : t.id === "mints"
+                  : item.id === "mints"
                     ? (totals?.mints ?? null)
-                    : t.id === "trades"
+                    : item.id === "trades"
                       ? (totals?.trades ?? null)
-                      : t.id === "burns"
+                      : item.id === "burns"
                         ? (totals?.burns ?? null)
                         : (totals?.launches ?? null);
             return (
-              <SegmentedTrigger key={t.id} value={t.id} grow={false}>
-                {t.label}
+              <SegmentedTrigger key={item.id} value={item.id} grow={false}>
+                {t(item.label)}
                 {n !== null && (
                   <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500 tabular-nums">
                     {commas(n)}
@@ -173,7 +175,7 @@ export function ActivityView() {
               the same pill the homepage's "Hide minted" wears. */}
           {tab === "orders" && (
             <label
-              title="Show only orders still resting on the book"
+              title={t("Show only orders still resting on the book")}
               className="hidden cursor-pointer items-center gap-1.5 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 sm:flex"
             >
               <input
@@ -182,7 +184,7 @@ export function ActivityView() {
                 onChange={(event) => setHideFilled(event.target.checked)}
                 className="size-3.5 accent-purple-600"
               />
-              <span>Hide filled</span>
+              <span>{t("Hide filled")}</span>
             </label>
           )}
           {/* Refresh every tape on an explicit click; normal interval polling
@@ -227,7 +229,7 @@ export function ActivityView() {
       <TabsContent value="orders" className="mt-4">
         <Feed
           feed={{ data: orders.data && orders.data.rows, isLoading: orders.isLoading }}
-          empty={hideFilled ? "Nothing resting on the book right now." : EMPTY.orders}
+          empty={hideFilled ? msg("Nothing resting on the book right now.") : EMPTY.orders}
         >
           {(rows) => <OrderTape rows={rows} height={height} />}
         </Feed>
@@ -286,26 +288,26 @@ function Feed<T>({
   empty: string;
   children: (rows: T[]) => React.ReactNode;
 }) {
+  const t = useT();
   if (feed.data === null) {
     return (
       <Empty>
-        The activity feed is unavailable right now. It will come back on its
-        own.
+        {t("The activity feed is unavailable right now. It will come back on its own.")}
       </Empty>
     );
   }
-  if (!feed.data) return <Empty>{feed.isLoading ? "Reading the chain…" : "Nothing to show."}</Empty>;
-  if (feed.data.length === 0) return <Empty>{empty}</Empty>;
+  if (!feed.data) return <Empty>{feed.isLoading ? t("Reading the chain…") : t("Nothing to show.")}</Empty>;
+  if (feed.data.length === 0) return <Empty>{t(empty)}</Empty>;
   return <>{children(feed.data)}</>;
 }
 
 const EMPTY: Record<Tab, string> = {
-  mints: "No mints yet — the first one will appear here.",
-  trades: "Nothing has traded yet. A launch has to graduate before it has a market.",
-  burns: "No XCP-69 tokens have been sent to the Counterparty burn address yet.",
-  orders: "The book is empty — no resting orders on any XCP-69 pair.",
-  pools: "No pools yet. A launch has to graduate before its liquidity exists.",
-  launches: "No launches yet.",
+  mints: msg("No mints yet — the first one will appear here."),
+  trades: msg("Nothing has traded yet. A launch has to graduate before it has a market."),
+  burns: msg("No XCP-69 tokens have been sent to the Counterparty burn address yet."),
+  orders: msg("The book is empty — no resting orders on any XCP-69 pair."),
+  pools: msg("No pools yet. A launch has to graduate before its liquidity exists."),
+  launches: msg("No launches yet."),
 };
 
 /* --------------------------------------------------------------------- */
@@ -313,14 +315,15 @@ const EMPTY: Record<Tab, string> = {
 /* --------------------------------------------------------------------- */
 
 function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
+  const t = useT();
   return (
-    <Tape columns={["When", "Asset", "Event", "Price", "Amount", "XCP", "Minter", "Status"]}>
+    <Tape columns={[msg("When"), msg("Asset"), msg("Event"), msg("Price"), msg("Amount"), "XCP", msg("Minter"), msg("Status")]}>
       {rows.map((r) => (
         <tr key={r.txHash} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
           <When block={r.block} height={height} txHash={r.txHash} />
           <Asset asset={r.asset} />
           <Cell>
-            <Pill tone="purple">Mint</Pill>
+            <Pill tone="purple">{t("Mint")}</Pill>
           </Cell>
           {/* Every mint of one launch pays the same fixed price, so this
               column is flat down a run of rows — which is the point: a launch
@@ -330,7 +333,7 @@ function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
           <Num strong>{fixedRaw(r.paid)}</Num>
           <Who address={r.source} />
           <Cell right>
-            <span className="text-xs text-gray-500 dark:text-gray-400">{MINT_STATUS[r.phase]}</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400">{t(MINT_STATUS[r.phase])}</span>
           </Cell>
         </tr>
       ))}
@@ -342,15 +345,16 @@ function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
  *  Counterparty status `closed`, so the launch's phase is the only thing that
  *  answers this — see the project's note on the launched-vs-refunded oracle. */
 const MINT_STATUS: Record<ActivityMint["phase"], string> = {
-  scheduled: "escrowed",
-  minting: "escrowed",
-  graduated: "credited",
-  refunded: "refunded",
+  scheduled: msg("escrowed"),
+  minting: msg("escrowed"),
+  graduated: msg("credited"),
+  refunded: msg("refunded"),
 };
 
 function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number }) {
+  const t = useT();
   return (
-    <Tape columns={["When", "Asset", "Side", "Price", "Amount", "XCP", "Trader", "Venue"]}>
+    <Tape columns={[msg("When"), msg("Asset"), msg("Side"), msg("Price"), msg("Amount"), "XCP", msg("Trader"), msg("Venue")]}>
       {rows.map((r) => {
         // Signed from the trader's side; the tape shows magnitudes and lets
         // the Side pill carry the direction.
@@ -362,7 +366,7 @@ function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number })
             <Asset asset={r.asset} />
             <Cell>
               <Pill tone={r.side === "buy" ? "green" : "red"}>
-                {r.side === "buy" ? "Buy" : "Sell"}
+                {r.side === "buy" ? t("Buy") : t("Sell")}
               </Pill>
             </Cell>
             <Num>{priceText(xcp, tokens, r.divisible)}</Num>
@@ -388,6 +392,7 @@ function TapePager({
   totalPages: number;
   onPage: (page: number) => void;
 }) {
+  const t = useT();
   if (totalPages <= 1) return null;
   return (
     <div className="mt-2 flex items-center justify-between rounded-xl border border-gray-200 bg-white px-4 py-2 text-xs text-gray-500 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-400">
@@ -397,30 +402,31 @@ function TapePager({
         onClick={() => onPage(page - 1)}
         className="rounded-md border border-gray-200 px-3 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800"
       >
-        ← Prev
+        {t("← Prev")}
       </button>
-      <span>Page {page} of {totalPages}</span>
+      <span>{t("Page {page} of {total}", { page, total: totalPages })}</span>
       <button
         type="button"
         disabled={page >= totalPages}
         onClick={() => onPage(page + 1)}
         className="rounded-md border border-gray-200 px-3 py-2 font-medium disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-800"
       >
-        Next →
+        {t("Next →")}
       </button>
     </div>
   );
 }
 
 function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
+  const t = useT();
   return (
-    <Tape columns={["When", "Asset", "Event", "Amount", "Burner", "Destination"]}>
+    <Tape columns={[msg("When"), msg("Asset"), msg("Event"), msg("Amount"), msg("Burner"), msg("Destination")]}>
       {rows.map((r) => (
         <tr key={r.key} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
           <When block={r.block} height={height} txHash={r.txHash} />
           <Asset asset={r.asset} />
           <Cell>
-            <Pill tone="orange">Burn</Pill>
+            <Pill tone="orange">{t("Burn")}</Pill>
           </Cell>
           <Num strong>{compact(tokenQty(r.quantity, true))}</Num>
           <Who address={r.source} />
@@ -431,7 +437,7 @@ function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
               rel="noreferrer"
               className={`text-xs text-orange-600 hover:underline dark:text-orange-400 ${FOCUS}`}
             >
-              🔥 burn
+              🔥 {t("burn")}
             </a>
           </Cell>
         </tr>
@@ -466,7 +472,7 @@ function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
 function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number }) {
   const t = useT();
   return (
-    <Tape columns={["When", "Asset", "Side", "Price", "Size", "XCP", "Maker", "Status"]}>
+    <Tape columns={[msg("When"), msg("Asset"), msg("Side"), msg("Price"), msg("Size"), "XCP", msg("Maker"), msg("Status")]}>
       {rows.map((r) => {
         const done = r.state !== "open" && r.state !== "partial";
         const pct = Math.round(r.filled * 100);
@@ -489,7 +495,7 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
             <Asset asset={r.asset} dim={done} />
             <Cell>
               <Pill tone={done ? "gray" : r.side === "buy" ? "green" : "red"}>
-                {r.side === "buy" ? "Bid" : "Ask"}
+                {r.side === "buy" ? t("Bid") : t("Ask")}
               </Pill>
             </Cell>
             <Num dim={done}>{priceText(r.xcpQuantity, r.tokenQuantity, r.divisible)}</Num>
@@ -502,13 +508,13 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
             <Who address={r.source} dim={done} />
             <Cell right>
               <span className="block">
-                <Pill tone={STATE_TONE[r.state]}>{STATE_LABEL[r.state]}</Pill>
+                <Pill tone={STATE_TONE[r.state]}>{t(STATE_LABEL[r.state])}</Pill>
               </span>
               {/* One qualifying fact per state: how far a partial got, how long
                   a live order has left, or whether a dead one ever traded. */}
               <span className="mt-0.5 block text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
                 {r.state === "partial"
-                  ? `${pct}% filled`
+                  ? t("{pct}% filled", { pct })
                   : r.state === "open"
                     ? height
                       ? t("{eta} left", { eta: blocksEta(r.expireBlock - height, t) })
@@ -516,8 +522,8 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
                     : r.state === "filled"
                       ? ""
                       : pct > 0
-                        ? `${pct}% filled`
-                        : "untouched"}
+                        ? t("{pct}% filled", { pct })
+                        : t("untouched")}
               </span>
             </Cell>
           </tr>
@@ -528,11 +534,11 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
 }
 
 const STATE_LABEL: Record<ActivityOrder["state"], string> = {
-  open: "Open",
-  partial: "Partial",
-  filled: "Filled",
-  cancelled: "Cancelled",
-  expired: "Expired",
+  open: msg("Open"),
+  partial: msg("Partial"),
+  filled: msg("Filled"),
+  cancelled: msg("Cancelled"),
+  expired: msg("Expired"),
 };
 
 /** Green for the one that completed, amber for the two still in motion, gray
@@ -566,8 +572,9 @@ const STATE_TONE: Record<ActivityOrder["state"], Tone> = {
  * so with an em dash rather than a misleading zero.
  */
 function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number }) {
+  const t = useT();
   return (
-    <Tape columns={["When", "Pool", "Event", "Price", "Tokens", "XCP", "Address", "LP"]}>
+    <Tape columns={[msg("When"), msg("Pool"), msg("Event"), msg("Price"), msg("Tokens"), "XCP", msg("Address"), "LP"]}>
       {rows.map((r) => {
         const vsXcp = r.counterAsset === "XCP";
         return (
@@ -589,7 +596,7 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
               </span>
             </td>
             <Cell>
-              <Pill tone={POOL_TONE[r.kind]}>{POOL_LABEL[r.kind]}</Pill>
+              <Pill tone={POOL_TONE[r.kind]}>{t(POOL_LABEL[r.kind])}</Pill>
             </Cell>
             <Num>{vsXcp ? priceText(r.counterQuantity, r.assetQuantity, r.assetDivisible) : "—"}</Num>
             <Num strong>{compact(tokenQty(r.assetQuantity, r.assetDivisible))}</Num>
@@ -608,7 +615,7 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
                     )}`}
               </span>
               <span className="block text-[11px] text-gray-400 dark:text-gray-500">
-                {r.graduation ? "locked forever" : r.kind === "created" ? "open LP" : ""}
+                {r.graduation ? t("locked forever") : r.kind === "created" ? t("open LP") : ""}
               </span>
             </Cell>
           </tr>
@@ -619,9 +626,9 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
 }
 
 const POOL_LABEL: Record<PoolEventKind, string> = {
-  created: "Created",
-  deposit: "Deposit",
-  withdraw: "Withdraw",
+  created: msg("Created"),
+  deposit: msg("Deposit"),
+  withdraw: msg("Withdraw"),
 };
 
 /** Purple for the one the protocol does — a graduation opening its pool is a
@@ -634,14 +641,15 @@ const POOL_TONE: Record<PoolEventKind, Tone> = {
 };
 
 function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number }) {
+  const t = useT();
   return (
-    <Tape columns={["When", "Asset", "Phase", "Price", "Hard cap", "Raised", "Creator", "Mints"]}>
+    <Tape columns={[msg("When"), msg("Asset"), msg("Phase"), msg("Price"), msg("Hard cap"), msg("Raised"), msg("Creator"), msg("Mints")]}>
       {rows.map((r) => (
         <tr key={r.txHash} className="transition-colors hover:bg-gray-50/70 dark:hover:bg-gray-800/60">
           <When block={r.block} height={height} txHash={r.txHash} />
           <Asset asset={r.asset} />
           <Cell>
-            <Pill tone={PHASE_TONE[r.phase]}>{r.phase}</Pill>
+            <Pill tone={PHASE_TONE[r.phase]}>{t(PHASE_LABEL[r.phase])}</Pill>
           </Cell>
           {/* The standard's own price: XCP per quantity_by_price tokens. */}
           <Num>{priceText(r.price, r.quantityByPrice, r.divisible)}</Num>
@@ -654,7 +662,7 @@ function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number 
           <Cell right>
             <span className="block text-xs text-gray-900 dark:text-gray-100 tabular-nums">{r.mints}</span>
             <span className="block text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
-              {r.minters} {r.minters === 1 ? "minter" : "minters"}
+              {r.minters === 1 ? t("{n} minter", { n: r.minters }) : t("{n} minters", { n: r.minters })}
             </span>
           </Cell>
         </tr>
@@ -662,6 +670,13 @@ function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number 
     </Tape>
   );
 }
+
+const PHASE_LABEL: Record<ActivityLaunch["phase"], string> = {
+  scheduled: msg("Scheduled"),
+  minting: msg("Minting"),
+  graduated: msg("Graduated"),
+  refunded: msg("Refunded"),
+};
 
 const PHASE_TONE: Record<ActivityLaunch["phase"], Tone> = {
   scheduled: "gray",
@@ -688,6 +703,7 @@ const PHASE_TONE: Record<ActivityLaunch["phase"], Tone> = {
  * hide on a phone.
  */
 function Tape({ columns, children }: { columns: string[]; children: React.ReactNode }) {
+  const t = useT();
   return (
     <div className="overflow-x-auto overflow-y-hidden rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
       <table className="w-full min-w-[58rem] text-sm">
@@ -705,7 +721,7 @@ function Tape({ columns, children }: { columns: string[]; children: React.ReactN
                     : ""
                 } ${i === columns.length - 1 ? "text-right" : ""}`}
               >
-                {c}
+                {t(c)}
               </th>
             ))}
           </tr>

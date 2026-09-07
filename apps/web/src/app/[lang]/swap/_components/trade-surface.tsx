@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
+import { useT } from "@/lib/i18n/client";
 import { LiquidityWidget } from "@/app/[lang]/swap/_components/liquidity-widget";
 import {
   LiquiditySettingsGear,
@@ -19,6 +20,7 @@ export function TradeSurface({
   assets: string[];
   xcpUsd: number | null;
 }) {
+  const t = useT();
   const [mode, setMode] = useState<"swap" | "liquidity">("swap");
   return (
     <SwapSettingsProvider>
@@ -27,7 +29,7 @@ export function TradeSurface({
           <SegmentedList className="w-64">
             {(["swap", "liquidity"] as const).map((m) => (
               <SegmentedTrigger key={m} value={m}>
-                {m}
+                {m === "swap" ? t("swap") : t("liquidity")}
               </SegmentedTrigger>
             ))}
           </SegmentedList>

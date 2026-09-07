@@ -5,6 +5,7 @@ import type { RewardAccount } from "@/lib/api/launchpad-api";
 import { commas, commasRaw } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
 import { MINTS_PER_MINT } from "@/lib/rewards";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * What this address has earned from the rewards programme.
@@ -25,20 +26,21 @@ export function RewardsCard({
   isSelf: boolean;
   onOpenHistory?: () => void;
 }) {
+  const t = useT();
   if (!account || account.earnedMints === 0) return null;
 
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
       <div className="flex items-baseline justify-between gap-3">
-        <span className={LABEL}>{isSelf ? "Your lifetime earnings" : "Lifetime earned"}</span>
+        <span className={LABEL}>{isSelf ? t("Your lifetime earnings") : t("Lifetime earned")}</span>
         <div className="flex items-center gap-3 text-xs">
           {onOpenHistory && (
             <button type="button" onClick={onOpenHistory} className="text-purple-600 dark:text-purple-400 hover:underline">
-              Payouts
+              {t("Payouts")}
             </button>
           )}
           <LazyLink href="/rewards" className="text-purple-600 dark:text-purple-400 hover:underline">
-            Program
+            {t("Program")}
           </LazyLink>
         </div>
       </div>
@@ -51,13 +53,20 @@ export function RewardsCard({
       </div>
 
       <p className="mt-1.5 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
-        {commas(account.earnedMints)} mint{account.earnedMints === 1 ? "" : "s"} across{" "}
-        {commas(account.launches)} launch{account.launches === 1 ? "" : "es"} ·{" "}
-        {commasRaw(account.committedXcp)} XCP committed
+        {t("{mints} across {launches} · {xcp} XCP committed", {
+          mints:
+            account.earnedMints === 1
+              ? t("{n} mint", { n: commas(account.earnedMints) })
+              : t("{n} mints", { n: commas(account.earnedMints) }),
+          launches:
+            account.launches === 1
+              ? t("{n} launch", { n: commas(account.launches) })
+              : t("{n} launches", { n: commas(account.launches) }),
+          xcp: commasRaw(account.committedXcp),
+        })}
       </p>
       <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-        {commas(MINTS_PER_MINT)} MINTS per mint · all-time program total, not
-        your wallet balance.
+        {t("{n} MINTS per mint · all-time program total, not your wallet balance.", { n: commas(MINTS_PER_MINT) })}
       </p>
     </div>
   );

@@ -11,6 +11,8 @@ import {
 import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { GearPopover } from "@/components/ui/popover";
+import { useT } from "@/lib/i18n/client";
+import { msg } from "@/lib/i18n/t";
 import { fetchFeeRate } from "@xcp/wallet-sdk";
 import {
   readSettings,
@@ -27,9 +29,9 @@ const SLIPPAGE_PRESETS = [0.5, 1, 2];
 const LQ_SLIPPAGE_PRESETS = [0.5, 1, 2.5];
 /** Resting-order lifetimes, in blocks. */
 export const LIMIT_EXPIRATIONS = [
-  { blocks: 144, label: "~1 day" },
-  { blocks: 1000, label: "~1 week" },
-  { blocks: 5000, label: "~5 weeks" },
+  { blocks: 144, label: msg("~1 day") },
+  { blocks: 1000, label: msg("~1 week") },
+  { blocks: 5000, label: msg("~5 weeks") },
 ];
 
 /**
@@ -153,6 +155,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
 
 /** The gear beside the mode tabs — render inside SwapSettingsProvider. */
 export function SwapSettingsGear() {
+  const t = useT();
   const s = useSwapSettings();
   return (
     <GearPopover
@@ -161,9 +164,9 @@ export function SwapSettingsGear() {
         s.expiration !== MARKET_EXPIRATION ||
         s.customFee > 0
       }
-      label="Swap settings"
+      label={t("Swap settings")}
     >
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Max slippage</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Max slippage")}</div>
       <div className="mt-2 flex items-center gap-1.5">
         <button
           type="button"
@@ -177,7 +180,7 @@ export function SwapSettingsGear() {
               : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
           }`}
         >
-          Auto
+          {t("Auto")}
         </button>
         {SLIPPAGE_PRESETS.map((p) => (
           <button
@@ -211,7 +214,7 @@ export function SwapSettingsGear() {
               if (v.trim() !== "") s.setSlippageAuto(false);
             }}
             placeholder="1.5"
-            ariaLabel="Custom slippage percent"
+            ariaLabel={t("Custom slippage percent")}
             className="w-8 bg-transparent text-right text-xs font-medium outline-none"
           />
           <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
@@ -219,29 +222,27 @@ export function SwapSettingsGear() {
       </div>
       {s.slippageAuto ? (
         <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-          Auto sizes slippage to the trade: what this quote needs, currently ~
-          {s.autoValue}%.
+          {t("Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.", { pct: s.autoValue })}
         </p>
       ) : s.slippage >= 20 ? (
         <p className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
-          {s.slippage}% slippage authorizes a very unfavorable fill. The
-          button will warn before swapping.
+          {t("{pct}% slippage authorizes a very unfavorable fill. The button will warn before swapping.", { pct: s.slippage })}
         </p>
       ) : s.slippage > 5 ? (
         <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
-          High slippage authorizes up to {s.slippage}% price impact.
+          {t("High slippage authorizes up to {pct}% price impact.", { pct: s.slippage })}
         </p>
       ) : s.slippage < 0.5 ? (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-          Below 0.5% the order may not fill.
+          {t("Below 0.5% the order may not fill.")}
         </p>
       ) : s.slippage > s.autoValue ? (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-          Higher than this trade needs (~{s.autoValue}%).
+          {t("Higher than this trade needs (~{pct}%).", { pct: s.autoValue })}
         </p>
       ) : null}
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">Expiration</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Expiration")}</span>
         <span
           className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.expiration !== MARKET_EXPIRATION
@@ -253,18 +254,17 @@ export function SwapSettingsGear() {
             value={s.customExpiration}
             onChange={s.setCustomExpiration}
             placeholder={String(MARKET_EXPIRATION)}
-            ariaLabel="Order expiration in blocks"
+            ariaLabel={t("Order expiration in blocks")}
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
-          <span className="text-xs text-gray-400 dark:text-gray-500">blocks</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500">{t("blocks")}</span>
         </span>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        How long an unfilled remainder rests before auto-refund.{" "}
-        {MARKET_EXPIRATION} = fill at confirmation or refund next block.
+        {t("How long an unfilled remainder rests before auto-refund. {n} = fill at confirmation or refund next block.", { n: MARKET_EXPIRATION })}
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
           className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
@@ -274,14 +274,14 @@ export function SwapSettingsGear() {
             value={s.customFeeRate}
             onChange={s.setCustomFeeRate}
             placeholder={s.medianFeeRate ? String(s.medianFeeRate) : "…"}
-            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            ariaLabel={t("Bitcoin fee rate in sats per vbyte")}
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
           <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        The Bitcoin miner fee. Default tracks the next-block median.
+        {t("The Bitcoin miner fee. Default tracks the next-block median.")}
       </p>
     </GearPopover>
   );
@@ -289,13 +289,14 @@ export function SwapSettingsGear() {
 
 /** The gear for the Limit tab — order lifetime + shared TX fee. */
 export function LimitSettingsGear() {
+  const t = useT();
   const s = useSwapSettings();
   return (
     <GearPopover
       active={s.limitExpiration !== 1000 || s.customFee > 0}
-      label="Limit order settings"
+      label={t("Limit order settings")}
     >
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Expiration</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Expiration")}</div>
       <div className="mt-2 flex items-center gap-1.5">
         {LIMIT_EXPIRATIONS.map((x) => (
           <button
@@ -308,15 +309,15 @@ export function LimitSettingsGear() {
                 : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
-            {x.label}
+            {t(x.label)}
           </button>
         ))}
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        How long the order rests unfilled before the remainder auto-refunds.
+        {t("How long the order rests unfilled before the remainder auto-refunds.")}
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
           className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
@@ -326,18 +327,17 @@ export function LimitSettingsGear() {
             value={s.customFeeRate}
             onChange={s.setCustomFeeRate}
             placeholder={s.medianFeeRate ? String(s.medianFeeRate) : "…"}
-            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            ariaLabel={t("Bitcoin fee rate in sats per vbyte")}
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
           <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        The Bitcoin miner fee. Default tracks the next-block median.
+        {t("The Bitcoin miner fee. Default tracks the next-block median.")}
       </p>
       <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        A resting order refunds in full at expiry — the price you set is
-        enforced by the order itself.
+        {t("A resting order refunds in full at expiry — the price you set is enforced by the order itself.")}
       </div>
     </GearPopover>
   );
@@ -345,13 +345,14 @@ export function LimitSettingsGear() {
 
 /** The gear for the Liquidity tab — its own looser slippage, shared TX fee. */
 export function LiquiditySettingsGear() {
+  const t = useT();
   const s = useSwapSettings();
   return (
     <GearPopover
       active={s.lqCustomSlip > 0 || s.customFee > 0}
-      label="Liquidity settings"
+      label={t("Liquidity settings")}
     >
-      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">Max slippage</div>
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("Max slippage")}</div>
       <div className="mt-2 flex items-center gap-1.5">
         {LQ_SLIPPAGE_PRESETS.map((p) => (
           <button
@@ -381,19 +382,17 @@ export function LiquiditySettingsGear() {
             value={s.lqCustomSlippage}
             onChange={s.setLqCustomSlippage}
             placeholder="5"
-            ariaLabel="Custom liquidity slippage percent"
+            ariaLabel={t("Custom liquidity slippage percent")}
             className="w-8 bg-transparent text-right text-xs font-medium outline-none"
           />
           <span className="text-xs text-gray-400 dark:text-gray-500">%</span>
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        If the pool moves past this before confirmation, the whole
-        transaction is void — nothing is debited; only the miner fee is
-        spent.
+        {t("If the pool moves past this before confirmation, the whole transaction is void — nothing is debited; only the miner fee is spent.")}
       </p>
       <div className="mt-3 flex items-center justify-between">
-        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">TX fee</span>
+        <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
         <span
           className={`flex items-center gap-1 rounded-lg border px-2 py-1 transition-colors focus-within:border-purple-400 dark:focus-within:border-purple-500 ${
             s.customFee > 0 ? "border-purple-600 bg-purple-50 dark:bg-purple-950/40" : "border-gray-200 dark:border-gray-800"
@@ -403,14 +402,14 @@ export function LiquiditySettingsGear() {
             value={s.customFeeRate}
             onChange={s.setCustomFeeRate}
             placeholder={s.medianFeeRate ? String(s.medianFeeRate) : "…"}
-            ariaLabel="Bitcoin fee rate in sats per vbyte"
+            ariaLabel={t("Bitcoin fee rate in sats per vbyte")}
             className="w-10 bg-transparent text-right text-xs font-medium outline-none"
           />
           <span className="text-xs text-gray-400 dark:text-gray-500">sat/vB</span>
         </span>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        The Bitcoin miner fee. Default tracks the next-block median.
+        {t("The Bitcoin miner fee. Default tracks the next-block median.")}
       </p>
     </GearPopover>
   );

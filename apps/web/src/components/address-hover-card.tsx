@@ -26,6 +26,7 @@ import {
 import { LABEL, FOCUS } from "@/components/ui/tokens";
 import { timeAgo, daysSince, monthYear } from "@/lib/chain-time";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
 import { XCP_API_BASE } from "@/lib/constants";
 
 export function IssuerChips({
@@ -157,14 +158,14 @@ export function IssuerChips({
   const ageDays = firstSeen ? daysSince(firstSeen) : null;
   const standing =
     issued && issued.count > 0
-      ? `${commas(issued.count)}${issued.capped ? "+" : ""} ${
-          issued.count === 1 && !issued.capped ? "asset" : "assets"
-        } issued`
+      ? issued.count === 1 && !issued.capped
+        ? t("{n} asset issued", { n: commas(issued.count) })
+        : t("{n} assets issued", { n: `${commas(issued.count)}${issued.capped ? "+" : ""}` })
       : ageDays !== null && ageDays > NEW_ADDRESS_DAYS
-        ? `on-chain since ${new Date(firstSeen! * 1000).getFullYear()}`
+        ? t("on-chain since {year}", { year: new Date(firstSeen! * 1000).getFullYear() })
         : // Only claim "new" on evidence: a failed lookup is not a young address.
           firstSeen !== null && issued !== null
-          ? "new address"
+          ? t("new address")
           : null;
 
   if (!data) return trailing ? <div className="mt-2 flex flex-wrap gap-1.5">{trailing}</div> : null;
@@ -184,18 +185,22 @@ export function IssuerChips({
       className="rounded-full border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/40 px-2 py-0.5 text-[11px] font-medium text-purple-700 dark:text-purple-300"
     >
       {data.prior === 0
-        ? "first launch"
+        ? t("first launch")
         : data.priorCapped
-          ? `${commas(data.prior)}+ launches`
-          : `${ordinal(data.prior + 1)} launch`}
+          ? t("{n}+ launches", { n: commas(data.prior) })
+          : t("{ordinal} launch", { ordinal: ordinal(data.prior + 1) })}
     </span>,
   ];
   if (data.judged > 0) {
     chips.push(
       <span key="record" className={chip}>
         {data.judged > 1
-          ? `${Math.round((data.graduated / data.judged) * 100)}% graduated (${data.graduated}/${data.judged})`
-          : `${data.graduated} graduated · ${data.judged - data.graduated} refunded`}
+          ? t("{pct}% graduated ({a}/{b})", {
+              pct: Math.round((data.graduated / data.judged) * 100),
+              a: data.graduated,
+              b: data.judged,
+            })
+          : t("{a} graduated · {b} refunded", { a: data.graduated, b: data.judged - data.graduated })}
       </span>,
     );
   }
@@ -300,6 +305,7 @@ async function issuedCount(source: string) {
 }
 
 function CopyButton({ value }: { value: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
   return (
     <button
@@ -313,7 +319,7 @@ function CopyButton({ value }: { value: string }) {
           () => {},
         );
       }}
-      aria-label="Copy issuer address"
+      aria-label={t("Copy issuer address")}
       className={`relative ml-1 inline-flex size-5 items-center justify-center rounded align-[-3px] text-gray-400 dark:text-gray-500 transition-colors after:absolute after:-inset-3 after:content-[''] hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-purple-600 dark:hover:text-purple-400 ${FOCUS}`}
     >
       {copied ? (
@@ -351,6 +357,7 @@ export function AddressHoverCard({
   className?: string;
   children: ReactNode;
 }) {
+  const t = useT();
   const locale = useLocale();
   const [armed, setArmed] = useState(false);
   const coarse = useCoarsePointer();
@@ -397,13 +404,13 @@ export function AddressHoverCard({
     >
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
-          <div className={LABEL}>XCP balance</div>
+          <div className={LABEL}>{t("XCP balance")}</div>
           <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
             {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
           </div>
         </div>
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
-          <div className={LABEL}>First seen</div>
+          <div className={LABEL}>{t("First seen")}</div>
           <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
             {firstSeen ? monthYear(firstSeen, locale) : "—"}
           </div>
@@ -411,31 +418,34 @@ export function AddressHoverCard({
       </div>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-          Holds{" "}
-          <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-            {typeof held === "number" ? commas(held) : "—"}
-          </span>{" "}
-          {held === 1 ? "token" : "tokens"}
+          {rich(t, held === 1 ? "Holds {count} token" : "Holds {count} tokens", {
+            count: (
+              <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                {typeof held === "number" ? commas(held) : "—"}
+              </span>
+            ),
+          })}
         </div>
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-          Issued{" "}
-          <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-            {issued
-              ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
-              : "—"}
-          </span>{" "}
-          {issued?.count === 1 && !issued.capped ? "token" : "tokens"}
+          {rich(t, issued?.count === 1 && !issued.capped ? "Issued {count} token" : "Issued {count} tokens", {
+            count: (
+              <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
+                {issued
+                  ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
+                  : "—"}
+              </span>
+            ),
+          })}
         </div>
       </div>
       {typeof score === "number" && tier && (
         <p className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2 text-[10px] text-gray-400 dark:text-gray-500">
-          Track record {Math.round(score)}/100 ({tier}) — observed on-chain
-          reputation from the XCP.io explorer, not an endorsement.
+          {t("Track record {score}/100 ({tier}) — observed on-chain reputation from the XCP.io explorer, not an endorsement.", { score: Math.round(score), tier })}
         </p>
       )}
       <div className="mt-2 flex items-center gap-3 text-xs font-medium">
         <LazyLink href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
-          View profile
+          {t("View profile")}
         </LazyLink>
         <a
           href={`https://xcp.io/address/${source}`}
@@ -443,7 +453,7 @@ export function AddressHoverCard({
           rel="noreferrer"
           className="text-gray-500 dark:text-gray-400 hover:underline"
         >
-          Explorer ↗
+          {t("Explorer ↗")}
         </a>
       </div>
     </HoverCard>
@@ -477,6 +487,7 @@ export function LaunchpadAddressHoverCard({
   className?: string;
   children: ReactNode;
 }) {
+  const t = useT();
   const [armed, setArmed] = useState(false);
   const coarse = useCoarsePointer();
   const { data, isLoading } = useSWR(
@@ -528,19 +539,19 @@ export function LaunchpadAddressHoverCard({
     >
       {isLoading || !data ? (
         <p className="py-3 text-center text-sm text-gray-400 dark:text-gray-500">
-          {isLoading ? "Loading xcp.fun activity…" : "Activity unavailable."}
+          {isLoading ? t("Loading xcp.fun activity…") : t("Activity unavailable.")}
         </p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
-              <div className={LABEL}>Balance</div>
+              <div className={LABEL}>{t("Balance")}</div>
               <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
                 {balance === null ? "—" : compact(tokenQty(balance, true))}
               </div>
             </div>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
-              <div className={LABEL}>Total PnL</div>
+              <div className={LABEL}>{t("Total PnL")}</div>
               <div
                 className={`mt-0.5 text-lg font-bold tabular-nums ${
                   pnl === null
@@ -555,32 +566,44 @@ export function LaunchpadAddressHoverCard({
             </div>
           </div>
           <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-            <span className="font-medium text-gray-900 dark:text-gray-100">Mint </span>
+            <span className="font-medium text-gray-900 dark:text-gray-100">{t("Mint")} </span>
             <span className="tabular-nums">{xcp(data.asset.minted_xcp ?? "0")}</span>
-            {" · Buy "}
+            {` · ${t("Buy")} `}
             <span className="tabular-nums">{xcp(data.asset.bought_xcp)}</span>
-            {" · Sell "}
+            {` · ${t("Sell")} `}
             <span className="tabular-nums">{xcp(data.asset.sold_xcp)} XCP</span>
           </div>
           <div className="mt-2 whitespace-nowrap rounded-xl bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
             <span className="font-medium text-gray-900 dark:text-gray-100">XCP-69</span>
-            {` · ${commas(data.mints.transactions)} mint${data.mints.transactions === 1 ? "" : "s"}`}
-            {` · ${commas(data.mints.launches)} launch${data.mints.launches === 1 ? "" : "es"}`}
+            {` · ${
+              data.mints.transactions === 1
+                ? t("{n} mint", { n: commas(data.mints.transactions) })
+                : t("{n} mints", { n: commas(data.mints.transactions) })
+            }`}
+            {` · ${
+              data.mints.launches === 1
+                ? t("{n} launch", { n: commas(data.mints.launches) })
+                : t("{n} launches", { n: commas(data.mints.launches) })
+            }`}
             {data.market.fills > 0
-              ? ` · ${commas(data.market.fills)} fill${data.market.fills === 1 ? "" : "s"}`
+              ? ` · ${
+                  data.market.fills === 1
+                    ? t("{n} fill", { n: commas(data.market.fills) })
+                    : t("{n} fills", { n: commas(data.market.fills) })
+                }`
               : ""}
           </div>
           {pnl === null &&
             (data.asset.mints > 0 || data.asset.buys > 0 || data.asset.sells > 0) && (
               <p className="mt-2 text-[10px] text-gray-400 dark:text-gray-500">
-                PnL is withheld because the live balance includes activity outside indexed mints and trades.
+                {t("PnL is withheld because the live balance includes activity outside indexed mints and trades.")}
               </p>
             )}
         </>
       )}
       <div className="mt-2 text-xs font-medium">
         <LazyLink href={`/profile/${source}`} className="text-purple-600 dark:text-purple-400 hover:underline">
-          View profile
+          {t("View profile")}
         </LazyLink>
       </div>
     </HoverCard>
@@ -592,10 +615,12 @@ export function LaunchpadAddressHoverCard({
  * The link still goes to the explorer, so touch users lose only the preview.
  */
 export function IssuerLine({ source }: { source: string }) {
+  const t = useT();
   return (
     <span className="mt-1 inline-block text-[13px] text-gray-500 dark:text-gray-400 tabular-nums">
-      by{" "}
-      <AddressHoverCard source={source}>{shortAddress(source)}</AddressHoverCard>
+      {rich(t, "by {address}", {
+        address: <AddressHoverCard source={source}>{shortAddress(source)}</AddressHoverCard>,
+      })}
       <CopyButton value={source} />
     </span>
   );

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
-import { getMessages } from "@/lib/i18n/server";
+import { getMessages, getT } from "@/lib/i18n/server";
 import { makeT, msg } from "@/lib/i18n/t";
 import { fetchXcpUsd } from "@/lib/api/price";
 import { fetchTradeableAssets } from "@/lib/tradeable";
@@ -34,17 +34,17 @@ export async function generateMetadata({
 }
 
 export default async function SwapPage() {
-  const [assets, xcpUsd] = await Promise.all([
+  const [assets, xcpUsd, t] = await Promise.all([
     fetchTradeableAssets(),
     fetchXcpUsd(),
+    getT(),
   ]);
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
       {assets.length === 0 ? (
         <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-          No launches have graduated yet. The first sell-out seeds the first
-          pool — and it becomes tradeable here in the same block.
+          {t("No launches have graduated yet. The first sell-out seeds the first pool — and it becomes tradeable here in the same block.")}
         </p>
       ) : (
         <TradeSurface assets={assets} xcpUsd={xcpUsd} />

@@ -9,6 +9,7 @@ import {
   type MinterEarning,
 } from "@/lib/api/launchpad-api";
 import { commas, fromSats, shortAddress } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
 import { LABEL } from "@/components/ui/tokens";
 import { mintsEarned } from "@/lib/rewards";
 
@@ -25,6 +26,7 @@ const PER_PAGE = 25;
  * a full page implies a next one closely enough.
  */
 export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
+  const t = useT();
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState("");
   const source = useDebounced(query.trim(), 300) || undefined;
@@ -49,8 +51,8 @@ export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
           setQuery(e.target.value);
           setPage(0);
         }}
-        placeholder="Search by address"
-        aria-label="Search minters by address"
+        placeholder={t("Search by address")}
+        aria-label={t("Search minters by address")}
         spellCheck={false}
         className="mt-4 w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3.5 py-2 font-mono text-xs text-gray-700 dark:text-gray-300 outline-none placeholder:font-sans placeholder:text-sm placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-purple-400 dark:focus:border-purple-500"
       />
@@ -58,10 +60,10 @@ export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
       {rows.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
           {source
-            ? "No mints from that address. Search matches a full address exactly."
+            ? t("No mints from that address. Search matches a full address exactly.")
             : page > 0
-              ? "Nothing past here — the board ends on the previous page."
-              : "Nobody has minted yet. The first row here is available."}
+              ? t("Nothing past here — the board ends on the previous page.")
+              : t("Nobody has minted yet. The first row here is available.")}
         </p>
       ) : (
         <div className="mt-3 overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -69,19 +71,19 @@ export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
             <thead>
               <tr className="border-b border-gray-100 dark:border-gray-800 text-left">
                 <th scope="col" className={`px-4 py-2.5 ${LABEL}`}>
-                  Minter
+                  {t("Minter")}
                 </th>
                 <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  Mints
+                  {t("Mints")}
                 </th>
                 <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  Launches
+                  {t("Launches")}
                 </th>
                 <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  Committed
+                  {t("Committed")}
                 </th>
                 <th scope="col" className={`px-4 py-2.5 text-right ${LABEL}`}>
-                  Earned
+                  {t("Earned")}
                 </th>
               </tr>
             </thead>
@@ -129,16 +131,16 @@ export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             className="rounded-md border border-gray-200 dark:border-gray-800 px-3 py-2 font-medium text-gray-600 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            ← Prev
+            {t("← Prev")}
           </button>
-          <span>Page {page + 1}</span>
+          <span>{t("Page {n}", { n: page + 1 })}</span>
           <button
             type="button"
             disabled={rows.length < PER_PAGE}
             onClick={() => setPage((p) => p + 1)}
             className="rounded-md border border-gray-200 dark:border-gray-800 px-3 py-2 font-medium text-gray-600 dark:text-gray-400 transition-colors hover:border-gray-300 dark:hover:border-gray-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Next →
+            {t("Next →")}
           </button>
         </div>
       )}

@@ -7,6 +7,7 @@ import { fetchJson } from "@/lib/client";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { ratio, type Raw } from "@/lib/numeric";
+import { useT } from "@/lib/i18n/client";
 
 interface OpenOrder {
   tx_hash: string;
@@ -39,6 +40,7 @@ export function OrdersTab({
   /** Only a wallet's own profile can cancel; a public one is read-only. */
   canCancel: boolean;
 }) {
+  const t = useT();
   const compose = useCompose();
   const { data: orders, mutate } = useSWR<OpenOrder[]>(
     `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/orders?status=open&limit=100`,
@@ -47,11 +49,11 @@ export function OrdersTab({
   );
   const busy = isBusy(compose.status);
 
-  if (!orders) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading orders…</p>;
+  if (!orders) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("Loading orders…")}</p>;
   if (orders.length === 0) {
     return (
       <p className="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
-        No open orders. Limit orders you place rest on the book until they fill or expire.
+        {t("No open orders. Limit orders you place rest on the book until they fill or expire.")}
       </p>
     );
   }
@@ -75,7 +77,7 @@ export function OrdersTab({
                 {token ? (
                   <>
                     <span className={buying ? "font-medium text-green-700 dark:text-green-400" : "font-medium text-red-600 dark:text-red-400"}>
-                      {buying ? "Buy" : "Sell"}
+                      {buying ? t("Buy") : t("Sell")}
                     </span>{" "}
                     <a href={`/${token}`} className="font-medium hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
                       {token}
@@ -84,13 +86,13 @@ export function OrdersTab({
                   </>
                 ) : (
                   <>
-                    <span className="font-medium text-gray-700 dark:text-gray-300">Swap</span>{" "}
+                    <span className="font-medium text-gray-700 dark:text-gray-300">{t("Swap")}</span>{" "}
                     {commasRaw(o.give_quantity)} {o.give_asset} → {commasRaw(o.get_quantity)} {o.get_asset}
                   </>
                 )}
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  {(filled * 100).toFixed(0)}% filled ·{" "}
-                  {o.expire_index === null ? "GTC" : `expires block ${o.expire_index.toLocaleString()}`}
+                  {t("{pct}% filled", { pct: (filled * 100).toFixed(0) })} ·{" "}
+                  {o.expire_index === null ? "GTC" : t("expires block {n}", { n: o.expire_index.toLocaleString() })}
                 </span>
               </div>
               {canCancel && (
@@ -100,7 +102,7 @@ export function OrdersTab({
                   onClick={() => compose.composeCancel({ offer_hash: o.tx_hash })}
                   className="rounded-md border border-gray-300 dark:border-gray-700 px-2.5 py-1.5 text-xs text-gray-600 dark:text-gray-400 transition-colors hover:border-red-400 dark:hover:border-red-500 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50"
                 >
-                  {busy ? "…" : "Cancel"}
+                  {busy ? "…" : t("Cancel")}
                 </button>
               )}
             </li>
@@ -109,7 +111,7 @@ export function OrdersTab({
       </ul>
       {compose.status === "confirmed" && (
         <p className="border-t border-gray-100 dark:border-gray-800 px-4 py-2 text-xs text-green-700 dark:text-green-400">
-          Cancel broadcast — the remainder refunds when it confirms.{" "}
+          {t("Cancel broadcast — the remainder refunds when it confirms.")}{" "}
           <button
             type="button"
             className="underline"
@@ -118,7 +120,7 @@ export function OrdersTab({
               mutate();
             }}
           >
-            Refresh
+            {t("Refresh")}
           </button>
         </p>
       )}

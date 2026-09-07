@@ -1,6 +1,8 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useT } from "@/lib/i18n/client";
+import type { T } from "@/lib/i18n/t";
 import type { Dispenser } from "@/lib/api/counterparty";
 import { fetchAddressUtxos } from "@/lib/esplora";
 import { shortAddress } from "@/lib/format";
@@ -98,6 +100,7 @@ export async function composeLeg(
   leg: PlannedLeg,
   feeRate: number,
   opts: { inputsSet?: string; excludeUtxos?: string[]; allowUnconfirmed?: boolean },
+  t: T,
 ): Promise<string> {
   const qp = new URLSearchParams({
     dispenser: leg.dispenser.source,
@@ -118,13 +121,14 @@ export async function composeLeg(
   const res = await relayingFetch(url, 30_000, { essential: true });
   const data = await res.json();
   if (!res.ok || data.error) {
-    throw new Error(data.error?.description ?? data.error ?? `Compose failed (${res.status})`);
+    throw new Error(data.error?.description ?? data.error ?? t("Compose failed ({status})", { status: res.status }));
   }
   return data.result.rawtransaction as string;
 }
 
-/** Live re-check of one dispenser right before composing its leg. */
-async function preflightLeg(leg: PlannedLeg): Promise<string | null> {
+/** Live re-check of one dispenser right before composing its leg. Returns
+ *  the reason it can no longer run, already in the visitor's language. */
+async function preflightLeg(leg: PlannedLeg, t: T): Promise<string | null> {
   try {
     const res = await relayingFetch(
       `${COUNTERPARTY_API_BASE}/addresses/${leg.dispenser.source}/dispensers`,
@@ -137,10 +141,10 @@ async function preflightLeg(leg: PlannedLeg): Promise<string | null> {
       satoshirate: number;
     }[] = res.ok ? ((await res.json()).result ?? []) : [];
     const live = rows.find((r) => r.asset === "XCP");
-    if (!live || live.status !== 0) return "route just closed";
-    if (live.satoshirate !== leg.dispenser.satoshirate) return "route price changed";
+    if (!live || live.status !== 0) return t("route just closed");
+    if (live.satoshirate !== leg.dispenser.satoshirate) return t("route price changed");
     if (live.give_remaining < leg.units * leg.dispenser.give_quantity)
-      return "route no longer has enough left";
+      return t("route no longer has enough left");
     return null;
   } catch {
     return null; // can't verify — compose-time validation still applies
@@ -153,6 +157,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *  behaviour does not depend on it, and a null rate just reports the purchase
  *  without a revenue figure. */
 export function useDispenseRouter(btcUsd?: number | null) {
+  const t = useT();
   const { address, signTransaction, broadcastTransaction } = useWallet();
   const [legs, setLegs] = useState<Leg[]>([]);
   const [phase, setPhase] = useState<RouterPhase>("idle");
@@ -213,8 +218,8 @@ export function useDispenseRouter(btcUsd?: number | null) {
             let rawHex = leg.rawHex;
             if (!rawHex) {
               patch(i, { status: "composing", error: null });
-              const stale = await preflightLeg(leg);
-              if (stale) throw new Error(`Skipped: ${stale}`);
+              const stale = await preflightLeg(leg, t);
+              if (stale) throw new Error(t("Skipped: {reason}", { reason: stale }));
               const chainedInputs =
                 chainModeRef.current && !leg.utxoAssigned
                   ? pendingChangeInputs(address)
@@ -228,7 +233,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
                 allowUnconfirmed: chainedInputs.length > 0 || (
                   chainModeRef.current && !leg.utxoAssigned && i > 0
                 ),
-              });
+              }, t);
               patch(i, { rawHex });
             }
 
@@ -253,7 +258,10 @@ export function useDispenseRouter(btcUsd?: number | null) {
             registerPending({
               txid,
               kind: "dispense",
-              label: `Load ${leg.units * (leg.dispenser.give_quantity / 1e8)} XCP via ${shortAddress(leg.dispenser.source)}`,
+              label: t("Load {amount} XCP via {address}", {
+                amount: leg.units * (leg.dispenser.give_quantity / 1e8),
+                address: shortAddress(leg.dispenser.source),
+              }),
               address: address ?? undefined,
             });
             // One event per LEG, not per plan: each leg is its own broadcast
@@ -267,7 +275,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
           } catch (e) {
             patch(i, {
               status: "error",
-              error: e instanceof Error ? e.message : "Failed",
+              error: e instanceof Error ? e.message : t("Failed"),
             });
             setPhase("partial");
             return;

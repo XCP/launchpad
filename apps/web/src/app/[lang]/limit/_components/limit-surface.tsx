@@ -8,6 +8,7 @@ import {
 } from "@/app/[lang]/swap/_components/swap-settings";
 import { TokenSelectModal } from "@/components/token-select-modal";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
+import { useT } from "@/lib/i18n/client";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { defaultTradeAsset } from "@/lib/trade-selection";
 
@@ -20,6 +21,7 @@ export function LimitSurface({
   assets: string[];
   xcpUsd: number | null;
 }) {
+  const t = useT();
   const { address } = useWallet();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [asset, setAsset] = useState(() => defaultTradeAsset(assets));
@@ -31,7 +33,7 @@ export function LimitSurface({
           <SegmentedList className="w-64">
             {(["buy", "sell"] as const).map((s) => (
               <SegmentedTrigger key={s} value={s}>
-                {s}
+                {s === "buy" ? t("buy") : t("sell")}
               </SegmentedTrigger>
             ))}
           </SegmentedList>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 
 /**
  * Quote-freshness countdown (CoW's construction): pathLength={100}
@@ -18,10 +19,11 @@ export function QuoteRing({
   lastUpdated: number | null;
   fetching: boolean;
 }) {
+  const t = useT();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(t);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
   }, []);
   if (!lastUpdated) return null;
   const remaining = Math.max(0, 100 - ((now - lastUpdated) / periodMs) * 100);
@@ -29,7 +31,7 @@ export function QuoteRing({
     <svg
       viewBox="0 0 20 20"
       className={`size-[18px] -rotate-90 ${fetching ? "animate-pulse" : ""}`}
-      aria-label="Quote refresh countdown"
+      aria-label={t("Quote refresh countdown")}
     >
       <circle cx="10" cy="10" r="8" fill="none" strokeWidth="2" className="stroke-gray-200 dark:stroke-gray-700" />
       <circle

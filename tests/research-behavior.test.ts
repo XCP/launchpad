@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ prefetch: () => undefined }) }));
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { pendingPressureByAsset } from "@/app/[lang]/research/_lib/behavior";
-import { LaunchTable, SellerSummary } from "@/app/research/_components/live-behavior-dashboard";
+import { LaunchTable, SellerSummary } from "@/app/[lang]/research/_components/live-behavior-dashboard";
 import {
   fetchResearchBehavior,
   type ResearchBehaviorSnapshot,

@@ -9,6 +9,7 @@ import { FOCUS } from "@/components/ui/tokens";
 import { useMempool } from "@/hooks/use-mempool";
 import { commas, fromSats, shortAddress, tokenQty } from "@/lib/format";
 import { groupMintsByAddress } from "@/lib/mempool";
+import { useT } from "@/lib/i18n/client";
 
 /** The page is being watched, so it polls hard. */
 const REFRESH_MS = 10_000;
@@ -16,6 +17,7 @@ const REFRESH_MS = 10_000;
 type Tab = "mints" | "orders" | "fairminters";
 
 export function MempoolView() {
+  const t = useT();
   const { fairminters, mints, orders, isLoading, refresh } = useMempool(REFRESH_MS);
 
   const groups = groupMintsByAddress(mints);
@@ -45,13 +47,13 @@ export function MempoolView() {
             than a control, so they size to their labels instead. */}
         <SegmentedList className="w-fit">
           <SegmentedTrigger value="mints" grow={false}>
-            Mints {mints.length > 0 && `(${mints.length})`}
+            {t("Mints")} {mints.length > 0 && `(${mints.length})`}
           </SegmentedTrigger>
           <SegmentedTrigger value="orders" grow={false}>
-            Orders {orders.length > 0 && `(${orders.length})`}
+            {t("Orders")} {orders.length > 0 && `(${orders.length})`}
           </SegmentedTrigger>
           <SegmentedTrigger value="fairminters" grow={false}>
-            Fairminters {fairminters.length > 0 && `(${fairminters.length})`}
+            {t("Fairminters")} {fairminters.length > 0 && `(${fairminters.length})`}
           </SegmentedTrigger>
         </SegmentedList>
         <RefreshButton onRefresh={refresh} />
@@ -59,9 +61,9 @@ export function MempoolView() {
 
       <TabsContent value="mints" className="mt-4">
         {isLoading ? (
-          <Empty>Reading the mempool…</Empty>
+          <Empty>{t("Reading the mempool…")}</Empty>
         ) : groups.length === 0 ? (
-          <Empty>Nothing queued — every mint so far has confirmed.</Empty>
+          <Empty>{t("Nothing queued — every mint so far has confirmed.")}</Empty>
         ) : (
           /* Horizontal scroll rather than dropped columns: every number here
              is the point of the table, so none of them is the one to hide. */
@@ -69,10 +71,10 @@ export function MempoolView() {
             <table className="w-full min-w-[34rem] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 text-left">
-                  <Th>Minter</Th>
-                  <Th>Asset</Th>
-                  <Th right>Mints</Th>
-                  <Th right>Supply</Th>
+                  <Th>{t("Minter")}</Th>
+                  <Th>{t("Asset")}</Th>
+                  <Th right>{t("Mints")}</Th>
+                  <Th right>{t("Supply")}</Th>
                   <Th right>XCP</Th>
                 </tr>
               </thead>
@@ -117,17 +119,17 @@ export function MempoolView() {
 
       <TabsContent value="orders" className="mt-4">
         {isLoading ? (
-          <Empty>Reading the mempool…</Empty>
+          <Empty>{t("Reading the mempool…")}</Empty>
         ) : orders.length === 0 ? (
-          <Empty>No orders queued — every order so far has confirmed.</Empty>
+          <Empty>{t("No orders queued — every order so far has confirmed.")}</Empty>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             <table className="w-full min-w-[28rem] text-sm">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800 text-left">
-                  <Th>Address</Th>
-                  <Th>Asset</Th>
-                  <Th>Side</Th>
+                  <Th>{t("Address")}</Th>
+                  <Th>{t("Asset")}</Th>
+                  <Th>{t("Side")}</Th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
@@ -144,7 +146,7 @@ export function MempoolView() {
                       </LazyLink>
                     </td>
                     <td className={`p-3 font-medium ${o.getAsset === o.asset ? "text-green-700 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                      {o.getAsset === o.asset ? "Buy" : "Sell"}
+                      {o.getAsset === o.asset ? t("Buy") : t("Sell")}
                     </td>
                   </tr>
                 ))}
@@ -156,12 +158,9 @@ export function MempoolView() {
 
       <TabsContent value="fairminters" className="mt-4">
         {isLoading ? (
-          <Empty>Reading the mempool…</Empty>
+          <Empty>{t("Reading the mempool…")}</Empty>
         ) : fairminters.length === 0 ? (
-          <Empty>
-            No launches queued. Every XCP-69 launch broadcast so far has
-            confirmed.
-          </Empty>
+          <Empty>{t("No launches queued. Every XCP-69 launch broadcast so far has confirmed.")}</Empty>
         ) : (
           <ul className="divide-y divide-gray-100 dark:divide-gray-800 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
             {fairminters.map((fm) => (
@@ -192,9 +191,9 @@ export function MempoolView() {
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="text-xs font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                    opens {commas(fm.start_block)}
+                    {t("opens {block}", { block: commas(fm.start_block) })}
                   </div>
-                  <div className="text-[11px] text-gray-400 dark:text-gray-500">unconfirmed</div>
+                  <div className="text-[11px] text-gray-400 dark:text-gray-500">{t("unconfirmed")}</div>
                 </div>
               </li>
             ))}

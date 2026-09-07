@@ -18,6 +18,8 @@ import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchJson } from "@/lib/client";
 import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
+import { useT } from "@/lib/i18n/client";
+import { rich } from "@/lib/i18n/rich";
 import {
   approx,
   big,
@@ -95,6 +97,7 @@ export function SwapWidget({
   /** Tight-rail mode (asset-page sidebar): wells stack the chip below. */
   compact?: boolean;
 }) {
+  const t = useT();
   const usdFmt = useFiat();
   const { code } = useFxRate();
   const { address, status: walletStatus } = useWallet();
@@ -133,7 +136,7 @@ export function SwapWidget({
   const action =
     giveAsset === "XCP" ? "buy" : getAsset === "XCP" ? "sell" : "swap";
   const actionLabel =
-    action === "buy" ? "Buy" : action === "sell" ? "Sell" : "Swap";
+    action === "buy" ? t("Buy") : action === "sell" ? t("Sell") : t("Swap");
   const selectableAssets = [
     "XCP",
     ...assets.filter((asset) => asset !== "XCP"),
@@ -333,10 +336,10 @@ export function SwapWidget({
     if (compose.status === "confirmed") {
       const label =
         action === "buy"
-          ? `Buy ${getAsset} — market order`
+          ? t("Buy {asset} — market order", { asset: getAsset })
           : action === "sell"
-            ? `Sell ${giveAsset} — market order`
-            : `Swap ${giveAsset} for ${getAsset} — market order`;
+            ? t("Sell {asset} — market order", { asset: giveAsset })
+            : t("Swap {give} for {get} — market order", { give: giveAsset, get: getAsset });
       registerPending({
         txid: compose.txid,
         kind: "order",
@@ -346,6 +349,7 @@ export function SwapWidget({
       });
     }
   }, [
+    t,
     compose.status,
     compose.txid,
     action,
@@ -483,7 +487,7 @@ export function SwapWidget({
           }
           className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
         >
-          {p === 100 ? "Max" : `${p}%`}
+          {p === 100 ? t("Max") : `${p}%`}
         </button>
       ))}
     </span>
@@ -495,10 +499,11 @@ export function SwapWidget({
     availableRaw !== null ? Math.round(approx(availableRaw) / SATS) : null;
   const availableLabel = availableUnits !== null && (
     <span>
-      Available:{" "}
-      {availableUnits >= 1e6
-        ? compactFmt(availableUnits)
-        : availableUnits.toLocaleString("en-US")}
+      {t("Available: {n}", {
+        n: availableUnits >= 1e6
+          ? compactFmt(availableUnits)
+          : availableUnits.toLocaleString("en-US"),
+      })}
     </span>
   );
 
@@ -510,11 +515,11 @@ export function SwapWidget({
       className="min-w-0 truncate text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
       onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
     >
-      Balance: {commasRaw(effBalance)}
+      {t("Balance: {n}", { n: commasRaw(effBalance) })}
       {pendingOutgoing > 0n && (
         <span className="text-gray-400 dark:text-gray-500">
           {" "}
-          · {commasRaw(pendingOutgoing)} pending
+          {t("· {n} pending", { n: commasRaw(pendingOutgoing) })}
         </span>
       )}
     </button>
@@ -522,35 +527,35 @@ export function SwapWidget({
 
   const buttonLabel = busy
     ? compose.status === "composing"
-      ? "Composing…"
+      ? t("Composing…")
       : compose.status === "signing"
-        ? "Confirm in wallet…"
-        : "Broadcasting…"
+        ? t("Confirm in wallet…")
+        : t("Broadcasting…")
     : amountRaw === 0
-      ? "Enter an amount"
+      ? t("Enter an amount")
       : !balanceSettled
-        ? "Checking balance…"
+        ? t("Checking balance…")
       : insufficient
-        ? `Insufficient ${giveAsset} balance`
+        ? t("Insufficient {asset} balance", { asset: giveAsset })
         : approx(outRaw) === 0
           ? staleQuote
-            ? "Fetching quote…"
+            ? t("Fetching quote…")
             : quoteError
               ? !poolHasLiquidity
-                ? "No quote for this pair"
-                : "Quote unavailable"
+                ? t("No quote for this pair")
+                : t("Quote unavailable")
             : availableRaw !== null
-              ? "Amount too small — rounds to 0"
-              : "No quote for this pair"
+              ? t("Amount too small — rounds to 0")
+              : t("No quote for this pair")
           : slippage >= 20
-            ? `${actionLabel} anyway — ${slippage}% slippage`
+            ? t("{action} anyway — {pct}% slippage", { action: actionLabel, pct: slippage })
             : impact >= 5
-              ? `${actionLabel} anyway`
+              ? t("{action} anyway", { action: actionLabel })
               : action === "buy"
-                ? `Buy ${getAsset}`
+                ? t("Buy {asset}", { asset: getAsset })
                 : action === "sell"
-                  ? `Sell ${giveAsset}`
-                  : `Swap ${giveAsset} for ${getAsset}`;
+                  ? t("Sell {asset}", { asset: giveAsset })
+                  : t("Swap {give} for {get}", { give: giveAsset, get: getAsset });
 
   // The live slippage figure in the buy-well corner; the gear that edits
   // it sits beside the mode tabs (the Uniswap placement). Auto is marked.
@@ -562,8 +567,8 @@ export function SwapWidget({
           : "text-gray-500 dark:text-gray-400"
       }
     >
-      Slippage: {slippage}%
-      {slippageAuto && <span className="text-gray-400 dark:text-gray-500"> · auto</span>}
+      {t("Slippage: {pct}%", { pct: slippage })}
+      {slippageAuto && <span className="text-gray-400 dark:text-gray-500"> {t("· auto")}</span>}
     </span>
   );
 
@@ -574,19 +579,19 @@ export function SwapWidget({
       <Well
         focusable
         layout={compact ? "stack" : "row"}
-        label="Sell"
+        label={t("Sell")}
         topRight={presetRow || undefined}
         chip={chipFor(giveAsset, "give")}
         chipRight={compact ? balanceLabel : undefined}
         footer={
           compact ? (
             <span>
-              {giveUsd === null ? `${code} unavailable` : `≈ ${usdFmt(giveUsd)}`}
+              {giveUsd === null ? t("{code} unavailable", { code }) : `≈ ${usdFmt(giveUsd)}`}
             </span>
           ) : (
             <>
               <span>
-                {giveUsd === null ? `${code} unavailable` : `≈ ${usdFmt(giveUsd)}`}
+                {giveUsd === null ? t("{code} unavailable", { code }) : `≈ ${usdFmt(giveUsd)}`}
               </span>
               {balanceLabel}
             </>
@@ -599,7 +604,7 @@ export function SwapWidget({
             setAmount(v);
             setPriceMoved(false);
           }}
-          ariaLabel={`Amount of ${giveAsset} to sell`}
+          ariaLabel={t("Amount of {asset} to sell", { asset: giveAsset })}
           className={`w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600 ${
             insufficient ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"
           }`}
@@ -611,19 +616,19 @@ export function SwapWidget({
       {/* Buy well */}
       <Well
         layout={compact ? "stack" : "row"}
-        label="Buy"
+        label={t("Buy")}
         topRight={availableLabel || undefined}
         chip={chipFor(getAsset, "get")}
         chipRight={compact ? slippageControl : undefined}
         footer={
           compact ? (
             <span>
-              {getUsd === null ? `${code} unavailable` : `≈ ${usdFmt(getUsd)}`}
+              {getUsd === null ? t("{code} unavailable", { code }) : `≈ ${usdFmt(getUsd)}`}
             </span>
           ) : (
             <>
               <span>
-                {getUsd === null ? `${code} unavailable` : `≈ ${usdFmt(getUsd)}`}
+                {getUsd === null ? t("{code} unavailable", { code }) : `≈ ${usdFmt(getUsd)}`}
               </span>
               {slippageControl}
             </>
@@ -654,7 +659,7 @@ export function SwapWidget({
           <button
             type="button"
             onClick={() => setRateInverted((v) => !v)}
-            aria-label="Invert rate"
+            aria-label={t("Invert rate")}
             className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
           >
             {rateText}
@@ -673,7 +678,7 @@ export function SwapWidget({
                       : "text-gray-400 dark:text-gray-500"
                 }
               >
-                Price impact {impact.toFixed(1)}%
+                {t("Price impact {pct}%", { pct: impact.toFixed(1) })}
               </span>
             )}
             {mempoolQuote && (
@@ -683,9 +688,13 @@ export function SwapWidget({
                     ? "font-medium text-amber-600 dark:text-amber-400"
                     : "text-gray-400 dark:text-gray-500"
                 }
-                title={`${mempoolQuote.pendingCount} unconfirmed ${mempoolQuote.pendingCount === 1 ? "order" : "orders"} on this pair in the same direction. If they confirm first, this trade gets about ${mempoolDrop.toFixed(1)}% less than the quote. Auto slippage allows for it.`}
+                title={
+                  mempoolQuote.pendingCount === 1
+                    ? t("{n} unconfirmed order on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: mempoolDrop.toFixed(1) })
+                    : t("{n} unconfirmed orders on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: mempoolDrop.toFixed(1) })
+                }
               >
-                {mempoolQuote.pendingCount} ahead in mempool
+                {t("{n} ahead in mempool", { n: mempoolQuote.pendingCount })}
                 {mempoolDrop > 0 && ` · −${mempoolDrop.toFixed(1)}%`}
               </span>
             )}
@@ -701,7 +710,7 @@ export function SwapWidget({
         {quote && approx(outRaw) > 0 && (
           <dl className="mt-1 space-y-1.5 border-t border-gray-100 dark:border-gray-800 pt-2 text-xs text-gray-500 dark:text-gray-400">
             <div className="flex justify-between">
-              <dt>Min received</dt>
+              <dt>{t("Min received")}</dt>
               <dd
                 className={`font-medium tabular-nums ${
                   minBelowMempool
@@ -710,43 +719,43 @@ export function SwapWidget({
                 }`}
                 title={
                   minBelowMempool
-                    ? "Above what the pending orders would leave. If they confirm first, this order rests for a block and refunds instead of filling — raise the slippage or use Auto."
+                    ? t("Above what the pending orders would leave. If they confirm first, this order rests for a block and refunds instead of filling — raise the slippage or use Auto.")
                     : undefined
                 }
               >
                 {commasRaw(minReceivedRaw)} {getAsset}
                 {minBelowMempool && (
-                  <span className="font-normal"> · above the mempool estimate</span>
+                  <span className="font-normal"> {t("· above the mempool estimate")}</span>
                 )}
               </dd>
             </div>
             {afterMempoolRaw !== null && (
               <div className="flex justify-between">
-                <dt>After mempool</dt>
+                <dt>{t("After mempool")}</dt>
                 <dd className="tabular-nums">
                   ≈ {commasRaw(afterMempoolRaw)} {getAsset}
                 </dd>
               </div>
             )}
             <div className="flex justify-between">
-              <dt>Route</dt>
+              <dt>{t("Route")}</dt>
               <dd>
                 {approx(quote.pool_output) > 0 && approx(quote.book_output) > 0
-                  ? "Pool + order book"
+                  ? t("Pool + order book")
                   : approx(quote.pool_output) > 0
-                    ? "Pool"
-                    : "Order book"}
+                    ? t("Pool")
+                    : t("Order book")}
               </dd>
             </div>
             {quote.fee_bps !== undefined && approx(quote.pool_output) > 0 && (
               <div className="flex justify-between">
-                <dt>LP fee</dt>
+                <dt>{t("LP fee")}</dt>
                 <dd>{(quote.fee_bps / 100).toFixed(2)}%</dd>
               </div>
             )}
             {feeRate !== null && (
               <div className="flex justify-between">
-                <dt>TX fee</dt>
+                <dt>{t("TX fee")}</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
                   {satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
@@ -766,22 +775,19 @@ export function SwapWidget({
       <div className="px-0.5 pb-0.5 pt-3">
         {poolInfo !== undefined && !poolHasLiquidity && !poolError && (
           <p className="mb-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            No active {giveAsset}/{getAsset} pool liquidity. A resting order
-            can still fill through the order book.
+            {t("No active {give}/{get} pool liquidity. A resting order can still fill through the order book.", { give: giveAsset, get: getAsset })}
           </p>
         )}
 
         {poolError && (
           <p className="mb-2 rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-600 dark:text-gray-400">
-            Couldn&apos;t check the {giveAsset}/{getAsset} pool. Quotes may still
-            use the order book.
+            {t("Couldn't check the {give}/{get} pool. Quotes may still use the order book.", { give: giveAsset, get: getAsset })}
           </p>
         )}
 
         {priceMoved && (
           <p className="mb-2 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            Quote moved — the numbers above are updated. Press again to swap
-            at the new price.
+            {t("Quote moved — the numbers above are updated. Press again to swap at the new price.")}
           </p>
         )}
 
@@ -804,14 +810,14 @@ export function SwapWidget({
           <div className="mt-2 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm">
             <div className="flex items-center justify-between">
               <span className="font-semibold text-green-800 dark:text-green-300">
-                Swap broadcast — <TxLink txid={compose.txid} />
+                {rich(t, "Swap broadcast — {tx}", { tx: <TxLink txid={compose.txid} /> })}
               </span>
               <button
                 type="button"
                 onClick={compose.reset}
                 className="text-xs text-green-800 dark:text-green-300 underline"
               >
-                Dismiss
+                {t("Dismiss")}
               </button>
             </div>
             <OrderTracker
@@ -830,7 +836,7 @@ export function SwapWidget({
           assets={selectableAssets}
           selected={selectorLeg === "give" ? giveAsset : getAsset}
           address={address}
-          title={selectorLeg === "give" ? "Choose what to sell" : "Choose what to buy"}
+          title={selectorLeg === "give" ? t("Choose what to sell") : t("Choose what to buy")}
           onSelect={chooseAsset}
         />
       )}

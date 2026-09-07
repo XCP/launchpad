@@ -6,16 +6,18 @@ import { TokenImage } from "@/components/token-image";
 import { fetchAssetBalance, fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchEventsBySource, fetchMintsBySource, fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { computeActivity, reconcileActivity, type ActivityKind } from "@/lib/activity";
-import { compact, fromSats, tokenQty } from "@/lib/format";
+import { blocksEta, compact, fromSats, tokenQty } from "@/lib/format";
+import { useT } from "@/lib/i18n/client";
+import { msg } from "@/lib/i18n/t";
 
 const LABEL: Record<ActivityKind, string> = {
-  mint: "Minted",
-  mint_pending: "Mint open",
-  refund: "Refunded",
-  buy: "Bought",
-  sell: "Sold",
-  movement_in: "Other in",
-  movement_out: "Other out",
+  mint: msg("Minted"),
+  mint_pending: msg("Mint open"),
+  refund: msg("Refunded"),
+  buy: msg("Bought"),
+  sell: msg("Sold"),
+  movement_in: msg("Other in"),
+  movement_out: msg("Other out"),
 };
 
 const TONE: Record<ActivityKind, string> = {
@@ -30,14 +32,8 @@ const TONE: Record<ActivityKind, string> = {
 
 /** Blocks land about every ten minutes, so distance from the tip is a decent
  *  age — an estimate, and labelled as one. */
-function ago(blocks: number): string {
-  const mins = blocks * 10;
-  if (mins < 60) return `~${Math.max(1, Math.round(mins))}m ago`;
-  if (mins < 60 * 24) return `~${Math.round(mins / 60)}h ago`;
-  return `~${Math.round(mins / (60 * 24))}d ago`;
-}
-
 export function ActivityTab({ address }: { address: string }) {
+  const t = useT();
   const { data, isLoading } = useSWR(
     ["activity", address],
     async () => {
@@ -62,13 +58,13 @@ export function ActivityTab({ address }: { address: string }) {
     { refreshInterval: 600_000, revalidateOnFocus: false },
   );
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading activity…</p>;
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("Loading activity…")}</p>;
 
   const rows = data?.rows ?? [];
   if (rows.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center text-sm text-gray-500 dark:text-gray-400">
-        No mints, trades, or transfers on xcp.fun launches yet.
+        {t("No mints, trades, or transfers on xcp.fun launches yet.")}
       </p>
     );
   }
@@ -81,11 +77,11 @@ export function ActivityTab({ address }: { address: string }) {
       <div className="overflow-x-auto">
         <div className="min-w-[34rem]">
           <div className="grid grid-cols-[minmax(0,1fr)_6rem_6rem_7rem_5rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-            <span>Token</span>
-            <span>Type</span>
-            <span className="text-right">Amount</span>
+            <span>{t("Token")}</span>
+            <span>{t("Type")}</span>
+            <span className="text-right">{t("Amount")}</span>
             <span className="text-right">XCP</span>
-            <span className="text-right">When</span>
+            <span className="text-right">{t("When")}</span>
           </div>
           <ul className="divide-y divide-gray-100 dark:divide-gray-800">
             {rows.map((r) => {
@@ -104,7 +100,7 @@ export function ActivityTab({ address }: { address: string }) {
                   </LazyLink>
                   <span>
                     <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${TONE[r.kind]}`}>
-                      {LABEL[r.kind]}
+                      {t(LABEL[r.kind])}
                     </span>
                   </span>
                   <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
@@ -130,10 +126,10 @@ export function ActivityTab({ address }: { address: string }) {
                   </span>
                   <span className="text-right text-xs text-gray-400 dark:text-gray-500">
                     {r.block === null
-                      ? "other"
+                      ? t("other")
                       : data?.height
-                        ? ago(data.height - r.block)
-                        : `block ${r.block}`}
+                        ? t("{age} ago", { age: blocksEta(Math.max(1, data.height - r.block), t) })
+                        : t("block {n}", { n: r.block })}
                   </span>
                 </li>
               );
@@ -142,12 +138,7 @@ export function ActivityTab({ address }: { address: string }) {
         </div>
       </div>
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other”
-        reconciles those events to the live balance and can represent a send,
-        receive, burn, or liquidity movement. An open
-        mint shows what you&apos;ve committed — that XCP is escrowed by
-        consensus and comes back automatically if the launch misses its soft
-        cap.
+        {t("Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.")}
       </p>
     </div>
   );

@@ -11,6 +11,7 @@ import { PortfolioChart, WindowPicker, WINDOW_BLOCKS, type Window } from "@/app/
 import { usePortfolio } from "@/app/[lang]/profile/_lib/use-portfolio";
 import { totalPnlXcpSats } from "@/lib/positions";
 import { WITHHELD_COPY } from "@/lib/withheld-copy";
+import { useT } from "@/lib/i18n/client";
 
 type Denom = "usd" | "xcp";
 
@@ -69,6 +70,7 @@ function Pnl({
  * profit, in the PnL column, nowhere else.
  */
 function ValueOverWindow({ values, format }: { values: number[]; format: (v: number) => string }) {
+  const t = useT();
   const from = values[0]!;
   const to = values[values.length - 1]!;
   return (
@@ -76,12 +78,13 @@ function ValueOverWindow({ values, format }: { values: number[]; format: (v: num
       {format(from)}
       <span className="mx-1.5 text-gray-400 dark:text-gray-500">→</span>
       <span className="text-gray-900 dark:text-gray-100">{format(to)}</span>
-      <span className="ml-1.5 text-gray-400 dark:text-gray-500">this window</span>
+      <span className="ml-1.5 text-gray-400 dark:text-gray-500">{t("this window")}</span>
     </p>
   );
 }
 
 export function PositionsTab({ address }: { address: string }) {
+  const t = useT();
   const usd = useFiat();
   const { code } = useFxRate();
   const { portfolio, isLoading } = usePortfolio(address);
@@ -93,7 +96,7 @@ export function PositionsTab({ address }: { address: string }) {
     return ((await res.json()) as { result?: DailyRate[] }).result ?? [];
   }, { revalidateOnFocus: false });
 
-  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">Loading positions…</p>;
+  if (isLoading) return <p className="p-6 text-center text-sm text-gray-400 dark:text-gray-500">{t("Loading positions…")}</p>;
 
   const open = portfolio?.open ?? [];
   const xcpUsd = portfolio?.xcpUsd ?? null;
@@ -142,10 +145,12 @@ export function PositionsTab({ address }: { address: string }) {
     <div className="space-y-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">Portfolio value</p>
+          <p className="text-xs uppercase tracking-wider text-gray-500 dark:text-gray-400">{t("Portfolio value")}</p>
           <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">{money(totalXcpSats)}</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Across {open.length} open {open.length === 1 ? "position" : "positions"}
+            {open.length === 1
+              ? t("Across {n} open position", { n: open.length })
+              : t("Across {n} open positions", { n: open.length })}
           </p>
         </div>
         {xcpUsd && (
@@ -180,31 +185,30 @@ export function PositionsTab({ address }: { address: string }) {
       )}
       {!chartComplete && open.length > 0 && (
         <p className="rounded-lg bg-gray-50 dark:bg-gray-800/60 px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
-          No value chart{historyIssues.length > 0 ? ` for ${historyIssues.join(", ")}` : ""}:
-          its recent transfer or liquidity history did not load completely, so
-          we cannot know how many tokens this wallet held at each point. Current
-          holdings and value are live and accurate.
+          {historyIssues.length > 0
+            ? t("No value chart for {assets}: its recent transfer or liquidity history did not load completely, so we cannot know how many tokens this wallet held at each point. Current holdings and value are live and accurate.", { assets: historyIssues.join(", ") })
+            : t("No value chart: its recent transfer or liquidity history did not load completely, so we cannot know how many tokens this wallet held at each point. Current holdings and value are live and accurate.")}
         </p>
       )}
 
       {open.length === 0 ? (
         <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 p-8 text-center">
-          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">No open positions in this wallet.</p>
+          <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{t("No open positions in this wallet.")}</p>
           <LazyLink
             href="/"
             className="inline-block rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-medium text-white hover:bg-purple-500"
           >
-            Explore launches
+            {t("Explore launches")}
           </LazyLink>
         </div>
       ) : (
         <div className="overflow-x-auto">
           <div className="min-w-[36rem]">
             <div className="grid grid-cols-[minmax(0,1fr)_7rem_6rem_10rem] gap-x-4 pb-1 text-[10px] font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-              <span>Token</span>
-              <span className="text-right">Holding</span>
-              <span className="text-right">Value</span>
-              <span className="text-right">Total PnL</span>
+              <span>{t("Token")}</span>
+              <span className="text-right">{t("Holding")}</span>
+              <span className="text-right">{t("Value")}</span>
+              <span className="text-right">{t("Total PnL")}</span>
             </div>
             <ul className="divide-y divide-gray-100 dark:divide-gray-800">
               {open.map((p) => {
@@ -251,9 +255,9 @@ export function PositionsTab({ address }: { address: string }) {
                           it stays neutral and says "of which". */}
                       {p.realizedXcpSats !== 0n && p.unrealizedXcpSats !== null && (
                         <span className="mt-0.5 block whitespace-nowrap text-[10px] text-gray-400 dark:text-gray-500">
-                          of which {p.realizedXcpSats < 0n ? "−" : ""}
-                          {money(p.realizedXcpSats < 0n ? -p.realizedXcpSats : p.realizedXcpSats)}{" "}
-                          realized
+                          {t("of which {amount} realized", {
+                            amount: `${p.realizedXcpSats < 0n ? "−" : ""}${money(p.realizedXcpSats < 0n ? -p.realizedXcpSats : p.realizedXcpSats)}`,
+                          })}
                         </span>
                       )}
                     </span>
@@ -266,14 +270,7 @@ export function PositionsTab({ address }: { address: string }) {
       )}
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        Total PnL combines profit or loss already realized by partial sales
-        with the unrealized result on tokens still held. It uses average-cost
-        accounting over your indexed mint-and-trade history. Incoming sends
-        and distributions enter at their market value on arrival. A dash means another
-        balance movement could not be reconciled or priced, so exact PnL is
-        not claimed.
-        Positions cover graduated XCP-69 launches — the ones with a locked pool
-        quoting them against XCP.
+        {t("Total PnL combines profit or loss already realized by partial sales with the unrealized result on tokens still held. It uses average-cost accounting over your indexed mint-and-trade history. Incoming sends and distributions enter at their market value on arrival. A dash means another balance movement could not be reconciled or priced, so exact PnL is not claimed. Positions cover graduated XCP-69 launches — the ones with a locked pool quoting them against XCP.")}
       </p>
     </div>
   );
