@@ -4,11 +4,33 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
 import { Globe, LOCALE_PREF_KEY, rememberLocale } from "@/components/language-switch";
 import { LazyLink } from "@/components/lazy-link";
+import { trackEvent } from "@/lib/analytics";
 import { useLocale } from "@/lib/i18n/client";
 import { isLocale, type Locale, localePath, matchLocale, splitLocale } from "@/lib/i18n/locales";
 
 const DISMISSED_KEY = "xcpfun:locale-dismissed:v1";
 const EVENT = "xcpfun:locale-suggest";
+const TRACKED_KEY = "xcpfun:browser-language-tracked:v1";
+
+/**
+ * What the browser asked for, reported once per session as an event: the
+ * site locale it maps to, or the bare language tag when the site has no
+ * such locale — "ru", "de", "id" — which is exactly the list of languages
+ * worth adding next. Fathom already knows the country; this is the
+ * language, which a country never tells you (Canada, Belgium, Switzerland).
+ */
+function trackBrowserLanguage() {
+  try {
+    if (sessionStorage.getItem(TRACKED_KEY)) return;
+    sessionStorage.setItem(TRACKED_KEY, "1");
+  } catch {
+    // Private mode: count it anyway; a few double counts beat none.
+  }
+  const tag = navigator.languages?.[0] ?? navigator.language;
+  if (!tag) return;
+  const spoken = matchLocale(tag) ?? tag.toLowerCase().split("-")[0];
+  trackEvent(`browser language: ${spoken}`);
+}
 
 /**
  * What the banner says, in the language it is offering — the reader it is
@@ -127,6 +149,14 @@ export function LocaleSuggest() {
     if (stored && pathname === "/" && stored !== current) router.replace(localePath(stored, "/"));
   }, [current, pathname, router]);
 
+  useEffect(() => {
+    trackBrowserLanguage();
+  }, []);
+
+  useEffect(() => {
+    if (offer) trackEvent(`language suggested: ${offer}`);
+  }, [offer]);
+
   if (!offer) return null;
   const copy = OFFER[offer];
   const { path } = splitLocale(pathname ?? "/");
@@ -145,6 +175,7 @@ export function LocaleSuggest() {
           href={path}
           locale={offer}
           onClick={() => {
+            trackEvent(`language suggestion accepted: ${offer}`);
             rememberLocale(offer);
             window.dispatchEvent(new Event(EVENT));
           }}
@@ -154,7 +185,10 @@ export function LocaleSuggest() {
         </LazyLink>
         <button
           type="button"
-          onClick={() => dismiss(offer)}
+          onClick={() => {
+            trackEvent(`language suggestion dismissed: ${offer}`);
+            dismiss(offer);
+          }}
           className="ms-auto text-xs text-purple-700 hover:text-purple-900 dark:text-purple-300 dark:hover:text-purple-100"
         >
           {copy.dismiss}

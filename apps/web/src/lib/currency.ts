@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
+import { trackEvent } from "@/lib/analytics";
 import { fetchFxRates } from "@/lib/api/launchpad-api";
 import { fiat } from "@/lib/format";
 import { useLocale } from "@/lib/i18n/client";
@@ -282,6 +283,7 @@ export function setCurrency(next: Currency | "auto") {
   } catch {
     // Private mode: the choice still applies for this page.
   }
+  trackEvent(`currency chosen: ${next}`);
   invalidate();
 }
 

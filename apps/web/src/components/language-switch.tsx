@@ -3,6 +3,7 @@
 import { DropdownMenu as DM } from "radix-ui";
 import { usePathname } from "next/navigation";
 import { LazyLink } from "@/components/lazy-link";
+import { trackEvent } from "@/lib/analytics";
 import { CURRENCIES, setCurrency, useCurrency } from "@/lib/currency";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { LOCALE_INFO, LOCALES, type Locale, splitLocale } from "@/lib/i18n/locales";
@@ -17,6 +18,9 @@ export function rememberLocale(locale: Locale) {
   } catch {
     // Private mode: the URL still carries the choice for this visit.
   }
+  // Every way of choosing a language ends here, so this is the one place
+  // the choice is counted: which languages people actually switch to.
+  trackEvent(`language chosen: ${locale}`);
 }
 
 export const MENU_ITEM =
