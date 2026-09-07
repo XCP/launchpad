@@ -53,12 +53,18 @@ const LINKS = [
 ];
 
 /** Secondary, and kept beside the wallet per the header's reading order:
- *  what you came to do on the left, what you look up on the right. */
+ *  what you came to do on the left, what you look up on the right.
+ *
+ *  Docs is not here. It is the longest word of the four in most languages
+ *  (Documentación, Документація, ドキュメント) and the least urgent: nobody
+ *  arrives needing the specification, and the people who do want it will
+ *  find it. Dropping one item buys every language the room the English row
+ *  never needed, and it still has two homes — the phone menu and the
+ *  footer — so nothing became unreachable. */
 const SECONDARY = [
   { href: "/activity", label: msg("Activity") },
   { href: "/stats", label: msg("Stats") },
   { href: "/faq", label: msg("FAQ") },
-  { href: "/docs", label: msg("Docs") },
 ];
 
 /** Both chips are links in the header rather than in this row — but the phone
@@ -70,6 +76,7 @@ const SECONDARY = [
 const MENU_EXTRA = [
   { href: "/rewards", label: msg("XCP Rewards") },
   { href: "/mempool", label: msg("Mempool") },
+  { href: "/docs", label: msg("Docs") },
 ];
 
 export function SiteHeader() {
