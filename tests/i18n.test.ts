@@ -5,6 +5,7 @@ import {
   isUnlocalizedPath,
   localePath,
   splitLocale,
+  matchLocale,
 } from "../apps/web/src/lib/i18n/locales";
 import { makeT, messageKey } from "../apps/web/src/lib/i18n/t";
 
@@ -66,5 +67,31 @@ describe("locale paths", () => {
     for (const p of ["/", "/faq", "/PEPE", "/ja/PEPE", "/profile/1abc"]) {
       expect(isUnlocalizedPath(p), p).toBe(false);
     }
+  });
+});
+
+describe("Chinese variants", () => {
+  it("keeps each variant as its own locale segment", () => {
+    expect(splitLocale("/zh-tw/faq")).toEqual({ locale: "zh-tw", path: "/faq" });
+    expect(splitLocale("/zh-hk")).toEqual({ locale: "zh-hk", path: "/" });
+    expect(splitLocale("/zh/PEPE")).toEqual({ locale: "zh", path: "/PEPE" });
+    expect(localePath("zh-hk", "/")).toBe("/zh-hk");
+    expect(localePath("zh", "/swap")).toBe("/zh/swap");
+  });
+
+  it("matches browser tags by script first, then region", () => {
+    expect(matchLocale("zh")).toBe("zh");
+    expect(matchLocale("zh-CN")).toBe("zh");
+    expect(matchLocale("zh-SG")).toBe("zh");
+    expect(matchLocale("zh-Hans-TW")).toBe("zh-tw");
+    expect(matchLocale("zh-Hant")).toBe("zh-tw");
+    expect(matchLocale("zh-TW")).toBe("zh-tw");
+    expect(matchLocale("zh-HK")).toBe("zh-hk");
+    expect(matchLocale("zh-Hant-HK")).toBe("zh-hk");
+    expect(matchLocale("zh-MO")).toBe("zh-hk");
+    expect(matchLocale("yue")).toBe("zh-hk");
+    expect(matchLocale("ja-JP")).toBe("ja");
+    expect(matchLocale("en-GB")).toBe("en");
+    expect(matchLocale("ko")).toBeNull();
   });
 });

@@ -900,7 +900,8 @@
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
   "Auto ({code})": [
-    "components/language-switch.tsx"
+    "components/language-switch.tsx",
+    "components/site-footer.tsx"
   ],
   "Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -1395,7 +1396,8 @@
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
   "Currency": [
-    "components/language-switch.tsx"
+    "components/language-switch.tsx",
+    "components/site-footer.tsx"
   ],
   "Currently unloading:": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -1912,6 +1914,9 @@
   ],
   "Known realized PnL": [
     "app/[lang]/profile/_components/history-tab.tsx"
+  ],
+  "Language": [
+    "components/site-footer.tsx"
   ],
   "latest launch {age}": [
     "components/address-hover-card.tsx"

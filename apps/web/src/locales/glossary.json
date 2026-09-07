@@ -2,150 +2,277 @@
   "_about": "Fixed renderings of the site's own vocabulary, per locale. The draft script hands these to the model with every batch, and a reviewer changes a term here rather than in a hundred strings. A term with no entry for a locale is the model's call. Keep the note in English: it is the reviewer's brief.",
   "terms": {
     "fairminter": {
-      "note": "Counterparty's on-chain mint contract. A proper noun on this site.",
-      "ja": "フェアミンター"
+      "note": "Counterparty's on-chain mint contract. A proper noun on this site. ZH: BRC-20 readers know 公平铸造 (fair mint). The Counterparty contract is the 合约.",
+      "ja": "フェアミンター",
+      "zh": "公平铸造合约",
+      "zh-tw": "公平鑄造合約",
+      "zh-hk": "公平鑄造合約"
     },
     "mint": {
-      "note": "Verb and noun: paying XCP into a fairminter for tokens.",
-      "ja": "ミント"
+      "note": "Verb and noun: paying XCP into a fairminter for tokens. ZH: UniSat and the BRC-20 community write Mint as 铸造.",
+      "ja": "ミント",
+      "zh": "铸造",
+      "zh-tw": "鑄造",
+      "zh-hk": "鑄造"
     },
     "minter": {
       "note": "An address that has minted.",
-      "ja": "ミンター"
+      "ja": "ミンター",
+      "zh": "铸造者",
+      "zh-tw": "鑄造者",
+      "zh-hk": "鑄造者"
     },
     "launch": {
-      "note": "One XCP-69 token launch, from announcement to pool.",
-      "ja": "ローンチ"
+      "note": "One XCP-69 token launch, from announcement to pool. ZH: pump.fun Chinese idiom: a token is 发射 (launched); a launchpad is 发射台. Never 发行 (issuance) or 启动.",
+      "ja": "ローンチ",
+      "zh": "发射",
+      "zh-tw": "發射",
+      "zh-hk": "發射"
     },
     "graduated": {
-      "note": "The launch sold out and its pool opened. pump.fun's sense of the word.",
-      "ja": "卒業"
+      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses.",
+      "ja": "卒業",
+      "zh": "毕业",
+      "zh-tw": "畢業",
+      "zh-hk": "畢業"
     },
     "refunded": {
       "note": "The launch missed its soft cap and everyone was repaid.",
-      "ja": "返金"
+      "ja": "返金",
+      "zh": "已退款",
+      "zh-tw": "已退款",
+      "zh-hk": "已退款"
     },
     "scheduled": {
-      "note": "Announced, not yet open for minting.",
-      "ja": "予定"
+      "note": "Announced, not yet open for minting. ZH: Announced on-chain, minting not open yet.",
+      "ja": "予定",
+      "zh": "待开始",
+      "zh-tw": "待開始",
+      "zh-hk": "待開始"
     },
     "upcoming": {
       "note": "Chip on a scheduled launch's card.",
-      "ja": "近日"
+      "ja": "近日",
+      "zh": "即将开始",
+      "zh-tw": "即將開始",
+      "zh-hk": "即將開始"
     },
     "minting": {
       "note": "Open for minting right now.",
-      "ja": "ミント中"
+      "ja": "ミント中",
+      "zh": "铸造中",
+      "zh-tw": "鑄造中",
+      "zh-hk": "鑄造中"
     },
     "soft cap": {
       "note": "The 69M-token sale target. Keep the loanword.",
-      "ja": "ソフトキャップ"
+      "ja": "ソフトキャップ",
+      "zh": "软顶",
+      "zh-tw": "軟頂",
+      "zh-hk": "軟頂"
     },
     "hard cap": {
-      "ja": "ハードキャップ"
+      "ja": "ハードキャップ",
+      "zh": "硬顶",
+      "zh-tw": "硬頂",
+      "zh-hk": "硬頂"
     },
     "pool": {
-      "note": "The TOKEN/XCP AMM pool.",
-      "ja": "プール"
+      "note": "The TOKEN/XCP AMM pool. ZH: 池 alone in tight labels. Uniswap zh-TW uses 資金池, but 流動性池 is clearer for an AMM.",
+      "ja": "プール",
+      "zh": "流动性池",
+      "zh-tw": "流動性池",
+      "zh-hk": "流動性池"
     },
     "liquidity": {
-      "ja": "流動性"
+      "ja": "流動性",
+      "zh": "流动性",
+      "zh-tw": "流動性",
+      "zh-hk": "流動性"
     },
     "LP burned": {
-      "note": "The pool's LP tokens were destroyed, so liquidity is locked forever.",
-      "ja": "LP焼却済み"
+      "note": "The pool's LP tokens were destroyed, so liquidity is locked forever. ZH: 销毁 is the one Chinese word for burn; there is no バーン/焼却 split.",
+      "ja": "LP焼却済み",
+      "zh": "LP 已销毁",
+      "zh-tw": "LP 已銷毀",
+      "zh-hk": "LP 已銷毀"
     },
     "market cap": {
-      "ja": "時価総額"
+      "ja": "時価総額",
+      "zh": "市值",
+      "zh-tw": "市值",
+      "zh-hk": "市值"
     },
     "price": {
-      "ja": "価格"
+      "ja": "価格",
+      "zh": "价格",
+      "zh-tw": "價格",
+      "zh-hk": "價格"
     },
     "holders": {
       "ja": "ホルダー",
-      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use."
+      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址.",
+      "zh": "持有者",
+      "zh-tw": "持有者",
+      "zh-hk": "持有者"
     },
     "supply": {
-      "ja": "供給量"
+      "ja": "供給量",
+      "zh": "供应量",
+      "zh-tw": "供應量",
+      "zh-hk": "供應量"
     },
     "volume": {
       "ja": "出来高",
-      "note": "The stock-market word, and what CoinMarketCap Japan uses. Zaif writes 取引高 in prose; keep 出来高 everywhere on this site."
+      "note": "The stock-market word, and what CoinMarketCap Japan uses. Zaif writes 取引高 in prose; keep 出来高 everywhere on this site. ZH: Uniswap and CMC China. UniSat writes 成交量; keep 交易量 everywhere here.",
+      "zh": "交易量",
+      "zh-tw": "交易量",
+      "zh-hk": "交易量"
     },
     "since mint": {
-      "note": "Return measured from the mint price.",
-      "ja": "ミント時比"
+      "note": "Return measured from the mint price. ZH: Return measured from the mint price.",
+      "ja": "ミント時比",
+      "zh": "较铸造价",
+      "zh-tw": "較鑄造價",
+      "zh-hk": "較鑄造價"
     },
     "all-time": {
-      "note": "The whole life of the market, as a window label beside 24h.",
-      "ja": "全期間"
+      "note": "The whole life of the market, as a window label beside 24h. ZH: CMC/Uniswap range label. As the window beside 24h on a card, 全期 fits where space is tight.",
+      "ja": "全期間",
+      "zh": "全部时间",
+      "zh-tw": "全部時間",
+      "zh-hk": "全部時間"
     },
     "performance": {
-      "ja": "パフォーマンス"
+      "ja": "パフォーマンス",
+      "zh": "涨跌幅",
+      "zh-tw": "漲跌幅",
+      "zh-hk": "漲跌幅",
+      "note": "Return as a percentage, the way CMC labels it."
     },
     "swap": {
-      "ja": "スワップ"
+      "ja": "スワップ",
+      "zh": "兑换",
+      "zh-tw": "兌換",
+      "zh-hk": "兌換",
+      "note": "Uniswap and UniSat both."
     },
     "limit": {
       "note": "Limit orders on Counterparty's order book (the nav label).",
-      "ja": "指値"
+      "ja": "指値",
+      "zh": "限价",
+      "zh-tw": "限價",
+      "zh-hk": "限價"
     },
     "dispense": {
-      "note": "Buying XCP from Counterparty dispensers (the nav label).",
-      "ja": "ディスペンス"
+      "note": "Buying XCP from Counterparty dispensers (the nav label). ZH: The nav label for buying XCP from Counterparty dispensers.",
+      "ja": "ディスペンス",
+      "zh": "分发器",
+      "zh-tw": "分發器",
+      "zh-hk": "分發器"
     },
     "dispenser": {
-      "ja": "ディスペンサー"
+      "ja": "ディスペンサー",
+      "zh": "分发器",
+      "zh-tw": "分發器",
+      "zh-hk": "分發器"
     },
     "activity": {
-      "ja": "アクティビティ"
+      "ja": "アクティビティ",
+      "zh": "动态",
+      "zh-tw": "動態",
+      "zh-hk": "動態"
     },
     "stats": {
-      "ja": "統計"
+      "ja": "統計",
+      "zh": "统计",
+      "zh-tw": "統計",
+      "zh-hk": "統計"
     },
     "docs": {
-      "ja": "ドキュメント"
+      "ja": "ドキュメント",
+      "zh": "文档",
+      "zh-tw": "文件",
+      "zh-hk": "文件",
+      "note": "Taiwan and Hong Kong say 文件 for documentation; the mainland says 文档."
     },
     "rewards": {
       "note": "The XCP Rewards programme for minters.",
-      "ja": "リワード"
+      "ja": "リワード",
+      "zh": "奖励",
+      "zh-tw": "獎勵",
+      "zh-hk": "獎勵"
     },
     "mempool": {
-      "ja": "メンプール"
+      "ja": "メンプール",
+      "zh": "内存池",
+      "zh-tw": "記憶體池",
+      "zh-hk": "內存池",
+      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存."
     },
     "connect": {
-      "note": "Connect a wallet.",
-      "ja": "接続"
+      "note": "Connect a wallet. ZH: Connect a wallet: 连接钱包 on Uniswap and UniSat. OpenCC turns 连接 into 連線 for Taiwan, which is the network sense; keep 連接.",
+      "ja": "接続",
+      "zh": "连接",
+      "zh-tw": "連接",
+      "zh-hk": "連接"
     },
     "create": {
       "note": "Create a launch.",
-      "ja": "作成"
+      "ja": "作成",
+      "zh": "创建",
+      "zh-tw": "建立",
+      "zh-hk": "建立"
     },
     "wallet": {
-      "ja": "ウォレット"
+      "ja": "ウォレット",
+      "zh": "钱包",
+      "zh-tw": "錢包",
+      "zh-hk": "錢包"
     },
     "address": {
-      "ja": "アドレス"
+      "ja": "アドレス",
+      "zh": "地址",
+      "zh-tw": "地址",
+      "zh-hk": "地址"
     },
     "block": {
       "note": "Bitcoin block.",
-      "ja": "ブロック"
+      "ja": "ブロック",
+      "zh": "区块",
+      "zh-tw": "區塊",
+      "zh-hk": "區塊"
     },
     "trading data": {
-      "ja": "取引データ"
+      "ja": "取引データ",
+      "zh": "交易数据",
+      "zh-tw": "交易資料",
+      "zh-hk": "交易數據"
     },
     "sort": {
-      "ja": "並び替え"
+      "ja": "並び替え",
+      "zh": "排序",
+      "zh-tw": "排序",
+      "zh-hk": "排序"
     },
     "newest": {
-      "ja": "新着"
+      "ja": "新着",
+      "zh": "最新",
+      "zh-tw": "最新",
+      "zh-hk": "最新"
     },
     "search": {
-      "ja": "検索"
+      "ja": "検索",
+      "zh": "搜索",
+      "zh-tw": "搜尋",
+      "zh-hk": "搜尋"
     },
     "all-time high": {
-      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値.",
-      "ja": "ATH"
+      "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値. ZH: CMC China writes 历史最高价; ATH is also understood but the Chinese is the norm.",
+      "ja": "ATH",
+      "zh": "历史最高",
+      "zh-tw": "歷史最高",
+      "zh-hk": "歷史最高"
     },
     "send": {
       "ja": "送金",
@@ -153,15 +280,115 @@
     },
     "miner fee": {
       "ja": "マイナー手数料",
-      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us."
+      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费.",
+      "zh": "矿工费",
+      "zh-tw": "礦工費",
+      "zh-hk": "礦工費"
     },
     "burn": {
       "ja": "バーン",
-      "note": "OPEN QUESTION for the reviewer: the site currently uses バーン for the burn tab and burn address, 焼却 for LP burned, and 破棄 for consensus destroying escrowed supply after a refund (Counterparty’s destroy message; Zaif writes 破壊 for proof of burn). Proposal: バーン for everything the community calls a burn including LP, 破棄 only for the protocol destroy. Decide, then apply in one pass."
+      "note": "OPEN QUESTION for the reviewer: the site currently uses バーン for the burn tab and burn address, 焼却 for LP burned, and 破棄 for consensus destroying escrowed supply after a refund (Counterparty’s destroy message; Zaif writes 破壊 for proof of burn). Proposal: バーン for everything the community calls a burn including LP, 破棄 only for the protocol destroy. Decide, then apply in one pass. ZH: OpenCC emits 銷燬; the normal Traditional form is 銷毀.",
+      "zh": "销毁",
+      "zh-tw": "銷毀",
+      "zh-hk": "銷毀"
     },
     "base currency": {
       "ja": "基軸通貨",
-      "note": "XCP as Counterparty’s native currency. Zaif’s own wording in its asset guide."
+      "note": "XCP as Counterparty’s native currency. Zaif’s own wording in its asset guide.",
+      "zh": "基础货币",
+      "zh-tw": "基礎貨幣",
+      "zh-hk": "基礎貨幣"
+    },
+    "transaction": {
+      "zh": "交易",
+      "zh-tw": "交易",
+      "zh-hk": "交易",
+      "note": "A Bitcoin transaction. A fill or trade is 成交, so the two never share a word in one sentence."
+    },
+    "fill": {
+      "zh": "成交",
+      "zh-tw": "成交",
+      "zh-hk": "成交"
+    },
+    "order book": {
+      "zh": "订单簿",
+      "zh-tw": "訂單簿",
+      "zh-hk": "訂單簿"
+    },
+    "limit order": {
+      "zh": "限价单",
+      "zh-tw": "限價單",
+      "zh-hk": "限價單"
+    },
+    "market order": {
+      "zh": "市价单",
+      "zh-tw": "市價單",
+      "zh-hk": "市價單"
+    },
+    "slippage": {
+      "zh": "滑点",
+      "zh-tw": "滑點",
+      "zh-hk": "滑點"
+    },
+    "price impact": {
+      "zh": "价格影响",
+      "zh-tw": "價格影響",
+      "zh-hk": "價格影響"
+    },
+    "escrow": {
+      "zh": "托管",
+      "zh-tw": "託管",
+      "zh-hk": "託管",
+      "note": "XCP held by the protocol until the launch resolves."
+    },
+    "consensus": {
+      "zh": "共识",
+      "zh-tw": "共識",
+      "zh-hk": "共識"
+    },
+    "token": {
+      "zh": "代币",
+      "zh-tw": "代幣",
+      "zh-hk": "代幣"
+    },
+    "lot": {
+      "zh": "份",
+      "zh-tw": "份",
+      "zh-hk": "份",
+      "note": "A 1,000-token lot: 一份 1,000 枚."
+    },
+    "dumper": {
+      "zh": "砸盘者",
+      "zh-tw": "砸盤者",
+      "zh-hk": "砸盤者",
+      "note": "An address that sold within blocks of graduation."
+    },
+    "dump": {
+      "zh": "砸盘",
+      "zh-tw": "砸盤",
+      "zh-hk": "砸盤"
+    },
+    "whale": {
+      "zh": "巨鲸",
+      "zh-tw": "巨鯨",
+      "zh-hk": "巨鯨"
+    },
+    "rug pull": {
+      "zh": "跑路",
+      "zh-tw": "跑路",
+      "zh-hk": "跑路",
+      "note": "The community word; 拉地毯 is a calque nobody uses."
+    },
+    "premine": {
+      "zh": "预挖",
+      "zh-tw": "預挖",
+      "zh-hk": "預挖"
+    },
+    "Bitcoin": {
+      "zh": "比特币",
+      "zh-tw": "比特幣",
+      "zh-hk": "比特幣",
+      "note": "BTC stays BTC as a ticker."
     }
   }
 }

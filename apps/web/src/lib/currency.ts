@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { fetchFxRates } from "@/lib/api/launchpad-api";
 import { fiat } from "@/lib/format";
 import { useLocale } from "@/lib/i18n/client";
-import { splitLocale } from "@/lib/i18n/locales";
+import { type Locale, splitLocale } from "@/lib/i18n/locales";
 
 /**
  * Which currency the site's fiat figures are shown in.
@@ -97,36 +97,48 @@ function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * What the page and the browser imply, and they only ever imply one thing:
- * Japan.
+ * What the page and the browser imply, and they imply exactly two things:
+ * Japan, and Hong Kong.
  *
- * Dollars are the default for everyone, and the one market the site goes
- * out of its way to meet in its own currency is Japan — so detection is a
- * single question with three signals rather than a table of every region.
- * First the page itself: a visitor reading the Japanese site sees yen,
- * because the language you read in and the currency you think in are one
- * decision to most people, and choosing 日本語 in the menu should not need
- * a second choice. Then the browser's language — `maximize()` fills in the
- * likely region for a bare "ja", so it resolves like "ja-JP" — and the
- * timezone, which says where the machine thinks it is. Any one is enough,
- * and an explicit currency choice in the menu overrides all of them.
+ * Dollars are the default for everyone. The markets the site goes out of
+ * its way to meet in their own currency are the ones it speaks the language
+ * of AND whose currency the ECB quotes: yen for Japan, Hong Kong dollars for
+ * Hong Kong. Taiwan reads its own page but keeps US dollars — the ECB does
+ * not quote TWD, and Taiwanese traders price in USDT anyway — and Simplified
+ * Chinese readers are scattered across the mainland, Singapore and Malaysia,
+ * where no single currency is right, so they get dollars too. First the page
+ * itself: a visitor reading the Japanese site sees yen, because the language
+ * you read in and the currency you think in are one decision to most people.
+ * Then the browser's language — `maximize()` fills in the likely region for
+ * a bare "ja", so it resolves like "ja-JP" — and the timezone, which says
+ * where the machine thinks it is. Any one is enough, and an explicit currency
+ * choice in the menu overrides all of them.
  */
+const PAGE_CURRENCY: Partial<Record<Locale, Currency>> = { ja: "JPY", "zh-hk": "HKD" };
+const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD" };
+const TIMEZONE_CURRENCY: Record<string, Currency> = { "Asia/Tokyo": "JPY", "Asia/Hong_Kong": "HKD", "Asia/Macau": "HKD" };
+
 function detect(): Currency {
   if (typeof navigator === "undefined") return "USD";
-  if (typeof location !== "undefined" && splitLocale(location.pathname).locale === "ja") {
-    return "JPY";
+  if (typeof location !== "undefined") {
+    const fromPage = PAGE_CURRENCY[splitLocale(location.pathname).locale];
+    if (fromPage) return fromPage;
   }
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const tag of tags) {
     try {
       const locale = new Intl.Locale(tag);
-      if (locale.language === "ja" || locale.maximize().region === "JP") return "JPY";
+      const region = locale.maximize().region ?? "";
+      if (locale.language === "ja") return "JPY";
+      if (locale.language === "yue") return "HKD";
+      if (REGION_CURRENCY[region]) return REGION_CURRENCY[region];
     } catch {
       // Malformed tag: try the next one.
     }
   }
   try {
-    if (Intl.DateTimeFormat().resolvedOptions().timeZone === "Asia/Tokyo") return "JPY";
+    const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (TIMEZONE_CURRENCY[zone]) return TIMEZONE_CURRENCY[zone];
   } catch {
     // No timezone available: language was the only signal.
   }

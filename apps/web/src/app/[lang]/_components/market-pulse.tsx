@@ -5,6 +5,7 @@ import { Dialog as D } from "radix-ui";
 import { useEffect, useId, useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { trackEvent } from "@/lib/analytics";
+import { intlLocale, usesMyriads } from "@/lib/format";
 import { priceChangePercent } from "@/lib/market";
 import { approx } from "@/lib/numeric";
 import { useFxRate } from "@/lib/currency";
@@ -34,7 +35,7 @@ const RANGES: { id: Range; label: string; days: number }[] = [
 const price = (market: Market, value: number | null, code: string, rate: number, locale: string) => {
   if (value === null) return "—";
   const converted = value * rate;
-  const japanese = locale === "ja";
+  const japanese = usesMyriads(locale);
   const options: Intl.NumberFormatOptions = { style: "currency", currency: code };
   if (converted >= (japanese ? 10_000 : 1_000_000)) {
     options.notation = "compact";
@@ -43,7 +44,7 @@ const price = (market: Market, value: number | null, code: string, rate: number,
     options.minimumFractionDigits = 0;
     options.maximumFractionDigits = 0;
   }
-  return converted.toLocaleString(japanese ? "ja-JP" : "en-US", options);
+  return converted.toLocaleString(intlLocale(locale), options);
 };
 
 const percent = (value: number) =>

@@ -7,6 +7,7 @@ import {
   rawToDecimalString,
   SATS,
 } from "@/lib/numeric";
+import { isLocale, LOCALE_INFO } from "@/lib/i18n/locales";
 import { makeT, type T } from "@/lib/i18n/t";
 
 /** `t` for callers that have no locale: the English source text itself. */
@@ -109,11 +110,16 @@ interface CurrencyShape {
 
 const SHAPES = new Map<string, CurrencyShape>();
 
-/** The Intl locale a page's numbers are written in. Japanese pages use
- *  Japan's own conventions — the fullwidth ￥ and 万/億 groupings — and
- *  everything else uses the English ones, so a page never mixes two. */
-function intlLocale(locale: string): string {
-  return locale === "ja" ? "ja-JP" : "en-US";
+/** The Intl locale a page's numbers are written in: the locale's own
+ *  conventions — Japan's fullwidth ￥ and 万/億 groupings, Hong Kong's HK$ —
+ *  and the English ones for everything else, so a page never mixes two. */
+export function intlLocale(locale: string): string {
+  return isLocale(locale) ? LOCALE_INFO[locale].intl : "en-US";
+}
+
+/** Whether a locale's readers count in 万/億 rather than K/M/B. */
+export function usesMyriads(locale: string): boolean {
+  return isLocale(locale) && LOCALE_INFO[locale].myriads;
 }
 
 function currencyShape(code: string, locale = "en"): CurrencyShape {
@@ -147,18 +153,19 @@ function currencyShape(code: string, locale = "en"): CurrencyShape {
  * amount is already in `code` — conversion happens before this, in
  * `useFiat` — so this is purely how the number is written.
  *
- * Japanese pages compact the Japanese way. CoinMarketCap and CoinGecko's
- * Japanese editions write 時価総額 as 1,920万 and 12.4億, never 19.2M, and a
- * reader who thinks in 万 has to convert K/M/B in their head. Intl knows the
- * groupings, so the locale decides: 万/億/兆 in Japanese, K/M/B elsewhere.
+ * Japanese and Chinese pages compact their own way. CoinMarketCap and
+ * CoinGecko's Japanese editions write 時価総額 as 1,920万 and 12.4億, never
+ * 19.2M, the Chinese editions write 市值 as 1920万 and 12.4亿, and a reader
+ * who thinks in 万 has to convert K/M/B in their head. Intl knows the
+ * groupings, so the locale decides: 万/億/兆 there, K/M/B elsewhere.
  * XCP and token amounts stay K/M everywhere — those are tickers' units, and
  * the same on every exchange.
  */
 export function fiat(n: number, code: string, locale = "en"): string {
   const { prefix, suffix, minor } = currencyShape(code, locale);
   const wrap = (body: string) => `${prefix}${body}${suffix}`;
-  if (locale === "ja" && n >= 10_000) {
-    return new Intl.NumberFormat("ja-JP", {
+  if (usesMyriads(locale) && n >= 10_000) {
+    return new Intl.NumberFormat(intlLocale(locale), {
       style: "currency",
       currency: code,
       notation: "compact",

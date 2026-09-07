@@ -5,7 +5,7 @@ import { useEffect, useSyncExternalStore } from "react";
 import { Globe, LOCALE_PREF_KEY, rememberLocale } from "@/components/language-switch";
 import { LazyLink } from "@/components/lazy-link";
 import { useLocale } from "@/lib/i18n/client";
-import { isLocale, type Locale, localePath, splitLocale } from "@/lib/i18n/locales";
+import { isLocale, type Locale, localePath, matchLocale, splitLocale } from "@/lib/i18n/locales";
 
 const DISMISSED_KEY = "xcpfun:locale-dismissed:v1";
 const EVENT = "xcpfun:locale-suggest";
@@ -17,6 +17,9 @@ const EVENT = "xcpfun:locale-suggest";
 const OFFER: Record<Locale, { text: string; action: string; dismiss: string }> = {
   en: { text: "This site is also available in English.", action: "View in English", dismiss: "Dismiss" },
   ja: { text: "このサイトは日本語でも表示できます。", action: "日本語で表示", dismiss: "閉じる" },
+  zh: { text: "本站也提供简体中文版。", action: "切换到简体中文", dismiss: "关闭" },
+  "zh-tw": { text: "本站也提供繁體中文版。", action: "切換到繁體中文", dismiss: "關閉" },
+  "zh-hk": { text: "本站亦提供繁體中文版。", action: "切換至繁體中文", dismiss: "關閉" },
 };
 
 /** The first of the browser's languages the site speaks, or null. */
@@ -24,8 +27,8 @@ function preferredLocale(): Locale | null {
   if (typeof navigator === "undefined") return null;
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const tag of tags) {
-    const language = tag.toLowerCase().split("-")[0];
-    if (isLocale(language)) return language;
+    const match = matchLocale(tag);
+    if (match) return match;
   }
   return null;
 }

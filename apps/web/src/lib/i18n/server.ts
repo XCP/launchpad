@@ -15,6 +15,9 @@ import { makeT, type Messages, type T } from "@/lib/i18n/t";
 const MESSAGES: Record<Locale, () => Promise<Messages>> = {
   en: async () => ({}),
   ja: () => import("@/locales/ja.json").then((m) => m.default as Messages),
+  zh: () => import("@/locales/zh.json").then((m) => m.default as Messages),
+  "zh-tw": () => import("@/locales/zh-tw.json").then((m) => m.default as Messages),
+  "zh-hk": () => import("@/locales/zh-hk.json").then((m) => m.default as Messages),
 };
 
 export async function getMessages(locale: Locale): Promise<Messages> {
@@ -26,6 +29,9 @@ export async function getMessages(locale: Locale): Promise<Messages> {
  *  have checked. While most of the file is on that list, the footer says so. */
 const STATUS: Partial<Record<Locale, () => Promise<{ machine: string[] }>>> = {
   ja: () => import("@/locales/ja.status.json").then((m) => m.default as { machine: string[] }),
+  zh: () => import("@/locales/zh.status.json").then((m) => m.default as { machine: string[] }),
+  "zh-tw": () => import("@/locales/zh-tw.status.json").then((m) => m.default as { machine: string[] }),
+  "zh-hk": () => import("@/locales/zh-hk.status.json").then((m) => m.default as { machine: string[] }),
 };
 
 export async function isMachineDrafted(locale: Locale): Promise<boolean> {
