@@ -434,7 +434,6 @@
   "Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each graduated launch. Held means no sale and a meaningful current balance; moved means no sale and no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.": "计数按独立地址。持有、转出、卖出是每个毕业发射的铸造者互斥的三种结果。持有指没有卖出且当前余额可观；转出指没有卖出且当前余额不可观；卖出指 xcp.fun 记录到至少一笔池子或订单簿卖出。",
   "Covered": "覆盖比例",
   "Create": "创建",
-  "Create a launch": "创建发射",
   "Created": "已创建",
   "Creator": "创建者",
   "Creator bought — block {n}": "创建者买入 — 区块 {n}",

@@ -434,7 +434,6 @@
   "Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each graduated launch. Held means no sale and a meaningful current balance; moved means no sale and no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.": "Los conteos usan direcciones únicas. Conservó, movió y vendió son resultados excluyentes para los acuñadores de cada lanzamiento graduado. Conservó significa que no vendió y mantiene un saldo relevante; movió, que no vendió y ya no tiene un saldo relevante; vendió, que hizo al menos una venta en el pool o en el libro de órdenes registrada por xcp.fun.",
   "Covered": "Cubierto",
   "Create": "Crear",
-  "Create a launch": "Crear un lanzamiento",
   "Created": "Creado",
   "Creator": "Creador",
   "Creator bought — block {n}": "El creador compró — bloque {n}",

@@ -434,7 +434,6 @@
   "Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each graduated launch. Held means no sale and a meaningful current balance; moved means no sale and no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.": "Подсчёт ведётся по уникальным адресам. «Держат», «переместили» и «продали» — взаимоисключающие исходы для минтеров каждого выпустившегося запуска. «Держат» — продаж не было и текущий баланс существенный; «переместили» — продаж не было и существенного баланса нет; «продали» — хотя бы одна продажа в пуле или в книге ордеров, зафиксированная xcp.fun.",
   "Covered": "Покрыто",
   "Create": "Создать",
-  "Create a launch": "Создать запуск",
   "Created": "Создан",
   "Creator": "Создатель",
   "Creator bought — block {n}": "Создатель купил — блок {n}",

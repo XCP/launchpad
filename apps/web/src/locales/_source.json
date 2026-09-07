@@ -1385,9 +1385,6 @@
   "Create": [
     "app/[lang]/_components/home-toolbar.tsx"
   ],
-  "Create a launch": [
-    "components/site-header.tsx"
-  ],
   "Created": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],

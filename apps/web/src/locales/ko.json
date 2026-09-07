@@ -434,7 +434,6 @@
   "Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each graduated launch. Held means no sale and a meaningful current balance; moved means no sale and no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.": "집계는 고유 주소 기준입니다. 보유, 이동, 매도는 졸업한 각 런칭의 민터에 대해 상호 배타적인 결과입니다. 보유는 매도 없이 의미 있는 현재 잔액이 있는 경우, 이동은 매도 없이 의미 있는 잔액도 없는 경우, 매도는 xcp.fun이 포착한 풀 또는 호가창 매도가 1건 이상 있는 경우입니다.",
   "Covered": "보전 비율",
   "Create": "만들기",
-  "Create a launch": "런칭 만들기",
   "Created": "생성됨",
   "Creator": "제작자",
   "Creator bought — block {n}": "제작자 매수 — 블록 {n}",
