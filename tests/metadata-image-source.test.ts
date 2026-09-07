@@ -56,6 +56,16 @@ function fixture() {
     cache,
     conditionalGets,
     plainGets,
+    /**
+     * The URLs the route asked the cache to forget.
+     *
+     * Compared as urls rather than as Requests. A Request is a host object
+     * whose structural equality is not stable across Node versions: the same
+     * assertion passed on 24 and failed on 22, reported as two values with no
+     * visible difference, which is a miserable thing to debug. The url is
+     * what the cache keys on anyway, so it is also what the assertion means.
+     */
+    deletedUrls: () => cache.delete.mock.calls.map(([key]) => key.url),
     flush: () => Promise.all(pending.splice(0)),
     /** The Cache API is best-effort storage: model the bytes being evicted
      *  while the shorter-lived location entry survives. */
@@ -229,7 +239,7 @@ describe("public image route", () => {
     expect(stale.headers.get("x-metadata-cache")).toBeNull();
     await f.flush();
     expect(f.entries.has(metadataCacheKey("/_image-version/COIN/version-2").url)).toBe(false);
-    expect(f.cache.delete).toHaveBeenCalledWith(metadataArtLocationCacheKey("COIN"));
+    expect(f.deletedUrls()).toContain(metadataArtLocationCacheKey("COIN").url);
 
     // The next request re-resolves and caches the new version properly.
     const fresh = await image();
@@ -300,7 +310,7 @@ describe("public image route", () => {
     const response = await image("COIN", "?fb=full");
     expect(response.status).toBe(302);
     expect(response.headers.get("location")).toBe("https://cdn.xcp.io/img/full/COIN");
-    expect(f.cache.delete).toHaveBeenCalledWith(metadataArtLocationCacheKey("COIN"));
+    expect(f.deletedUrls()).toContain(metadataArtLocationCacheKey("COIN").url);
   });
 });
 
@@ -344,7 +354,7 @@ describe("hero art route", () => {
     const response = await art();
     expect(await response.text()).toBe("after");
     expect(response.headers.get("cache-control")).toBe("public, max-age=60");
-    expect(f.cache.delete).toHaveBeenCalledWith(metadataArtLocationCacheKey("COIN"));
+    expect(f.deletedUrls()).toContain(metadataArtLocationCacheKey("COIN").url);
     expect(f.plainGets()).toBe(1);
   });
 });
