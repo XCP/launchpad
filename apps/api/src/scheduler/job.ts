@@ -1,7 +1,7 @@
 export interface ScheduledJobEvent {
   event: "scheduled_job";
   job: string;
-  outcome: "success" | "error";
+  outcome: "success" | "partial" | "error";
   duration_ms: number;
   progress?: Record<string, number | boolean | string | null>;
   error?: { name: string; message: string };
@@ -34,13 +34,16 @@ export async function runScheduledJob<T>(
   const startedAt = Date.now();
   try {
     const result = await run();
-    console.log({
+    const progress = progressDetails(result);
+    const event: ScheduledJobEvent = {
       event: "scheduled_job",
       job,
-      outcome: "success",
+      outcome: progress?.partial === true ? "partial" : "success",
       duration_ms: Date.now() - startedAt,
-      progress: progressDetails(result),
-    } satisfies ScheduledJobEvent);
+      progress,
+    };
+    if (event.outcome === "partial") console.warn(event);
+    else console.log(event);
     return result;
   } catch (error) {
     console.error({
