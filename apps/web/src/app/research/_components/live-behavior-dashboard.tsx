@@ -1,7 +1,7 @@
 "use client";
 
 import { LazyLink } from "@/components/lazy-link";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import useSWR from "swr";
 import { pendingPressureByAsset, type PendingPressure } from "@/app/research/_lib/behavior";
 import { useMempool } from "@/hooks/use-mempool";
@@ -215,8 +215,7 @@ export function LaunchTable({
   rows: ResearchLaunchBehavior[];
   pending: Map<string, PendingPressure>;
 }) {
-  const [showAll, setShowAll] = useState(false);
-  const visibleRows = showAll ? rows : rows.slice(0, 5);
+  const visibleRows = rows;
 
   return (
     <section className="overflow-hidden rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
@@ -274,15 +273,6 @@ export function LaunchTable({
             </table>
           </div>
 
-          {rows.length > 5 && (
-            <button
-              type="button"
-              onClick={() => setShowAll((current) => !current)}
-              className="w-full border-t border-gray-100 dark:border-gray-800 px-4 py-2.5 text-xs font-semibold text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/40"
-            >
-              {showAll ? "Show top 5" : `Show all ${rows.length}`}
-            </button>
-          )}
         </>
       )}
     </section>

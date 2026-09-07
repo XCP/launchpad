@@ -92,7 +92,9 @@ export interface BehaviorCohorts {
 }
 
 /** The two universes the research surface compares, already in the same order
- * as the public launch index: graduated by market cap, minting by progress. */
+ * as the public launch index: every graduated launch by market cap, and the
+ * ten furthest-along mints (the open set churns and is the costlier half of
+ * the behavior scan). */
 export async function listBehaviorTargets(db: D1Database): Promise<BehaviorTarget[]> {
   const columns = `asset, phase, minters, earned_quantity, soft_cap, hard_cap,
     burned_quantity, pool_xcp_reserve, pool_token_reserve`;
@@ -100,7 +102,7 @@ export async function listBehaviorTargets(db: D1Database): Promise<BehaviorTarge
     db.prepare(
       `SELECT ${columns} FROM launches
         WHERE conforming = 1 AND phase = 'graduated'
-        ORDER BY market_cap_rank DESC, tx_index DESC LIMIT 10`,
+        ORDER BY market_cap_rank DESC, tx_index DESC`,
     ),
     db.prepare(
       `SELECT ${columns} FROM launches
