@@ -67,8 +67,10 @@ export function buildFairminterInscriptionMetadata(params: FairminterInscription
     // description Counterparty records is this URL, exactly as on an ordinary launch, while
     // the image still becomes the inscription. Core's composer never writes a description
     // here, so this rests on the unpacker's leniency; regtest it before trusting a new Core.
+    // Bytes, not text: core's unpacker calls .decode() on the description, as it would on the
+    // envelope content the Rust parser appends as bytes; a CBOR text string fails the unpack.
     "text/plain",
-    params.description,
+    new TextEncoder().encode(params.description),
   ];
 
   // The bare array, as core's own composer writes it. Core also defines a map form

@@ -10,6 +10,7 @@
     "dev:web": "npm run dev --workspace apps/web",
     "dev:api": "npm run dev --workspace apps/api",
     "test": "vitest run",
+    "test:regtest": "vitest run --config vitest.regtest.config.mts",
     "test:watch": "vitest",
     "check": "npm run test && npm run check --workspace apps/web && npm run check --workspace apps/api",
     "smoke": "node scripts/smoke.mjs",
