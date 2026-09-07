@@ -1,0 +1,29 @@
+-- The `soonest` ordering had no index, so listing a phase by it sorted.
+--
+-- Measured on production D1 over one day: 2,141 runs, 128,430 rows read, 3.30ms
+-- average, query efficiency 0.19. It reads about sixty rows to return eleven.
+-- The plan was
+--   SEARCH launches USING INDEX idx_launches_listed (conforming=? AND phase=?)
+--   USE TEMP B-TREE FOR ORDER BY
+-- The seek finds the phase cheaply; the sort is the cost. Every conforming row
+-- of the phase goes into a temp b-tree before LIMIT/OFFSET takes its slice, so
+-- the work grows with the phase rather than with the page. OFFSET is a
+-- secondary effect here, not the cause.
+--
+-- PARTIAL on conforming = 1, and phase first, following idx_launches_rank
+-- exactly: that is the only way this table is ever listed, and it keeps
+-- non-conforming rows out of the index rather than carrying them for a query
+-- that always excludes them.
+--
+-- The write cost is the mildest available on this table. `phase` and
+-- `start_block` barely move: a launch's start block is fixed when it is
+-- created, and phase changes a handful of times in a launch's life. The
+-- indexer's per-tick writes are progress columns, which are not in this key,
+-- so they do not move it. Compare `graduated` (last_mint_block ASC), which has
+-- the same missing-index defect and must NOT be indexed the same way, because
+-- last_mint_block churns on every tick that sees a mint.
+--
+-- The plan this produces is a single seek that stops at the LIMIT:
+--   SEARCH launches USING INDEX idx_launches_soonest (phase=?)
+CREATE INDEX idx_launches_soonest ON launches(phase, start_block ASC, tx_index DESC)
+  WHERE conforming = 1;
