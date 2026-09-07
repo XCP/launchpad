@@ -15,7 +15,7 @@
       "uk": "fairminter"
     },
     "mint": {
-      "note": "Verb and noun: paying XCP into a fairminter for tokens. ZH: UniSat and the BRC-20 community write Mint as 铸造. ES: acuñar is UniSat's word; the community also says mintear — use acuñar in UI and prose. KO: 민팅 (noun and 민팅하다), the NFT/inscription word; never 발행 (issuance). PT: mintar is the Brazilian NFT/BRC-20 verb (cunhar is formal and unused); the noun is mint. FR: minter (verb) and mint (noun) as the French NFT community writes; UniSat's frapper is unused in practice. RU: минт (noun) and минтить (verb) — UniSat ru writes Минт; чеканка is unused. UK: мінт / мінтити. RU/UK past participle: заминчено / змінтовано (сминчено and замінчено are not words).",
+      "note": "Verb and noun: paying XCP into a fairminter for tokens. ZH: UniSat and the BRC-20 community write Mint as 铸造. ES: acuñar is UniSat's word; the community also says mintear — use acuñar in UI and prose. KO: 민팅 (noun and 민팅하다), the NFT/inscription word; never 발행 (issuance). PT: mintar is the Brazilian NFT/BRC-20 verb (cunhar is formal and unused); the noun is mint. FR: minter (verb) and mint (noun) as the French NFT community writes; UniSat's frapper is unused in practice. RU: минт (noun) and минтить (verb) — UniSat ru writes Минт; чеканка is unused. UK: мінт / мінтити. RU/UK past participle: заминчено / змінтовано (сминчено and замінчено are not words). RU QA: заминчено is a site coinage — morphologically regular from the attested заминтить (coindaily.ru, bits.media), but no source writes it. Kept because the only competitor, отчеканено (UniSat), is the mint-house verb this glossary already rules out with чеканка.",
       "ja": "ミント",
       "zh": "铸造",
       "zh-tw": "鑄造",
@@ -54,7 +54,7 @@
       "uk": "запуск"
     },
     "graduated": {
-      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers. pump.fun vocabulary in both (graduar / graduer); the site's sense, never the school sense. pump.fun's school metaphor survives in Russian: the community says токен выпустился (graduated) and выпуск for graduation; never выпущен, which reads as issued. UK: випустився / випуск.",
+      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers. pump.fun vocabulary in both (graduar / graduer); the site's sense, never the school sense. RU QA 2026-09-07: no Russian source has a single word for pump.fun graduation — media paraphrase (вышло на Raydium). выпуститься is kept because it is exactly the Russian school-graduation verb, so the metaphor survives as it does in 毕业/卒業/졸업. Only the VERB forms are used: the noun выпуск means issuance in a token context (выпуск токенов), so the noun is выпускной. Never выпущен, which also reads as issued. UK: випустився / випуск.",
       "ja": "卒業",
       "zh": "毕业",
       "zh-tw": "畢業",
@@ -208,7 +208,7 @@
     },
     "holders": {
       "ja": "ホルダー",
-      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址. MONAPARTY: Monacard writes 所有者, Monapalette 保有者, blogs ホルダー; ホルダー kept for the memecoin register. ES: the community says holders; Uniswap's titulares and UniSat's poseedores read like a bank. KO: 홀더 is what Korean crypto Twitter and Upbit communities say; Uniswap's 보유자 is the formal word. PT: the Brazilian community says holders; Uniswap's detentores reads formal. FR: détenteurs is attested by both Uniswap and UniSat; holders is understood but the French word is used. The community word in both; UniSat's держатели and Uniswap's владельцы read formal.",
+      "note": "Katakana, as the Japanese crypto community writes it; 保有者 is the formal word exchanges use. ZH: UniSat and CMC China. Not 持币地址. MONAPARTY: Monacard writes 所有者, Monapalette 保有者, blogs ホルダー; ホルダー kept for the memecoin register. ES: the community says holders; Uniswap's titulares and UniSat's poseedores read like a bank. KO: 홀더 is what Korean crypto Twitter and Upbit communities say; Uniswap's 보유자 is the formal word. PT: the Brazilian community says holders; Uniswap's detentores reads formal. FR: détenteurs is attested by both Uniswap and UniSat; holders is understood but the French word is used. RU/UK QA 2026-09-07: both wallets say держатели (UniSat holders = держатели, Uniswap rhcca.stat.holders = Держатели — NOT владельцы, as an earlier note claimed); холдеры is the memecoin-community word (habr: ранние холдеры) and is kept for register.",
       "zh": "持有者",
       "zh-tw": "持有者",
       "zh-hk": "持有者",
@@ -311,7 +311,7 @@
       "uk": "ліміт"
     },
     "dispense": {
-      "note": "The nav label for buying XCP from Counterparty dispensers; same word as dispenser in every locale. ES: dispensador is an ordinary Spanish word for exactly this machine. KO: 자판기, the everyday vending-machine word, on Dan's rule that a dispenser is a vending machine. PT: dispenser is an everyday Brazilian loanword (dispenser de álcool); FR: distributeur, the vending-machine word (distributeur automatique) — Dan's rule that a dispenser is a vending machine. A dispenser is a vending machine (торговый автомат / торговий автомат); автомат alone is the everyday short form, on Dan's rule.",
+      "note": "The nav label for buying XCP from Counterparty dispensers; same word as dispenser in every locale. ES: dispensador is an ordinary Spanish word for exactly this machine. KO: 자판기, the everyday vending-machine word, on Dan's rule that a dispenser is a vending machine. PT: dispenser is an everyday Brazilian loanword (dispenser de álcool); FR: distributeur, the vending-machine word (distributeur automatique) — Dan's rule that a dispenser is a vending machine. A dispenser is a vending machine (торговый автомат / торговий автомат); автомат alone is the everyday short form, on Dan's rule. RU: автомат is the site's short form; the attested noun is диспенсер (see the dispenser entry).",
       "ja": "自販機",
       "zh": "售货机",
       "zh-tw": "販賣機",
@@ -328,7 +328,7 @@
       "zh": "售货机",
       "zh-tw": "販賣機",
       "zh-hk": "售賣機",
-      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry.",
+      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry. RU QA 2026-09-07: диспенсер is the attested Counterparty-Russian noun and торговый автомат the attested metaphor (bytwork.com: «автоматические диспенсеры»… «Подобно торговым автоматам»). автомат is kept as the short form on Dan's rule, and glossed once in the FAQ as «ончейн-автомат (диспенсер Counterparty)» — which also removes its collision with автоматически in that sentence.",
       "es": "dispensador",
       "ko": "자판기",
       "pt": "dispenser",
@@ -744,12 +744,12 @@
       "zh": "跑路",
       "zh-tw": "跑路",
       "zh-hk": "跑路",
-      "note": "The community word; 拉地毯 is a calque nobody uses. Kept in English in both; ES may gloss as estafa de salida once. Kept in English in both. Transliterated in both, as ForkLog and Incrypted write it.",
+      "note": "The community word; 拉地毯 is a calque nobody uses. Kept in English in both; ES may gloss as estafa de salida once. Kept in English in both. RU/UK: transliterated, and never hyphenated — attested as рагпуллы (bits.media), Рагпулл (Incrypted), рагпул (ForkLog UA); раг-пулл appears in no source.",
       "es": "rug pull",
       "ko": "러그풀",
       "pt": "rug pull",
       "fr": "rug pull",
-      "ru": "раг-пулл",
+      "ru": "рагпулл",
       "uk": "раг-пул"
     },
     "premine": {
