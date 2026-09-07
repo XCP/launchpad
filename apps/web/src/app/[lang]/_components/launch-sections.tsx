@@ -70,8 +70,35 @@ function pendingByAsset(mints: MempoolMint[], orders: MempoolOrder[]): Map<strin
 interface SortOption {
   id: string;
   label: string;
-  by: (a: SectionRow, b: SectionRow) => number;
+  /** Every ordering but pace is a level and ignores the tip. */
+  by: (a: SectionRow, b: SectionRow, height: number) => number;
 }
+
+/**
+ * Mint pace: how far the raise has come, over how far the clock has.
+ *
+ * Progress alone cannot say whether a launch is doing well. 40% is a strong
+ * showing on day two of the 1,000-block window and a failing one on day six.
+ * Both legs here are fractions of that same window — funded over soft cap,
+ * elapsed over start-to-deadline — so the units cancel and 1.00 means exactly
+ * on schedule, above it ahead, below it behind.
+ *
+ * The window is read from the record rather than assumed to be 1,000 blocks,
+ * so a launch whose start moved is still measured against its own clock.
+ * Null before the first block of the window has passed, when the rate is not
+ * a number yet.
+ */
+function mintPace(row: SectionRow, height: number): number | null {
+  const deadline = row.fm.soft_cap_deadline_block || row.fm.end_block;
+  const window = deadline - row.fm.start_block;
+  const elapsed = height - row.fm.start_block;
+  if (window <= 0 || elapsed <= 0) return null;
+  return row.progress / (elapsed / window);
+}
+
+/** Pace for sorting: a launch too young to have a rate goes last, the way
+ *  every other "not a number yet" on this page does. */
+const paceRank = (row: SectionRow, height: number) => mintPace(row, height) ?? -1;
 
 /**
  * Age rank, in blocks.
@@ -173,6 +200,15 @@ const SORTS: Record<string, SortOption[]> = {
     // DEFAULT_SORT.minting in apps/api/src/queries/launches.ts, which is what
     // the server renders page one with.
     { id: "progress", label: msg("Progress"), by: (a, b) => b.progress - a.progress },
+    // Not a column the API can index — it is a rate against the live tip — so
+    // the request carries the tip and the worker orders on it. See SORT_SQL's
+    // `pace` in apps/api/src/queries/launches.ts, which computes the same
+    // ratio from the same two columns.
+    {
+      id: "pace",
+      label: msg("Mint Pace"),
+      by: (a, b, height) => paceRank(b, height) - paceRank(a, height),
+    },
     // The window is fixed by the standard at start_block + 1,000, so the
     // deadline is exact and closing order never contradicts opening order.
     // end_block is NOT the field for this: it is 0 on every conforming
@@ -394,8 +430,8 @@ function Section({
   const local = useMemo(() => {
     if (paged) return null;
     const by = (options.find((o) => o.id === sortId) ?? options[0]!).by;
-    return [...initial.rows].sort(by);
-  }, [paged, initial.rows, options, sortId]);
+    return [...initial.rows].sort((a, b) => by(a, b, height));
+  }, [paged, initial.rows, options, sortId, height]);
 
   const atDefault = sortId === defaultSort && page === 0 && !unmintedBy;
 
@@ -433,7 +469,20 @@ function Section({
    * the section no longer needs a reload to notice that the chain moved.
    */
   const { data, error, isLoading } = useSWR<LaunchPage>(
-    paged ? ["launch-page", phase, sortId, current, perPage, unmintedBy ?? null] : null,
+    paged
+      ? [
+          "launch-page",
+          phase,
+          sortId,
+          current,
+          perPage,
+          unmintedBy ?? null,
+          // Part of the key only where it is part of the answer. Pace is
+          // ordered against the tip, so a new block IS a new page; every
+          // other sort would just be re-fetching the same rows.
+          sortId === "pace" ? height : null,
+        ]
+      : null,
     async () => {
       const res = await fetchLaunchPage(
         phase,
@@ -441,6 +490,7 @@ function Section({
         perPage,
         current * perPage,
         unmintedBy,
+        sortId === "pace" ? height : undefined,
       );
       // Thrown, not returned as null: an error leaves SWR holding the last
       // page that loaded, which is what belongs on screen, and it schedules
@@ -919,6 +969,15 @@ const signedPercent = (n: number, num: Numbers) =>
 const progressPercent = (fraction: number, num: Numbers) =>
   num.percent(fraction, { minDigits: 1 });
 
+/** Pace as a table cell. Two places: the third would be precision this does
+ *  not have, since both legs move with every block. */
+const paceCell = (row: SectionRow, height: number, num: Numbers) => {
+  const pace = mintPace(row, height);
+  return pace === null
+    ? "—"
+    : pace.toLocaleString(num.intl, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 const DENOMINATIONS: readonly Denomination[] = ["usd", "xcp"];
 
 /** One return in the card's stat row: a caption/value line from `sm` up, a
@@ -1064,6 +1123,7 @@ function LaunchTable({
   const num = useNumbers();
   const t = useT();
   const usd = useFiat();
+  const { code, rate } = useFxRate();
   const graduated = phase === "graduated";
   const scheduled = phase === "scheduled";
   // The graduated columns follow the section's USD/XCP switch: cap and price
@@ -1074,13 +1134,18 @@ function LaunchTable({
   const inUsd = denomination === "usd" && xcpUsd !== null && xcpUsd > 0;
   const capCell = (capXcp: number) =>
     capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${num.compact(capXcp)} XCP`) : "—";
+  // A token price sits far below a cent, so it needs more places than `fiat`
+  // gives — but it is still the visitor's currency. The old form wrote a
+  // dollar sign over a figure the row beside it was quoting in euros.
   const priceCell = (priceXcp: number) =>
     priceXcp > 0
       ? inUsd
-        ? `$${(priceXcp * xcpUsd).toLocaleString(num.intl, {
+        ? (priceXcp * xcpUsd * rate).toLocaleString(num.intl, {
+            style: "currency",
+            currency: code,
             minimumFractionDigits: 2,
             maximumFractionDigits: 8,
-          })}`
+          })
         : `${priceLabel(priceXcp, num)} XCP`
       : "—";
   const returnCell = (value: number | null, suffix?: string) =>
@@ -1096,24 +1161,47 @@ function LaunchTable({
         {suffix && <span className="text-gray-400 dark:text-gray-500"> {suffix}</span>}
       </span>
     );
-  const head = graduated
-    ? [msg("Market cap"), msg("Price"), msg("All-time"), msg("24h"), msg("Graduated"), msg("Holders")]
+  const head: { label: string; hint?: string }[] = graduated
+    ? [
+        { label: msg("Market cap") },
+        { label: msg("Price") },
+        { label: msg("All-time") },
+        { label: msg("24h") },
+        { label: msg("Graduated") },
+        { label: msg("Holders") },
+      ]
     : scheduled
-      ? [msg("Opens"), msg("Closes"), msg("Announced")]
-      : [msg("Progress"), msg("Raised"), msg("Minters"), msg("Closes")];
+      ? [{ label: msg("Opens") }, { label: msg("Closes") }, { label: msg("Announced") }]
+      : [
+          { label: msg("Progress") },
+          {
+            label: msg("Pace"),
+            hint: msg(
+              "Funded % ÷ elapsed %, both measured against the live chain tip. 1.00 is on schedule.",
+            ),
+          },
+          { label: msg("Raised") },
+          { label: msg("Minters") },
+          { label: msg("Closes") },
+        ];
 
   return (
     // Its own scroller: a wide table must never make the page scroll sideways.
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-      <table className={`w-full text-sm ${graduated ? "min-w-[48rem]" : "min-w-[38rem]"}`}>
+      <table className={`w-full text-sm ${graduated ? "min-w-[48rem]" : scheduled ? "min-w-[38rem]" : "min-w-[44rem]"}`}>
         <thead>
           <tr className="border-b border-gray-100 dark:border-gray-800">
             <th scope="col" className={`px-3 py-2.5 text-left ${LABEL}`}>
               {t("Token")}
             </th>
             {head.map((h) => (
-              <th key={h} scope="col" className={`px-3 py-2.5 text-right ${LABEL}`}>
-                {t(h)}
+              <th
+                key={h.label}
+                scope="col"
+                title={h.hint ? t(h.hint) : undefined}
+                className={`px-3 py-2.5 text-right ${LABEL}`}
+              >
+                {t(h.label)}
               </th>
             ))}
           </tr>
@@ -1170,6 +1258,7 @@ function LaunchTable({
                 ) : (
                   <>
                     <Cell>{progressPercent(r.progress, num)}</Cell>
+                    <Cell>{paceCell(r, height, num)}</Cell>
                     <Cell>{num.compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
                     <Cell>{minterText(r.minters, num)}</Cell>
                     <Cell>{deadline > 0 ? blocksEta(deadline - height, t) : "—"}</Cell>

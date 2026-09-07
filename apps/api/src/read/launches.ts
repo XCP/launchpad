@@ -70,6 +70,12 @@ launchesRoute.get("/v2/launches", async (c) => {
     const offset = clamp(Number(c.req.query("offset") ?? 0) || 0, 0, MAX_OFFSET);
     const sort = c.req.query("sort");
     const unmintedBy = c.req.query("unminted_by")?.trim() || undefined;
+    // The tip, for `sort=pace` — the only ordering that is a rate and so the
+    // only one that changes when a block lands. Forced to an integer inside
+    // the range of a plausible Bitcoin height before it is used, because it
+    // reaches an ORDER BY as a literal; anything else is dropped, which puts
+    // pace back on progress order rather than failing the page.
+    const tip = clamp(Math.trunc(Number(c.req.query("tip") ?? 0)) || 0, 0, 10_000_000);
     // A real wallet address is alphanumeric and comfortably below 90 chars.
     // Reject arbitrary cache-busting strings before they reach D1: this route
     // is edge-cached by URL, so binding alone protects SQL but not resources.
@@ -83,6 +89,7 @@ launchesRoute.get("/v2/launches", async (c) => {
       limit,
       offset,
       unmintedBy,
+      tip,
     );
     // `king` is the launch that minted most recently out of everything still
     // minting — a fact about the phase, not about this page, which is why it

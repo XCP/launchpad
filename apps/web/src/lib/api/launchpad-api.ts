@@ -812,11 +812,17 @@ export async function fetchLaunchPage(
   /** When present, exclude launches this address has already minted. The
    *  worker applies it before LIMIT so totals and paging remain truthful. */
   unmintedBy?: string,
+  /** The chain tip. Only `sort=pace` reads it — it is the one ordering that
+   *  is a rate against the clock rather than a level — and it is left out
+   *  otherwise so every other page keeps one cache key per block instead of
+   *  a new one. */
+  tip?: number,
 ): Promise<IndexedPage | null> {
   try {
     const qs =
       `phase=${phase}&limit=${limit}&offset=${offset}` +
       (sort ? `&sort=${encodeURIComponent(sort)}` : "") +
+      (tip ? `&tip=${Math.trunc(tip)}` : "") +
       (unmintedBy ? `&unminted_by=${encodeURIComponent(unmintedBy)}` : "");
     const res = await launchpadApiFetch(`/v2/launches?${qs}`, {
       signal: AbortSignal.timeout(6_000),

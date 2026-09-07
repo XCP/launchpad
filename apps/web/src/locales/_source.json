@@ -1720,6 +1720,9 @@
   "full XCP refund, automatic": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
   ],
+  "Funded % ÷ elapsed %, both measured against the live chain tip. 1.00 is on schedule.": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
   "Get XCP — xcp.fun": [
     "app/[lang]/dispense/page.tsx"
   ],
@@ -2212,6 +2215,9 @@
   "Mint open": [
     "app/[lang]/profile/_components/activity-tab.tsx"
   ],
+  "Mint Pace": [
+    "app/[lang]/_components/launch-sections.tsx"
+  ],
   "mint price": [
     "app/[lang]/[asset]/_components/price-chart.tsx",
     "app/[lang]/faq/_components/explainer.tsx"
@@ -2700,6 +2706,9 @@
   ],
   "Overview": [
     "app/[lang]/docs/page.tsx"
+  ],
+  "Pace": [
+    "app/[lang]/_components/launch-sections.tsx"
   ],
   "Page {n}": [
     "app/[lang]/rewards/_components/earners-table.tsx"
