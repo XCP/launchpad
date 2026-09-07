@@ -1,0 +1,36 @@
+# The repo had no CI at all: `npm run check` and the test suite ran when
+# somebody remembered, which is the same as saying the guards were advisory.
+# This runs exactly what a person runs locally, so a green tick here and a
+# green run there mean the same thing.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push supersedes the first; there is nothing to learn from a run
+# against a commit that is already history.
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # .node-version is the pin the repo already keeps for local work.
+          node-version-file: .node-version
+          cache: npm
+
+      # `ci` not `install`: the lockfile decides, and a run that silently
+      # resolved a different tree would not be testing what ships.
+      - run: npm ci
+
+      # The root script: the vitest suite, then tsc, eslint, the raw-satoshi
+      # check and the i18n guards in both workspaces.
+      - run: npm run check

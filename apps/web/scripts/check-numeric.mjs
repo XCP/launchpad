@@ -323,11 +323,11 @@ const EXEMPT = new Map([
     "a simulator in whole units derived from the XCP-69 constants (690 XCP, " +
       "31M tokens) — no API values, nothing composed",
   ],
-  [
-    "app/[asset]/_components/phase-preview.tsx",
-    "the design-phase simulator: fabricates a tape from the standard's own " +
-      "constants so every lifecycle state can be looked at",
-  ],
+  // app/[asset]/_components/phase-preview.tsx was exempted here, as the
+  // design-phase simulator that fabricated a tape from the standard's own
+  // constants. The file is gone and the exemption outlived it by months. The
+  // existence check below is what noticed, and is why this cannot happen
+  // again quietly.
 ]);
 
 /** Raw money arithmetic on a line, ignoring comments. */
@@ -360,16 +360,31 @@ function sourceFiles(dir) {
 // files carry an `api:` prefix, because "indexer/sync.ts" and "lib/format.ts"
 // sitting in one list with no way to tell which app they belong to is how an
 // exemption gets granted to the wrong file.
+//
+// The `[lang]` route segment is dropped from the key. Every page moved under
+// it when the site became multilingual, which silently unmatched three of the
+// exemptions below — a check that had been passing began failing on files it
+// was written to allow, and nothing said so, because nothing ran it. A key
+// that survives a routing change is the fix; the exemptions name a FILE, and
+// which URL prefix it happens to sit under is not part of the argument.
 const key = (file) =>
   (file.startsWith(API_SRC)
     ? `api:${relative(API_SRC, file)}`
     : relative(SRC, file)
   )
     .split(sep)
-    .join("/");
-const files = [...sourceFiles(SRC), ...sourceFiles(API_SRC)].filter(
-  (file) => !EXEMPT.has(key(file)),
-);
+    .join("/")
+    .replace("app/[lang]/", "app/");
+
+// Every exemption has to name a file that exists. An exemption for a path
+// nobody wrote is either a typo or a rename, and both mean the file it meant
+// to allow is being scanned without anyone knowing.
+const scanned = [...sourceFiles(SRC), ...sourceFiles(API_SRC)];
+const keys = new Set(scanned.map(key));
+for (const named of EXEMPT.keys()) {
+  if (!keys.has(named)) failures.push(`exemption names a file that does not exist: ${named}`);
+}
+const files = scanned.filter((file) => !EXEMPT.has(key(file)));
 
 if (files.length < 50) {
   failures.push(`only found ${files.length} source files — the scan is not reaching the tree`);
