@@ -165,7 +165,7 @@ export function IssuerChips({
           ? "new address"
           : null;
 
-  if (!data) return trailing ? <div className="mt-2">{trailing}</div> : null;
+  if (!data) return trailing ? <div className="mt-2 flex flex-wrap gap-1.5">{trailing}</div> : null;
 
   const chip =
     "rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums";

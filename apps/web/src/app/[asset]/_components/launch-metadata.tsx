@@ -4,13 +4,15 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { fetchJson } from "@/lib/client";
 import { METADATA_ORIGIN } from "@/lib/metadata";
-import { inscriptionContentUrl } from "@/lib/constants";
+import { inscriptionPageUrl } from "@/lib/constants";
 
 import { FOCUS } from "@/components/ui/tokens";
 
 interface HostedMeta {
   description?: unknown;
   social?: { type?: string; data?: string }[];
+  /** Written by the create flow for an inscription launch; `id` is `<reveal txid>i0`. */
+  inscription?: { id?: unknown };
 }
 
 /** True only for metadata we publish ourselves. Third-party JSON is never
@@ -139,21 +141,16 @@ export function HostedSocials({ url, asset }: { url: string; asset: string }) {
   );
 }
 
-/** For an inscribed launch: the content is the on-chain description itself
- *  (see fm.mime_type), not a URL — this is the only place that fact is
- *  visible, so it gets its own chip, linked out to where the inscription
- *  actually lives. `txHash` is the fairminter's creating transaction,
- *  which is also the inscription's reveal transaction (same tx carries
- *  both the ordinal envelope and the Counterparty message).
- *
- *  /content, not /inscription: this points at the inscribed thing itself
- *  rather than the record describing it. GENXSIXNINE inscribed a live mint
- *  viewer as text/html, so /content opens the artwork running; /inscription
- *  opens a page of metadata about a page. Same id either way. */
+/** For an inscribed launch, a chip linked to the inscription's page on
+ *  ordinals.com. `txHash` is the reveal transaction, which for a launch is
+ *  also the fairminter's creating transaction (one tx carries the ordinal
+ *  envelope and the Counterparty message). Every ordinals link on the site
+ *  goes to /inscription, the record with the content in it, rather than
+ *  /content alone. */
 export function InscriptionChip({ txHash }: { txHash: string }) {
   return (
     <a
-      href={inscriptionContentUrl(txHash)}
+      href={inscriptionPageUrl(txHash)}
       target="_blank"
       rel="noreferrer"
       className="rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums transition-colors hover:border-purple-300 dark:hover:border-purple-700 hover:text-purple-600 dark:hover:text-purple-400"
@@ -161,6 +158,18 @@ export function InscriptionChip({ txHash }: { txHash: string }) {
       inscription ↗
     </a>
   );
+}
+
+/** The chip for a launch whose description is our hosted JSON rather than the
+ *  inscription itself: since 2026-09-06 an inscription launch records the JSON
+ *  URL as its description, so the inscription is only knowable from the JSON's
+ *  `inscription.id`. Renders nothing for hosted launches that were not inscribed. */
+export function HostedInscriptionChip({ url }: { url: string }) {
+  const { data } = useHostedMeta(url);
+  const id = data?.inscription?.id;
+  const match = typeof id === "string" ? /^([0-9a-f]{64})i\d+$/i.exec(id) : null;
+  if (!match) return null;
+  return <InscriptionChip txHash={match[1]!.toLowerCase()} />;
 }
 
 /* ---------- issuer reputation ---------- */

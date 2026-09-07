@@ -2,7 +2,14 @@
 
 import { LazyLink } from "@/components/lazy-link";
 import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[asset]/_components/launch-chrome";
-import { HostedDescription, HostedSocials, InscriptionChip, LaunchDescription, isOurMetadata } from "@/app/[asset]/_components/launch-metadata";
+import {
+  HostedDescription,
+  HostedInscriptionChip,
+  HostedSocials,
+  InscriptionChip,
+  LaunchDescription,
+  isOurMetadata,
+} from "@/app/[asset]/_components/launch-metadata";
 import { DenomToggle, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[asset]/_components/launch-stats";
 import { classifyDescription, proseDescription } from "@launchpad/xcp69/description";
 import { ScheduledPulse } from "@/app/[asset]/_components/scheduled-pulse";
@@ -326,7 +333,10 @@ export function LaunchView({
                 currentAsset={asset}
                 trailing={
                   isOurMetadata(fm.description) ? (
-                    <HostedSocials url={fm.description} asset={asset} />
+                    <>
+                      <HostedSocials url={fm.description} asset={asset} />
+                      <HostedInscriptionChip url={fm.description} />
+                    </>
                   ) : isInscribed ? (
                     <InscriptionChip txHash={fm.tx_hash} />
                   ) : null
@@ -478,7 +488,13 @@ export function LaunchView({
               <IssuerChips
                 source={fm.source}
                 currentAsset={asset}
-                trailing={isInscribed ? <InscriptionChip txHash={fm.tx_hash} /> : null}
+                trailing={
+                  isOurMetadata(fm.description) ? (
+                    <HostedInscriptionChip url={fm.description} />
+                  ) : isInscribed ? (
+                    <InscriptionChip txHash={fm.tx_hash} />
+                  ) : null
+                }
               />
             </div>
           </div>
@@ -626,7 +642,10 @@ export function LaunchView({
                 </span>
               )}
               {isOurMetadata(fm.description) ? (
-                <HostedSocials url={fm.description} asset={asset} />
+                <>
+                  <HostedSocials url={fm.description} asset={asset} />
+                  <HostedInscriptionChip url={fm.description} />
+                </>
               ) : isInscribed ? (
                 <InscriptionChip txHash={fm.tx_hash} />
               ) : null}
