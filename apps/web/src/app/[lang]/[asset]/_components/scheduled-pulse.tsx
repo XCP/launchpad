@@ -4,15 +4,13 @@ import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
 import useSWR from "swr";
 import { fetchJson } from "@/lib/client";
-import {
-  blocksEta,
-  commas,
-} from "@/lib/format";
+import { blocksEta } from "@/lib/format";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 
 import { LABEL } from "@/components/ui/tokens";
 import { blockAge } from "@/lib/chain-time";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 /** Chain height, polled lazily: every 2 minutes far out, tightening to 30s
  *  inside the final 12 blocks so the last stretch reads like a countdown. */
@@ -68,6 +66,7 @@ export function ScheduledPulse({
    *  is minting. */
   waitingCta?: ReactNode;
 }) {
+  const num = useNumbers();
   const t = useT();
   const height = useChainHeight(startBlock, initialHeight);
   const remaining = Math.max(startBlock - height, 0);
@@ -140,7 +139,11 @@ export function ScheduledPulse({
   // Minutes, not blocksEta: three tiles in a row reading "~1h" said less
   // than nothing.
   const pendingEta = (blocks: number) =>
-    blocks * 10 < 60 ? t("~{n}m", { n: blocks * 10 }) : t("~{n}h", { n: ((blocks * 10) / 60).toFixed(1) });
+    blocks * 10 < 60
+      ? t("~{n}m", { n: blocks * 10 })
+      : t("~{n}h", {
+          n: num.fixed((blocks * 10) / 60, 1),
+        });
 
   const [nowSec, setNowSec] = useState<number | null>(null);
   useEffect(() => {
@@ -158,7 +161,7 @@ export function ScheduledPulse({
             lands — so for a few seconds this label sits under a pill that
             still says "Scheduled". "live" is the honest word for that gap:
             the chain has opened minting, the page hasn't caught up yet. */}
-        <div className={`mb-3 text-center ${LABEL}`}>minting is live</div>
+        <div className={`mb-3 text-center ${LABEL}`}>{t("minting is live")}</div>
         {mintForm}
       </div>
     );
@@ -184,7 +187,7 @@ export function ScheduledPulse({
             <>
               {blocksEta(remaining, t)}{" "}
               <span className="text-lg font-semibold text-gray-400 dark:text-gray-500">
-                · {t("{n} blocks", { n: commas(remaining) })}
+                · {t("{n} blocks", { n: num.commas(remaining) })}
               </span>
             </>
           )}
@@ -243,12 +246,12 @@ export function ScheduledPulse({
             <span className="whitespace-nowrap">
               {t("minting opens at")}{" "}
               <span className="font-medium text-gray-700 dark:text-gray-300">
-                {t("block {n}", { n: commas(startBlock) })}
+                {t("block {n}", { n: num.commas(startBlock) })}
               </span>
             </span>
             {deadlineBlock > 0 && (
               <span className="whitespace-nowrap">
-                {" \u00b7 "}{t("window closes {n}", { n: commas(deadlineBlock) })}
+                {" \u00b7 "}{t("window closes {n}", { n: num.commas(deadlineBlock) })}
               </span>
             )}
           </>
@@ -274,6 +277,7 @@ function BlockTile({
   label: string;
   pulseDelayMs?: number;
 }) {
+  const num = useNumbers();
   const pulses = tone === "pending";
   const face = {
     tip: "bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-sm",
@@ -289,7 +293,7 @@ function BlockTile({
           tone === "pending" ? "text-purple-300" : "text-purple-500 dark:text-purple-400"
         }`}
       >
-        {height.toLocaleString()}
+        {num.commas(height)}
       </div>
       <div
         style={

@@ -31,27 +31,34 @@ export function tokenQty(raw: RawLike | null | undefined, divisible: boolean): n
   return divisible ? fromSats(raw) : approx(raw);
 }
 
-/** 1234567.89 → "1.23M"; keeps small numbers plain. */
-export function compact(n: number): string {
+/**
+ * 1234567.89 → "1.23M"; keeps small numbers plain.
+ *
+ * The K/M/B suffixes stay Latin in every language — they are the units a
+ * ticker is quoted in, and 万/億 belongs to money rather than to token
+ * counts (see {@link fiat}). What follows the locale is the decimal mark:
+ * a French reader reads "1,23M", not "1.23M".
+ */
+export function compact(n: number, locale = "en"): string {
   if (!Number.isFinite(n)) return "0";
   const abs = Math.abs(n);
   // Round tokens are the common case here (100M supply, 31M pool, 1M cap),
   // and "100.00M" reads as false precision — keep decimals only when they
   // carry a digit.
   const scaled = (value: number, suffix: string) =>
-    `${Number(value.toFixed(2)).toLocaleString("en-US", {
+    `${Number(value.toFixed(2)).toLocaleString(intlLocale(locale), {
       maximumFractionDigits: 2,
     })}${suffix}`;
   if (abs >= 1e12) return scaled(n / 1e12, "T");
   if (abs >= 1e9) return scaled(n / 1e9, "B");
   if (abs >= 1e6) return scaled(n / 1e6, "M");
   if (abs >= 1e3) return scaled(n / 1e3, "K");
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  return n.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 });
 }
 
 /** Grouped display of a number that has already been divided down. */
-export function commas(n: number): string {
-  return n.toLocaleString("en-US", { maximumFractionDigits: 8 });
+export function commas(n: number, locale = "en"): string {
+  return n.toLocaleString(intlLocale(locale), { maximumFractionDigits: 8 });
 }
 
 /**
@@ -60,25 +67,42 @@ export function commas(n: number): string {
  * string to Intl unconverted, which formats strings exactly but numbers only
  * to double precision. Pass `decimals: 0` for indivisible assets.
  */
-export function commasRaw(raw: RawLike | null | undefined, decimals = 8): string {
+export function commasRaw(raw: RawLike | null | undefined, decimals = 8, locale = "en"): string {
   return formatExact(rawToDecimalString(raw, decimals), {
     maximumFractionDigits: Math.max(decimals, 0),
-  });
+  }, intlLocale(locale));
 }
 
 /** Grouped raw quantity padded to its full precision for aligned tables. */
-export function fixedRaw(raw: RawLike | null | undefined, decimals = 8): string {
+export function fixedRaw(raw: RawLike | null | undefined, decimals = 8, locale = "en"): string {
   return formatExact(rawToDecimalString(raw, decimals), {
     minimumFractionDigits: Math.max(decimals, 0),
     maximumFractionDigits: Math.max(decimals, 0),
+  }, intlLocale(locale));
+}
+
+/**
+ * A number to an exact number of decimal places, grouped.
+ *
+ * The shape that was being hand-written all over the app: the minimum and
+ * maximum fraction digits set to the same value. {@link commas} caps at eight
+ * places and drops the ones it does not need, which is right for a quantity
+ * and wrong for a column — 1.5 beside 1.50 reads as two different
+ * measurements taken to different precisions.
+ */
+export function fixed(n: number, places = 2, locale = "en"): string {
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString(intlLocale(locale), {
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
   });
 }
 
 /** Sub-cent-safe price formatting with significant digits. */
-export function price(n: number): string {
+export function price(n: number, locale = "en"): string {
   if (n === 0) return "0";
-  if (n >= 1) return n.toLocaleString("en-US", { maximumFractionDigits: 4 });
-  return n.toLocaleString("en-US", { maximumSignificantDigits: 4 });
+  if (n >= 1) return n.toLocaleString(intlLocale(locale), { maximumFractionDigits: 4 });
+  return n.toLocaleString(intlLocale(locale), { maximumSignificantDigits: 4 });
 }
 
 /**
@@ -91,8 +115,41 @@ export function price(n: number): string {
  * is finer than any fee decision anyone makes, and whole rates still print
  * whole — 2, not 2.00.
  */
-export function satsPerVb(n: number): string {
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+export function satsPerVb(n: number, locale = "en"): string {
+  return n.toLocaleString(intlLocale(locale), { maximumFractionDigits: 2 });
+}
+
+/**
+ * A ratio written as a percentage: 0.123 -> "12.3%", "12,3 %" in French.
+ *
+ * Take the ratio, not the already-multiplied number, so that Intl can place
+ * the sign the way the language does. Among our locales only French and
+ * Russian separate it from the digits, and none of them move it in front,
+ * but Intl is the thing that knows that, not us.
+ */
+export function percent(
+  fraction: number,
+  { digits = 1, minDigits = 0, signed = false }: PercentOptions = {},
+  locale = "en",
+): string {
+  if (!Number.isFinite(fraction)) return "—";
+  return new Intl.NumberFormat(intlLocale(locale), {
+    style: "percent",
+    minimumFractionDigits: minDigits,
+    maximumFractionDigits: Math.max(digits, minDigits),
+    signDisplay: signed ? "exceptZero" : "auto",
+  }).format(fraction);
+}
+
+export interface PercentOptions {
+  /** Most places to show. A trailing zero is dropped unless `minDigits` asks
+   *  for it: a lone figure reads better as "100%" than as "100.0%". */
+  digits?: number;
+  /** Fewest places to show. A COLUMN of percentages wants this at 1, so that
+   *  50% and 49.4% line up instead of reading as two different measures. */
+  minDigits?: number;
+  /** Prefix a plus on a gain. For a change, not for a share. */
+  signed?: boolean;
 }
 
 /**
@@ -172,10 +229,10 @@ export function fiat(n: number, code: string, locale = "en"): string {
       maximumFractionDigits: n >= 100_000_000 ? 2 : 1,
     }).format(n);
   }
-  if (n >= 1000) return wrap(compact(n));
+  if (n >= 1000) return wrap(compact(n, locale));
   if (n >= 100 || (n >= 1 && minor === 0)) return wrap(String(Math.round(n)));
   if (n >= 1) return wrap(n.toFixed(2));
-  return wrap(n.toLocaleString("en-US", { maximumSignificantDigits: 2 }));
+  return wrap(n.toLocaleString(intlLocale(locale), { maximumSignificantDigits: 2 }));
 }
 
 /** USD display: compact for big figures, cents only where they matter.
@@ -209,4 +266,58 @@ export function blocksDuration(blocks: number, t: T = ENGLISH): string {
 export function blocksEta(blocks: number, t: T = ENGLISH): string {
   if (blocks <= 0) return t("now");
   return t("~{duration}", { duration: blocksDuration(blocks, t) });
+}
+
+/**
+ * The formatters above, bound to one locale.
+ *
+ * A number is not language-neutral. "1,234.56" reads as one and a bit to a
+ * Brazilian, and French, Russian and Ukrainian group with a space and mark
+ * the decimal with a comma. Seven of the site's locales happen to agree with
+ * English — Japanese, Korean, all three Chinese and Latin American Spanish
+ * all group with commas — so binding changes nothing for them and fixes the
+ * four it does not.
+ *
+ * What deliberately does NOT follow the locale: the K/M/B suffixes, which
+ * are the units a ticker is quoted in, and the digits themselves, which stay
+ * Western even where a locale has its own numerals.
+ *
+ * Components reach this through `useNumbers()`, or `getNumbers()` on the
+ * server; both are in lib/i18n. It is a plain function so that either side
+ * can call it.
+ */
+export interface Numbers {
+  /** 1234567.89 → "1.23M" ("1,23M" where the comma is the decimal mark). */
+  compact: (n: number) => string;
+  /** Grouped display of an already-divided number. */
+  commas: (n: number) => string;
+  /** Grouped display of a RAW quantity, exact to its last satoshi. */
+  commasRaw: (raw: RawLike | null | undefined, decimals?: number) => string;
+  /** Grouped raw quantity padded to full precision, for aligned columns. */
+  fixedRaw: (raw: RawLike | null | undefined, decimals?: number) => string;
+  /** A plain number to an exact number of places: 1.5 at 2 places is "1.50". */
+  fixed: (n: number, places?: number) => string;
+  /** Sub-cent-safe price. */
+  price: (n: number) => string;
+  /** A fee rate in sat/vB. */
+  satsPerVb: (n: number) => string;
+  /** A RATIO as a percentage: 0.123 -> "12.3%", "12,3 %" in French. */
+  percent: (fraction: number, options?: PercentOptions) => string;
+  /** The Intl locale tag behind all of the above, for the few call sites
+   *  that need NumberFormat options of their own. */
+  intl: string;
+}
+
+export function bindNumbers(locale: string): Numbers {
+  return {
+    compact: (n) => compact(n, locale),
+    commas: (n) => commas(n, locale),
+    commasRaw: (raw, decimals) => commasRaw(raw, decimals, locale),
+    fixedRaw: (raw, decimals) => fixedRaw(raw, decimals, locale),
+    fixed: (n, places) => fixed(n, places, locale),
+    price: (n) => price(n, locale),
+    satsPerVb: (n) => satsPerVb(n, locale),
+    percent: (fraction, options) => percent(fraction, options, locale),
+    intl: intlLocale(locale),
+  };
 }

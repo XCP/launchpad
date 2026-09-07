@@ -3,15 +3,11 @@
 import useSWR from "swr";
 import { fetchJson } from "@/lib/client";
 import { useDenomination, setDenomination } from "@/lib/denomination";
-import {
-  commas,
-  commasRaw,
-  compact,
-  fromSats,
-} from "@/lib/format";
+import { fromSats } from "@/lib/format";
 import type { Raw } from "@/lib/numeric";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import {
   XCP69,
   XCP69_RAISE_SATS,
@@ -23,6 +19,7 @@ import { SATS } from "@/lib/numeric";
 import { XCP_API_BASE } from "@/lib/constants";
 
 export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const denom = useDenomination();
@@ -45,10 +42,10 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
 
   const cells: [string, string][] = usdMode
     ? [
-        [t("Price"), `${usd(priceXcp * rate)} / ${commas(lot)}`],
+        [t("Price"), `${usd(priceXcp * rate)} / ${num.commas(lot)}`],
         [
           t("Per address"),
-          t("{amount} · {tokens} max", { amount: usd(capXcp * rate), tokens: compact(capTokens) }),
+          t("{amount} · {tokens} max", { amount: usd(capXcp * rate), tokens: num.compact(capTokens) }),
         ],
         [t("Target"), t("{amount} or refund", { amount: usd(targetXcp * rate) })],
         [
@@ -60,15 +57,15 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
         ],
       ]
     : [
-        [t("Price"), `${priceXcp} XCP / ${commas(lot)}`],
+        [t("Price"), `${num.commas(priceXcp)} XCP / ${num.commas(lot)}`],
         [
           t("Per address"),
-          t("{amount} · {tokens} max", { amount: `${capXcp} XCP`, tokens: compact(capTokens) }),
+          t("{amount} · {tokens} max", { amount: `${capXcp} XCP`, tokens: num.compact(capTokens) }),
         ],
-        [t("Target"), t("{amount} or refund", { amount: `${commas(targetXcp)} XCP` })],
+        [t("Target"), t("{amount} or refund", { amount: `${num.commas(targetXcp)} XCP` })],
         [
           t("Supply"),
-          t("{supply} · {pool} pool", { supply: compact(supplyTokens), pool: compact(poolTokens) }),
+          t("{supply} · {pool} pool", { supply: num.compact(supplyTokens), pool: num.compact(poolTokens) }),
         ],
       ];
 
@@ -157,12 +154,13 @@ export function useAddressFreshness(addresses: string[]) {
  *  are already flagged in the table below, so the count here doesn't
  *  repeat that — just how many, in plain terms. */
 export function ParticipantsStat({ participants }: { participants: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <div>
       <div className={LABEL}>{t("Holders")}</div>
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-        {t("{n} addresses", { n: participants })}
+        {t("{n} addresses", { n: num.commas(participants) })}
       </div>
     </div>
   );
@@ -205,6 +203,7 @@ export function RaisedStat({
   /** Sale progress in [0, 1] — a share of the raise, not of the wallet. */
   progress: number;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const denom = useDenomination();
@@ -215,9 +214,9 @@ export function RaisedStat({
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
         {usdMode
           ? usd(fromSats(paidQuantity) * (xcpUsd as number))
-          : `${commasRaw(paidQuantity)} XCP`}
+          : `${num.commasRaw(paidQuantity)} XCP`}
         {" · "}
-        {(progress * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%
+        {num.percent(progress)}
       </div>
     </div>
   );
@@ -233,6 +232,7 @@ export function TxFeesStat({
   totalFeeSats: number;
   btcUsd: number | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const denom = useDenomination();
@@ -246,7 +246,7 @@ export function TxFeesStat({
       <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
         {usdMode
           ? usd(fromSats(totalFeeSats) * (btcUsd as number))
-          : t("{n} sats", { n: commas(totalFeeSats) })}
+          : t("{n} sats", { n: num.commas(totalFeeSats) })}
       </div>
     </div>
   );

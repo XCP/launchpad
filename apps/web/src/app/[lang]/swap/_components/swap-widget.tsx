@@ -16,9 +16,9 @@ import { FlipNotch } from "@/components/ui/flip-notch";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchJson } from "@/lib/client";
-import { commasRaw, compact as compactFmt, price as formatPrice, satsPerVb } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { rich } from "@/lib/i18n/rich";
 import {
   approx,
@@ -97,6 +97,7 @@ export function SwapWidget({
   /** Tight-rail mode (asset-page sidebar): wells stack the chip below. */
   compact?: boolean;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   const { code } = useFxRate();
@@ -392,8 +393,8 @@ export function SwapWidget({
   const rateText =
     rate !== null
       ? rateInverted
-        ? `1 ${getAsset} = ${formatPrice(1 / rate)} ${giveAsset}`
-        : `1 ${giveAsset} = ${formatPrice(rate)} ${getAsset}`
+        ? `1 ${getAsset} = ${num.price(1 / rate)} ${giveAsset}`
+        : `1 ${giveAsset} = ${num.price(rate)} ${getAsset}`
       : null;
   const giveUnitUsd =
     rate !== null && xcpUsd
@@ -487,7 +488,7 @@ export function SwapWidget({
           }
           className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
         >
-          {p === 100 ? t("Max") : `${p}%`}
+          {p === 100 ? t("Max") : num.percent(p / 100, { digits: 0 })}
         </button>
       ))}
     </span>
@@ -501,8 +502,8 @@ export function SwapWidget({
     <span>
       {t("Available: {n}", {
         n: availableUnits >= 1e6
-          ? compactFmt(availableUnits)
-          : availableUnits.toLocaleString("en-US"),
+          ? num.compact(availableUnits)
+          : num.commas(availableUnits),
       })}
     </span>
   );
@@ -515,11 +516,11 @@ export function SwapWidget({
       className="min-w-0 truncate text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
       onClick={() => setAmount(fmtAmount(approx(effBalance) / SATS))}
     >
-      {t("Balance: {n}", { n: commasRaw(effBalance) })}
+      {t("Balance: {n}", { n: num.commasRaw(effBalance) })}
       {pendingOutgoing > 0n && (
         <span className="text-gray-400 dark:text-gray-500">
           {" "}
-          {t("· {n} pending", { n: commasRaw(pendingOutgoing) })}
+          {t("· {n} pending", { n: num.commasRaw(pendingOutgoing) })}
         </span>
       )}
     </button>
@@ -548,7 +549,7 @@ export function SwapWidget({
               ? t("Amount too small — rounds to 0")
               : t("No quote for this pair")
           : slippage >= 20
-            ? t("{action} anyway — {pct}% slippage", { action: actionLabel, pct: slippage })
+            ? t("{action} anyway — {pct}% slippage", { action: actionLabel, pct: num.commas(slippage) })
             : impact >= 5
               ? t("{action} anyway", { action: actionLabel })
               : action === "buy"
@@ -567,7 +568,7 @@ export function SwapWidget({
           : "text-gray-500 dark:text-gray-400"
       }
     >
-      {t("Slippage: {pct}%", { pct: slippage })}
+      {t("Slippage: {pct}%", { pct: num.commas(slippage) })}
       {slippageAuto && <span className="text-gray-400 dark:text-gray-500"> {t("· auto")}</span>}
     </span>
   );
@@ -645,7 +646,7 @@ export function SwapWidget({
             transition: staleQuote ? "none" : "opacity 250ms ease-in-out",
           }}
         >
-          {approx(outRaw) > 0 ? commasRaw(outRaw) : "0"}
+          {approx(outRaw) > 0 ? num.commasRaw(outRaw) : "0"}
         </div>
       </Well>
 
@@ -678,7 +679,9 @@ export function SwapWidget({
                       : "text-gray-400 dark:text-gray-500"
                 }
               >
-                {t("Price impact {pct}%", { pct: impact.toFixed(1) })}
+                {/* The "%" belongs to the translation, which places it and any
+                    space itself, so only the number is localized here. */}
+                {t("Price impact {pct}%", { pct: num.fixed(impact, 1) })}
               </span>
             )}
             {mempoolQuote && (
@@ -690,12 +693,13 @@ export function SwapWidget({
                 }
                 title={
                   mempoolQuote.pendingCount === 1
-                    ? t("{n} unconfirmed order on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: mempoolDrop.toFixed(1) })
-                    : t("{n} unconfirmed orders on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: mempoolDrop.toFixed(1) })
+                    ? t("{n} unconfirmed order on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: num.fixed(mempoolDrop, 1) })
+                    : t("{n} unconfirmed orders on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: num.fixed(mempoolDrop, 1) })
                 }
               >
                 {t("{n} ahead in mempool", { n: mempoolQuote.pendingCount })}
-                {mempoolDrop > 0 && ` · −${mempoolDrop.toFixed(1)}%`}
+                {mempoolDrop > 0 &&
+                  ` · −${num.percent(mempoolDrop / 100, { minDigits: 1 })}`}
               </span>
             )}
             {rateText && (
@@ -723,7 +727,7 @@ export function SwapWidget({
                     : undefined
                 }
               >
-                {commasRaw(minReceivedRaw)} {getAsset}
+                {num.commasRaw(minReceivedRaw)} {getAsset}
                 {minBelowMempool && (
                   <span className="font-normal"> {t("· above the mempool estimate")}</span>
                 )}
@@ -733,7 +737,7 @@ export function SwapWidget({
               <div className="flex justify-between">
                 <dt>{t("After mempool")}</dt>
                 <dd className="tabular-nums">
-                  ≈ {commasRaw(afterMempoolRaw)} {getAsset}
+                  ≈ {num.commasRaw(afterMempoolRaw)} {getAsset}
                 </dd>
               </div>
             )}
@@ -750,14 +754,16 @@ export function SwapWidget({
             {quote.fee_bps !== undefined && approx(quote.pool_output) > 0 && (
               <div className="flex justify-between">
                 <dt>{t("LP fee")}</dt>
-                <dd>{(quote.fee_bps / 100).toFixed(2)}%</dd>
+                <dd>
+                  {num.percent(quote.fee_bps / 10_000, { digits: 2, minDigits: 2 })}
+                </dd>
               </div>
             )}
             {feeRate !== null && (
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
-                  {satsPerVb(feeRate)} sat/vB
+                  {num.satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
                     <span className="text-gray-400 dark:text-gray-500">
                       {" "}

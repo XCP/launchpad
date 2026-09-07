@@ -36,6 +36,20 @@ export const monthYear = (unixSec: number, locale = "en") =>
     year: "numeric",
   });
 
+/**
+ * "Sep 7", or "7 sept." — a chart axis label and the date on a candle.
+ *
+ * Takes the Intl tag rather than our locale id, because every caller is a
+ * component that already holds one as `num.intl`. Optionally carries the
+ * time, for a chart bucketed by the hour.
+ */
+export const monthDay = (unixMs: number, intl = "en-US", withTime = false) =>
+  new Date(unixMs).toLocaleString(intl, {
+    month: "short",
+    day: "numeric",
+    ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}),
+  });
+
 /** Age of a block, from its own timestamp. Coarser than timeAgo on purpose —
  *  this labels a block tile, where "7m" and "just now" mean the same thing. */
 export function blockAge(sec: number, t: T = ENGLISH) {

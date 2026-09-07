@@ -1,5 +1,6 @@
 import { lang } from "next/root-params";
 import { DEFAULT_LOCALE, isLocale, type Locale } from "@/lib/i18n/locales";
+import { bindNumbers, type Numbers } from "@/lib/format";
 import { makeT, type Messages, type T } from "@/lib/i18n/t";
 
 /**
@@ -64,4 +65,10 @@ export async function getLocale(): Promise<Locale> {
 export async function getT(): Promise<T> {
   const locale = await getLocale();
   return makeT(await getMessages(locale));
+}
+
+/** The number formatters for the current request's locale, for a server
+ *  component. The client half of this is `useNumbers`. */
+export async function getNumbers(): Promise<Numbers> {
+  return bindNumbers(await getLocale());
 }

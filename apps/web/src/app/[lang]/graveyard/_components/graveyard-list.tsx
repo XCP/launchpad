@@ -2,11 +2,12 @@
 
 import { LazyLink } from "@/components/lazy-link";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { useState } from "react";
 import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
-import { blocksDuration, commas, compact, fromSats, shortAddress } from "@/lib/format";
+import { blocksDuration, fromSats, shortAddress } from "@/lib/format";
 import { type LaunchPage, PER_PAGE, type SectionRow, toSectionRow } from "@/lib/launch-row";
 
 const REFRESH_MS = 60_000;
@@ -20,6 +21,7 @@ export function GraveyardList({
   initialAvailable: boolean;
   height: number;
 }) {
+  const num = useNumbers();
   const t = useT();
   const perPage = PER_PAGE.refunded;
   const [page, setPage] = useState(0);
@@ -64,7 +66,7 @@ export function GraveyardList({
           <h1 className="text-2xl font-bold">{t("Graveyard")}</h1>
           {total > 0 && (
             <span className="text-sm font-medium tabular-nums text-gray-400 dark:text-gray-500">
-              {commas(total)}
+              {num.commas(total)}
             </span>
           )}
         </div>
@@ -111,6 +113,7 @@ export function GraveyardList({
 }
 
 function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
+  const num = useNumbers();
   const t = useT();
   const { fm } = row;
   const closedBlock = fm.soft_cap_deadline_block || fm.end_block;
@@ -121,8 +124,8 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
     row.minters === null
       ? t("— minters")
       : row.minters === 1
-        ? t("{n} minter", { n: commas(row.minters) })
-        : t("{n} minters", { n: commas(row.minters) });
+        ? t("{n} minter", { n: num.commas(row.minters) })
+        : t("{n} minters", { n: num.commas(row.minters) });
   const refunded = fromSats(fm.paid_quantity ?? 0);
 
   return (
@@ -144,8 +147,11 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
             <span className="truncate text-lg font-bold text-white">
               {fm.asset_longname ?? fm.asset}
             </span>
+            {/* The trailing zero is kept: a card reading 50% beside one
+                reading 49.4% looks like two different measures, and
+                so the place is pinned. */}
             <span className="shrink-0 text-sm font-semibold tabular-nums text-white/90">
-              {(row.progress * 100).toFixed(1)}%
+              {num.percent(row.progress, { minDigits: 1 })}
             </span>
           </div>
         </div>
@@ -154,7 +160,7 @@ function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
       <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center justify-between gap-2">
           <span className="min-w-0 truncate tabular-nums">
-            {refunded > 0 ? t("{amount} XCP repaid", { amount: compact(refunded) }) : t("No XCP committed")}
+            {refunded > 0 ? t("{amount} XCP repaid", { amount: num.compact(refunded) }) : t("No XCP committed")}
           </span>
           <span className="shrink-0 tabular-nums">{minters}</span>
         </div>

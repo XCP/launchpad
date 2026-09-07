@@ -6,7 +6,7 @@ import { TokenImage } from "@/components/token-image";
 import { Dialog } from "@/components/ui/dialog";
 import { fetchBalance } from "@/lib/client";
 import { useT } from "@/lib/i18n/client";
-import { commasRaw } from "@/lib/format";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { mapWithLimit } from "@/lib/net";
 
 async function fetchBalances(
@@ -81,6 +81,7 @@ function ModalBody({
   rowLabel?: (asset: string) => string;
   onPick: (asset: string) => void;
 }) {
+  const num = useNumbers();
   const t = useT();
   const [query, setQuery] = useState("");
 
@@ -132,7 +133,7 @@ function ModalBody({
                 </span>
                 {bal !== undefined && bal > 0n && (
                   <span className="shrink-0 text-sm text-gray-500 dark:text-gray-400">
-                    {commasRaw(bal)}
+                    {num.commasRaw(bal)}
                   </span>
                 )}
               </button>

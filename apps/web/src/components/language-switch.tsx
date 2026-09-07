@@ -42,6 +42,7 @@ export const MENU_ITEM =
  * so thirty currencies never swallow two languages.
  */
 export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
+  const t = useT();
   const locale = useLocale();
   const pathname = usePathname();
   const { path } = splitLocale(pathname ?? "/");
@@ -49,7 +50,7 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
   return (
     <DM.Root>
       <DM.Trigger
-        aria-label="Language"
+        aria-label={t("Language")}
         className={`flex items-center gap-1.5 rounded-full border border-gray-200 bg-white text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 ${
           compact ? "size-9 justify-center" : "h-9 px-3"
         }`}
@@ -61,7 +62,8 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
         <DM.Content
           align="end"
           sideOffset={8}
-          className="modal-pop z-50 w-52 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
+          collisionPadding={12}
+          className="modal-pop z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] w-52 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
           <LanguageItems path={path} />
           <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
@@ -72,8 +74,8 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
   );
 }
 
-/** One row per language, each in its own name, the current one ticked.
- *  Shared with the phone menu, which lists them inline. */
+/** One row per language, each in its own name, the current one ticked. The
+ *  list itself, shared by the desktop globe menu and the phone's submenu. */
 export function LanguageItems({ path }: { path: string }) {
   const locale = useLocale();
   return (
@@ -99,11 +101,70 @@ export function LanguageItems({ path }: { path: string }) {
 }
 
 /**
+ * The languages, as a submenu, for the one menu that cannot afford a row
+ * each: the phone's.
+ *
+ * Eleven languages inline made that menu 925px tall on a 647px screen — the
+ * bottom of it, Telegram and Create, was simply off the end. Every language
+ * added made it worse, and the list is meant to keep growing.
+ *
+ * The globe is on the trigger rather than the section, because that is the
+ * whole reason this row has to be findable: a visitor who cannot read the
+ * menu is looking for a symbol, and the globe is the one every web user
+ * recognises.
+ *
+ * Beside it is the current language in its own name, and nothing else. The
+ * word "Language" was there and came off: it is the longest thing on a row
+ * in a 176px menu, and a globe followed by 日本語 has never needed a caption
+ * to say what it does. The row still reports which language is in force,
+ * which is the other thing a label would have been for.
+ */
+export function LanguageSubmenu({ path }: { path: string }) {
+  const t = useT();
+  const locale = useLocale();
+  return (
+    <DM.Sub>
+      <DM.SubTrigger className={MENU_ITEM} aria-label={t("Language")}>
+        <span className="flex min-w-0 items-center gap-2">
+          <Globe />
+          <span className="truncate">{LOCALE_INFO[locale].native}</span>
+        </span>
+        <span aria-hidden className="text-gray-400">
+          ›
+        </span>
+      </DM.SubTrigger>
+      <DM.Portal>
+        {/* Overlapping its parent, on purpose.
+
+            A submenu opens to the right of its parent and flips to the left
+            when the right is full. On a 390px screen BOTH are full — a 192px
+            panel beside a 192px panel wants 384px of the 370 there are — so
+            the flipped one hung 22px off the edge of the screen. Radix does
+            not correct that: it flips the side, it does not slide along it,
+            and a submenu cannot be told to open downward instead.
+
+            So it is pulled back over its parent by more than its own
+            overhang. A phone menu covering the rows behind it is ordinary; a
+            panel half off the screen is not. */}
+        <DM.SubContent
+          sideOffset={-48}
+          alignOffset={-6}
+          collisionPadding={12}
+          className="modal-pop z-50 max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height,20rem))] w-48 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
+        >
+          <LanguageItems path={path} />
+        </DM.SubContent>
+      </DM.Portal>
+    </DM.Sub>
+  );
+}
+
+/**
  * The currency, as a submenu: "Currency · JPY ▸" opens the full list with
  * Auto at the top. Auto shows what it currently resolves to, so a visitor
  * can see why the numbers are in yen before deciding whether to change it.
  */
-export function CurrencySubmenu() {
+export function CurrencySubmenu({ overlap = false }: { overlap?: boolean } = {}) {
   const t = useT();
   const { code, auto, detected } = useCurrency();
   const item = `${MENU_ITEM} text-xs`;
@@ -120,8 +181,11 @@ export function CurrencySubmenu() {
       </DM.SubTrigger>
       <DM.Portal>
         <DM.SubContent
-          sideOffset={6}
+          /* See LanguageSubmenu: on a phone the submenu has to cover its
+             parent rather than hang off the screen. */
+          sideOffset={overlap ? -48 : 6}
           alignOffset={-6}
+          collisionPadding={12}
           className="modal-pop z-50 max-h-80 w-44 overflow-y-auto rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
           <DM.Item className={item} onSelect={() => setCurrency("auto")}>

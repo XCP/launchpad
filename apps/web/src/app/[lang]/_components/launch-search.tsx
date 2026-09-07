@@ -6,9 +6,10 @@ import { Dialog as D } from "radix-ui";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { trackEvent } from "@/lib/analytics";
-import { blocksDuration, blocksEta, commas, compact, shortAddress } from "@/lib/format";
+import { blocksDuration, blocksEta, shortAddress } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useLocalePath, useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import type { T } from "@/lib/i18n/t";
 import { fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { type SearchRow, toSearchRow } from "@/lib/launch-row";
@@ -62,17 +63,22 @@ function metric(
   xcpUsd: number | null,
   usd: (n: number) => string,
   t: T,
+  num: Numbers,
 ): string {
   const shown = phase === "all" ? "minters" : row.phase;
   if (shown === "graduated") {
-    if (row.marketCapXcp <= 0) return t("{n} minters", { n: commas(row.minters) });
-    return xcpUsd ? usd(row.marketCapXcp * xcpUsd) : `${compact(row.marketCapXcp)} XCP`;
+    if (row.marketCapXcp <= 0) return t("{n} minters", { n: num.commas(row.minters) });
+    return xcpUsd ? usd(row.marketCapXcp * xcpUsd) : `${num.compact(row.marketCapXcp)} XCP`;
   }
-  if (shown === "minting") return `${(row.progress * 100).toFixed(1)}%`;
+  // The trailing zero is kept: a row reading 50% beside one reading 49.4%
+  // looks like two different measures.
+  if (shown === "minting") {
+    return num.percent(row.progress, { minDigits: 1 });
+  }
   if (shown === "scheduled") return t("opens {eta}", { eta: blocksEta(row.startBlock - height, t) });
   return row.minters === 1
-    ? t("{n} minter", { n: commas(row.minters) })
-    : t("{n} minters", { n: commas(row.minters) });
+    ? t("{n} minter", { n: num.commas(row.minters) })
+    : t("{n} minters", { n: num.commas(row.minters) });
 }
 
 /** A phase, as a word in the visitor's language. */
@@ -118,6 +124,7 @@ export function LaunchSearch({
   height: number;
   xcpUsd: number | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const router = useRouter();
@@ -308,7 +315,7 @@ export function LaunchSearch({
                       </span>
                     </span>
                     <span className="shrink-0 text-xs font-medium tabular-nums text-gray-600 dark:text-gray-400">
-                      {metric(r, phase, height, xcpUsd, usd, t)}
+                      {metric(r, phase, height, xcpUsd, usd, t, num)}
                     </span>
                   </button>
                 </li>
@@ -318,8 +325,12 @@ export function LaunchSearch({
 
           <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-800 px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500">
             <span>
-              {t("{shown} of {total}", { shown: results.length, total: rows?.length ?? 0 })}
-              {hiddenRefunded > 0 && ` · ${t("{n} refunded hidden", { n: hiddenRefunded })}`}
+              {t("{shown} of {total}", {
+                shown: num.commas(results.length),
+                total: num.commas(rows?.length ?? 0),
+              })}
+              {hiddenRefunded > 0 &&
+                ` · ${t("{n} refunded hidden", { n: num.commas(hiddenRefunded) })}`}
             </span>
             <span className="hidden sm:block">{t("Enter opens the first result · Esc closes")}</span>
           </div>

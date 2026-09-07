@@ -9,9 +9,10 @@ import { TokenImage } from "@/components/token-image";
 import { PendingDot } from "@/components/pending-dot";
 import { useMempool } from "@/hooks/use-mempool";
 import { LABEL } from "@/components/ui/tokens";
-import { blocksDuration, blocksEta, commas, compact, fromSats, shortAddress } from "@/lib/format";
+import { blocksDuration, blocksEta, fromSats, shortAddress } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import { fetchHolderCount, type MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
@@ -70,8 +71,35 @@ function pendingByAsset(mints: MempoolMint[], orders: MempoolOrder[]): Map<strin
 interface SortOption {
   id: string;
   label: string;
-  by: (a: SectionRow, b: SectionRow) => number;
+  /** Every ordering but pace is a level and ignores the tip. */
+  by: (a: SectionRow, b: SectionRow, height: number) => number;
 }
+
+/**
+ * Mint pace: how far the raise has come, over how far the clock has.
+ *
+ * Progress alone cannot say whether a launch is doing well. 40% is a strong
+ * showing on day two of the 1,000-block window and a failing one on day six.
+ * Both legs here are fractions of that same window — funded over soft cap,
+ * elapsed over start-to-deadline — so the units cancel and 1.00 means exactly
+ * on schedule, above it ahead, below it behind.
+ *
+ * The window is read from the record rather than assumed to be 1,000 blocks,
+ * so a launch whose start moved is still measured against its own clock.
+ * Null before the first block of the window has passed, when the rate is not
+ * a number yet.
+ */
+function mintPace(row: SectionRow, height: number): number | null {
+  const deadline = row.fm.soft_cap_deadline_block || row.fm.end_block;
+  const window = deadline - row.fm.start_block;
+  const elapsed = height - row.fm.start_block;
+  if (window <= 0 || elapsed <= 0) return null;
+  return row.progress / (elapsed / window);
+}
+
+/** Pace for sorting: a launch too young to have a rate goes last, the way
+ *  every other "not a number yet" on this page does. */
+const paceRank = (row: SectionRow, height: number) => mintPace(row, height) ?? -1;
 
 /**
  * Age rank, in blocks.
@@ -100,8 +128,8 @@ const minterRank = (r: SectionRow) => r.minters ?? -1;
 /** The count as a cell or a card reads it: an em dash for "not counted",
  *  which is the same convention the market-cap and deadline columns already
  *  use for a figure that isn't there. */
-const minterText = (n: number | null) => (n === null ? "—" : commas(n));
-const holderText = (n: number | null) => (n === null ? "—" : commas(n));
+const minterText = (n: number | null, num: Numbers) => (n === null ? "—" : num.commas(n));
+const holderText = (n: number | null, num: Numbers) => (n === null ? "—" : num.commas(n));
 
 /**
  * Dollar-performance rank with the sitewide current XCP/USD factor removed.
@@ -173,6 +201,15 @@ const SORTS: Record<string, SortOption[]> = {
     // DEFAULT_SORT.minting in apps/api/src/queries/launches.ts, which is what
     // the server renders page one with.
     { id: "progress", label: msg("Progress"), by: (a, b) => b.progress - a.progress },
+    // Not a column the API can index — it is a rate against the live tip — so
+    // the request carries the tip and the worker orders on it. See SORT_SQL's
+    // `pace` in apps/api/src/queries/launches.ts, which computes the same
+    // ratio from the same two columns.
+    {
+      id: "pace",
+      label: msg("Mint Pace"),
+      by: (a, b, height) => paceRank(b, height) - paceRank(a, height),
+    },
     // The window is fixed by the standard at start_block + 1,000, so the
     // deadline is exact and closing order never contradicts opening order.
     // end_block is NOT the field for this: it is 0 on every conforming
@@ -373,6 +410,7 @@ function Section({
   /** Connected wallet eligible for the live-launch filter. Null hides it. */
   walletAddress: string | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const { code } = useFxRate();
   const options = SORTS[phase] ?? SORTS.scheduled!;
@@ -393,8 +431,8 @@ function Section({
   const local = useMemo(() => {
     if (paged) return null;
     const by = (options.find((o) => o.id === sortId) ?? options[0]!).by;
-    return [...initial.rows].sort(by);
-  }, [paged, initial.rows, options, sortId]);
+    return [...initial.rows].sort((a, b) => by(a, b, height));
+  }, [paged, initial.rows, options, sortId, height]);
 
   const atDefault = sortId === defaultSort && page === 0 && !unmintedBy;
 
@@ -432,7 +470,20 @@ function Section({
    * the section no longer needs a reload to notice that the chain moved.
    */
   const { data, error, isLoading } = useSWR<LaunchPage>(
-    paged ? ["launch-page", phase, sortId, current, perPage, unmintedBy ?? null] : null,
+    paged
+      ? [
+          "launch-page",
+          phase,
+          sortId,
+          current,
+          perPage,
+          unmintedBy ?? null,
+          // Part of the key only where it is part of the answer. Pace is
+          // ordered against the tip, so a new block IS a new page; every
+          // other sort would just be re-fetching the same rows.
+          sortId === "pace" ? height : null,
+        ]
+      : null,
     async () => {
       const res = await fetchLaunchPage(
         phase,
@@ -440,6 +491,7 @@ function Section({
         perPage,
         current * perPage,
         unmintedBy,
+        sortId === "pace" ? height : undefined,
       );
       // Thrown, not returned as null: an error leaves SWR holding the last
       // page that loaded, which is what belongs on screen, and it schedules
@@ -596,13 +648,13 @@ function Section({
           {title}
           {total > 0 && (
             <span className="text-sm font-medium text-gray-400 dark:text-gray-500 tabular-nums">
-              {commas(total)}
+              {num.commas(total)}
             </span>
           )}
         </h2>
 
         {showControls && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 shrink items-center gap-2">
             {/* USD or XCP for every return, price and cap in this section: the
                 same switch the price chart has, with the same default. Shown
                 on phones too, unlike the Trading Data link beside it, because
@@ -783,10 +835,16 @@ function SortMenu({
     <DM.Root>
       <DM.Trigger
         aria-label={label}
-        className="flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+        className="flex min-w-0 items-center gap-1 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
       >
-        <span className="text-gray-400 dark:text-gray-500">{t("Sort:")}</span>
-        {t(active.label)}
+        {/* The word "Sort" is the first thing to go on a phone: the button
+            already says what it sorts by, the accessible name says the rest,
+            and in a language where the label is "Сортировка: Капитализация"
+            keeping both pushes the toolbar past the screen. The value then
+            truncates rather than overflowing, so no language can widen this
+            row beyond the space it has. */}
+        <span className="hidden text-gray-400 dark:text-gray-500 sm:inline">{t("Sort:")}</span>
+        <span className="truncate">{t(active.label)}</span>
         {/* Chevron, drawn rather than shipped as an icon dependency. */}
         <svg viewBox="0 0 16 16" className="size-3 text-gray-400 dark:text-gray-500" aria-hidden="true">
           <path
@@ -892,12 +950,30 @@ function Pager({
 }
 
 /** A change with its sign, to a tenth: +12.5%, −3%, 0%. Both chips on the
- *  graduated card use it, so they cannot round differently. */
-const signedPercent = (n: number) =>
-  `${n > 0 ? "+" : ""}${n.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  })}%`;
+ *  graduated card use it, so they cannot round differently. The number
+ *  arrives already multiplied out, so it goes back to a ratio for Intl,
+ *  which is what places the sign and the space before the "%" the way the
+ *  language does. */
+const signedPercent = (n: number, num: Numbers) =>
+  num.percent(n / 100, { digits: 1, signed: true });
+
+/**
+ * A ratio as a percentage to one decimal, keeping the trailing zero: a
+ * progress bar that reads 50% next to one reading 49.4% looks like two
+ * different measures, so this column never drops the place.
+ *
+ * The place is pinned rather than trimmed, so a row reading 50% never sits
+ * beside one reading 49.4% looking like a different measure.
+ */
+const progressPercent = (fraction: number, num: Numbers) =>
+  num.percent(fraction, { minDigits: 1 });
+
+/** Pace as a table cell. Two places: the third would be precision this does
+ *  not have, since both legs move with every block. */
+const paceCell = (row: SectionRow, height: number, num: Numbers) => {
+  const pace = mintPace(row, height);
+  return pace === null ? "—" : num.fixed(pace, 2);
+};
 
 const DENOMINATIONS: readonly Denomination[] = ["usd", "xcp"];
 
@@ -1009,13 +1085,6 @@ function launchReturns(
   };
 }
 
-/** Full eight places. These prices sit far below 1 XCP, so the usual two or
- *  four decimals would round most of them to the same number. */
-const priceLabel = (xcpPrice: number) =>
-  xcpPrice > 0
-    ? xcpPrice.toLocaleString("en-US", { minimumFractionDigits: 8, maximumFractionDigits: 8 })
-    : "—";
-
 const age = (announceBlock: number, height: number, t: T) =>
   announceBlock > 0 ? blocksDuration(height - announceBlock, t) : "—";
 
@@ -1041,8 +1110,10 @@ function LaunchTable({
   xcpUsdDayAgo?: number | null;
   denomination?: Denomination;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
+  const { code, rate } = useFxRate();
   const graduated = phase === "graduated";
   const scheduled = phase === "scheduled";
   // The graduated columns follow the section's USD/XCP switch: cap and price
@@ -1052,15 +1123,22 @@ function LaunchTable({
   // rather than padding the row with columns of zero.
   const inUsd = denomination === "usd" && xcpUsd !== null && xcpUsd > 0;
   const capCell = (capXcp: number) =>
-    capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${compact(capXcp)} XCP`) : "—";
+    capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${num.compact(capXcp)} XCP`) : "—";
+  // A token price sits far below a cent, so it needs more places than `fiat`
+  // gives — but it is still the visitor's currency. The old form wrote a
+  // dollar sign over a figure the row beside it was quoting in euros. In XCP
+  // the price gets its full eight places, since two or four would round most
+  // of these to the same number.
   const priceCell = (priceXcp: number) =>
     priceXcp > 0
       ? inUsd
-        ? `$${(priceXcp * xcpUsd).toLocaleString("en-US", {
+        ? (priceXcp * xcpUsd * rate).toLocaleString(num.intl, {
+            style: "currency",
+            currency: code,
             minimumFractionDigits: 2,
             maximumFractionDigits: 8,
-          })}`
-        : `${priceLabel(priceXcp)} XCP`
+          })
+        : `${num.fixed(priceXcp, 8)} XCP`
       : "—";
   const returnCell = (value: number | null, suffix?: string) =>
     value === null ? (
@@ -1071,28 +1149,51 @@ function LaunchTable({
           value >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
         }
       >
-        {signedPercent(value)}
+        {signedPercent(value, num)}
         {suffix && <span className="text-gray-400 dark:text-gray-500"> {suffix}</span>}
       </span>
     );
-  const head = graduated
-    ? [msg("Market cap"), msg("Price"), msg("All-time"), msg("24h"), msg("Graduated"), msg("Holders")]
+  const head: { label: string; hint?: string }[] = graduated
+    ? [
+        { label: msg("Market cap") },
+        { label: msg("Price") },
+        { label: msg("All-time") },
+        { label: msg("24h") },
+        { label: msg("Graduated") },
+        { label: msg("Holders") },
+      ]
     : scheduled
-      ? [msg("Opens"), msg("Closes"), msg("Announced")]
-      : [msg("Progress"), msg("Raised"), msg("Minters"), msg("Closes")];
+      ? [{ label: msg("Opens") }, { label: msg("Closes") }, { label: msg("Announced") }]
+      : [
+          { label: msg("Progress") },
+          {
+            label: msg("Pace"),
+            hint: msg(
+              "Funded % ÷ elapsed %, both measured against the live chain tip. 1.00 is on schedule.",
+            ),
+          },
+          { label: msg("Raised") },
+          { label: msg("Minters") },
+          { label: msg("Closes") },
+        ];
 
   return (
     // Its own scroller: a wide table must never make the page scroll sideways.
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-      <table className={`w-full text-sm ${graduated ? "min-w-[48rem]" : "min-w-[38rem]"}`}>
+      <table className={`w-full text-sm ${graduated ? "min-w-[48rem]" : scheduled ? "min-w-[38rem]" : "min-w-[44rem]"}`}>
         <thead>
           <tr className="border-b border-gray-100 dark:border-gray-800">
             <th scope="col" className={`px-3 py-2.5 text-left ${LABEL}`}>
               {t("Token")}
             </th>
             {head.map((h) => (
-              <th key={h} scope="col" className={`px-3 py-2.5 text-right ${LABEL}`}>
-                {t(h)}
+              <th
+                key={h.label}
+                scope="col"
+                title={h.hint ? t(h.hint) : undefined}
+                className={`px-3 py-2.5 text-right ${LABEL}`}
+              >
+                {t(h.label)}
               </th>
             ))}
           </tr>
@@ -1138,7 +1239,7 @@ function LaunchTable({
                       )}
                     </Cell>
                     <Cell>{age(r.lastMintBlock ?? r.announceBlock, height, t)}</Cell>
-                    <Cell>{holderText(r.holders)}</Cell>
+                    <Cell>{holderText(r.holders, num)}</Cell>
                   </>
                 ) : scheduled ? (
                   <>
@@ -1148,9 +1249,10 @@ function LaunchTable({
                   </>
                 ) : (
                   <>
-                    <Cell>{(r.progress * 100).toFixed(1)}%</Cell>
-                    <Cell>{compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
-                    <Cell>{minterText(r.minters)}</Cell>
+                    <Cell>{progressPercent(r.progress, num)}</Cell>
+                    <Cell>{paceCell(r, height, num)}</Cell>
+                    <Cell>{num.compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
+                    <Cell>{minterText(r.minters, num)}</Cell>
                     <Cell>{deadline > 0 ? blocksEta(deadline - height, t) : "—"}</Cell>
                   </>
                 )}
@@ -1234,6 +1336,7 @@ function Card({
   /** This is the section's front slot — see the pin in Section. */
   fresh: boolean;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const { fm, phase, conforming } = row;
@@ -1241,9 +1344,9 @@ function Card({
   const returns =
     phase === "graduated" ? launchReturns(row, height, xcpUsd, xcpUsdDayAgo, denomination) : null;
   const performance = returns?.sinceMint ?? null;
-  const performanceLabel = performance !== null ? signedPercent(performance) : null;
+  const performanceLabel = performance !== null ? signedPercent(performance, num) : null;
   const dayChange = returns?.recent ?? null;
-  const dayChangeLabel = dayChange !== null ? signedPercent(dayChange) : null;
+  const dayChangeLabel = dayChange !== null ? signedPercent(dayChange, num) : null;
   const windowLabel = returns?.window ?? "24h";
 
   const chip =
@@ -1256,12 +1359,12 @@ function Card({
   // Graduated cards carry their market cap in the stat row under the art,
   // where it leads, in whichever denomination the section is switched to.
   const headline =
-    phase === "minting" ? `${(row.progress * 100).toFixed(1)}%` : undefined;
+    phase === "minting" ? progressPercent(row.progress, num) : undefined;
   const capLabel =
     row.marketCapXcp > 0
       ? denomination === "usd" && xcpUsd
         ? usd(row.marketCapXcp * xcpUsd)
-        : `${compact(row.marketCapXcp)} XCP`
+        : `${num.compact(row.marketCapXcp)} XCP`
       : "—";
 
   // Bottom-left. Participation for the phases that have it: XCP-69 caps one
@@ -1284,16 +1387,16 @@ function Card({
       ? minters === null
         ? t("— minters")
         : minters >= XCP69_MIN_PARTICIPANTS
-          ? t("{n} minters", { n: commas(minters) })
-          : t("{n} of {min} minters", { n: commas(minters), min: XCP69_MIN_PARTICIPANTS })
+          ? t("{n} minters", { n: num.commas(minters) })
+          : t("{n} of {min} minters", { n: num.commas(minters), min: XCP69_MIN_PARTICIPANTS })
       : phase === "graduated"
         ? row.displayDescription ??
           (minters === null
             ? t("XCP-69 market")
             : minters === 1
-              ? t("{n} minter", { n: commas(minters) })
-              : t("{n} minters", { n: commas(minters) }))
-        : t("Opens at Block {block}", { block: fm.start_block.toLocaleString() });
+              ? t("{n} minter", { n: num.commas(minters) })
+              : t("{n} minters", { n: num.commas(minters) }))
+        : t("Opens at Block {block}", { block: num.commas(fm.start_block) });
 
   // Bottom-right, always a time — the one axis every phase shares, pointing
   // backwards for the finished and forwards for the rest.

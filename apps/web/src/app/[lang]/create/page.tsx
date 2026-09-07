@@ -11,9 +11,10 @@ import { trackTx } from "@/lib/analytics";
 import { fileIsAnimatedWebp } from "@/lib/animated-webp";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
-import { fromSats, commas } from "@/lib/format";
+import { fromSats } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { rich } from "@/lib/i18n/rich";
 import { msg, type T } from "@/lib/i18n/t";
 import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
@@ -207,6 +208,7 @@ const inputClass =
   "mt-1 block w-full rounded-xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 p-3 text-sm outline-none transition-colors focus:border-purple-500 focus:bg-white dark:focus:bg-gray-900";
 
 export default function CreatePage() {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const { address, status: walletStatus, signPsbt, broadcastTransaction } = useWallet();
@@ -488,7 +490,7 @@ export default function CreatePage() {
                 ),
                 block: (
                   <span className="font-mono font-medium text-gray-900 dark:text-gray-100">
-                    {scheduledStart?.toLocaleString()}
+                    {scheduledStart === null ? "" : num.commas(scheduledStart)}
                   </span>
                 ),
                 when: scheduledLabel ?? "",
@@ -725,7 +727,7 @@ export default function CreatePage() {
                 <div className="flex justify-between">
                   <dt>{t("Bitcoin tx fee")}</dt>
                   <dd className="tabular-nums text-gray-700 dark:text-gray-300">
-                    {commas(launchCostSats(feeRate, launchDescription))}{" "}
+                    {num.commas(launchCostSats(feeRate, launchDescription))}{" "}
                     sats
                     {btcUsd !== null && btcUsd !== undefined && (
                       <span className="text-gray-400 dark:text-gray-500">
@@ -808,6 +810,7 @@ function PreviewCard({
   onCustomBlockChange: (v: string) => void;
   blockHeight: number | undefined;
 }) {
+  const num = useNumbers();
   const t = useT();
   const customBlockNum = Math.round(parseFloat(customBlockInput)) || 0;
   const priceXcp = XCP69.PRICE / SATS;
@@ -879,16 +882,16 @@ function PreviewCard({
           length, and the minimum-community floor are all true but not
           decision-relevant the way these four are; they live in the docs. */}
       <dl className="mt-4 space-y-2 border-t border-gray-200 dark:border-gray-800 pt-4 text-xs">
-        <Row k={t("Supply")} v={commas(supplyTokens)} />
-        <Row k={t("Price")} v={`${priceXcp} XCP / ${commas(lot)}`} />
-        <Row k={t("Target")} v={t("{xcp} XCP or refund", { xcp: commas(targetXcp) })} />
+        <Row k={t("Supply")} v={num.commas(supplyTokens)} />
+        <Row k={t("Price")} v={`${priceXcp} XCP / ${num.commas(lot)}`} />
+        <Row k={t("Target")} v={t("{xcp} XCP or refund", { xcp: num.commas(targetXcp) })} />
         <Row k={t("Liquidity")} v={t("locked forever, LP burned")} />
         <Row
           k={t("Minting opens")}
           v={
             preannounceOption === "custom"
               ? customBlockInput
-                ? t("block {n}", { n: commas(customBlockNum) })
+                ? t("block {n}", { n: num.commas(customBlockNum) })
                 : t("custom block")
               : presetLabel
                 ? t(presetLabel)
@@ -916,6 +919,7 @@ function ScheduleGear({
   onCustomBlockChange: (v: string) => void;
   blockHeight: number | undefined;
 }) {
+  const num = useNumbers();
   const t = useT();
   const customNum = Math.round(parseFloat(customBlock)) || 0;
   const minBlock =
@@ -983,14 +987,14 @@ function ScheduleGear({
             <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
               {t(
                 "Any future block, {floor} — tighter than the presets go. Under ~2 hours pays double the network fee.",
-                { floor: minBlock ? t("{n} or later", { n: commas(minBlock) }) : t("at least ~1 hour out") },
+                { floor: minBlock ? t("{n} or later", { n: num.commas(minBlock) }) : t("at least ~1 hour out") },
               )}
             </p>
           ) : tooSoon ? (
             <p className="mt-1.5 text-[11px] font-medium text-red-600 dark:text-red-400">
               {t(
                 "Too soon — needs to be block {n} or later (~1 hour out). The launch has to confirm before it opens.",
-                { n: minBlock ? commas(minBlock) : "…" },
+                { n: minBlock ? num.commas(minBlock) : "…" },
               )}
             </p>
           ) : (

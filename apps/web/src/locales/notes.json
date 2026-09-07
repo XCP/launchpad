@@ -59,5 +59,11 @@
   "adjusts to {n}": "Mint panel: the amount will be rounded to the nearest whole lot.",
   "at ATH": "Price is at its all-time high right now.",
   "closes@@chart": "Price chart caption: closing prices, the series a line chart draws (\"Hourly closes\"). A noun.",
-  "Mempool@@chip": "The amber header chip \"Mempool (2)\": a count of unconfirmed XCP-69 transactions waiting for a block. Translate the meaning (unconfirmed / pending), not the jargon; a Japanese reviewer read メンプール as main pool. Keep it to about 5em: it sits in the header row beside the nav, and a long one clips the nav in languages whose words are already long."
+  "Mempool@@chip": "The amber header chip \"Mempool (2)\": a count of unconfirmed XCP-69 transactions waiting for a block. Translate the meaning (unconfirmed / pending), not the jargon; a Japanese reviewer read メンプール as main pool. Keep it to about 5em: it sits in the header row beside the nav, and a long one clips the nav in languages whose words are already long.",
+  "limit": "Tab on a launch page beside swap and liquidity: the limit-order mode. Lowercase; the tab capitalises it in CSS.",
+  "swap": "Tab beside liquidity: the swap mode. Lowercase; the tab capitalises it in CSS.",
+  "liquidity": "Tab beside swap: add or remove pool liquidity. Lowercase; the tab capitalises it in CSS.",
+  "Filled": "An order status: the whole order executed. Not \"full\".",
+  "inscription": "Chip on a launch whose image is inscribed on-chain, linking to the ordinals record. Lowercase, inside a pill beside an arrow.",
+  "Dismiss": "Accessible name for the × that closes an error banner."
 }

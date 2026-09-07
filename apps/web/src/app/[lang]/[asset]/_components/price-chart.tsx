@@ -4,9 +4,11 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import useSWR from "swr";
 import type { ChartCandle } from "@/lib/api/launchpad-api";
 import type { ChartResolution } from "@/lib/candles";
-import { commas, compact, fromSats } from "@/lib/format";
+import { monthDay } from "@/lib/chain-time";
+import { fromSats } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import { big } from "@/lib/numeric";
 import { XCP69 } from "@/lib/xcp69";
 
@@ -83,11 +85,8 @@ interface Plotted {
 
 /** Full eight-place XCP. Axis ticks drop the unit — the axis is labelled
  *  once — but anything a reader might quote keeps it. */
-const xcp = (xcpPrice: number, withUnit = false) =>
-  `${xcpPrice.toLocaleString("en-US", {
-    minimumFractionDigits: 8,
-    maximumFractionDigits: 8,
-  })}${withUnit ? " XCP" : ""}`;
+const xcp = (xcpPrice: number, num: Numbers, withUnit = false) =>
+  `${num.fixed(xcpPrice, 8)}${withUnit ? " XCP" : ""}`;
 
 const UP = "#15803d";
 const DOWN = "#dc2626";
@@ -121,6 +120,7 @@ export function PriceChart({
   launchXcpUsd?: number | null;
   devTrades?: DevTrade[];
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const { code } = useFxRate();
@@ -318,10 +318,10 @@ export function PriceChart({
   const rising = last && first ? last.vClose >= first.vOpen : true;
 
   const priceLabel = (p: number, at?: number) => {
-    if (!inUsd) return xcp(p, true);
+    if (!inUsd) return xcp(p, num, true);
     const rate = at !== undefined ? rateAt(at) : null;
     const effective = rate ?? xcpUsd;
-    return effective ? usd(p * effective) : xcp(p, true);
+    return effective ? usd(p * effective) : xcp(p, num, true);
   };
 
   // A candle knows the highest block it contains, so the creator's trade —
@@ -459,7 +459,7 @@ export function PriceChart({
                 fontSize={9}
                 className="fill-gray-500 dark:fill-gray-400"
               >
-                {inUsd ? usd(t.v) : xcp(t.v)}
+                {inUsd ? usd(t.v) : xcp(t.v, num)}
               </text>
             </g>
           ))}
@@ -556,8 +556,8 @@ export function PriceChart({
             <g key={`${m.x}-${m.kind}`}>
               <title>
                 {m.kind === "buy"
-                  ? t("Creator bought — block {n}", { n: m.block.toLocaleString() })
-                  : t("Creator sold — block {n}", { n: m.block.toLocaleString() })}
+                  ? t("Creator bought — block {n}", { n: num.commas(m.block) })
+                  : t("Creator sold — block {n}", { n: num.commas(m.block) })}
               </title>
               <circle
                 cx={m.x}
@@ -604,15 +604,7 @@ export function PriceChart({
           )}
 
           <text x={PAD.left} y={H - 6} fontSize={10} className="fill-gray-500 dark:fill-gray-400">
-            {points[0]
-              ? new Date(points[0].candle.time * 1000).toLocaleDateString(
-                  "en-US",
-                  {
-                    month: "short",
-                    day: "numeric",
-                  },
-                )
-              : ""}
+            {points[0] ? monthDay(points[0].candle.time * 1000, num.intl) : ""}
           </text>
           <text
             x={W - PAD.right}
@@ -658,19 +650,13 @@ export function PriceChart({
             ))}
           </div>
           <div className="mt-1 tabular-nums text-gray-300 dark:text-gray-600">
-            {commas(fromSats(hover.candle.volumeXcpRaw))} XCP ·{" "}
+            {num.commas(fromSats(hover.candle.volumeXcpRaw))} XCP ·{" "}
             {hover.candle.trades === 1
               ? t("{n} trade", { n: hover.candle.trades })
               : t("{n} trades", { n: hover.candle.trades })}
           </div>
           <div className="text-gray-400 dark:text-gray-500">
-            {new Date(hover.candle.time * 1000).toLocaleString("en-US", {
-              month: "short",
-              day: "numeric",
-              ...(bucketLabel === "hour"
-                ? { hour: "numeric", minute: "2-digit" }
-                : {}),
-            })}
+            {monthDay(hover.candle.time * 1000, num.intl, bucketLabel === "hour")}
           </div>
         </div>
       )}
@@ -681,7 +667,7 @@ export function PriceChart({
             {
               period: bucketLabel === "hour" ? t("Hourly") : t("Daily"),
               kind: mode === "line" ? t("closes", "chart") : t("candles"),
-              volume: compact(fromSats(maxVol.toString())),
+              volume: num.compact(fromSats(maxVol.toString())),
               bucket: bucketWord,
               trend: rising ? t("up") : t("down"),
             },

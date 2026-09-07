@@ -168,10 +168,17 @@ export function LocaleSuggest() {
       lang={offer}
       className="border-b border-purple-100 bg-purple-50 text-sm text-purple-900 dark:border-purple-950 dark:bg-purple-950/40 dark:text-purple-100"
     >
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2">
-        <span className="flex items-center gap-2">
-          <Globe />
-          {copy.text}
+      <div className="mx-auto flex max-w-5xl items-center gap-x-4 gap-y-1 px-4 py-2 sm:flex-wrap">
+        {/* The sentence and the link together are two lines on a phone, in
+            every language — and the second line is the one worth tapping. So
+            a narrow screen gets the globe and the action alone, which say the
+            same thing in few enough words to fit beside the dismiss. The
+            sentence comes back as soon as there is room for it. */}
+        <span className="flex min-w-0 items-center gap-2">
+          <span className="shrink-0">
+            <Globe />
+          </span>
+          <span className="hidden truncate sm:inline">{copy.text}</span>
         </span>
         <LazyLink
           href={path}
@@ -181,7 +188,7 @@ export function LocaleSuggest() {
             rememberLocale(offer);
             window.dispatchEvent(new Event(EVENT));
           }}
-          className="font-semibold underline underline-offset-2"
+          className="min-w-0 truncate font-semibold underline underline-offset-2"
         >
           {copy.action}
         </LazyLink>
@@ -191,7 +198,7 @@ export function LocaleSuggest() {
             trackEvent(`language suggestion dismissed: ${offer}`);
             dismiss(offer);
           }}
-          className="ms-auto text-xs text-purple-700 hover:text-purple-900 dark:text-purple-300 dark:hover:text-purple-100"
+          className="ms-auto shrink-0 text-xs text-purple-700 hover:text-purple-900 dark:text-purple-300 dark:hover:text-purple-100"
         >
           {copy.dismiss}
         </button>

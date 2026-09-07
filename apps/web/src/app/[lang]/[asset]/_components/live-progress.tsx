@@ -1,6 +1,7 @@
 "use client";
 
-import { compact, tokenQty } from "@/lib/format";
+import { tokenQty } from "@/lib/format";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { useLaunchRoom, useStatusTransition } from "@/app/[lang]/[asset]/_components/launch-room";
 import { big, type Raw, ratio, sumRaw } from "@/lib/numeric";
 
@@ -37,6 +38,7 @@ export function LiveProgress({
    *  else, the sale has ended and this view is stale. */
   serverStatus: string;
 }) {
+  const num = useNumbers();
   const { state } = useLaunchRoom();
   // Sells out or refunds while you're watching: the page follows.
   useStatusTransition(serverStatus);
@@ -51,10 +53,10 @@ export function LiveProgress({
   return (
     <>
       <div className="mb-2 flex items-baseline justify-between">
-        <span className="text-lg font-bold">{confirmedPct.toFixed(1)}%</span>
+        <span className="text-lg font-bold">{num.percent(confirmedPct / 100)}</span>
         <span className="text-sm text-gray-500 dark:text-gray-400">
-          {compact(tokenQty(earned, divisible))} /{" "}
-          {big(target) > 0n ? compact(tokenQty(target, divisible)) : "∞"}
+          {num.compact(tokenQty(earned, divisible))} /{" "}
+          {big(target) > 0n ? num.compact(tokenQty(target, divisible)) : "∞"}
           {allOrNothing ? " · to launch" : ""}
         </span>
       </div>

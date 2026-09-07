@@ -71,6 +71,28 @@ describe("launch unminted filter", () => {
     expect(statements[0]!.sql).toContain("END DESC, tx_index DESC");
   });
 
+  it("carries the chain tip into the pace ordering, and nothing else", async () => {
+    const { db, statements } = captureDb();
+
+    await listLaunchPage(db, "minting", "pace", 12, 0, undefined, 100_000);
+
+    expect(statements[0]!.sql).toContain("100000 > start_block");
+    expect(statements[0]!.sql).toContain("current_deadline_block - start_block");
+    expect(statements[0]!.sql).toContain("END DESC, tx_index DESC");
+    // The tip is an ORDER BY literal, never a bind: an ORDER BY cannot take
+    // a parameter, which is why the caller has to clamp it to an integer.
+    expect(statements[0]!.bindings).toEqual(["minting", 12, 0]);
+  });
+
+  it("ignores the tip on every ordering that is a level rather than a rate", async () => {
+    const { db, statements } = captureDb();
+
+    await listLaunchPage(db, "minting", "progress", 12, 0, undefined, 100_000);
+
+    expect(statements[0]!.sql).toContain("ORDER BY rank_key DESC, tx_index DESC");
+    expect(statements[0]!.sql).not.toContain("100000");
+  });
+
   it("sorts the graveyard by when each launch failed", async () => {
     const { db, statements } = captureDb();
 

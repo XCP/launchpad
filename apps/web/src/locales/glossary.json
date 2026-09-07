@@ -1,5 +1,5 @@
 {
-  "_about": "Fixed renderings of the site's own vocabulary, per locale. The draft script hands these to the model with every batch, and a reviewer changes a term here rather than in a hundred strings. A term with no entry for a locale is the model's call. Keep the note in English: it is the reviewer's brief.",
+  "_about": "Fixed renderings of the site's own vocabulary, per locale. The draft script hands these to the model with every batch, and a reviewer changes a term here rather than in a hundred strings. A term with no entry for a locale is the model's call. Keep the note in English: it is the reviewer's brief. UK sourcing traps (2026-09-07): incrypted.com/<slug> is RUSSIAN and only /ua/ paths are Ukrainian, so anything cited as \"Incrypted\" for a Russian term is Russian evidence; ForkLog UA lives at forklog.com.ua, not forklog.com/ua; there is no Ukrainian Cointelegraph; Kuna ceased operations in 2025. Ukrainian genitives fixed here: токена (gen.) vs токену (dat.), блоку, мінту, пулу.",
   "terms": {
     "fairminter": {
       "note": "Counterparty's on-chain mint contract. A proper noun on this site. ZH: BRC-20 readers know 公平铸造 (fair mint). The Counterparty contract is the 合约. ES: proper noun, lowercase, glossed once as el contrato de acuñación justa. KO: loanword, as the BRC-20 community writes 페어민트. PT/FR: proper noun, lowercase, glossed once (o contrato de mint justo / le contrat de mint équitable). KO QA 2026-09-07: no Korean source names the contract; Runes coverage says 오픈 민트 for an open mint. 페어민터 kept as a loanword. RU/UK: proper noun, Latin, glossed once (контракт честного минта / контракт чесного мінту).",
@@ -54,7 +54,7 @@
       "uk": "запуск"
     },
     "graduated": {
-      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers. pump.fun vocabulary in both (graduar / graduer); the site's sense, never the school sense. RU QA 2026-09-07: no Russian source has a single word for pump.fun graduation — media paraphrase (вышло на Raydium). выпуститься is kept because it is exactly the Russian school-graduation verb, so the metaphor survives as it does in 毕业/卒業/졸업. Only the VERB forms are used: the noun выпуск means issuance in a token context (выпуск токенов), so the noun is выпускной. Never выпущен, which also reads as issued. UK: випустився / випуск.",
+      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers. pump.fun vocabulary in both (graduar / graduer); the site's sense, never the school sense. RU QA 2026-09-07: no Russian source has a single word for pump.fun graduation — media paraphrase (вышло на Raydium). выпуститься is kept because it is exactly the Russian school-graduation verb, so the metaphor survives as it does in 毕业/卒業/졸업. Only the VERB forms are used: the noun выпуск means issuance in a token context (выпуск токенов), so the noun is выпускной. Never выпущен, which also reads as issued. UK: випустився / випуск. UK QA 2026-09-07: випустився is a COINAGE — no Ukrainian source uses it for this sense, and the attested renderings (міграція, завершення кривої зв'язування) describe a bonding-curve migration, which is not what XCP-69 does. Kept because the school metaphor carries and nothing attested fits; awaiting a native reviewer. The noun for issuance must stay off this root (емітовано, not випущено) or the two senses collide.",
       "ja": "卒業",
       "zh": "毕业",
       "zh-tw": "畢業",
@@ -328,7 +328,7 @@
       "zh": "售货机",
       "zh-tw": "販賣機",
       "zh-hk": "售賣機",
-      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry. RU QA 2026-09-07: диспенсер is the attested Counterparty-Russian noun and торговый автомат the attested metaphor (bytwork.com: «автоматические диспенсеры»… «Подобно торговым автоматам»). автомат is kept as the short form on Dan's rule, and glossed once in the FAQ as «ончейн-автомат (диспенсер Counterparty)» — which also removes its collision with автоматически in that sentence.",
+      "note": "DECIDED 2026-09-07: a dispenser is a vending machine. Attested in Japanese by the Monaparty (Japanese Counterparty fork) community: a note.com explainer titled 「Monaparty アセットの自動販売機」 says Dispenser に当たる和訳はいくつかありますが、このメッセージの働きに最も近いのは「自動販売機」です, and writes Dispenser in Latin in the body; ディスペンサー was our own loanword with no community use, so 自販機 (the everyday short form) replaces it. Chinese has no attested community term: press wrote 分配器 once (Sohu), our draft said 分发器, and 售货机 / 販賣機 / 售賣機 are the regional vending-machine words. The verb sense, send BTC and receive XCP, is what the word has to carry. RU QA 2026-09-07: диспенсер is the attested Counterparty-Russian noun and торговый автомат the attested metaphor (bytwork.com: «автоматические диспенсеры»… «Подобно торговым автоматам»). автомат is kept as the short form on Dan's rule, and glossed once in the FAQ as «ончейн-автомат (диспенсер Counterparty)» — which also removes its collision with автоматически in that sentence. UK QA: автомат is a COINAGE — crypto Ukrainian has no word for an on-chain vending machine, and криптобанкомат means a PHYSICAL ATM. Kept on the site's cross-locale rule and glossed once as ончейн-автомат.",
       "es": "dispensador",
       "ko": "자판기",
       "pt": "dispenser",
@@ -710,7 +710,7 @@
       "zh": "砸盘者",
       "zh-tw": "砸盤者",
       "zh-hk": "砸盤者",
-      "note": "An address that sold within blocks of graduation. Both communities use the English word; ES los dumpers, KO 덤퍼. The verb: dumpear / 덤핑. Both keep the English word; the verb dumpar (PT) / dump (FR). Both keep the English; the verb is дампить / слить (RU), дампити (UK).",
+      "note": "An address that sold within blocks of graduation. Both communities use the English word; ES los dumpers, KO 덤퍼. The verb: dumpear / 덤핑. Both keep the English word; the verb dumpar (PT) / dump (FR). Both keep the English; the verb is дампить / слить (RU), дампити (UK). UK QA: дампер is a coinage; Ukrainian has no noun for the actor. The verb is зливати.",
       "es": "dumper",
       "ko": "덤퍼",
       "pt": "dumper",
@@ -727,7 +727,8 @@
       "pt": "dump",
       "fr": "dump",
       "ru": "дамп",
-      "uk": "дамп"
+      "uk": "дамп",
+      "note": "UK QA: the noun дамп is attested (ForkLog), but the Ukrainian VERB is зливати, not дампити — «миттєво зливають свої монети». Дампери is kept for the actor, which has no Ukrainian noun."
     },
     "whale": {
       "zh": "巨鲸",
@@ -744,13 +745,13 @@
       "zh": "跑路",
       "zh-tw": "跑路",
       "zh-hk": "跑路",
-      "note": "The community word; 拉地毯 is a calque nobody uses. Kept in English in both; ES may gloss as estafa de salida once. Kept in English in both. RU/UK: transliterated, and never hyphenated — attested as рагпуллы (bits.media), Рагпулл (Incrypted), рагпул (ForkLog UA); раг-пулл appears in no source.",
+      "note": "The community word; 拉地毯 is a calque nobody uses. Kept in English in both; ES may gloss as estafa de salida once. Kept in English in both. RU/UK: transliterated, and never hyphenated — attested as рагпуллы (bits.media), Рагпулл (Incrypted), рагпул (ForkLog UA); раг-пулл appears in no source. UK QA 2026-09-07: ForkLog UA writes рагпул, unhyphenated; the hyphenated form appears in no Ukrainian source.",
       "es": "rug pull",
       "ko": "러그풀",
       "pt": "rug pull",
       "fr": "rug pull",
       "ru": "рагпулл",
-      "uk": "раг-пул"
+      "uk": "рагпул"
     },
     "premine": {
       "zh": "预挖",
@@ -761,13 +762,14 @@
       "pt": "pré-mineração",
       "fr": "prémine",
       "ru": "премайн",
-      "uk": "премайн"
+      "uk": "премайн",
+      "note": "UK QA: премайн is attested only on Incrypted's RUSSIAN side (incrypted.com/<slug> is Russian; only /ua/ paths are Ukrainian). Kept as a term of art — there is no Ukrainian alternative — and glossed on first use in the FAQ."
     },
     "Bitcoin": {
       "zh": "比特币",
       "zh-tw": "比特幣",
       "zh-hk": "比特幣",
-      "note": "BTC stays BTC as a ticker. ES keeps Bitcoin; KO writes 비트코인 in prose, BTC as ticker. RU: биткоин in prose (ForkLog spelling, no й), BTC as ticker. UK: біткоїн.",
+      "note": "BTC stays BTC as a ticker. ES keeps Bitcoin; KO writes 비트코인 in prose, BTC as ticker. RU: биткоин in prose (ForkLog spelling, no й), BTC as ticker. UK: біткоїн. UK QA: біткоїн is kept against правопис § 126, which gives біткойн (й for the glide [j]; уk.wikipedia renamed its article on that argument in 2023). Incrypted and ForkLog are 100% біткоїн, the state encyclopaedia has Біткоїн, and § 129 II reads as licensing ї after a vowel. Usage wins for this audience; the objection is recorded so it is not re-litigated. The same reasoning carries мемкоїн.",
       "es": "Bitcoin",
       "ko": "비트코인",
       "pt": "Bitcoin",
@@ -826,7 +828,8 @@
     },
     "coin (as a traded name)": {
       "ja": "銘柄",
-      "note": "JAPANESE X 2026-09: traders call each coin a 銘柄 (コミュニティが強い銘柄); used for graduated coins on the stats page (卒業銘柄). コイン stays where the English explains what a coin is."
+      "note": "JAPANESE X 2026-09: traders call each coin a 銘柄 (コミュニティが強い銘柄); used for graduated coins on the stats page (卒業銘柄). コイン stays where the English explains what a coin is. UK: монета (Rabby and MetaMask keep токен and монета distinct, as English does); коїни is a bare transliteration and is not used.",
+      "uk": "монета"
     },
     "surge": {
       "ja": "高騰",
@@ -834,7 +837,8 @@
     },
     "bounty": {
       "es": "premio",
-      "note": "ES QA: premio, so it never collides with recompensas (rewards)."
+      "note": "ES QA: premio, so it never collides with recompensas (rewards). UK: приз, so it never collides with винагорода, which carries reward and the XCP Rewards programme name.",
+      "uk": "приз"
     },
     "portfolio": {
       "es": "portafolio",

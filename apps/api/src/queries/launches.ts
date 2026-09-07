@@ -214,6 +214,39 @@ export function isLaunchPhase(s: string): s is LaunchPhase {
  * announcement was never resolved, and 0 sorts the newest launch last under
  * DESC. start_block stands in for exactly those rows.
  */
+/**
+ * Mint pace, as an ORDER BY expression: funded over elapsed.
+ *
+ * Both legs are fractions of the SAME window — earned over soft cap, blocks
+ * gone over blocks in the window — so the units cancel and 1.0 is exactly on
+ * schedule. That is what makes a launch on day two comparable with one on day
+ * six, which raw progress is not.
+ *
+ * Exported for its test: it is the one sort key that is arithmetic rather
+ * than a column, so it is the one worth running against real SQLite.
+ *
+ * The window is start-to-deadline rather than a hard 1,000 blocks, so a launch
+ * whose start moved is still measured against its own clock. Written from the
+ * columns rather than from `rank_key`, whose meaning depends on the phase.
+ *
+ * `tip` reaches the SQL as a literal, because an ORDER BY cannot take a bound
+ * parameter — the same constraint that makes the rest of this table a closed
+ * whitelist of strings. The caller has already forced it to an integer inside
+ * a plausible block range; a `Number` is all that is ever interpolated here.
+ */
+export function paceOrder(tip: number): string {
+  const at = Math.trunc(Number(tip)) || 0;
+  return `CASE
+    WHEN CAST(soft_cap AS REAL) > 0
+     AND current_deadline_block > start_block
+     AND ${at} > start_block
+    THEN (CAST(earned_quantity AS REAL) / CAST(soft_cap AS REAL))
+       * (current_deadline_block - start_block)
+       / (${at} - start_block)
+    ELSE NULL
+  END DESC`;
+}
+
 const SORT_SQL = {
   progress: "rank_key DESC",
   mcap: "market_cap_rank DESC",
@@ -252,6 +285,9 @@ const SORT_SQL = {
           / 100000000.0)
     ELSE NULL
   END DESC`,
+  // The only entry that is a function: pace is a rate against the live chain
+  // tip, and the tip is not a column. See paceOrder above.
+  pace: paceOrder,
   closing: "current_deadline_block ASC",
   // Refunded launches belong in the order they actually failed, not the
   // order they were announced. Delayed starts and deadline extensions make
@@ -330,6 +366,9 @@ export async function listLaunchPage(
   limit: number,
   offset: number,
   unmintedBy?: string,
+  /** The chain tip, for the one ordering that is a rate rather than a level.
+   *  Ignored by every other sort. */
+  tip = 0,
 ): Promise<LaunchPage> {
   // The lookup is the validation: anything not a key of the table lands on the
   // phase's default, so no caller-supplied string ever reaches the SQL.
@@ -338,7 +377,8 @@ export async function listLaunchPage(
   // tx_index breaks every tie, so two launches that compare equal cannot swap
   // places between two renders — which across pages is worse than untidy: a
   // row can appear twice, or not at all.
-  const order = `${SORT_SQL[key]}, tx_index DESC`;
+  const sql = SORT_SQL[key];
+  const order = `${typeof sql === "function" ? sql(tip) : sql}, tx_index DESC`;
 
   /**
    * A wallet filter belongs inside the query, not after LIMIT. Filtering the

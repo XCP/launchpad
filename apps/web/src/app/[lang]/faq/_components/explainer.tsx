@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { commas, compact, price as priceFmt } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { XCP69, XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
 
 /**
@@ -101,6 +101,7 @@ function LaunchMeter({
   xcpUsd: number | null;
   onSoldOut: () => void;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   // Slider travel maps 1:1 onto the supply bar below it: the track spans the
@@ -119,11 +120,11 @@ function LaunchMeter({
         <h3 className="font-semibold">{t("1 · The launch is binary")}</h3>
         <div className="text-right">
           <span className={`text-3xl font-bold ${soldOut ? "text-green-600 dark:text-green-400" : "text-gray-900 dark:text-gray-100"}`}>
-            {compact(minted)}
+            {num.compact(minted)}
           </span>
           <span className="text-sm text-gray-400 dark:text-gray-500">
             {" "}
-            {t("of {supply} supply minted", { supply: compact(SUPPLY) })}
+            {t("of {supply} supply minted", { supply: num.compact(SUPPLY) })}
           </span>
         </div>
       </div>
@@ -176,7 +177,7 @@ function LaunchMeter({
         {soldOut ? (
           <span className="font-medium text-green-700 dark:text-green-400">
             {t("✓ Graduated — pool created with {xcp} XCP{usd} + 31M tokens, LP burned.", {
-              xcp: commas(RAISE),
+              xcp: num.commas(RAISE),
               usd: withUsd(RAISE, xcpUsd, usdFmt),
             })}
           </span>
@@ -188,7 +189,7 @@ function LaunchMeter({
           <span className="font-medium text-amber-700 dark:text-amber-400">
             {t(
               "↩ Minting — {xcp} XCP{usd} raised so far, all of it returned automatically if the launch doesn't sell out.",
-              { xcp: commas(Math.round(committed)), usd: withUsd(committed, xcpUsd, usdFmt) },
+              { xcp: num.commas(Math.round(committed)), usd: withUsd(committed, xcpUsd, usdFmt) },
             )}
           </span>
         )}
@@ -210,6 +211,7 @@ function LaunchMeter({
 }
 
 function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   // pressure ∈ [-100, 100]; quadratic magnitude keeps small trades readable
@@ -235,8 +237,8 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
     // premium doing its job, and the copy should say so.
     const exitMultiple = tokensIn > 0 ? xcpOut / tokensIn / MINT_PRICE : 0;
     const vars = {
-      left: commas(Math.round(xcpReserve)),
-      xcp: commas(Math.round(xcpOut)),
+      left: num.commas(Math.round(xcpReserve)),
+      xcp: num.commas(Math.round(xcpOut)),
       mult: exitMultiple.toFixed(2),
       paid: (exitMultiple * 100).toFixed(0),
       pct: (mag * 100).toFixed(mag < 0.1 ? 1 : 0),
@@ -262,7 +264,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
     xcpReserve = RAISE + xcpIn;
     tokenReserve = POOL_TOKENS - tokensOut;
     price = xcpReserve / tokenReserve;
-    const vars = { xcp: commas(Math.round(xcpIn)), usd: withUsd(xcpIn, xcpUsd, usdFmt) };
+    const vars = { xcp: num.commas(Math.round(xcpIn)), usd: withUsd(xcpIn, xcpUsd, usdFmt) };
     line =
       pressure === 100
         ? t(
@@ -325,7 +327,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
           <div className="flex items-baseline justify-between">
             <span className="text-xs font-medium text-purple-700 dark:text-purple-300">{t("XCP in the pool")}</span>
             <span className="font-semibold text-gray-900 dark:text-gray-100">
-              {commas(Math.round(xcpReserve))}
+              {num.commas(Math.round(xcpReserve))}
               <span className="text-xs font-normal text-gray-400 dark:text-gray-500">
                 {withUsd(xcpReserve, xcpUsd, usdFmt)}
               </span>
@@ -342,7 +344,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         <div>
           <div className="flex items-baseline justify-between">
             <span className="text-xs font-medium text-cyan-700 dark:text-cyan-300">{t("Tokens in the pool")}</span>
-            <span className="font-semibold text-gray-900 dark:text-gray-100">{compact(tokenReserve)}</span>
+            <span className="font-semibold text-gray-900 dark:text-gray-100">{num.compact(tokenReserve)}</span>
           </div>
           <div className="relative mt-1 h-5 overflow-hidden rounded-md bg-gray-100 dark:bg-gray-800">
             <div
@@ -358,7 +360,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         <div className="rounded-md bg-gray-50 dark:bg-gray-800/60 p-2">
           <div className="text-xs text-gray-500 dark:text-gray-400">{t("Token price")}</div>
           <div className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {priceFmt(price)} <span className="text-xs font-normal text-gray-400 dark:text-gray-500">XCP</span>
+            {num.price(price)} <span className="text-xs font-normal text-gray-400 dark:text-gray-500">XCP</span>
           </div>
           {xcpUsd && (
             <div className="text-xs text-gray-400 dark:text-gray-500">≈{usdFmt(price * xcpUsd)}</div>
@@ -367,7 +369,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         <div className="rounded-md bg-gray-50 dark:bg-gray-800/60 p-2">
           <div className="text-xs text-gray-500 dark:text-gray-400">{t("Market cap")}</div>
           <div className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {compact(price * SUPPLY)}{" "}
+            {num.compact(price * SUPPLY)}{" "}
             <span className="text-xs font-normal text-gray-400 dark:text-gray-500">XCP</span>
           </div>
           {xcpUsd && (
@@ -387,7 +389,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         <p className="mt-2">
           {t(
             "This is the protocol's own swap math: constant product with a 50 bps fee that stays in the pool. Price is the ratio of the two reserves — one drains as the other fills, which is why the tick marks sit at center: both sides open worth {xcp} XCP each. The reserve approaches zero without ever arriving, and the LP is burned, so this liquidity can be traded against forever and withdrawn by no one — whatever XCP sits in the pool is out of circulation for good.",
-            { xcp: commas(RAISE) },
+            { xcp: num.commas(RAISE) },
           )}
         </p>
         <p className="mt-2">

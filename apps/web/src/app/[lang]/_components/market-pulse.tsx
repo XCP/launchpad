@@ -6,10 +6,12 @@ import { useEffect, useId, useState } from "react";
 import { TokenImage } from "@/components/token-image";
 import { trackEvent } from "@/lib/analytics";
 import { intlLocale, usesMyriads } from "@/lib/format";
+import { monthDay } from "@/lib/chain-time";
 import { priceChangePercent } from "@/lib/market";
 import { approx } from "@/lib/numeric";
 import { useFxRate } from "@/lib/currency";
 import { useT, useLocale } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 
 type Market = "btc" | "xcp";
 type Range = "1d" | "7d" | "30d" | "1y";
@@ -44,11 +46,17 @@ const price = (market: Market, value: number | null, code: string, rate: number,
     options.minimumFractionDigits = 0;
     options.maximumFractionDigits = 0;
   }
-  return converted.toLocaleString(japanese ? intlLocale(locale) : "en-US", options);
+  return converted.toLocaleString(intlLocale(locale), options);
 };
 
-const percent = (value: number) =>
-  `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
+/** A 30-day move with its sign. `value` arrives already multiplied out by
+ *  priceChangePercent, so it goes back to a ratio for `num.percent`, which is
+ *  what places the sign and the space before the "%" the way the language
+ *  does. `minDigits` pins the place, so the chip does not change width as the
+ *  number crosses a round figure — the default trims that zero, which is
+ *  right for a share of supply and wrong for a ticker. */
+const percent = (value: number, num: Numbers) =>
+  num.percent(value / 100, { minDigits: 1, signed: true });
 
 function BtcMark({ large = false }: { large?: boolean }) {
   return (
@@ -142,6 +150,7 @@ function TickerButton({
   onClick: () => void;
 }) {
   const t = useT();
+  const num = useNumbers();
   const { code, rate } = useFxRate();
   const locale = useLocale();
   const isBtc = market === "btc";
@@ -173,7 +182,7 @@ function TickerButton({
                 : "text-red-600 dark:text-red-400"
             }`}
           >
-            {percent(change30d)}
+            {percent(change30d, num)}
           </span>
         )}
       </span>
@@ -217,6 +226,7 @@ function MarketModal({
   xcpChange30d: number | null;
 }) {
   const t = useT();
+  const num = useNumbers();
   const { code, rate } = useFxRate();
   const locale = useLocale();
   const [points, setPoints] = useState<PricePoint[] | null>(null);
@@ -362,7 +372,7 @@ function MarketModal({
                 </p>
                 {change !== null && (
                   <p className={`text-sm font-semibold tabular-nums ${change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
-                    {percent(change)} <span className="font-normal text-gray-400">{range.toUpperCase()}</span>
+                    {percent(change, num)} <span className="font-normal text-gray-400">{range.toUpperCase()}</span>
                   </p>
                 )}
               </div>
@@ -424,10 +434,10 @@ function MarketModal({
             <Stat label={isBtc ? t("XCP exchange rate") : t("Floor price")} value={
               isBtc
                 ? btcInXcp
-                  ? `1 BTC = ${Math.round(btcInXcp).toLocaleString("en-US")} XCP`
+                  ? `1 BTC = ${num.commas(Math.round(btcInXcp))} XCP`
                   : "—"
                 : floorSats
-                  ? `1 XCP = ${Math.round(approx(floorSats)).toLocaleString("en-US")} sats`
+                  ? `1 XCP = ${num.commas(Math.round(approx(floorSats)))} sats`
                   : "—"
             } />
             <Stat label={t("Data")} value={isBtc ? t("BTC market · cached 5 min") : t("XCP market · cached 15 min")} />
@@ -449,6 +459,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 function MarketLineChart({ market, points }: { market: Market; points: PricePoint[] }) {
   const t = useT();
+  const num = useNumbers();
   const gradientId = useId().replaceAll(":", "");
   const width = 720;
   const height = 260;
@@ -464,8 +475,8 @@ function MarketLineChart({ market, points }: { market: Market; points: PricePoin
   const baseline = height - pad.bottom;
   const area = `${line} L${x(points.length - 1).toFixed(1)},${baseline} L${x(0).toFixed(1)},${baseline} Z`;
   const color = market === "btc" ? "#f97316" : "#2563eb";
-  const start = new Date(points[0]!.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-  const end = new Date(points[points.length - 1]!.timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const start = monthDay(points[0]!.timestamp, num.intl);
+  const end = monthDay(points[points.length - 1]!.timestamp, num.intl);
 
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="h-64 w-full" role="img" aria-label={t("{market} price history with {n} points", { market: market.toUpperCase(), n: points.length })}>

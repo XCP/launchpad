@@ -1,6 +1,6 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
-import { getMessages, getT } from "@/lib/i18n/server";
+import { getMessages, getNumbers, getT } from "@/lib/i18n/server";
 import { makeT, msg } from "@/lib/i18n/t";
 import { rich } from "@/lib/i18n/rich";
 import type { Metadata } from "next";
@@ -10,7 +10,7 @@ import { fetchCommunities, fetchLaunchStats } from "@/lib/api/launchpad-api";
 import { CommunitiesSection } from "@/app/[lang]/stats/_components/communities";
 import { Stat } from "@/app/[lang]/stats/_components/stat";
 import { fetchXcpUsd, fetchXcpUsdHistory } from "@/lib/api/price";
-import { commas, fromSats } from "@/lib/format";
+import { fromSats } from "@/lib/format";
 import { Fiat } from "@/components/fiat";
 import { historicalUsdAt } from "@/lib/market";
 import { LABEL } from "@/components/ui/tokens";
@@ -44,15 +44,6 @@ export const revalidate = 60;
  *  returns; anything longer stops being "lately". */
 const WINDOW_DAYS = 28;
 
-/** Stats are aggregate estimates, so one decimal keeps partial XCP visible
- * without implying transaction-level precision. Keep every XCP figure on
- * this page on the same visual scale. */
-const formatXcp = (value: number) =>
-  value.toLocaleString("en-US", {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
-
 /**
  * The scoreboard, and the one place refunded launches are counted.
  *
@@ -63,6 +54,7 @@ const formatXcp = (value: number) =>
  * entirely would be the dishonest way to remove that section.
  */
 export default async function StatsPage() {
+  const num = await getNumbers();
   const t = await getT();
   const height = await fetchBlockHeight();
   const [stats, xcpUsd, xcpUsdHistory, communities] = await Promise.all([
@@ -142,7 +134,7 @@ export default async function StatsPage() {
         <Stat
           className="order-1 sm:order-none"
           label={t("Market cap")}
-          value={`${formatXcp(marketCapXcp)} XCP`}
+          value={`${num.fixed(marketCapXcp, 1)} XCP`}
           hint={
             xcpUsd
               ? rich(t, "≈ {amount} · graduated coins", { amount: <Fiat usd={marketCapXcp * xcpUsd} /> })
@@ -160,7 +152,7 @@ export default async function StatsPage() {
           // Not "locked pools": a graduated launch burns its LP, but the number
           // also carries pools whose liquidity is not locked, and calling all
           // of it locked promised something this figure cannot back.
-          value={`${formatXcp(poolXcp)} XCP`}
+          value={`${num.fixed(poolXcp, 1)} XCP`}
           hint={
             xcpUsd
               ? rich(t, "≈ {amount} in pools", { amount: <Fiat usd={poolXcp * xcpUsd} /> })
@@ -175,7 +167,7 @@ export default async function StatsPage() {
           // refunded launch, so it was committed rather than transacted.
           // This is XCP that actually changed hands, which is the harder
           // number to produce and the one worth showing on its own.
-          value={`${formatXcp(tradeXcp)} XCP`}
+          value={`${num.fixed(tradeXcp, 1)} XCP`}
           hint={
             historicalTradeUsd > 0
               ? rich(t, "≈ {amount} traded, all time", { amount: <Fiat usd={historicalTradeUsd} /> })
@@ -185,19 +177,19 @@ export default async function StatsPage() {
         <Stat
           className="order-3 sm:order-none"
           label={t("Mints")}
-          value={commas(activity.mints)}
+          value={num.commas(activity.mints)}
           hint={t("mint transactions")}
         />
         <Stat
           className="order-4 sm:order-none"
           label={t("Minters")}
-          value={commas(activity.minters)}
+          value={num.commas(activity.minters)}
           hint={t("distinct addresses")}
         />
         <Stat
           className="order-5 sm:order-none"
           label={t("Active escrow")}
-          value={`${formatXcp(activeXcp)} XCP`}
+          value={`${num.fixed(activeXcp, 1)} XCP`}
           hint={
             xcpUsd
               ? rich(t, "≈ {amount} committed to open mints", { amount: <Fiat usd={activeXcp * xcpUsd} /> })
@@ -215,7 +207,7 @@ export default async function StatsPage() {
         <div className="flex items-baseline justify-between gap-3">
           <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("Minting activity")}</h2>
           <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-            {t("{n} in the last {days} days", { n: commas(windowTotal), days: WINDOW_DAYS })}
+            {t("{n} in the last {days} days", { n: num.commas(windowTotal), days: WINDOW_DAYS })}
           </span>
         </div>
 
@@ -255,10 +247,10 @@ export default async function StatsPage() {
       <section>
         <h2 className={`mb-3 ${LABEL}`}>{t("Launches by phase")}</h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label={t("Scheduled")} value={commas(counts.scheduled)} hint={t("announced, not open")} />
-          <Stat label={t("Minting")} value={commas(counts.minting)} hint={t("open right now")} />
-          <Stat label={t("Graduated")} value={commas(counts.graduated)} hint={t("sold out, pool locked")} />
-          <Stat label={t("Refunded")} value={commas(counts.refunded)} hint={t("missed the cap, paid back")} />
+          <Stat label={t("Scheduled")} value={num.commas(counts.scheduled)} hint={t("announced, not open")} />
+          <Stat label={t("Minting")} value={num.commas(counts.minting)} hint={t("open right now")} />
+          <Stat label={t("Graduated")} value={num.commas(counts.graduated)} hint={t("sold out, pool locked")} />
+          <Stat label={t("Refunded")} value={num.commas(counts.refunded)} hint={t("missed the cap, paid back")} />
         </div>
       </section>
 
@@ -305,7 +297,7 @@ export default async function StatsPage() {
           <div className="flex items-baseline justify-between gap-3">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t("Refund activity")}</h3>
             <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
-              {t("{n} in the last {days} days", { n: commas(refundTotal), days: WINDOW_DAYS })}
+              {t("{n} in the last {days} days", { n: num.commas(refundTotal), days: WINDOW_DAYS })}
             </span>
           </div>
           {refundPeak === 0 ? (
@@ -320,12 +312,12 @@ export default async function StatsPage() {
                       d.n === 1
                         ? t("{n} refund · {xcp} XCP returned · about {when}", {
                             n: d.n,
-                            xcp: formatXcp(d.xcp),
+                            xcp: num.fixed(d.xcp, 1),
                             when: about(d.daysAgo),
                           })
                         : t("{n} refunds · {xcp} XCP returned · about {when}", {
                             n: d.n,
-                            xcp: formatXcp(d.xcp),
+                            xcp: num.fixed(d.xcp, 1),
                             when: about(d.daysAgo),
                           })
                     }
@@ -347,8 +339,8 @@ export default async function StatsPage() {
 
       <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
         {total === 1
-          ? t("{n} conforming launch · chain tip {height}", { n: commas(total), height: commas(height) })
-          : t("{n} conforming launches · chain tip {height}", { n: commas(total), height: commas(height) })}
+          ? t("{n} conforming launch · chain tip {height}", { n: num.commas(total), height: num.commas(height) })
+          : t("{n} conforming launches · chain tip {height}", { n: num.commas(total), height: num.commas(height) })}
       </p>
     </div>
   );

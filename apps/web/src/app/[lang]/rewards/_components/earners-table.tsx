@@ -8,8 +8,9 @@ import {
   fetchMinterEarnings,
   type MinterEarning,
 } from "@/lib/api/launchpad-api";
-import { commas, fromSats, shortAddress } from "@/lib/format";
+import { fromSats, shortAddress } from "@/lib/format";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { LABEL } from "@/components/ui/tokens";
 import { mintsEarned } from "@/lib/rewards";
 
@@ -26,6 +27,7 @@ const PER_PAGE = 25;
  * a full page implies a next one closely enough.
  */
 export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
+  const num = useNumbers();
   const t = useT();
   const [page, setPage] = useState(0);
   const [query, setQuery] = useState("");
@@ -104,16 +106,16 @@ export function EarnersTable({ initial }: { initial: MinterEarning[] }) {
                     </LazyLink>
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">
-                    {commas(m.mints)}
+                    {num.commas(m.mints)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                    {commas(m.launches)}
+                    {num.commas(m.launches)}
                   </td>
                   <td className="px-4 py-3 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                    {commas(fromSats(m.paid))} XCP
+                    {num.commas(fromSats(m.paid))} XCP
                   </td>
                   <td className="px-4 py-3 text-right font-medium tabular-nums text-gray-900 dark:text-gray-100">
-                    {commas(mintsEarned(m.mints))}
+                    {num.commas(mintsEarned(m.mints))}
                     <span className="ml-1 text-[11px] font-normal text-gray-400 dark:text-gray-500">MINTS</span>
                   </td>
                 </tr>

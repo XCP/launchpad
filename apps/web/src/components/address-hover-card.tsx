@@ -6,12 +6,7 @@ import useSWR from "swr";
 import { HoverCard } from "@/components/ui/hover-card";
 import { fetchJson } from "@/lib/client";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
-import {
-  commas,
-  compact,
-  shortAddress,
-  tokenQty,
-} from "@/lib/format";
+import { shortAddress, tokenQty } from "@/lib/format";
 import { big, type RawLike } from "@/lib/numeric";
 import { fetchLaunchpadAddressSummary } from "@/lib/api/launchpad-api";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
@@ -26,6 +21,7 @@ import {
 import { LABEL, FOCUS } from "@/components/ui/tokens";
 import { timeAgo, daysSince, monthYear } from "@/lib/chain-time";
 import { useLocale, useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { rich } from "@/lib/i18n/rich";
 import { XCP_API_BASE } from "@/lib/constants";
 
@@ -39,6 +35,7 @@ export function IssuerChips({
   /** The project's own links, flowing at the end of the same run. */
   trailing?: ReactNode;
 }) {
+  const num = useNumbers();
   const t = useT();
   // First-timers get a different second chip: what they've issued outside
   // the standard says whether they're new on-chain or just new here.
@@ -159,8 +156,8 @@ export function IssuerChips({
   const standing =
     issued && issued.count > 0
       ? issued.count === 1 && !issued.capped
-        ? t("{n} asset issued", { n: commas(issued.count) })
-        : t("{n} assets issued", { n: `${commas(issued.count)}${issued.capped ? "+" : ""}` })
+        ? t("{n} asset issued", { n: num.commas(issued.count) })
+        : t("{n} assets issued", { n: `${num.commas(issued.count)}${issued.capped ? "+" : ""}` })
       : ageDays !== null && ageDays > NEW_ADDRESS_DAYS
         ? t("on-chain since {year}", { year: new Date(firstSeen! * 1000).getFullYear() })
         : // Only claim "new" on evidence: a failed lookup is not a young address.
@@ -187,7 +184,7 @@ export function IssuerChips({
       {data.prior === 0
         ? t("first launch")
         : data.priorCapped
-          ? t("{n}+ launches", { n: commas(data.prior) })
+          ? t("{n}+ launches", { n: num.commas(data.prior) })
           : t("{ordinal} launch", { ordinal: ordinal(data.prior + 1) })}
     </span>,
   ];
@@ -357,6 +354,7 @@ export function AddressHoverCard({
   className?: string;
   children: ReactNode;
 }) {
+  const num = useNumbers();
   const t = useT();
   const locale = useLocale();
   const [armed, setArmed] = useState(false);
@@ -406,7 +404,7 @@ export function AddressHoverCard({
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
           <div className={LABEL}>{t("XCP balance")}</div>
           <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-            {xcpNum === null || Number.isNaN(xcpNum) ? "—" : commas(xcpNum)}
+            {xcpNum === null || Number.isNaN(xcpNum) ? "—" : num.commas(xcpNum)}
           </div>
         </div>
         <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
@@ -421,7 +419,7 @@ export function AddressHoverCard({
           {rich(t, held === 1 ? "Holds {count} token" : "Holds {count} tokens", {
             count: (
               <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
-                {typeof held === "number" ? commas(held) : "—"}
+                {typeof held === "number" ? num.commas(held) : "—"}
               </span>
             ),
           })}
@@ -431,7 +429,7 @@ export function AddressHoverCard({
             count: (
               <span className="font-semibold text-gray-900 dark:text-gray-100 tabular-nums">
                 {issued
-                  ? `${commas(issued.count)}${issued.capped ? "+" : ""}`
+                  ? `${num.commas(issued.count)}${issued.capped ? "+" : ""}`
                   : "—"}
               </span>
             ),
@@ -487,6 +485,7 @@ export function LaunchpadAddressHoverCard({
   className?: string;
   children: ReactNode;
 }) {
+  const num = useNumbers();
   const t = useT();
   const [armed, setArmed] = useState(false);
   const coarse = useCoarsePointer();
@@ -514,9 +513,9 @@ export function LaunchpadAddressHoverCard({
     value !== null && tracked
       ? big(tracked.realized_pnl_xcp) + value - big(tracked.cost_xcp)
       : null;
-  const xcp = (raw: RawLike) => compact(tokenQty(raw, true));
+  const xcp = (raw: RawLike) => num.compact(tokenQty(raw, true));
   const signedXcp = (raw: bigint) =>
-    `${raw > 0n ? "+" : ""}${compact(tokenQty(raw, true))} XCP`;
+    `${raw > 0n ? "+" : ""}${num.compact(tokenQty(raw, true))} XCP`;
 
   return (
     <HoverCard
@@ -547,7 +546,7 @@ export function LaunchpadAddressHoverCard({
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
               <div className={LABEL}>{t("Balance")}</div>
               <div className="mt-0.5 text-lg font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-                {balance === null ? "—" : compact(tokenQty(balance, true))}
+                {balance === null ? "—" : num.compact(tokenQty(balance, true))}
               </div>
             </div>
             <div className="rounded-xl bg-gray-50 dark:bg-gray-800/60 p-3">
@@ -577,19 +576,19 @@ export function LaunchpadAddressHoverCard({
             <span className="font-medium text-gray-900 dark:text-gray-100">XCP-69</span>
             {` · ${
               data.mints.transactions === 1
-                ? t("{n} mint", { n: commas(data.mints.transactions) })
-                : t("{n} mints", { n: commas(data.mints.transactions) })
+                ? t("{n} mint", { n: num.commas(data.mints.transactions) })
+                : t("{n} mints", { n: num.commas(data.mints.transactions) })
             }`}
             {` · ${
               data.mints.launches === 1
-                ? t("{n} launch", { n: commas(data.mints.launches) })
-                : t("{n} launches", { n: commas(data.mints.launches) })
+                ? t("{n} launch", { n: num.commas(data.mints.launches) })
+                : t("{n} launches", { n: num.commas(data.mints.launches) })
             }`}
             {data.market.fills > 0
               ? ` · ${
                   data.market.fills === 1
-                    ? t("{n} fill", { n: commas(data.market.fills) })
-                    : t("{n} fills", { n: commas(data.market.fills) })
+                    ? t("{n} fill", { n: num.commas(data.market.fills) })
+                    : t("{n} fills", { n: num.commas(data.market.fills) })
                 }`
               : ""}
           </div>

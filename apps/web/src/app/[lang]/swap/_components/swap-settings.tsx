@@ -12,6 +12,7 @@ import useSWR from "swr";
 import { AmountInput } from "@/components/amount-input";
 import { GearPopover } from "@/components/ui/popover";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { msg } from "@/lib/i18n/t";
 import { fetchFeeRate } from "@xcp/wallet-sdk";
 import {
@@ -155,6 +156,7 @@ export function SwapSettingsProvider({ children }: { children: ReactNode }) {
 
 /** The gear beside the mode tabs — render inside SwapSettingsProvider. */
 export function SwapSettingsGear() {
+  const num = useNumbers();
   const t = useT();
   const s = useSwapSettings();
   return (
@@ -197,7 +199,7 @@ export function SwapSettingsGear() {
                 : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
-            {p}%
+            {num.percent(p / 100, { digits: 1 })}
           </button>
         ))}
         <div
@@ -222,15 +224,15 @@ export function SwapSettingsGear() {
       </div>
       {s.slippageAuto ? (
         <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-          {t("Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.", { pct: s.autoValue })}
+          {t("Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.", { pct: num.commas(s.autoValue) })}
         </p>
       ) : s.slippage >= 20 ? (
         <p className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
-          {t("{pct}% slippage authorizes a very unfavorable fill. The button will warn before swapping.", { pct: s.slippage })}
+          {t("{pct}% slippage authorizes a very unfavorable fill. The button will warn before swapping.", { pct: num.commas(s.slippage) })}
         </p>
       ) : s.slippage > 5 ? (
         <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
-          {t("High slippage authorizes up to {pct}% price impact.", { pct: s.slippage })}
+          {t("High slippage authorizes up to {pct}% price impact.", { pct: num.commas(s.slippage) })}
         </p>
       ) : s.slippage < 0.5 ? (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
@@ -238,7 +240,7 @@ export function SwapSettingsGear() {
         </p>
       ) : s.slippage > s.autoValue ? (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-          {t("Higher than this trade needs (~{pct}%).", { pct: s.autoValue })}
+          {t("Higher than this trade needs (~{pct}%).", { pct: num.commas(s.autoValue) })}
         </p>
       ) : null}
       <div className="mt-3 flex items-center justify-between">
@@ -345,6 +347,7 @@ export function LimitSettingsGear() {
 
 /** The gear for the Liquidity tab — its own looser slippage, shared TX fee. */
 export function LiquiditySettingsGear() {
+  const num = useNumbers();
   const t = useT();
   const s = useSwapSettings();
   return (
@@ -368,7 +371,7 @@ export function LiquiditySettingsGear() {
                 : "border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-700"
             }`}
           >
-            {p}%
+            {num.percent(p / 100, { digits: 1 })}
           </button>
         ))}
         <div

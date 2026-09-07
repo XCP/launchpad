@@ -2,6 +2,7 @@
 
 import { LazyLink } from "@/components/lazy-link";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import { msg } from "@/lib/i18n/t";
 import { useState } from "react";
 import useSWR from "swr";
@@ -26,7 +27,7 @@ import {
   type ActivityTrade,
   type PoolEventKind,
 } from "@/lib/api/launchpad-api";
-import { blocksEta, commas, compact, fixedRaw, shortAddress, tokenQty } from "@/lib/format";
+import { blocksEta, shortAddress, tokenQty } from "@/lib/format";
 import { big, ratio, type RawLike } from "@/lib/numeric";
 
 /** How many rows a tape holds. A feed is read by scrolling, not by paging, and
@@ -85,6 +86,7 @@ const TABS: { id: Tab; label: string }[] = [
  * makes both halves possible.
  */
 export function ActivityView() {
+  const num = useNumbers();
   const t = useT();
   const [tab, setTab] = useState<Tab>("mints");
   const [tradePage, setTradePage] = useState(1);
@@ -161,7 +163,7 @@ export function ActivityView() {
                 {t(item.label)}
                 {n !== null && (
                   <span className="ml-1.5 text-xs font-normal text-gray-400 dark:text-gray-500 tabular-nums">
-                    {commas(n)}
+                    {num.commas(n)}
                   </span>
                 )}
               </SegmentedTrigger>
@@ -315,6 +317,7 @@ const EMPTY: Record<Tab, string> = {
 /* --------------------------------------------------------------------- */
 
 function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <Tape columns={[msg("When"), msg("Asset"), msg("Event"), msg("Price"), msg("Amount"), "XCP", msg("Minter"), msg("Status")]}>
@@ -328,9 +331,9 @@ function MintTape({ rows, height }: { rows: ActivityMint[]; height?: number }) {
           {/* Every mint of one launch pays the same fixed price, so this
               column is flat down a run of rows — which is the point: a launch
               whose price changes between rows is not an XCP-69 launch. */}
-          <Num>{priceText(r.paid, r.earned, r.divisible)}</Num>
-          <Num strong>{compact(tokenQty(r.earned, r.divisible))}</Num>
-          <Num strong>{fixedRaw(r.paid)}</Num>
+          <Num>{priceText(r.paid, r.earned, r.divisible, num)}</Num>
+          <Num strong>{num.compact(tokenQty(r.earned, r.divisible))}</Num>
+          <Num strong>{num.fixedRaw(r.paid)}</Num>
           <Who address={r.source} />
           <Cell right>
             <span className="text-xs text-gray-500 dark:text-gray-400">{t(MINT_STATUS[r.phase])}</span>
@@ -352,6 +355,7 @@ const MINT_STATUS: Record<ActivityMint["phase"], string> = {
 };
 
 function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <Tape columns={[msg("When"), msg("Asset"), msg("Side"), msg("Price"), msg("Amount"), "XCP", msg("Trader"), msg("Venue")]}>
@@ -369,9 +373,9 @@ function TradeTape({ rows, height }: { rows: ActivityTrade[]; height?: number })
                 {r.side === "buy" ? t("Buy") : t("Sell")}
               </Pill>
             </Cell>
-            <Num>{priceText(xcp, tokens, r.divisible)}</Num>
-            <Num strong>{compact(tokenQty(tokens, r.divisible))}</Num>
-            <Num strong>{fixedRaw(xcp)}</Num>
+            <Num>{priceText(xcp, tokens, r.divisible, num)}</Num>
+            <Num strong>{num.compact(tokenQty(tokens, r.divisible))}</Num>
+            <Num strong>{num.fixedRaw(xcp)}</Num>
             <Who address={r.address} />
             <Cell right>
               <span className="text-xs text-gray-500 dark:text-gray-400">{r.venue}</span>
@@ -418,6 +422,7 @@ function TapePager({
 }
 
 function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <Tape columns={[msg("When"), msg("Asset"), msg("Event"), msg("Amount"), msg("Burner"), msg("Destination")]}>
@@ -428,7 +433,7 @@ function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
           <Cell>
             <Pill tone="orange">{t("Burn")}</Pill>
           </Cell>
-          <Num strong>{compact(tokenQty(r.quantity, true))}</Num>
+          <Num strong>{num.compact(tokenQty(r.quantity, true))}</Num>
           <Who address={r.source} />
           <Cell right>
             <a
@@ -470,6 +475,7 @@ function BurnTape({ rows, height }: { rows: ActivityBurn[]; height?: number }) {
  * filled row, which is the least informative number available.
  */
 function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <Tape columns={[msg("When"), msg("Asset"), msg("Side"), msg("Price"), msg("Size"), "XCP", msg("Maker"), msg("Status")]}>
@@ -498,12 +504,12 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
                 {r.side === "buy" ? t("Bid") : t("Ask")}
               </Pill>
             </Cell>
-            <Num dim={done}>{priceText(r.xcpQuantity, r.tokenQuantity, r.divisible)}</Num>
+            <Num dim={done}>{priceText(r.xcpQuantity, r.tokenQuantity, r.divisible, num)}</Num>
             <Num strong dim={done}>
-              {compact(tokenQty(r.tokenQuantity, r.divisible))}
+              {num.compact(tokenQty(r.tokenQuantity, r.divisible))}
             </Num>
             <Num strong dim={done}>
-              {fixedRaw(r.xcpQuantity)}
+              {num.fixedRaw(r.xcpQuantity)}
             </Num>
             <Who address={r.source} dim={done} />
             <Cell right>
@@ -572,6 +578,7 @@ const STATE_TONE: Record<ActivityOrder["state"], Tone> = {
  * so with an em dash rather than a misleading zero.
  */
 function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <Tape columns={[msg("When"), msg("Pool"), msg("Event"), msg("Price"), msg("Tokens"), "XCP", msg("Address"), "LP"]}>
@@ -598,10 +605,10 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
             <Cell>
               <Pill tone={POOL_TONE[r.kind]}>{t(POOL_LABEL[r.kind])}</Pill>
             </Cell>
-            <Num>{vsXcp ? priceText(r.counterQuantity, r.assetQuantity, r.assetDivisible) : "—"}</Num>
-            <Num strong>{compact(tokenQty(r.assetQuantity, r.assetDivisible))}</Num>
+            <Num>{vsXcp ? priceText(r.counterQuantity, r.assetQuantity, r.assetDivisible, num) : "—"}</Num>
+            <Num strong>{num.compact(tokenQty(r.assetQuantity, r.assetDivisible))}</Num>
             <Num strong>
-              {vsXcp ? fixedRaw(r.counterQuantity) : "—"}
+              {vsXcp ? num.fixedRaw(r.counterQuantity) : "—"}
             </Num>
             <Who address={r.source} />
             <Cell right>
@@ -610,7 +617,7 @@ function PoolTape({ rows, height }: { rows: ActivityPoolEvent[]; height?: number
               <span className="block text-xs text-gray-900 dark:text-gray-100 tabular-nums">
                 {r.lpQuantity === null
                   ? "—"
-                  : `${r.kind === "withdraw" ? "−" : r.kind === "deposit" ? "+" : ""}${compact(
+                  : `${r.kind === "withdraw" ? "−" : r.kind === "deposit" ? "+" : ""}${num.compact(
                       tokenQty(r.lpQuantity, true),
                     )}`}
               </span>
@@ -641,6 +648,7 @@ const POOL_TONE: Record<PoolEventKind, Tone> = {
 };
 
 function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <Tape columns={[msg("When"), msg("Asset"), msg("Phase"), msg("Price"), msg("Hard cap"), msg("Raised"), msg("Creator"), msg("Mints")]}>
@@ -652,9 +660,9 @@ function LaunchTape({ rows, height }: { rows: ActivityLaunch[]; height?: number 
             <Pill tone={PHASE_TONE[r.phase]}>{t(PHASE_LABEL[r.phase])}</Pill>
           </Cell>
           {/* The standard's own price: XCP per quantity_by_price tokens. */}
-          <Num>{priceText(r.price, r.quantityByPrice, r.divisible)}</Num>
-          <Num strong>{compact(tokenQty(r.hardCap, r.divisible))}</Num>
-          <Num strong>{fixedRaw(r.paid)}</Num>
+          <Num>{priceText(r.price, r.quantityByPrice, r.divisible, num)}</Num>
+          <Num strong>{num.compact(tokenQty(r.hardCap, r.divisible))}</Num>
+          <Num strong>{num.fixedRaw(r.paid)}</Num>
           <Who address={r.source} />
           {/* Two lines, the same shape the When cell uses: the count the
               column is named for, and the one that qualifies it. "3 · 3" under
@@ -753,6 +761,7 @@ function When({
   /** Terminal rows step back so the live ones read as foreground. */
   dim?: boolean;
 }) {
+  const num = useNumbers();
   const t = useT();
   const label =
     block === null
@@ -766,7 +775,7 @@ function When({
         {label}
       </span>
       <span className="block text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">
-        {block === null ? "—" : `#${block.toLocaleString("en-US")}`}
+        {block === null ? "—" : `#${num.commas(block)}`}
       </span>
     </>
   );
@@ -904,7 +913,12 @@ const abs = (raw: RawLike): bigint => {
  * column of prices lines up on the decimal point: 0.00003152 and 10.00000000
  * are instantly comparable, where "0.00003152" above "10" is not.
  */
-function priceText(xcpRaw: RawLike, tokenRaw: RawLike, divisible: boolean): string {
+function priceText(
+  xcpRaw: RawLike,
+  tokenRaw: RawLike,
+  divisible: boolean,
+  num: Numbers,
+): string {
   if (big(tokenRaw) === 0n) return "—";
-  return (ratio(xcpRaw, tokenRaw) / (divisible ? 1 : 1e8)).toFixed(8);
+  return num.fixed(ratio(xcpRaw, tokenRaw) / (divisible ? 1 : 1e8), 8);
 }

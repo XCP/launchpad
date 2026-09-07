@@ -1,13 +1,13 @@
 "use client";
 
 import useSWR from "swr";
-import { commasRaw, price as formatPrice } from "@/lib/format";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { ratio, type Raw } from "@/lib/numeric";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 interface OpenOrder {
   tx_hash: string;
@@ -40,6 +40,7 @@ export function OrdersTab({
   /** Only a wallet's own profile can cancel; a public one is read-only. */
   canCancel: boolean;
 }) {
+  const num = useNumbers();
   const t = useT();
   const compose = useCompose();
   const { data: orders, mutate } = useSWR<OpenOrder[]>(
@@ -82,17 +83,17 @@ export function OrdersTab({
                     <a href={`/${token}`} className="font-medium hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
                       {token}
                     </a>{" "}
-                    {commasRaw(tokens)} @ {formatPrice(ratio(xcp, tokens))}
+                    {num.commasRaw(tokens)} @ {num.price(ratio(xcp, tokens))}
                   </>
                 ) : (
                   <>
                     <span className="font-medium text-gray-700 dark:text-gray-300">{t("Swap")}</span>{" "}
-                    {commasRaw(o.give_quantity)} {o.give_asset} → {commasRaw(o.get_quantity)} {o.get_asset}
+                    {num.commasRaw(o.give_quantity)} {o.give_asset} → {num.commasRaw(o.get_quantity)} {o.get_asset}
                   </>
                 )}
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                   {t("{pct}% filled", { pct: (filled * 100).toFixed(0) })} ·{" "}
-                  {o.expire_index === null ? "GTC" : t("expires block {n}", { n: o.expire_index.toLocaleString() })}
+                  {o.expire_index === null ? "GTC" : t("expires block {n}", { n: num.commas(o.expire_index) })}
                 </span>
               </div>
               {canCancel && (

@@ -4,13 +4,13 @@ import { msg } from "@/lib/i18n/t";
 import { LazyLink } from "@/components/lazy-link";
 import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
-import { CurrencySubmenu, LanguageItems, LanguageSwitch } from "@/components/language-switch";
+import { CurrencySubmenu, LanguageSubmenu, LanguageSwitch } from "@/components/language-switch";
 import { usePathname } from "next/navigation";
 import { useT } from "@/lib/i18n/client";
 import { splitLocale } from "@/lib/i18n/locales";
 import { MempoolChip, useMempoolCount } from "@/components/mempool-chip";
 import { RewardsChip } from "@/components/rewards-chip";
-import { TELEGRAM_URL, TelegramChip } from "@/components/telegram-chip";
+import { TelegramChip } from "@/components/telegram-chip";
 
 /**
  * The site header.
@@ -53,12 +53,18 @@ const LINKS = [
 ];
 
 /** Secondary, and kept beside the wallet per the header's reading order:
- *  what you came to do on the left, what you look up on the right. */
+ *  what you came to do on the left, what you look up on the right.
+ *
+ *  Docs is not here. It is the longest word of the four in most languages
+ *  (Documentación, Документація, ドキュメント) and the least urgent: nobody
+ *  arrives needing the specification, and the people who do want it will
+ *  find it. Dropping one item buys every language the room the English row
+ *  never needed, and it still has two homes — the phone menu and the
+ *  footer — so nothing became unreachable. */
 const SECONDARY = [
   { href: "/activity", label: msg("Activity") },
   { href: "/stats", label: msg("Stats") },
   { href: "/faq", label: msg("FAQ") },
-  { href: "/docs", label: msg("Docs") },
 ];
 
 /** Both chips are links in the header rather than in this row — but the phone
@@ -70,6 +76,7 @@ const SECONDARY = [
 const MENU_EXTRA = [
   { href: "/rewards", label: msg("XCP Rewards") },
   { href: "/mempool", label: msg("Mempool") },
+  { href: "/docs", label: msg("Docs") },
 ];
 
 export function SiteHeader() {
@@ -217,7 +224,14 @@ function MobileMenu() {
         <DM.Content
           align="end"
           sideOffset={8}
-          className="modal-pop z-50 w-48 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1.5 shadow-lg"
+          collisionPadding={12}
+          // w-48 is what the longest language name needs on its row before it
+          // truncates: 繁體中文（香港）. The submenu is the same width and
+          // overlaps this menu when it opens, because 390px will not hold two
+          // side by side and a covered parent reads better than a clipped
+          // name. max-h is Radix's own measurement of the room below the
+          // trigger, so the menu can never again run past the fold.
+          className="modal-pop z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] w-48 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-1.5 shadow-lg"
         >
           {LINKS.map((l) => (
             <DM.Item key={l.href} asChild>
@@ -235,24 +249,19 @@ function MobileMenu() {
             </DM.Item>
           ))}
           <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
-          {/* Languages, each in its own name — the one section of this menu a
-              visitor who cannot read the rest still needs to find — and the
-              currency beneath them, as in the desktop globe menu. */}
-          <LanguageItems path={path} />
-          <CurrencySubmenu />
-          <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
-          {/* An external destination, so it says so — the menu is the index of
-              the site and this is the one row that leaves it. */}
-          <DM.Item asChild>
-            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className={item}>
-              Telegram ↗
-            </a>
-          </DM.Item>
-          <DM.Item asChild>
-            <LazyLink href="/create" className={item}>
-              {t("Create a launch")}
-            </LazyLink>
-          </DM.Item>
+          {/* Language and currency, each a submenu. Listed inline they were
+              eleven rows and thirty-one, and this menu is the one place with
+              no room to spare: on a phone it is the whole navigation. Both
+              triggers name what is in force, so the choice is still visible
+              without opening either. */}
+          <LanguageSubmenu path={path} />
+          <CurrencySubmenu overlap />
+          {/* Telegram and Create used to end this menu and no longer do. Both
+              were duplicates of something already on the phone's screen: the
+              paper plane is a chip in this very header, and Create is the
+              button beside the search on the front page. A menu that has to
+              fit on one screen spends its rows on the pages with no other
+              way in. */}
         </DM.Content>
       </DM.Portal>
     </DM.Root>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useT } from "@/lib/i18n/client";
 import { FOCUS } from "@/components/ui/tokens";
 
 /** Smashable without hammering the API: the button always responds, but a
@@ -18,6 +19,7 @@ const MANUAL_REFRESH_DEBOUNCE_MS = 10_000;
  * a cooldown is two chances for one of them to become a different number.
  */
 export function RefreshButton({ onRefresh }: { onRefresh: () => void }) {
+  const t = useT();
   const [now, setNow] = useState(() => Date.now());
   const [lastManual, setLastManual] = useState(0);
 
@@ -39,7 +41,7 @@ export function RefreshButton({ onRefresh }: { onRefresh: () => void }) {
         onRefresh();
       }}
       aria-disabled={cooling}
-      aria-label="Refresh"
+      aria-label={t("Refresh")}
       className={`flex size-7 items-center justify-center rounded-full transition-colors ${FOCUS} ${
         cooling
           ? "cursor-default text-gray-300 dark:text-gray-600"
