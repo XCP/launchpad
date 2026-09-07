@@ -198,9 +198,11 @@ function attemptFetch(path: string, revalidate: number): Promise<Response> {
  * to more than half a minute — and it showed: /zh/swap and /ko/swap were
  * cancelled after 40 seconds of wall time having burned 4ms of CPU, waiting.
  * A build has no such limit because nobody is waiting and the page budget is
- * 180 seconds.
+ * 180 seconds. Fifteen seconds rather than ten because the other caller of
+ * this path is background ISR revalidation, and a revalidation that gives up
+ * six times stops being retried at all.
  */
-const RUNTIME_BUDGET_MS = 12_000;
+const RUNTIME_BUDGET_MS = 15_000;
 
 async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
   const building = process.env.NEXT_PHASE === "phase-production-build";

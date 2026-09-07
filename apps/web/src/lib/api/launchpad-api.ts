@@ -59,6 +59,14 @@ interface WorkerBinding {
 const BUILD_DEADLINE_MS = 20_000;
 
 /**
+ * The deadline for a server render that is not a build — in practice, an ISR
+ * revalidation running in the background queue. Longer than the two to six
+ * seconds these call sites ask for, because those numbers were chosen for a
+ * browser, and shorter than a build's because the queue does hold a slot.
+ */
+const SERVER_DEADLINE_MS = 10_000;
+
+/**
  * How long a server render may reuse an answer from this API when the caller
  * names no window of its own.
  *
@@ -97,14 +105,21 @@ async function launchpadApiFetch(path: string, init: NextFetchInit = {}): Promis
     if (init.next?.revalidate === undefined) {
       init.next = { ...init.next, revalidate: SERVER_REVALIDATE_S };
     }
-    // Only a build gets the longer deadline. Static generation saturates every
-    // core, so a three-second timer there can expire before its fetch is even
-    // issued — a 0ms "aborted due to timeout" that costs the page its indexed
-    // read. A revalidation render has a visitor waiting behind it and keeps
-    // the deadline its caller chose.
-    if (process.env.NEXT_PHASE === "phase-production-build") {
-      init.signal = AbortSignal.timeout(BUILD_DEADLINE_MS);
-    }
+    // Deadlines here were written for a visitor waiting on a fetch. No server
+    // render is that. A build has nobody waiting at all, and an ISR
+    // revalidation runs in the background queue after the visitor has already
+    // been served the cached page — so in both, a short timer buys nothing and
+    // costs a lot.
+    //
+    // It cost exactly that: "The revalidation for xcp.fun/ko/swap has failed
+    // after 6 retries. It will not be tried again", alongside fourteen
+    // TimeoutErrors in one queue invocation. A page that stops revalidating is
+    // a far worse outcome than a background render taking ten seconds.
+    init.signal = AbortSignal.timeout(
+      process.env.NEXT_PHASE === "phase-production-build"
+        ? BUILD_DEADLINE_MS
+        : SERVER_DEADLINE_MS,
+    );
   }
 
   if (typeof window === "undefined") {
