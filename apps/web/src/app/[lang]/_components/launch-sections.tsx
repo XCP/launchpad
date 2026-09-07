@@ -603,7 +603,7 @@ function Section({
         </h2>
 
         {showControls && (
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex min-w-0 shrink items-center gap-2">
             {/* USD or XCP for every return, price and cap in this section: the
                 same switch the price chart has, with the same default. Shown
                 on phones too, unlike the Trading Data link beside it, because
@@ -784,10 +784,16 @@ function SortMenu({
     <DM.Root>
       <DM.Trigger
         aria-label={label}
-        className="flex items-center gap-1 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
+        className="flex min-w-0 items-center gap-1 rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-gray-300 transition-colors hover:border-gray-300 dark:hover:border-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500"
       >
-        <span className="text-gray-400 dark:text-gray-500">{t("Sort:")}</span>
-        {t(active.label)}
+        {/* The word "Sort" is the first thing to go on a phone: the button
+            already says what it sorts by, the accessible name says the rest,
+            and in a language where the label is "Сортировка: Капитализация"
+            keeping both pushes the toolbar past the screen. The value then
+            truncates rather than overflowing, so no language can widen this
+            row beyond the space it has. */}
+        <span className="hidden text-gray-400 dark:text-gray-500 sm:inline">{t("Sort:")}</span>
+        <span className="truncate">{t(active.label)}</span>
         {/* Chevron, drawn rather than shipped as an icon dependency. */}
         <svg viewBox="0 0 16 16" className="size-3 text-gray-400 dark:text-gray-500" aria-hidden="true">
           <path
