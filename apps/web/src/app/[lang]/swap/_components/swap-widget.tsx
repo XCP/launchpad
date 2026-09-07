@@ -743,7 +743,7 @@ export function SwapWidget({
                 }`}
                 title={
                   minBelowMempool
-                    ? t("Above what the pending orders would leave. If they confirm first, this order rests for a block and refunds instead of filling — raise the slippage or use Auto.")
+                    ? t("Pending orders may leave less than your minimum received. If they confirm first, any unfilled amount stays open until expiry and is then returned. Review slippage or use Auto.")
                     : undefined
                 }
               >

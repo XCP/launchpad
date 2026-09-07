@@ -531,7 +531,7 @@ function LoadCard({
           </p>
         ) : (
           <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-            {t("Broadcast legs are final — each is its own transaction. Failed legs can be retried.")}
+            {t("Each route is a separate transaction. Broadcast routes cannot be canceled here. Failed routes can be retried.")}
           </p>
         )}
       </div>
@@ -713,7 +713,7 @@ function LoadCard({
             </div>
             <div className="flex justify-between">
               <dt>{t("Arrival")}</dt>
-              <dd>{t("next block after BTC confirms")}</dd>
+              <dd>{t("when the BTC payment confirms")}</dd>
             </div>
           </dl>
         )}

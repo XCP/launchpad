@@ -600,7 +600,7 @@ export function TradePanel({
             </div>
             {fillPct !== null && (
               <div className="flex justify-between">
-                <dt>{t("Fills now")}</dt>
+                <dt>{t("Estimated fill")}</dt>
                 <dd
                   className={limitFillsNow ? "font-medium text-green-700 dark:text-green-400" : ""}
                 >

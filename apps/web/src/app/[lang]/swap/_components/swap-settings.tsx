@@ -242,7 +242,7 @@ export function SwapSettingsGear() {
         </p>
       ) : s.slippage > 5 ? (
         <p className="mt-2 text-[11px] text-red-600 dark:text-red-400">
-          {t("High slippage authorizes up to {pct}% price impact.", { pct: num.commas(s.slippage) })}
+          {t("Slippage tolerance of {pct}% permits receiving less than quoted.", { pct: num.commas(s.slippage) })}
         </p>
       ) : s.slippage < 0.5 ? (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
@@ -276,7 +276,7 @@ export function SwapSettingsGear() {
         </span>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        {t("How long an unfilled remainder rests before auto-refund. {n} = fill at confirmation or refund next block.", { n: MARKET_EXPIRATION })}
+        {t("How many blocks an unfilled remainder stays open before expiry. {n} is the shortest setting.", { n: MARKET_EXPIRATION })}
       </p>
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>
@@ -354,7 +354,7 @@ export function LimitSettingsGear() {
         {t("The Bitcoin miner fee. Default tracks the next-block median.")}
       </p>
       <div className="mt-3 border-t border-gray-100 dark:border-gray-800 pt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        {t("A resting order refunds in full at expiry — the price you set is enforced by the order itself.")}
+        {t("Any unfilled amount is returned at expiry. The order enforces your limit price.")}
       </div>
     </GearPopover>
   );
@@ -408,7 +408,7 @@ export function LiquiditySettingsGear() {
         </div>
       </div>
       <p className="mt-2 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
-        {t("If the pool moves past this before confirmation, the whole transaction is void — nothing is debited; only the miner fee is spent.")}
+        {t("If these limits cannot be met at confirmation, the liquidity operation is invalid. Pool assets are not debited; the Bitcoin network fee is still paid.")}
       </p>
       <div className="mt-3 flex items-center justify-between">
         <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{t("TX fee")}</span>

@@ -717,14 +717,8 @@
   "A refunded launch is not money lost. XCP-69 is all-or-nothing: one that misses its soft cap returns every satoshi by consensus, with no decision by us and no way for anyone to keep it.": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
-  "A resting order refunds in full at expiry — the price you set is enforced by the order itself.": [
-    "app/[lang]/swap/_components/swap-settings.tsx"
-  ],
   "About": [
     "app/[lang]/docs/page.tsx"
-  ],
-  "Above what the pending orders would leave. If they confirm first, this order rests for a block and refunds instead of filling — raise the slippage or use Auto.": [
-    "app/[lang]/swap/_components/swap-widget.tsx"
   ],
   "Across {n} fully exited position": [
     "app/[lang]/profile/_components/history-tab.tsx"
@@ -867,6 +861,9 @@
   "Any future block, {floor} — tighter than the presets go. Under ~2 hours pays double the network fee.": [
     "app/[lang]/create/page.tsx"
   ],
+  "Any unfilled amount is returned at expiry. The order enforces your limit price.": [
+    "app/[lang]/swap/_components/swap-settings.tsx"
+  ],
   "API base:": [
     "app/[lang]/docs/page.tsx"
   ],
@@ -993,9 +990,6 @@
   ],
   "Broadcast as {tx}. Minting opens at block {block} ({when}) — until then the launch is announced on-chain and nobody, you included, can mint. Then it runs for 1,000 blocks (~7 days): it sells out, or everyone is refunded.": [
     "app/[lang]/create/page.tsx"
-  ],
-  "Broadcast legs are final — each is its own transaction. Failed legs can be retried.": [
-    "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "Broadcast, waiting to confirm. Its page and editing open up once it lands in a block.": [
     "app/[lang]/profile/_components/launches-tab.tsx"
@@ -1538,6 +1532,9 @@
   "Each number counts unique addresses. A sale is a pool or order-book sale captured by xcp.fun. Dump means the address sold within {blocks} blocks of graduation. A meaningful balance is more than one token and more than 1% of the address's acquired amount.": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
+  "Each route is a separate transaction. Broadcast routes cannot be canceled here. Failed routes can be retried.": [
+    "app/[lang]/dispense/_components/bridge.tsx"
+  ],
   "Earned": [
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
@@ -1577,6 +1574,9 @@
   ],
   "Escrowed until the launch resolves: tokens if it sells out, full XCP refund if it doesn't.": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "Estimated fill": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
   "Event": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -1698,9 +1698,6 @@
   "Filled / expires": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
-  "Fills now": [
-    "app/[lang]/[asset]/_components/trade-panel.tsx"
-  ],
   "Find a launch by asset name, and sort or filter the results.": [
     "app/[lang]/_components/launch-search.tsx"
   ],
@@ -1801,9 +1798,6 @@
   "Hide minted": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
-  "High slippage authorizes up to {pct}% price impact.": [
-    "app/[lang]/swap/_components/swap-settings.tsx"
-  ],
   "Higher than this trade needs (~{pct}%).": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
@@ -1843,10 +1837,10 @@
   "How it works — xcp.fun": [
     "app/[lang]/faq/page.tsx"
   ],
-  "How long an unfilled remainder rests before auto-refund. {n} = fill at confirmation or refund next block.": [
+  "How long the order rests unfilled before the remainder auto-refunds.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
-  "How long the order rests unfilled before the remainder auto-refunds.": [
+  "How many blocks an unfilled remainder stays open before expiry. {n} is the shortest setting.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
   "How much your own swap moves the price. Larger swaps against the fixed reserves get a worse average price.": [
@@ -1868,7 +1862,7 @@
   "If launched": [
     "app/[lang]/profile/_components/minting-tab.tsx"
   ],
-  "If the pool moves past this before confirmation, the whole transaction is void — nothing is debited; only the miner fee is spent.": [
+  "If these limits cannot be met at confirmation, the liquidity operation is invalid. Pool assets are not debited; the Bitcoin network fee is still paid.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
   "Image": [
@@ -2403,9 +2397,6 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
-  "next block after BTC confirms": [
-    "app/[lang]/dispense/_components/bridge.tsx"
-  ],
   "No — a mint escrows XCP against the launch. If it graduates you hold the tokens; if it refunds you get every satoshi back. The only thing a mint actually costs you is the Bitcoin fee — which is the part this programme covers.": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
@@ -2787,6 +2778,9 @@
   "pending": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
     "app/[lang]/profile/_components/minting-tab.tsx"
+  ],
+  "Pending orders may leave less than your minimum received. If they confirm first, any unfilled amount stays open until expiry and is then returned. Review slippage or use Auto.": [
+    "app/[lang]/swap/_components/swap-widget.tsx"
   ],
   "People with xcp.fun open right now, including you. Several tabs from the same browser count once. Closing the tab removes you.": [
     "components/site-presence.tsx"
@@ -3261,6 +3255,9 @@
   ],
   "Slippage": [
     "app/[lang]/docs/page.tsx"
+  ],
+  "Slippage tolerance of {pct}% permits receiving less than quoted.": [
+    "app/[lang]/swap/_components/swap-settings.tsx"
   ],
   "Slippage: {pct}%": [
     "app/[lang]/swap/_components/swap-widget.tsx"
@@ -3742,6 +3739,9 @@
   ],
   "When do I get paid?": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
+  ],
+  "when the BTC payment confirms": [
+    "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "Where do I get the XCP to mint with?": [
     "app/[lang]/faq/page.tsx"
