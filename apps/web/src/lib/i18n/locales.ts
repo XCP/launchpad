@@ -29,8 +29,15 @@
  * Portuguese readers are, and Portugal reads Brazilian fine. French is one
  * locale for France, Belgium, Switzerland, Québec and the Maghreb, in the
  * neutral register French crypto interfaces use (vous, portefeuille).
+ *
+ * Russian and Ukrainian ship together. Russian reaches Belarus, Kazakhstan
+ * and the rest of the CIS as well as Russia, so a Belarusian or Kazakh
+ * browser is offered Russian; Ukrainian is its own locale so a Ukrainian
+ * browser is never handed Russian. Neither currency is quoted by the ECB
+ * (the rouble was dropped in 2022, the hryvnia never listed), so both keep
+ * dollars, which is what both markets price in anyway.
  */
-export const LOCALES = ["en", "ja", "zh", "zh-tw", "zh-hk", "es", "ko", "pt", "fr"] as const;
+export const LOCALES = ["en", "ja", "zh", "zh-tw", "zh-hk", "es", "ko", "pt", "fr", "ru", "uk"] as const;
 
 export type Locale = (typeof LOCALES)[number];
 
@@ -67,6 +74,8 @@ export const LOCALE_INFO: Record<Locale, LocaleInfo> = {
   ko: { native: "한국어", tag: "ko", intl: "ko-KR", og: "ko_KR", dir: "ltr", myriads: true },
   pt: { native: "Português", tag: "pt-BR", intl: "pt-BR", og: "pt_BR", dir: "ltr", myriads: false },
   fr: { native: "Français", tag: "fr", intl: "fr-FR", og: "fr_FR", dir: "ltr", myriads: false },
+  ru: { native: "Русский", tag: "ru", intl: "ru-RU", og: "ru_RU", dir: "ltr", myriads: false },
+  uk: { native: "Українська", tag: "uk", intl: "uk-UA", og: "uk_UA", dir: "ltr", myriads: false },
 };
 
 export function isLocale(value: unknown): value is Locale {
@@ -91,6 +100,8 @@ export function matchLocale(tag: string): Locale | null {
   if (language === "ko") return "ko";
   if (language === "pt") return "pt";
   if (language === "fr") return "fr";
+  if (language === "uk") return "uk";
+  if (language === "ru" || language === "be" || language === "kk") return "ru";
   if (language === "yue") return "zh-hk";
   if (language === "zh") {
     if (parts.has("hk") || parts.has("mo")) return "zh-hk";

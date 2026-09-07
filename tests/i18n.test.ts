@@ -117,3 +117,15 @@ describe("Portuguese and French", () => {
     expect(localePath("fr", "/")).toBe("/fr");
   });
 });
+
+describe("Russian and Ukrainian", () => {
+  it("keeps Ukrainian its own locale and folds the CIS into Russian", () => {
+    expect(matchLocale("uk")).toBe("uk");
+    expect(matchLocale("uk-UA")).toBe("uk");
+    expect(matchLocale("ru-RU")).toBe("ru");
+    expect(matchLocale("be")).toBe("ru");
+    expect(matchLocale("kk-KZ")).toBe("ru");
+    expect(splitLocale("/uk/faq")).toEqual({ locale: "uk", path: "/faq" });
+    expect(localePath("ru", "/")).toBe("/ru");
+  });
+});
