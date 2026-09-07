@@ -44,7 +44,7 @@ const price = (market: Market, value: number | null, code: string, rate: number,
     options.minimumFractionDigits = 0;
     options.maximumFractionDigits = 0;
   }
-  return converted.toLocaleString(intlLocale(locale), options);
+  return converted.toLocaleString(japanese ? intlLocale(locale) : "en-US", options);
 };
 
 const percent = (value: number) =>

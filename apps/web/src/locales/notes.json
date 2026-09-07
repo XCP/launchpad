@@ -22,7 +22,6 @@
   "Failed on": "Stat label on a refunded launch: the date it failed.",
   "Sold out in": "Stat label on a graduated launch: how long the sale took to sell out.",
   "Closed": "Launch status: the sale is over, one way or the other.",
-  "closes": "Table header in the scheduled/minting list: when minting closes.",
   "closing": "Sort option: launches whose minting window ends soonest.",
   "Opens": "Table header: when minting opens.",
   "Announced": "Table header: when the launch was announced on-chain.",
@@ -58,5 +57,6 @@
   "vs pool": "Order book: how a resting order's price compares with the pool's.",
   "{n}× apart": "Order book: the best bid and ask are this many times apart.",
   "adjusts to {n}": "Mint panel: the amount will be rounded to the nearest whole lot.",
-  "at ATH": "Price is at its all-time high right now."
+  "at ATH": "Price is at its all-time high right now.",
+  "closes@@chart": "Price chart caption: closing prices, the series a line chart draws (\"Hourly closes\"). A noun."
 }

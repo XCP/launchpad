@@ -2,7 +2,7 @@
   "_about": "Fixed renderings of the site's own vocabulary, per locale. The draft script hands these to the model with every batch, and a reviewer changes a term here rather than in a hundred strings. A term with no entry for a locale is the model's call. Keep the note in English: it is the reviewer's brief.",
   "terms": {
     "fairminter": {
-      "note": "Counterparty's on-chain mint contract. A proper noun on this site. ZH: BRC-20 readers know 公平铸造 (fair mint). The Counterparty contract is the 合约. ES: proper noun, lowercase, glossed once as el contrato de acuñación justa. KO: loanword, as the BRC-20 community writes 페어민트. PT/FR: proper noun, lowercase, glossed once (o contrato de mint justo / le contrat de mint équitable).",
+      "note": "Counterparty's on-chain mint contract. A proper noun on this site. ZH: BRC-20 readers know 公平铸造 (fair mint). The Counterparty contract is the 合约. ES: proper noun, lowercase, glossed once as el contrato de acuñación justa. KO: loanword, as the BRC-20 community writes 페어민트. PT/FR: proper noun, lowercase, glossed once (o contrato de mint justo / le contrat de mint équitable). KO QA 2026-09-07: no Korean source names the contract; Runes coverage says 오픈 민트 for an open mint. 페어민터 kept as a loanword.",
       "ja": "フェアミンター",
       "zh": "公平铸造合约",
       "zh-tw": "公平鑄造合約",
@@ -245,7 +245,7 @@
       "zh": "兑换",
       "zh-tw": "兌換",
       "zh-hk": "兌換",
-      "note": "Uniswap and UniSat both. ES: UniSat's intercambiar; Uniswap says cambiar; the noun stays swap in casual Spanish. KO: 스왑. ES nav/tab label is Swap (the noun every Spanish DEX keeps); intercambiar stays as the verb in prose and on confirm buttons. Preguntas frecuentes overflowed the header, so the nav says FAQ. Nav/tab label Swap in both; the verb is trocar (Uniswap pt-BR) / échanger (Uniswap and UniSat fr).",
+      "note": "Uniswap and UniSat both. ES: UniSat's intercambiar; Uniswap says cambiar; the noun stays swap in casual Spanish. KO: 스왑. ES nav/tab label is Swap (the noun every Spanish DEX keeps); intercambiar stays as the verb in prose and on confirm buttons. Preguntas frecuentes overflowed the header, so the nav says FAQ. Nav/tab label Swap in both; the verb is trocar (Uniswap pt-BR) / échanger (Uniswap and UniSat fr). ES QA 2026-09-07: the draft had drifted to intercambio in prose; corrected to swap as the noun everywhere.",
       "es": "swap",
       "ko": "스왑",
       "pt": "swap",
@@ -331,7 +331,7 @@
       "zh": "内存池",
       "zh-tw": "記憶體池",
       "zh-hk": "內存池",
-      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存. MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept.",
+      "note": "Taiwan says 記憶體 for memory; Hong Kong and the mainland say 内存. MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it.",
       "es": "mempool",
       "ko": "멤풀",
       "pt": "mempool",
@@ -452,7 +452,7 @@
     },
     "miner fee": {
       "ja": "トランザクション手数料",
-      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费. MONAPARTY: both Japanese Counterparty wallets, Mpurse and Monapalette, label it トランザクション手数料; replaces マイナー手数料. ES: comisión (not tarifa) is how Spanish Bitcoin users say fee; UniSat writes tarifa de red. KO: 채굴 수수료 for the Bitcoin miner fee; 네트워크 수수료 is the generic word. PT: taxa (fee) as Uniswap pt-BR; taxa de rede is the generic network fee. FR: frais de minage; frais de réseau is the generic.",
+      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us. ZH: UniSat writes 网络费用 for the network fee; on this site the fee goes to miners, so 矿工费. MONAPARTY: both Japanese Counterparty wallets, Mpurse and Monapalette, label it トランザクション手数料; replaces マイナー手数料. ES: comisión (not tarifa) is how Spanish Bitcoin users say fee; UniSat writes tarifa de red. KO: 채굴 수수료 for the Bitcoin miner fee; 네트워크 수수료 is the generic word. PT: taxa (fee) as Uniswap pt-BR; taxa de rede is the generic network fee. FR: frais de minage; frais de réseau is the generic. KO QA: wallets and Uniswap label it 네트워크 수수료; 채굴 수수료 kept because it says who is paid.",
       "zh": "矿工费",
       "zh-tw": "礦工費",
       "zh-hk": "礦工費",
@@ -539,7 +539,7 @@
       "zh-hk": "滑點",
       "es": "deslizamiento",
       "ko": "슬리피지",
-      "note": "ES: deslizamiento (Uniswap and UniSat). KO: 슬리피지 is the common spelling; Uniswap's 슬리페이지 is rarer. Both communities keep the English word; Uniswap's deslizamento / glissement are understood but not what people say.",
+      "note": "ES: deslizamiento (Uniswap and UniSat). KO: 슬리피지 — Uniswap ko-KR itself writes 슬리피지 (25 hits, none for 슬리페이지).",
       "pt": "slippage",
       "fr": "slippage"
     },
@@ -690,6 +690,14 @@
     "surge": {
       "ja": "高騰",
       "note": "JAPANESE X: 高騰 for a price surge (XCP の高騰); 火を吹く and 億る are slang, not for UI."
+    },
+    "bounty": {
+      "es": "premio",
+      "note": "ES QA: premio, so it never collides with recompensas (rewards)."
+    },
+    "portfolio": {
+      "es": "portafolio",
+      "note": "ES QA: portafolio in Latin America; never cartera."
     }
   }
 }

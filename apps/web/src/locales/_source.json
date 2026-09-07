@@ -1180,11 +1180,11 @@
     "app/[lang]/[asset]/_components/launch-view.tsx",
     "app/[lang]/profile/_components/profile-view.tsx"
   ],
-  "closes": [
-    "app/[lang]/[asset]/_components/price-chart.tsx"
-  ],
   "Closes": [
     "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "closes@@chart": [
+    "app/[lang]/[asset]/_components/price-chart.tsx"
   ],
   "closing": [
     "app/[lang]/[asset]/_components/launch-view.tsx"

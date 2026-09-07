@@ -680,7 +680,7 @@ export function PriceChart({
             "{period} {kind} from every fill on the pair — pool and order book. Volume beneath in XCP; {volume} XCP is the busiest {bucket} shown. Trend {trend} over this range.",
             {
               period: bucketLabel === "hour" ? t("Hourly") : t("Daily"),
-              kind: mode === "line" ? t("closes") : t("candles"),
+              kind: mode === "line" ? t("closes", "chart") : t("candles"),
               volume: compact(fromSats(maxVol.toString())),
               bucket: bucketWord,
               trend: rising ? t("up") : t("down"),
