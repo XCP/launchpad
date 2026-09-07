@@ -331,7 +331,7 @@
       "zh": "内存池",
       "zh-tw": "記憶體池",
       "zh-hk": "記憶池",
-      "note": "Taiwan says 記憶體池 (CoinGlass zh-TW); Hong Kong says 記憶池 (OSL HK academy) — 內存 is the mainland computing word; the mainland says 内存池 (Foresight). MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it.",
+      "note": "Taiwan says 記憶體池 (CoinGlass zh-TW); Hong Kong says 記憶池 (OSL HK academy) — 內存 is the mainland computing word; the mainland says 内存池 (Foresight). MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it. JA REVIEW 2026-09-07: a Japanese reader took the header chip メンプール for main pool, so the chip alone says 未承認 (and pending/待确认 elsewhere) while the page and nav keep the jargon.",
       "es": "mempool",
       "ko": "멤풀",
       "pt": "mempool",

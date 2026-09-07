@@ -670,6 +670,7 @@
   "Maximum-mint addresses controlled": "支配する上限ミントアドレス",
   "Mempool": "メンプール",
   "Mempool — xcp.fun": "メンプール — xcp.fun",
+  "Mempool@@chip": "未承認",
   "Message format": "メッセージ形式",
   "Method and limits": "方法と限界",
   "Min LP · slippage {pct}%": "最小 LP · スリッページ {pct}%",

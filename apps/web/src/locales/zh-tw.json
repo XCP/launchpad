@@ -670,6 +670,7 @@
   "Maximum-mint addresses controlled": "控制的滿額鑄造地址",
   "Mempool": "記憶體池",
   "Mempool — xcp.fun": "記憶體池 — xcp.fun",
+  "Mempool@@chip": "待確認",
   "Message format": "訊息格式",
   "Method and limits": "方法與侷限",
   "Min LP · slippage {pct}%": "最少 LP · 滑點 {pct}%",

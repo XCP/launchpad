@@ -670,6 +670,7 @@
   "Maximum-mint addresses controlled": "Direcciones con acuñación máxima controladas",
   "Mempool": "Mempool",
   "Mempool — xcp.fun": "Mempool — xcp.fun",
+  "Mempool@@chip": "Pendientes",
   "Message format": "Formato del mensaje",
   "Method and limits": "Método y límites",
   "Min LP · slippage {pct}%": "LP mín. · deslizamiento {pct}%",

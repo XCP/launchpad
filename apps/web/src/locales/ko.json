@@ -670,6 +670,7 @@
   "Maximum-mint addresses controlled": "보유한 최대 민팅 주소 수",
   "Mempool": "멤풀",
   "Mempool — xcp.fun": "멤풀 — xcp.fun",
+  "Mempool@@chip": "대기 중",
   "Message format": "메시지 형식",
   "Method and limits": "방법과 한계",
   "Min LP · slippage {pct}%": "최소 LP · 슬리피지 {pct}%",

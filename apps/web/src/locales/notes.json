@@ -58,5 +58,6 @@
   "{n}× apart": "Order book: the best bid and ask are this many times apart.",
   "adjusts to {n}": "Mint panel: the amount will be rounded to the nearest whole lot.",
   "at ATH": "Price is at its all-time high right now.",
-  "closes@@chart": "Price chart caption: closing prices, the series a line chart draws (\"Hourly closes\"). A noun."
+  "closes@@chart": "Price chart caption: closing prices, the series a line chart draws (\"Hourly closes\"). A noun.",
+  "Mempool@@chip": "The amber header chip \"Mempool (2)\": a count of unconfirmed XCP-69 transactions waiting for a block. Translate the meaning (unconfirmed / pending), not the jargon; a Japanese reviewer read メンプール as main pool."
 }

@@ -57,7 +57,11 @@ export function MempoolChip({ className = "" }: { className?: string }) {
       <PendingDot />
       {/* Same count grammar as the tabs on /mempool — "Mints (3)" — so the
           chip and the page it opens read as one system. */}
-      <span>{t("Mempool")}</span>
+      {/* The chip has its own key: in English it says Mempool, but a reader
+          who has never met the word needs what it MEANS here — unconfirmed
+          transactions waiting — and a Japanese reviewer read メンプール as
+          "main pool". */}
+      <span>{t("Mempool", "chip")}</span>
       <span className="tabular-nums">({count})</span>
     </LazyLink>
   );
