@@ -5,8 +5,8 @@ import useSWR from "swr";
 import type { ChartCandle } from "@/lib/api/launchpad-api";
 import type { ChartResolution } from "@/lib/candles";
 import { monthDay } from "@/lib/chain-time";
-import { fromSats } from "@/lib/format";
-import { useFiat, useFxRate } from "@/lib/currency";
+import { fromSats, fiat } from "@/lib/format";
+import { useNumberLocale } from "@/lib/number-preference";
 import { useT } from "@/lib/i18n/client";
 import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import { big } from "@/lib/numeric";
@@ -122,8 +122,11 @@ export function PriceChart({
 }) {
   const num = useNumbers();
   const t = useT();
-  const usd = useFiat();
-  const { code } = useFxRate();
+  // Historical rates are USD. Today's FX preference cannot rewrite that
+  // history; only separators follow the independent number preference.
+  const numberLocale = useNumberLocale();
+  const usd = (value: number) => fiat(value, "USD", numberLocale);
+  const code = "USD";
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Plotted | null>(null);
   const [range, setRange] = useState<ChartRange>(() => defaultRange(candles));

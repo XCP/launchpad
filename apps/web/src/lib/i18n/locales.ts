@@ -17,13 +17,13 @@
  * region in vocabulary, not only in characters — Taiwan writes 軟體 and 網路
  * where Hong Kong writes 軟件 and 網絡 — so `zh-tw` and `zh-hk` are separate
  * files, derived from the Simplified draft with OpenCC's regional phrase
- * tables and then checked by hand.
+ * tables. Per-key status records which wording still needs human review.
  *
  * Spanish is one locale for the whole language. The site's Spanish readers
  * are in the Americas — Mexico, Venezuela, Argentina — so the draft is
- * Latin American in vocabulary (billetera, not cartera) and neutral enough
- * that Spain reads it without noticing. Korean is one locale and one
- * currency, and counts in 만/억 like Japanese and Chinese.
+ * Latin American in vocabulary. Keep a shared base until reviewed regional
+ * wording warrants overrides; Spain's number formatting is independently
+ * selectable. Korean uses 만/억 compact display. Fiat is a separate choice.
  *
  * Portuguese is Brazilian (`pt`, tagged pt-BR): Brazil is where the site's
  * Portuguese readers are, and Portugal reads Brazilian fine. French is one

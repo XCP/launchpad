@@ -18,10 +18,10 @@ export function ErrorBanner({
   const t = useT();
   if (!children) return null;
   return (
-    <p
+    <div role="alert"
       className={`flex items-start justify-between gap-2 rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-sm text-red-700 dark:text-red-400 ${className}`}
     >
-      <span>{children}</span>
+      <div className="min-w-0">{children}</div>
       {onDismiss && (
         <button
           type="button"
@@ -32,6 +32,6 @@ export function ErrorBanner({
           ×
         </button>
       )}
-    </p>
+    </div>
   );
 }

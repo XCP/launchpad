@@ -4,8 +4,7 @@ import { useCallback, useSyncExternalStore } from "react";
 import { trackEvent } from "@/lib/analytics";
 import { fetchFxRates } from "@/lib/api/launchpad-api";
 import { fiat } from "@/lib/format";
-import { useLocale } from "@/lib/i18n/client";
-import { type Locale, splitLocale } from "@/lib/i18n/locales";
+import { useNumberLocale } from "@/lib/number-preference";
 
 /**
  * Which currency the site's fiat figures are shown in.
@@ -81,9 +80,9 @@ export interface CurrencyState {
 
 const PREF_KEY = "xcpfun:currency:v1";
 const FX_KEY = "xcpfun:fx:v1";
-const EVENT = "xcpfun:currency";
 /** The ECB publishes once a business day; twice a day is plenty. */
 const FX_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+const FX_RETRY_MS = 60 * 1000;
 
 const SERVER: CurrencyState = {
   code: "USD",
@@ -98,28 +97,11 @@ function isCurrency(value: unknown): value is Currency {
 }
 
 /**
- * What the page and the browser imply: Japan, Hong Kong, Korea, Brazil,
- * and the euro for French pages.
- *
- * Dollars are the default for everyone. The markets the site goes out of
- * its way to meet in their own currency are the ones it speaks the language
- * of AND whose currency the ECB quotes: yen for Japan, Hong Kong dollars for
- * Hong Kong, won for Korea, reais for Brazil. French pages default to euros
- * because France and Belgium are most of their readers; a Swiss or Québécois
- * reader picks CHF or CAD from the menu. Spanish readers span a dozen
- * currencies, so they get dollars, which Latin America prices in anyway. Taiwan reads its own
- * page but keeps US dollars — the ECB does
- * not quote TWD, and Taiwanese traders price in USDT anyway — and Simplified
- * Chinese readers are scattered across the mainland, Singapore and Malaysia,
- * where no single currency is right, so they get dollars too. First the page
- * itself: a visitor reading the Japanese site sees yen, because the language
- * you read in and the currency you think in are one decision to most people.
- * Then the browser's language — `maximize()` fills in the likely region for
- * a bare "ja", so it resolves like "ja-JP" — and the timezone, which says
- * where the machine thinks it is. Any one is enough, and an explicit currency
- * choice in the menu overrides all of them.
+ * Auto uses the browser's language and timezone, with dollars as the
+ * fallback. The page's language is independent: reading a translation
+ * never changes the currency. An explicit choice, including USD, overrides
+ * detection. `maximize()` gives a bare browser tag such as "ja" its region.
  */
-const PAGE_CURRENCY: Partial<Record<Locale, Currency>> = { ja: "JPY", "zh-hk": "HKD", ko: "KRW", pt: "BRL", fr: "EUR" };
 const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD", KR: "KRW", BR: "BRL", FR: "EUR", BE: "EUR", LU: "EUR", MC: "EUR" };
 const TIMEZONE_CURRENCY: Record<string, Currency> = {
   "Asia/Tokyo": "JPY",
@@ -134,10 +116,6 @@ const TIMEZONE_CURRENCY: Record<string, Currency> = {
 
 function detect(): Currency {
   if (typeof navigator === "undefined") return "USD";
-  if (typeof location !== "undefined") {
-    const fromPage = PAGE_CURRENCY[splitLocale(location.pathname).locale];
-    if (fromPage) return fromPage;
-  }
   const tags = navigator.languages?.length ? navigator.languages : [navigator.language];
   for (const tag of tags) {
     try {
@@ -161,13 +139,17 @@ function detect(): Currency {
   return "USD";
 }
 
+let preference: Currency | null | undefined;
+
 function readPreference(): Currency | null {
+  if (preference !== undefined) return preference;
   try {
     const stored = localStorage.getItem(PREF_KEY);
-    return isCurrency(stored) ? stored : null;
+    preference = isCurrency(stored) ? stored : null;
   } catch {
-    return null;
+    preference = null;
   }
+  return preference;
 }
 
 interface StoredFx {
@@ -176,16 +158,20 @@ interface StoredFx {
   rates: Record<string, number>;
 }
 
-function readFx(): StoredFx | null {
+let fx: StoredFx | null | undefined;
+
+function parseFx(raw: string | null): StoredFx | null {
   try {
-    const raw = localStorage.getItem(FX_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<StoredFx>;
     if (
       typeof parsed.fetchedAt !== "number" ||
+      !Number.isFinite(parsed.fetchedAt) ||
+      parsed.fetchedAt > Date.now() ||
       typeof parsed.date !== "string" ||
       typeof parsed.rates !== "object" ||
-      parsed.rates === null
+      parsed.rates === null ||
+      Array.isArray(parsed.rates)
     ) {
       return null;
     }
@@ -195,8 +181,21 @@ function readFx(): StoredFx | null {
   }
 }
 
+function readFx(): StoredFx | null {
+  if (fx !== undefined) return fx;
+  try {
+    fx = parseFx(localStorage.getItem(FX_KEY));
+  } catch {
+    fx = null;
+  }
+  return fx;
+}
+
 let snapshot: CurrencyState | null = null;
 let fetching = false;
+let retryAt = 0;
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+const subscribers = new Set<() => void>();
 
 function compute(): CurrencyState {
   const preference = readPreference();
@@ -205,54 +204,68 @@ function compute(): CurrencyState {
   if (code === "USD") return { code, auto: preference === null, detected, rate: 1, date: null };
   const fx = readFx();
   const rate = fx?.rates[code];
+  const usableRate = typeof rate === "number" && Number.isFinite(rate) && rate > 0 ? rate : null;
   return {
     code,
     auto: preference === null,
     detected,
-    rate: typeof rate === "number" && rate > 0 ? rate : null,
-    date: fx?.date ?? null,
+    rate: usableRate,
+    date: usableRate === null ? null : fx?.date ?? null,
   };
 }
 
-/** Fetch the table when a non-dollar currency has none, or one older than a
- *  trading day. Never for dollars, and never twice for one table: a fresh
- *  table that lacks the chosen code leaves that code in dollars until the
- *  next refresh, rather than refetching on every render — a fetch that
- *  resolves invalidates the snapshot, which re-renders, which would ask
- *  again, forever. */
-function ensureRates(state: CurrencyState) {
-  if (state.code === "USD" || fetching) return;
-  const fx = readFx();
-  if (fx && Date.now() - fx.fetchedAt < FX_MAX_AGE_MS) return;
+function clearRefreshTimer() {
+  if (refreshTimer !== null) clearTimeout(refreshTimer);
+  refreshTimer = null;
+}
+
+/** One timer and request for the whole store, started by subscriptions, not
+ *  renders. A fresh table missing a currency still waits for its TTL. Failed
+ *  requests keep any usable rate and retry with a delay, including in a tab
+ *  that stays open overnight. */
+function refreshRates() {
+  clearRefreshTimer();
+  if (subscribers.size === 0 || read().code === "USD" || fetching) return;
+  const table = readFx();
+  const dueAt = Math.max(table ? table.fetchedAt + FX_MAX_AGE_MS : 0, retryAt);
+  const delay = dueAt - Date.now();
+  if (delay > 0) {
+    refreshTimer = setTimeout(refreshRates, delay);
+    return;
+  }
   fetching = true;
   void fetchFxRates()
     .then((result) => {
-      if (!result) return;
+      if (!result) {
+        retryAt = Date.now() + FX_RETRY_MS;
+        return;
+      }
+      fx = { fetchedAt: Date.now(), date: result.date, rates: result.rates };
+      retryAt = 0;
       try {
-        localStorage.setItem(
-          FX_KEY,
-          JSON.stringify({ fetchedAt: Date.now(), date: result.date, rates: result.rates }),
-        );
+        localStorage.setItem(FX_KEY, JSON.stringify(fx));
       } catch {
-        // Private mode: the rate still applies for this page via the snapshot.
+        // The in-memory table still applies when persistence is unavailable.
       }
       invalidate();
     })
+    .catch(() => {
+      retryAt = Date.now() + FX_RETRY_MS;
+    })
     .finally(() => {
       fetching = false;
+      refreshRates();
     });
 }
 
 function invalidate() {
   snapshot = null;
-  window.dispatchEvent(new Event(EVENT));
+  subscribers.forEach((onChange) => onChange());
+  refreshRates();
 }
 
 function read(): CurrencyState {
-  if (!snapshot) {
-    snapshot = compute();
-    ensureRates(snapshot);
-  }
+  if (!snapshot) snapshot = compute();
   return snapshot;
 }
 
@@ -260,23 +273,39 @@ function readServer(): CurrencyState {
   return SERVER;
 }
 
+function onStorage(e: StorageEvent) {
+  if (e.key !== PREF_KEY && e.key !== FX_KEY && e.key !== null) return;
+  if (e.key === PREF_KEY || e.key === null) {
+    preference = isCurrency(e.newValue) ? e.newValue : null;
+  }
+  if (e.key === FX_KEY || e.key === null) fx = parseFx(e.newValue);
+  invalidate();
+}
+
 function subscribe(onChange: () => void) {
-  const onStorage = (e: StorageEvent) => {
-    if (e.key === PREF_KEY || e.key === FX_KEY) {
-      snapshot = null;
-      onChange();
-    }
-  };
-  window.addEventListener(EVENT, onChange);
-  window.addEventListener("storage", onStorage);
+  subscribers.add(onChange);
+  if (subscribers.size === 1) {
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", refreshRates);
+    window.addEventListener("online", refreshRates);
+    window.addEventListener("languagechange", invalidate);
+  }
+  refreshRates();
   return () => {
-    window.removeEventListener(EVENT, onChange);
-    window.removeEventListener("storage", onStorage);
+    subscribers.delete(onChange);
+    if (subscribers.size === 0) {
+      clearRefreshTimer();
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", refreshRates);
+      window.removeEventListener("online", refreshRates);
+      window.removeEventListener("languagechange", invalidate);
+    }
   };
 }
 
 /** An explicit choice, or "auto" to go back to what the browser says. */
 export function setCurrency(next: Currency | "auto") {
+  preference = next === "auto" ? null : next;
   try {
     if (next === "auto") localStorage.removeItem(PREF_KEY);
     else localStorage.setItem(PREF_KEY, next);
@@ -303,7 +332,7 @@ export function useCurrency(): CurrencyState {
  */
 export function useFiat(): (usd: number) => string {
   const { code, rate } = useFxRate();
-  const locale = useLocale();
+  const locale = useNumberLocale();
   return useCallback((usd: number) => fiat(usd * rate, code, locale), [code, rate, locale]);
 }
 

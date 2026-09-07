@@ -36,10 +36,10 @@ export const MENU_ITEM =
  * flags are countries, and Chinese alone spans three. Choosing navigates to
  * the same path under the other prefix, so nothing about the page is lost.
  *
- * Currency rides along because the two are one decision to most people:
- * the language you read in sets the currency you see, unless you say
- * otherwise (see lib/currency). It is a submenu rather than a second list
- * so thirty currencies never swallow two languages.
+ * Currency has its own choice: Auto uses the browser's regional preference,
+ * and an explicit currency stays selected when the page language changes
+ * (see lib/currency). It is a submenu rather than a second list so thirty
+ * currencies never swallow the language choices.
  */
 export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
   const t = useT();

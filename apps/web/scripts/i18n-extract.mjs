@@ -9,15 +9,12 @@
 //   node scripts/i18n-extract.mjs --check  # exit 1 if a locale has gaps
 import { readdirSync, readFileSync, statSync, writeFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
+// eslint-disable-next-line no-restricted-imports -- Node scripts cannot resolve the app's @/ alias.
+import { collectMessages } from "./i18n-catalog.mjs";
 
 const ROOT = new URL("../src", import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
 const LOCALES_DIR = join(ROOT, "locales");
 const check = process.argv.includes("--check");
-
-// t("text"), t('text'), t(`text`) with no ${}, optionally followed by
-// `, {vars}` or `, "context"`. Multi-line calls are matched because the
-// argument is the first thing after the paren.
-const CALL = /\b(?:t\(|msg\(|rich\(\s*t\s*,)\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`([^`$]*)`)\s*(?:,\s*(?:"([^"]*)"|'([^']*)'))?/g;
 
 function* files(dir) {
   for (const name of readdirSync(dir)) {
@@ -31,17 +28,17 @@ function* files(dir) {
 }
 
 const found = new Map(); // key -> [files]
+const indirect = [];
 for (const file of files(ROOT)) {
   const src = readFileSync(file, "utf8");
-  for (const m of src.matchAll(CALL)) {
-    const text = (m[1] ?? m[2] ?? m[3]).replace(/\\(["'`])/g, "$1");
-    const context = m[4] ?? m[5];
-    if (!text.trim()) continue;
-    const key = context ? `${text}@@${context}` : text;
+  const rel = relative(ROOT, file).replace(/\\/g, "/");
+  const messages = collectMessages(src, file);
+  for (const key of messages.keys) {
     const list = found.get(key) ?? [];
-    list.push(relative(ROOT, file).replace(/\\/g, "/"));
+    list.push(rel);
     found.set(key, list);
   }
+  for (const value of messages.indirect) indirect.push(`${rel}: t(${value})`);
 }
 
 const keys = [...found.keys()].sort((a, b) => a.localeCompare(b));
@@ -57,14 +54,8 @@ console.log(`source: ${keys.length} strings (${keys.length - previous >= 0 ? "+"
 // A t(x) whose argument is not a literal is translating a string defined
 // elsewhere — fine when that definition is wrapped in msg(), invisible to
 // this scan when it is not. List them so a bare label array cannot hide.
-const INDIRECT = /\bt\(\s*([A-Za-z_$][\w$.]*)\s*\)/g;
-const indirect = [];
-for (const file of files(ROOT)) {
-  const src = readFileSync(file, "utf8");
-  for (const m of src.matchAll(INDIRECT)) indirect.push(`${relative(ROOT, file).replace(/\\/g, "/")}: t(${m[1]})`);
-}
 if (indirect.length && !check) {
-  console.log(`indirect: ${indirect.length} t(identifier) calls — their labels must be msg()-marked where defined:`);
+  console.log(`indirect: ${indirect.length} t(expression) calls — their labels must be msg()-marked where defined:`);
   for (const line of indirect) console.log(`  ${line}`);
 }
 

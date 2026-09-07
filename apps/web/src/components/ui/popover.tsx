@@ -49,7 +49,7 @@ export function GearPopover({
         <P.Content
           align="end"
           sideOffset={8}
-          className="modal-pop z-50 w-64 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-lg focus:outline-none"
+          className="modal-pop z-50 max-h-[var(--radix-popover-content-available-height)] w-80 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-lg focus:outline-none"
         >
           {children}
         </P.Content>

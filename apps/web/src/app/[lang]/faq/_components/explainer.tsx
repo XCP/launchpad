@@ -394,7 +394,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         </p>
         <p className="mt-2">
           {t(
-            "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every round trip leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.",
+            "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.",
           )}
         </p>
       </details>

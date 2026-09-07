@@ -2,9 +2,14 @@
 // Derive zh-tw and zh-hk from the Simplified draft with OpenCC's regional
 // phrase tables, then apply the glossary's own renderings where OpenCC
 // disagrees, plus a few known OpenCC quirks. Writes both locale files and
-// their status lists.
-import { readFileSync, writeFileSync } from "node:fs";
+// their status lists. Reviewed regional wording is kept: a reviewer removes
+// its key from status.machine, as in the other translation tools.
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import * as OpenCC from "opencc-js";
+// eslint-disable-next-line no-restricted-imports -- Node scripts cannot resolve the app's @/ alias.
+import { mergeDerivedMessages } from "./i18n-catalog.mjs";
+
+const read = (path, fallback) => existsSync(path) ? JSON.parse(readFileSync(path, "utf8")) : fallback;
 
 const zh = JSON.parse(readFileSync("src/locales/zh.json", "utf8"));
 const glossary = JSON.parse(readFileSync("src/locales/glossary.json", "utf8")).terms;
@@ -47,8 +52,10 @@ for (const [variant, to] of [["zh-tw", "twp"], ["zh-hk", "hk"]]) {
     for (const [from, to2] of [...QUIRKS[variant], ...overrides]) s = s.split(from).join(to2);
     out[key] = s;
   }
-  const sorted = Object.fromEntries(Object.entries(out).sort(([a], [b]) => a.localeCompare(b)));
-  writeFileSync(`src/locales/${variant}.json`, JSON.stringify(sorted, null, 2) + "\n");
-  writeFileSync(`src/locales/${variant}.status.json`, JSON.stringify({ machine: Object.keys(sorted) }, null, 2) + "\n");
-  console.log(variant, Object.keys(sorted).length, "entries; glossary overrides:", overrides.map(([a, b]) => `${a}→${b}`).join(" "));
+  const messagesPath = `src/locales/${variant}.json`;
+  const statusPath = `src/locales/${variant}.status.json`;
+  const merged = mergeDerivedMessages(out, read(messagesPath, {}), read(statusPath, { machine: [] }));
+  writeFileSync(messagesPath, JSON.stringify(merged.messages, null, 2) + "\n");
+  writeFileSync(statusPath, JSON.stringify(merged.status, null, 2) + "\n");
+  console.log(variant, Object.keys(merged.messages).length, "entries; glossary overrides:", overrides.map(([a, b]) => `${a}→${b}`).join(" "));
 }

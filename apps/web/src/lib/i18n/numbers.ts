@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { bindNumbers, type Numbers } from "@/lib/format";
-import { useLocale } from "@/lib/i18n/client";
+import { useNumberLocale } from "@/lib/number-preference";
 
 export type { Numbers };
 
@@ -14,6 +14,6 @@ export type { Numbers };
  * cannot be imported from the server. This file is only the hook.
  */
 export function useNumbers(): Numbers {
-  const locale = useLocale();
+  const locale = useNumberLocale();
   return useMemo(() => bindNumbers(locale), [locale]);
 }

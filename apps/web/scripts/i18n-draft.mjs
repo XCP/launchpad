@@ -29,6 +29,8 @@ const LANGUAGE = {
   "zh-hk": "Traditional Chinese (Hong Kong)",
   es: "Spanish",
   fr: "French",
+  ru: "Russian",
+  uk: "Ukrainian",
   pt: "Brazilian Portuguese",
   de: "German",
   it: "Italian",

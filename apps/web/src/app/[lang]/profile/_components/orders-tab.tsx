@@ -1,6 +1,7 @@
 "use client";
 
 import useSWR from "swr";
+import { LazyLink } from "@/components/lazy-link";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
 import { isBusy } from "@/hooks/use-busy";
@@ -80,9 +81,9 @@ export function OrdersTab({
                     <span className={buying ? "font-medium text-green-700 dark:text-green-400" : "font-medium text-red-600 dark:text-red-400"}>
                       {buying ? t("Buy") : t("Sell")}
                     </span>{" "}
-                    <a href={`/${token}`} className="font-medium hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
+                    <LazyLink href={`/${token}`} className="font-medium hover:text-purple-700 dark:hover:text-purple-300 hover:underline">
                       {token}
-                    </a>{" "}
+                    </LazyLink>{" "}
                     {num.commasRaw(tokens)} @ {num.price(ratio(xcp, tokens))}
                   </>
                 ) : (

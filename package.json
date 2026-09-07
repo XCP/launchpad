@@ -22,6 +22,7 @@
   "devDependencies": {
     "@scure/bip32": "^2.3.0",
     "esbuild": "0.28.2",
+    "happy-dom": "20.14.0",
     "vitest": "^4.1.10"
   }
 }

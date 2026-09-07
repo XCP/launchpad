@@ -1,6 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { hex } from "@scure/base";
+import type { Transaction } from "@scure/btc-signer";
+import { parseRawInteger } from "@xcp/wallet-sdk/amounts";
 import { useT } from "@/lib/i18n/client";
 import type { T } from "@/lib/i18n/t";
 import type { Dispenser } from "@/lib/api/counterparty";
@@ -9,6 +12,7 @@ import { shortAddress } from "@/lib/format";
 import { trackTx } from "@/lib/analytics";
 import {
   fetchFeeRate,
+  addressScriptPubKey,
   ownTransactionOutputs,
   parseTxInputs,
   pendingChangeInputs,
@@ -16,10 +20,14 @@ import {
   registerBroadcast,
   registerPending,
   relayingFetch,
+  serializeComposeParams,
+  serializeFeeRate,
+  WalletSdkError,
   withAddressTransactionLock,
 } from "@xcp/wallet-sdk";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { assertSameTransaction, readPsbt, readTransaction } from "@/lib/transaction-verification";
 
 /**
  * Multi-dispense router: fills one load across up to MAX_LEGS dispensers as
@@ -45,6 +53,7 @@ export const MAX_LEGS = 3;
 const FEE_VBYTES = 300;
 /** Breather between legs: lets the wallet's popup monitor (5s close-grace) settle. */
 const INTER_LEG_DELAY_MS = 1200;
+const MAX_BTC_SATS = 2_100_000_000_000_000n;
 
 export interface PlannedLeg {
   dispenser: Dispenser;
@@ -77,6 +86,46 @@ interface Utxo {
   value: number;
 }
 
+/** This bridge routes one whole XCP per vend, with an exact BTC payment. */
+function paymentForLeg(leg: PlannedLeg): bigint {
+  const units = parseRawInteger(leg.units, { min: 1n });
+  const rate = parseRawInteger(leg.dispenser.satoshirate, { min: 1n, max: MAX_BTC_SATS });
+  const payment = parseRawInteger(leg.btcSats, { min: 1n, max: MAX_BTC_SATS });
+  if (parseRawInteger(leg.dispenser.give_quantity) !== 100_000_000n || units * rate !== payment) {
+    throw new WalletSdkError("invalid_argument", "Dispenser payment does not match the reviewed XCP quantity");
+  }
+  return payment;
+}
+
+function validateDispenseTransaction(raw: string, address: string, leg: PlannedLeg): Transaction {
+  const payment = paymentForLeg(leg);
+  const transaction = readTransaction(raw);
+  const destination = addressScriptPubKey(leg.dispenser.source);
+  const change = addressScriptPubKey(address);
+  if (destination === change) throw new WalletSdkError("invalid_argument", "Source and dispenser must differ");
+  let payments = 0;
+  for (let i = 0; i < transaction.outputsLength; i++) {
+    const output = transaction.getOutput(i);
+    const script = hex.encode(output.script!);
+    if (script === destination) {
+      if (output.amount !== payment) throw new WalletSdkError("transaction_mismatch", "Dispenser payment amount changed");
+      payments++;
+    } else if (script !== change && !(output.script?.[0] === 0x6a && output.amount === 0n)) {
+      throw new WalletSdkError("transaction_mismatch", "Unexpected dispense transaction output");
+    }
+  }
+  if (payments !== 1) throw new WalletSdkError("transaction_mismatch", "Missing or repeated dispenser payment");
+  return transaction;
+}
+
+/** Verify both Core's payment and the wallet's returned envelope before broadcast. */
+export async function signDispenseLeg(raw: string, address: string, leg: PlannedLeg, sign: (raw: string) => Promise<string>): Promise<string> {
+  const expected = validateDispenseTransaction(raw, address, leg);
+  const signed = await sign(raw);
+  assertSameTransaction(expected, readTransaction(signed));
+  return signed;
+}
+
 /**
  * The coins this load will be paid from.
  *
@@ -102,10 +151,10 @@ export async function composeLeg(
   opts: { inputsSet?: string; excludeUtxos?: string[]; allowUnconfirmed?: boolean },
   t: T,
 ): Promise<string> {
-  const qp = new URLSearchParams({
+  const qp = serializeComposeParams("dispense", {
     dispenser: leg.dispenser.source,
-    quantity: String(leg.btcSats),
-    sat_per_vbyte: String(feeRate),
+    quantity: paymentForLeg(leg),
+    sat_per_vbyte: serializeFeeRate(feeRate),
     exclude_utxos_with_balances: "true",
     verbose: "true",
   });
@@ -113,7 +162,7 @@ export async function composeLeg(
   if (opts.excludeUtxos?.length) qp.set("exclude_utxos", opts.excludeUtxos.join(","));
   if (opts.allowUnconfirmed) qp.set("allow_unconfirmed_inputs", "true");
 
-  const url = `${COUNTERPARTY_API_BASE}/addresses/${address}/compose/dispense?${qp}`;
+  const url = `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/compose/dispense?${qp}`;
   // A person is waiting on this request, so use the same unbudgeted relay
   // protection as the shared compose pipeline. The direct Counterparty host
   // can surface a CORS-hidden rate limit as the browser's raw "Failed to
@@ -123,31 +172,44 @@ export async function composeLeg(
   if (!res.ok || data.error) {
     throw new Error(data.error?.description ?? data.error ?? t("Compose failed ({status})", { status: res.status }));
   }
-  return data.result.rawtransaction as string;
+  const raw = data.result?.rawtransaction;
+  const transaction = validateDispenseTransaction(raw, address, leg);
+  if (data.result.psbt) {
+    assertSameTransaction(transaction, readPsbt(data.result.psbt));
+  }
+  return raw;
 }
 
 /** Live re-check of one dispenser right before composing its leg. Returns
  *  the reason it can no longer run, already in the visitor's language. */
-async function preflightLeg(leg: PlannedLeg, t: T): Promise<string | null> {
+export async function preflightLeg(leg: PlannedLeg, t: T): Promise<string | null> {
   try {
+    paymentForLeg(leg);
     const res = await relayingFetch(
-      `${COUNTERPARTY_API_BASE}/addresses/${leg.dispenser.source}/dispensers`,
+      `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(leg.dispenser.source)}/dispensers`,
       10_000,
     );
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const rows: {
       asset: string;
       status: number;
       give_remaining: number;
+      give_quantity: number;
       satoshirate: number;
-    }[] = res.ok ? ((await res.json()).result ?? []) : [];
+      tx_hash: string;
+      oracle_address: string | null;
+    }[] = (await res.json()).result ?? [];
     const live = rows.find((r) => r.asset === "XCP");
     if (!live || live.status !== 0) return t("route just closed");
-    if (live.satoshirate !== leg.dispenser.satoshirate) return t("route price changed");
-    if (live.give_remaining < leg.units * leg.dispenser.give_quantity)
+    if (live.tx_hash !== leg.dispenser.tx_hash || live.oracle_address !== null
+      || parseRawInteger(live.satoshirate) !== parseRawInteger(leg.dispenser.satoshirate)
+      || parseRawInteger(live.give_quantity) !== parseRawInteger(leg.dispenser.give_quantity)) return t("route price changed");
+    if (parseRawInteger(live.give_remaining) < parseRawInteger(leg.units) * parseRawInteger(leg.dispenser.give_quantity))
       return t("route no longer has enough left");
     return null;
   } catch {
-    return null; // can't verify — compose-time validation still applies
+    // Core only checks the current dispenser, not the quantity the site quoted.
+    return t("Could not refresh the quote. Try again.");
   }
 }
 
@@ -159,6 +221,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export function useDispenseRouter(btcUsd?: number | null) {
   const t = useT();
   const { address, signTransaction, broadcastTransaction } = useWallet();
+  const currentAddress = useRef(address);
+  useEffect(() => { currentAddress.current = address; }, [address]);
+  const planAddress = useRef<string | null>(null);
   const [legs, setLegs] = useState<Leg[]>([]);
   const [phase, setPhase] = useState<RouterPhase>("idle");
   const [planError, setPlanError] = useState<string | null>(null);
@@ -166,6 +231,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
   const chainModeRef = useRef(false);
   const feeRateRef = useRef(3);
   const runningRef = useRef(false);
+  const planningRef = useRef(false);
 
   const sync = () => setLegs([...legsRef.current]);
   const patch = (i: number, p: Partial<Leg>) => {
@@ -176,6 +242,11 @@ export function useDispenseRouter(btcUsd?: number | null) {
   /** Run legs from startIdx to completion (or first hard stop). */
   const run = async (startIdx: number) => {
     if (!address || runningRef.current) return;
+    if (planAddress.current !== address) {
+      setPlanError("Wallet address changed. Reconnect the account that started this load.");
+      setPhase("partial");
+      return;
+    }
     runningRef.current = true;
     setPhase("running");
     try {
@@ -213,13 +284,16 @@ export function useDispenseRouter(btcUsd?: number | null) {
           if (i > startIdx) await sleep(INTER_LEG_DELAY_MS);
 
           try {
+            if (currentAddress.current !== address) throw new WalletSdkError("invalid_argument", "Wallet address changed before signing");
+            // Even a cached transaction must still buy the reviewed XCP lot.
+            // Core cannot enforce a previous quote on an ordinary BTC payment.
+            const stale = await preflightLeg(leg, t);
+            if (stale) throw new Error(t("Skipped: {reason}", { reason: stale }));
             // Compose (unless retrying an already-composed hex — same hex
             // re-sign is deduped by the wallet, so reuse it).
             let rawHex = leg.rawHex;
             if (!rawHex) {
               patch(i, { status: "composing", error: null });
-              const stale = await preflightLeg(leg, t);
-              if (stale) throw new Error(t("Skipped: {reason}", { reason: stale }));
               const chainedInputs =
                 chainModeRef.current && !leg.utxoAssigned
                   ? pendingChangeInputs(address)
@@ -240,7 +314,13 @@ export function useDispenseRouter(btcUsd?: number | null) {
             const inputs = parseTxInputs(rawHex);
 
             patch(i, { status: "signing", error: null });
-            const signedHex = await signTransaction(rawHex);
+            if (currentAddress.current !== address) throw new WalletSdkError("invalid_argument", "Wallet address changed before signing");
+            const signedHex = await signDispenseLeg(rawHex, address, leg, signTransaction);
+            // A wallet popup can stay open for minutes; re-check before the
+            // irreversible BTC broadcast, then preserve the exact signed bytes.
+            const moved = await preflightLeg(leg, t);
+            if (moved) throw new Error(t("Skipped: {reason}", { reason: moved }));
+            if (currentAddress.current !== address) throw new WalletSdkError("invalid_argument", "Wallet address changed before broadcast");
 
             patch(i, { status: "broadcasting" });
             const txid = await broadcastTransaction(signedHex);
@@ -289,7 +369,9 @@ export function useDispenseRouter(btcUsd?: number | null) {
   };
 
   const start = async (planned: PlannedLeg[], feeRateOverride?: number) => {
-    if (!address || planned.length === 0 || runningRef.current) return;
+    if (!address || planned.length === 0 || runningRef.current || planningRef.current) return;
+    planningRef.current = true;
+    planAddress.current = address;
     setPlanError(null);
     setPhase("running");
     legsRef.current = planned.map((p) => ({
@@ -303,7 +385,9 @@ export function useDispenseRouter(btcUsd?: number | null) {
     sync();
 
     try {
+      for (const leg of planned) paymentForLeg(leg);
       feeRateRef.current = feeRateOverride ?? (await fetchFeeRate());
+      serializeFeeRate(feeRateRef.current);
       const knownSpent = new Set(recentlySpentUtxos(address));
       const utxos = (await fetchConfirmedUtxos(address)).filter(
         (utxo) => !knownSpent.has(`${utxo.txid}:${utxo.vout}`),
@@ -357,18 +441,20 @@ export function useDispenseRouter(btcUsd?: number | null) {
     } catch (e) {
       setPlanError(e instanceof Error ? e.message : "Planning failed");
       setPhase(legsRef.current.some((l) => l.status === "done") ? "partial" : "idle");
+    } finally {
+      planningRef.current = false;
     }
   };
 
   /** Retry a failed leg (and continue any legs after it). */
   const retry = (idx: number) => {
-    if (runningRef.current) return;
+    if (runningRef.current || planningRef.current) return;
     patch(idx, { status: "pending", error: null });
     run(idx);
   };
 
   const reset = () => {
-    if (runningRef.current) return;
+    if (runningRef.current || planningRef.current) return;
     legsRef.current = [];
     chainModeRef.current = false;
     setLegs([]);

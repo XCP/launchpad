@@ -82,7 +82,9 @@ export function prepareCommit(
   const tapInternalKey = btc.TAPROOT_UNSPENDABLE_KEY
   const commitOutput = btc.p2tr(tapInternalKey, { script, leafVersion: 0xc0 }, NETWORK, true)
   const revealWeight = estimateRevealWeight(script.length, !!data.parentInscriptionId)
-  const revealBaseFee = revealWeight.vsize * feeRate
+  // Generated BTC fees round up to whole satoshis; the chosen sat/vB rate
+  // remains fractional. Otherwise 0.1 sat/vB can create a fractional output.
+  const revealBaseFee = Math.ceil(revealWeight.vsize * feeRate)
   const revealFeePadding = feePadding(revealBaseFee)
   const revealFundedFee = revealBaseFee + revealFeePadding
 

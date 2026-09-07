@@ -26,7 +26,7 @@ import {
 const PAGE_METADATA = {
   title: msg("Docs — xcp.fun"),
   description:
-    msg("Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, what it costs (nothing), and how to integrate."),
+    msg("Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, fees, and how to integrate."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -78,7 +78,7 @@ const TOC: { section: string; items: [string, string][] }[] = [
 const PRICING_TERMS: [string, string][] = [
   [
     msg("Price"),
-    msg("XCP reserve ÷ token reserve. Moves with every swap; there is no order book and no market maker."),
+    msg("Pool price is XCP reserve ÷ token reserve. Swaps change this ratio. Limit orders can also trade on Counterparty's order book."),
   ],
   [
     msg("Market cap"),
@@ -105,7 +105,7 @@ function CodeBlock({ children }: { children: string }) {
 /** Inline code as the docs write it. Never translated: these are field
  *  names, statuses and endpoints the reader will type. */
 function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-gray-100 dark:bg-gray-800 px-1">{children}</code>;
+  return <code className="break-all rounded bg-gray-100 dark:bg-gray-800 px-1">{children}</code>;
 }
 
 export default async function DocsPage() {

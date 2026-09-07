@@ -48,7 +48,7 @@ export function Well({
       </div>
       {layout === "row" ? (
         <div className="mt-1 flex items-center justify-between gap-3">
-          {children}
+          <div className="min-w-0 flex-1">{children}</div>
           {chip}
         </div>
       ) : (

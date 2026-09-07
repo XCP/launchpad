@@ -4,14 +4,8 @@ import { fileURLToPath } from "node:url";
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 
 /**
- * Unit tests for the pure layers only — the numeric primitives, the XCP-69
- * predicate, the candle fold, and the small pure helpers the app leans on.
- *
- * Deliberately no jsdom and no component rendering. What is worth testing
- * here is the code where being wrong is SILENT: a predicate that admits a
- * non-conforming launch, or a serializer that puts the wrong digits into a
- * transaction, produces something that looks entirely normal and is wrong
- * permanently. A broken layout announces itself; these do not.
+ * Pure boundary tests run in Node. Editing tests opt into happy-dom per
+ * file to exercise actual React handlers and submission gates.
  */
 export default defineConfig({
   resolve: {
@@ -35,6 +29,6 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/**/*.test.ts"],
+    include: ["tests/**/*.test.{ts,tsx}"],
   },
 });

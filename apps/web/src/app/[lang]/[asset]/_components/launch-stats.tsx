@@ -5,7 +5,7 @@ import { fetchJson } from "@/lib/client";
 import { useDenomination, setDenomination } from "@/lib/denomination";
 import { fromSats } from "@/lib/format";
 import type { Raw } from "@/lib/numeric";
-import { useFiat } from "@/lib/currency";
+import { useFiat, useFxRate } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
 import {
@@ -22,6 +22,7 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
   const num = useNumbers();
   const t = useT();
   const usd = useFiat();
+  const { code } = useFxRate();
   const denom = useDenomination();
   const usdMode = denom === "USD" && !!xcpUsd;
   const rate = xcpUsd ?? 0;
@@ -88,12 +89,12 @@ export function TermsStrip({ xcpUsd }: { xcpUsd: number | null }) {
                 <button
                   type="button"
                   onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
-                  aria-label={usdMode ? t("Show amounts in XCP") : t("Show amounts in US dollars")}
+                  aria-label={usdMode ? t("Show amounts in XCP") : t("Show amounts in {currency}", { currency: code })}
                   className={`relative shrink-0 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95 ${FOCUS} ${
                     i === 1 ? "md:hidden" : "hidden md:block"
                   }`}
                 >
-                  {usdMode ? "XCP" : "USD"}
+                  {usdMode ? "XCP" : code}
                 </button>
               )}
             </div>
@@ -174,18 +175,19 @@ export function ParticipantsStat({ participants }: { participants: number }) {
  *  their own rate's availability); this component only handles placement. */
 export function DenomToggle({ visibleOn }: { visibleOn: "mobile" | "desktop" }) {
   const t = useT();
+  const { code } = useFxRate();
   const denom = useDenomination();
   const usdMode = denom === "USD";
   return (
     <button
       type="button"
       onClick={() => setDenomination(usdMode ? "XCP" : "USD")}
-      aria-label={usdMode ? t("Show amounts in XCP") : t("Show amounts in US dollars")}
+      aria-label={usdMode ? t("Show amounts in XCP") : t("Show amounts in {currency}", { currency: code })}
       className={`relative shrink-0 rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[7px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 transition-colors after:absolute after:-inset-x-2 after:-inset-y-3 after:content-[''] hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95 ${FOCUS} ${
         visibleOn === "mobile" ? "sm:hidden" : "hidden sm:block"
       }`}
     >
-      {usdMode ? "XCP" : "USD"}
+      {usdMode ? "XCP" : code}
     </button>
   );
 }

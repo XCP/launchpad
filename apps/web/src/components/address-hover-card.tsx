@@ -185,7 +185,7 @@ export function IssuerChips({
         ? t("first launch")
         : data.priorCapped
           ? t("{n}+ launches", { n: num.commas(data.prior) })
-          : t("{ordinal} launch", { ordinal: ordinal(data.prior + 1) })}
+          : t("Launch #{n}", { n: num.commas(data.prior + 1) })}
     </span>,
   ];
   if (data.judged > 0) {
@@ -239,9 +239,6 @@ export function IssuerChips({
 }
 
 /* ---------- issuer identity ---------- */
-
-const ordinal = (n: number) =>
-  `${n}${["th", "st", "nd", "rd"][n % 100 > 10 && n % 100 < 14 ? 0 : Math.min(n % 10, 4) % 4] ?? "th"}`;
 
 interface Reputation {
   track_record?: { score?: number; tier?: string };

@@ -24,27 +24,27 @@ const absolute = (locale: Parameters<typeof localePath>[0], path: string) => {
   return `${METADATA_ORIGIN}${p === "/" ? "" : p}`;
 };
 
-function entry(path: string, priority: number): MetadataRoute.Sitemap[number] {
+function entries(path: string, priority: number): MetadataRoute.Sitemap {
   const languages: Record<string, string> = {};
   for (const l of LOCALES) languages[LOCALE_INFO[l].tag] = absolute(l, path);
   languages["x-default"] = absolute("en", path);
-  return {
-    url: absolute("en", path),
+  return LOCALES.map((locale) => ({
+    url: absolute(locale, path),
     priority,
     alternates: { languages },
-  };
+  }));
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const entries = STATIC_PATHS.map((p) => entry(p, p === "/" ? 1 : 0.6));
+  const urls = STATIC_PATHS.flatMap((p) => entries(p, p === "/" ? 1 : 0.6));
   // Every conforming launch, whatever its phase: a refunded launch's page is
   // still its record. The index is the site's own, so an outage here means a
   // shorter sitemap rather than a failed one.
   try {
     const index = await fetchSearchIndex();
-    for (const row of index ?? []) entries.push(entry(`/${row.asset}`, 0.8));
+    for (const row of index ?? []) urls.push(...entries(`/${row.asset}`, 0.8));
   } catch {
     // Static pages only, this time.
   }
-  return entries;
+  return urls;
 }

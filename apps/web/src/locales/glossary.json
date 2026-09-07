@@ -54,7 +54,7 @@
       "uk": "запуск"
     },
     "graduated": {
-      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers. pump.fun vocabulary in both (graduar / graduer); the site's sense, never the school sense. RU QA 2026-09-07: no Russian source has a single word for pump.fun graduation — media paraphrase (вышло на Raydium). выпуститься is kept because it is exactly the Russian school-graduation verb, so the metaphor survives as it does in 毕业/卒業/졸업. Only the VERB forms are used: the noun выпуск means issuance in a token context (выпуск токенов), so the noun is выпускной. Never выпущен, which also reads as issued. UK: випустився / випуск. UK QA 2026-09-07: випустився is a COINAGE — no Ukrainian source uses it for this sense, and the attested renderings (міграція, завершення кривої зв'язування) describe a bonding-curve migration, which is not what XCP-69 does. Kept because the school metaphor carries and nothing attested fits; awaiting a native reviewer. The noun for issuance must stay off this root (емітовано, not випущено) or the two senses collide.",
+      "note": "The launch sold out and its pool opened. pump.fun's sense of the word. ZH: pump.fun 内盘→外盘 vocabulary: 毕业 is the word the Chinese memecoin community uses. ES: pump.fun Spanish coverage says graduarse / graduación. KO: 졸업, attested in crypto.com and BTCC Korean pump.fun explainers. pump.fun vocabulary in both (graduar / graduer); the site's sense, never the school sense. RU/UK review 2026-09-07: use the explicit phase label пул открыт / пул відкрито and opening-of-the-pool wording in prose. The previous school-graduation coinages were not established regional terminology and overlapped token issuance. In XCP-69 this means the sale reached its target and the initial pool opened; no bonding-curve migration is implied.",
       "ja": "卒業",
       "zh": "毕业",
       "zh-tw": "畢業",
@@ -63,8 +63,8 @@
       "ko": "졸업",
       "pt": "graduado",
       "fr": "gradué",
-      "ru": "выпустился",
-      "uk": "випустився"
+      "ru": "пул открыт",
+      "uk": "пул відкрито"
     },
     "refunded": {
       "note": "The launch missed its soft cap and everyone was repaid. KO: 환불 for the refund, 환불됨 as the phase chip. The phase chip; the noun is возврат / повернення.",
@@ -169,15 +169,15 @@
       "uk": "ліквідність"
     },
     "LP burned": {
-      "note": "The pool's LP tokens were destroyed, so liquidity is locked forever. ZH: 销毁 is the one Chinese word for burn; there is no バーン/焼却 split.",
+      "note": "Short crypto label for initial LP tokens made permanently unspendable. Core pooldeposit credits them to the canonical unspendable address; it does not destroy the underlying pool assets. Say LP tokens, never burned liquidity. Later user-added liquidity is separate from the initial locked allocation.",
       "ja": "LP バーン済み",
       "zh": "LP 已销毁",
       "zh-tw": "LP 已銷毀",
       "zh-hk": "LP 已銷毀",
-      "es": "LP quemado",
+      "es": "tokens LP quemados",
       "ko": "LP 소각됨",
-      "pt": "LP queimado",
-      "fr": "LP brûlée",
+      "pt": "tokens LP queimados",
+      "fr": "tokens LP brûlés",
       "ru": "LP сожжены",
       "uk": "LP спалено"
     },
@@ -374,7 +374,7 @@
       "uk": "документація"
     },
     "rewards": {
-      "note": "The XCP Rewards programme for minters.",
+      "note": "The minter reward programme. User preference 2026-09-07: use the local Rewards word without an XCP prefix in non-English labels and page titles. Identify currencies beside actual amounts.",
       "ja": "リワード",
       "zh": "奖励",
       "zh-tw": "獎勵",
