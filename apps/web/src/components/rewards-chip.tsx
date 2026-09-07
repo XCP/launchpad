@@ -27,7 +27,15 @@ export function RewardsChip({ className = "" }: { className?: string }) {
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-green-400 opacity-75" />
         <span className="relative inline-flex size-1.5 rounded-full bg-green-500" />
       </span>
-      <span>{t("XCP Rewards")}</span>
+      {/* "XCP Rewards" only where the row can afford the word. Between lg
+          and xl the two navs, three chips and the wallet compete for one
+          capped row, and the secondary nav is what loses — FAQ and Docs fall
+          off the end. The programme is the same either way, so the chip
+          gives up its prefix first. Two whole strings rather than a
+          conditional prefix: languages put XCP on the other side of the
+          word (Награды XCP, XCP リワード) and some drop it entirely. */}
+      <span className="xl:hidden">{t("Rewards")}</span>
+      <span className="hidden xl:inline">{t("XCP Rewards")}</span>
     </LazyLink>
   );
 }
