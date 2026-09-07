@@ -69,7 +69,8 @@
       "ja": "供給量"
     },
     "volume": {
-      "ja": "出来高"
+      "ja": "出来高",
+      "note": "The stock-market word, and what CoinMarketCap Japan uses. Zaif writes 取引高 in prose; keep 出来高 everywhere on this site."
     },
     "since mint": {
       "note": "Return measured from the mint price.",
@@ -145,6 +146,22 @@
     "all-time high": {
       "note": "Keep the Latin abbreviation the community uses; CMC Japan writes 過去最高値.",
       "ja": "ATH"
+    },
+    "send": {
+      "ja": "送金",
+      "note": "Moving an asset between addresses. Zaif and the wider community say 送金; 送付 is for documents."
+    },
+    "miner fee": {
+      "ja": "マイナー手数料",
+      "note": "The Bitcoin fee. Zaif calls its withdrawal network fee 送金手数料, but on this site the fee goes to miners, not to us."
+    },
+    "burn": {
+      "ja": "バーン",
+      "note": "OPEN QUESTION for the reviewer: the site currently uses バーン for the burn tab and burn address, 焼却 for LP burned, and 破棄 for consensus destroying escrowed supply after a refund (Counterparty’s destroy message; Zaif writes 破壊 for proof of burn). Proposal: バーン for everything the community calls a burn including LP, 破棄 only for the protocol destroy. Decide, then apply in one pass."
+    },
+    "base currency": {
+      "ja": "基軸通貨",
+      "note": "XCP as Counterparty’s native currency. Zaif’s own wording in its asset guide."
     }
   }
 }
