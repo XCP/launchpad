@@ -50,18 +50,13 @@ const price = (market: Market, value: number | null, code: string, rate: number,
 };
 
 /** A 30-day move with its sign. `value` arrives already multiplied out by
- *  priceChangePercent, so it goes back to a ratio for Intl, which is what
- *  places the sign and the space before the "%" the way the language does.
- *  Always to one place, so the chip does not change width as the number
- *  crosses a round figure — `num.percent` trims that zero by design, which
- *  is right for a share of supply and wrong for a ticker. */
+ *  priceChangePercent, so it goes back to a ratio for `num.percent`, which is
+ *  what places the sign and the space before the "%" the way the language
+ *  does. `minDigits` pins the place, so the chip does not change width as the
+ *  number crosses a round figure — the default trims that zero, which is
+ *  right for a share of supply and wrong for a ticker. */
 const percent = (value: number, num: Numbers) =>
-  (value / 100).toLocaleString(num.intl, {
-    style: "percent",
-    signDisplay: "exceptZero",
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+  num.percent(value / 100, { minDigits: 1, signed: true });
 
 function BtcMark({ large = false }: { large?: boolean }) {
   return (

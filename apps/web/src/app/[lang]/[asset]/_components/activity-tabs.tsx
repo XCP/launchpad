@@ -47,10 +47,6 @@ import {
 
 const PER_PAGE = 25;
 
-/** Eight-place XCP, the shape `fixedRaw` writes — for the handful of values
- *  that arrive as already-divided doubles rather than raw satoshi. */
-const EIGHT_PLACES = { minimumFractionDigits: 8, maximumFractionDigits: 8 } as const;
-
 /**
  * Column layout shared by the Trades and Orders tables, which render the same
  * six columns. The 41.5rem floor matches the minters grid above and stays
@@ -325,7 +321,7 @@ export function ActivityTabs({
             isBuy: false,
             price: poolSpot / (1 - POOL_FEE),
             amountText: num.compact(poolTok * (1 - 1 / Math.sqrt(1 + POOL_BAND))),
-            xcpText: (poolXcp * (Math.sqrt(1 + POOL_BAND) - 1)).toLocaleString(num.intl, EIGHT_PLACES),
+            xcpText: num.fixed(poolXcp * (Math.sqrt(1 + POOL_BAND) - 1), 8),
           },
           {
             o: null,
@@ -333,7 +329,7 @@ export function ActivityTabs({
             isBuy: true,
             price: poolSpot * (1 - POOL_FEE),
             amountText: num.compact(poolTok * (1 / Math.sqrt(1 - POOL_BAND) - 1)),
-            xcpText: (poolXcp * (1 - Math.sqrt(1 - POOL_BAND))).toLocaleString(num.intl, EIGHT_PLACES),
+            xcpText: num.fixed(poolXcp * (1 - Math.sqrt(1 - POOL_BAND)), 8),
           },
         ]
       : [];
@@ -752,7 +748,7 @@ export function ActivityTabs({
                           {trade.buy ? t("↗ Buy") : t("↘ Sell")}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                          {(ratio(trade.xcpRaw, trade.tokenRaw) / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
+                          {num.fixed(ratio(trade.xcpRaw, trade.tokenRaw) / (divisible ? 1 : 1e8), 8)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {num.compact(tokens)}
@@ -989,19 +985,16 @@ export function ActivityTabs({
                           <td colSpan={6} className="px-4 py-1.5 text-center text-[11px] text-gray-500 dark:text-gray-400">
                             {t("spread")}{" "}
                             <span className="tabular-nums text-gray-700 dark:text-gray-300">
-                              {(bestBid / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
+                              {num.fixed(bestBid / (divisible ? 1 : 1e8), 8)}
                             </span>{" "}
                             →{" "}
                             <span className="tabular-nums text-gray-700 dark:text-gray-300">
-                              {(bestAsk / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
+                              {num.fixed(bestAsk / (divisible ? 1 : 1e8), 8)}
                             </span>
                             {bestBid > 0 && (
                               <span className="ml-1.5 text-gray-400 dark:text-gray-500">
                                 ({t("{n}× apart", {
-                                  n: (bestAsk / bestBid).toLocaleString(num.intl, {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  }),
+                                  n: num.fixed(bestAsk / bestBid, 2),
                                 })})
                               </span>
                             )}
@@ -1017,7 +1010,7 @@ export function ActivityTabs({
                           {pool ? t("◆ Pool") : isBuy ? t("↗ Bid") : t("↘ Ask")}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                          {(price / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
+                          {num.fixed(price / (divisible ? 1 : 1e8), 8)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {amountText}

@@ -103,10 +103,6 @@ export default async function RewardsPage() {
   const measuredFee = stats?.activity.median_fee_sats ?? 0;
   const typicalMintFeeSats = measuredFee > 0 ? measuredFee : FALLBACK_MINT_FEE_SATS;
   const feeXcp = typicalMintFeeSats / satsPerXcp;
-  // Both are small XCP figures quoted to the cent; two decimals always, so
-  // they line up with each other and with the pool price beside them.
-  const twoDp = (value: number) =>
-    value.toLocaleString(num.intl, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="mx-auto max-w-3xl space-y-10">
@@ -166,7 +162,7 @@ export default async function RewardsPage() {
           <Stat label={t("Per mint")} value={`${num.commas(MINTS_PER_MINT)} MINTS`} hint={t("one transaction")} />
           <Stat
             label={t("Worth")}
-            value={`${twoDp(rewardXcp)} XCP`}
+            value={`${num.fixed(rewardXcp, 2)} XCP`}
             hint={t("at the live pool price")}
           />
           <Stat
@@ -174,8 +170,8 @@ export default async function RewardsPage() {
             value={`~${num.commas(typicalMintFeeSats)} sats`}
             hint={
               measuredFee > 0
-                ? t("~{xcp} XCP · {n}-mint median", { xcp: twoDp(feeXcp), n: num.commas(feeSamples) })
-                : t("~{xcp} XCP · estimate", { xcp: twoDp(feeXcp) })
+                ? t("~{xcp} XCP · {n}-mint median", { xcp: num.fixed(feeXcp, 2), n: num.commas(feeSamples) })
+                : t("~{xcp} XCP · estimate", { xcp: num.fixed(feeXcp, 2) })
             }
           />
           <Stat
@@ -287,7 +283,7 @@ export default async function RewardsPage() {
           <Faq q={t("What is MINTS?")} open>
             {t(
               "The first fairminter ever created on Counterparty — block 866,297, before any other, and it minted out free to 1,376 addresses. The supply is 100,000,000, locked forever; no more can ever be issued. The live MINTS/XCP pool prices the reward: right now 1 MINTS trades at {price} XCP, so {n} MINTS is {worth} XCP.",
-              { price: num.price(mintsPriceXcp), n: num.commas(MINTS_PER_MINT), worth: twoDp(rewardXcp) },
+              { price: num.price(mintsPriceXcp), n: num.commas(MINTS_PER_MINT), worth: num.fixed(rewardXcp, 2) },
             )}
           </Faq>
           <Faq q={t("Why per transaction, not per token?")}>

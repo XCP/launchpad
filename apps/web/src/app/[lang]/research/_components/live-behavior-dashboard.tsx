@@ -504,10 +504,7 @@ function MobileStat({ label, value, detail }: { label: string; value: string; de
 function rankSignal(row: ResearchLaunchBehavior, t: T, num: Numbers): string {
   if (row.phase === "minting") {
     return t("{pct}% minted", {
-      pct: Math.min(100, ratio(row.earnedQuantity, row.softCap) * 100).toLocaleString(num.intl, {
-        minimumFractionDigits: 1,
-        maximumFractionDigits: 1,
-      }),
+      pct: num.fixed(Math.min(100, ratio(row.earnedQuantity, row.softCap) * 100), 1),
     });
   }
   const tokenReserve = big(row.poolTokenReserve);
@@ -525,9 +522,5 @@ function rankSignal(row: ResearchLaunchBehavior, t: T, num: Numbers): string {
  */
 function allocationShare(part: string, whole: string | null, num: Numbers): string {
   const share = big(whole) <= 0n ? 0 : Math.min(1, ratio(part, whole));
-  return share.toLocaleString(num.intl, {
-    style: "percent",
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
+  return num.percent(share, { minDigits: 1 });
 }

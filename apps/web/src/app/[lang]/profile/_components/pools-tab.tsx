@@ -31,13 +31,8 @@ interface PoolPosition {
 }
 
 function holding(n: number, num: Numbers): string {
-  if (n > 0 && n < 1) {
-    return n.toLocaleString(num.intl, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  }
-  return n.toLocaleString(num.intl, { maximumFractionDigits: 0 });
+  if (n > 0 && n < 1) return num.fixed(n, 2);
+  return num.fixed(n, 0);
 }
 
 async function loadPosition(
@@ -210,10 +205,7 @@ export function PoolsTab({
                   ? t("Share unavailable")
                   : position.poolSharePct >= 0.01
                     ? t("{pct}% of pool", {
-                        pct: position.poolSharePct.toLocaleString(num.intl, {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        }),
+                        pct: num.fixed(position.poolSharePct, 2),
                       })
                     : t("<0.01% of pool")}
               </p>

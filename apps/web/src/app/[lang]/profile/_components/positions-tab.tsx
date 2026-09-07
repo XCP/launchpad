@@ -23,10 +23,8 @@ type Denom = "usd" | "xcp";
  * dropping them would render the whole holding as "0".
  */
 function holding(n: number, num: Numbers): string {
-  if (n > 0 && n < 1) {
-    return n.toLocaleString(num.intl, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  }
-  return n.toLocaleString(num.intl, { maximumFractionDigits: 0 });
+  if (n > 0 && n < 1) return num.fixed(n, 2);
+  return num.fixed(n, 0);
 }
 
 function Pnl({

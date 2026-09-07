@@ -1,6 +1,5 @@
 import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
-import type { Numbers } from "@/lib/i18n/numbers";
 import { getMessages, getNumbers, getT } from "@/lib/i18n/server";
 import { makeT, msg } from "@/lib/i18n/t";
 import { rich } from "@/lib/i18n/rich";
@@ -44,15 +43,6 @@ export const revalidate = 60;
 /** How many ~daily buckets the chart shows. Matches the window apps/api
  *  returns; anything longer stops being "lately". */
 const WINDOW_DAYS = 28;
-
-/** Stats are aggregate estimates, so one decimal keeps partial XCP visible
- * without implying transaction-level precision. Keep every XCP figure on
- * this page on the same visual scale. */
-const formatXcp = (value: number, num: Numbers) =>
-  value.toLocaleString(num.intl, {
-    minimumFractionDigits: 1,
-    maximumFractionDigits: 1,
-  });
 
 /**
  * The scoreboard, and the one place refunded launches are counted.
@@ -144,7 +134,7 @@ export default async function StatsPage() {
         <Stat
           className="order-1 sm:order-none"
           label={t("Market cap")}
-          value={`${formatXcp(marketCapXcp, num)} XCP`}
+          value={`${num.fixed(marketCapXcp, 1)} XCP`}
           hint={
             xcpUsd
               ? rich(t, "≈ {amount} · graduated coins", { amount: <Fiat usd={marketCapXcp * xcpUsd} /> })
@@ -162,7 +152,7 @@ export default async function StatsPage() {
           // Not "locked pools": a graduated launch burns its LP, but the number
           // also carries pools whose liquidity is not locked, and calling all
           // of it locked promised something this figure cannot back.
-          value={`${formatXcp(poolXcp, num)} XCP`}
+          value={`${num.fixed(poolXcp, 1)} XCP`}
           hint={
             xcpUsd
               ? rich(t, "≈ {amount} in pools", { amount: <Fiat usd={poolXcp * xcpUsd} /> })
@@ -177,7 +167,7 @@ export default async function StatsPage() {
           // refunded launch, so it was committed rather than transacted.
           // This is XCP that actually changed hands, which is the harder
           // number to produce and the one worth showing on its own.
-          value={`${formatXcp(tradeXcp, num)} XCP`}
+          value={`${num.fixed(tradeXcp, 1)} XCP`}
           hint={
             historicalTradeUsd > 0
               ? rich(t, "≈ {amount} traded, all time", { amount: <Fiat usd={historicalTradeUsd} /> })
@@ -199,7 +189,7 @@ export default async function StatsPage() {
         <Stat
           className="order-5 sm:order-none"
           label={t("Active escrow")}
-          value={`${formatXcp(activeXcp, num)} XCP`}
+          value={`${num.fixed(activeXcp, 1)} XCP`}
           hint={
             xcpUsd
               ? rich(t, "≈ {amount} committed to open mints", { amount: <Fiat usd={activeXcp * xcpUsd} /> })
@@ -322,12 +312,12 @@ export default async function StatsPage() {
                       d.n === 1
                         ? t("{n} refund · {xcp} XCP returned · about {when}", {
                             n: d.n,
-                            xcp: formatXcp(d.xcp, num),
+                            xcp: num.fixed(d.xcp, 1),
                             when: about(d.daysAgo),
                           })
                         : t("{n} refunds · {xcp} XCP returned · about {when}", {
                             n: d.n,
-                            xcp: formatXcp(d.xcp, num),
+                            xcp: num.fixed(d.xcp, 1),
                             when: about(d.daysAgo),
                           })
                     }

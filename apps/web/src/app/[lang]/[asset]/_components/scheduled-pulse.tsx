@@ -142,10 +142,7 @@ export function ScheduledPulse({
     blocks * 10 < 60
       ? t("~{n}m", { n: blocks * 10 })
       : t("~{n}h", {
-          n: ((blocks * 10) / 60).toLocaleString(num.intl, {
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 1,
-          }),
+          n: num.fixed((blocks * 10) / 60, 1),
         });
 
   const [nowSec, setNowSec] = useState<number | null>(null);

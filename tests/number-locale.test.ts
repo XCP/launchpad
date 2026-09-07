@@ -4,6 +4,7 @@ import {
   commas,
   compact,
   fiat,
+  fixed,
   intlLocale,
   percent,
   price,
@@ -50,6 +51,33 @@ describe("grouping and decimal marks follow the page", () => {
     for (const locale of LOCALES) {
       expect(() => new Intl.NumberFormat(intlLocale(locale))).not.toThrow();
     }
+  });
+});
+
+describe("fixed", () => {
+  it("pads and truncates to exactly the places asked for", () => {
+    expect(fixed(1.5, 2, "en")).toBe("1.50");
+    expect(fixed(1.567, 2, "en")).toBe("1.57");
+    expect(fixed(42, 0, "en")).toBe("42");
+    expect(fixed(0.000012345, 8, "en")).toBe("0.00001235");
+  });
+
+  it("groups and marks the decimal the way the page does", () => {
+    expect(fixed(1234.5, 2, "en")).toBe("1,234.50");
+    expect(fixed(1234.5, 2, "pt")).toBe("1.234,50");
+    expect(fixed(1234.5, 2, "fr")).toMatch(/^1.234,50$/);
+  });
+
+  it("is the shape a column wants, where commas is the shape a quantity wants", () => {
+    // The distinction the escape hatch was being used to express: a column
+    // of 1.50 and 1.20 reads as one measure, 1.5 beside 1.2 as two.
+    expect(commas(1.5, "en")).toBe("1.5");
+    expect(fixed(1.5, 2, "en")).toBe("1.50");
+  });
+
+  it("does not print NaN at a reader", () => {
+    expect(fixed(Number.NaN, 2, "en")).toBe("—");
+    expect(fixed(Number.POSITIVE_INFINITY, 2, "en")).toBe("—");
   });
 });
 

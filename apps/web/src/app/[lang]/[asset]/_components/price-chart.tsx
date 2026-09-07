@@ -86,10 +86,7 @@ interface Plotted {
 /** Full eight-place XCP. Axis ticks drop the unit — the axis is labelled
  *  once — but anything a reader might quote keeps it. */
 const xcp = (xcpPrice: number, num: Numbers, withUnit = false) =>
-  `${xcpPrice.toLocaleString(num.intl, {
-    minimumFractionDigits: 8,
-    maximumFractionDigits: 8,
-  })}${withUnit ? " XCP" : ""}`;
+  `${num.fixed(xcpPrice, 8)}${withUnit ? " XCP" : ""}`;
 
 const UP = "#15803d";
 const DOWN = "#dc2626";

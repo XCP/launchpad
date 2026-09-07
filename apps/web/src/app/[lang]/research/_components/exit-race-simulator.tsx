@@ -13,18 +13,9 @@ import {
   scenarioCashFlow,
 } from "@/app/[lang]/research/_lib/economics";
 
-/** A figure to two decimals, for the labels that write their own unit.
- *  Module scope, so the page's formatters are passed in rather than reached
- *  for with a hook. */
-const fixed2 = (value: number, num: Numbers) =>
-  value.toLocaleString(num.intl, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-
 /** An XCP figure to the cent. */
 const money = (value: number, num: Numbers, signed = false) =>
-  `${signed && value >= 0 ? "+" : ""}${fixed2(value, num)} XCP`;
+  `${signed && value >= 0 ? "+" : ""}${num.fixed(value, 2)} XCP`;
 
 /** A dollar figure in the visitor's currency, to that currency's own minor
  *  units, with an explicit sign when the caller asks for one. */
@@ -141,11 +132,7 @@ export function ExitRaceSimulator({
             <span className="font-medium text-gray-600 dark:text-gray-400">{t("Public allocation captured")}</span>
             <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
               {addresses}M / 69M ·{" "}
-              {(capturedPct / 100).toLocaleString(num.intl, {
-                style: "percent",
-                minimumFractionDigits: 1,
-                maximumFractionDigits: 1,
-              })}
+              {num.percent(capturedPct / 100, { minDigits: 1 })}
             </span>
           </div>
           <div
@@ -169,7 +156,7 @@ export function ExitRaceSimulator({
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Metric
             label={t("Capital + BTC overhead")}
-            value={`${fixed2(scenario.capitalXcp + scenario.overheadXcp, num)} XCP-eq`}
+            value={`${num.fixed(scenario.capitalXcp + scenario.overheadXcp, 2)} XCP-eq`}
             hint={`${scenario.capitalXcp.toFixed(0)} XCP + ${num.commas(totalOverheadSats)} sats`}
           />
           <Metric
@@ -179,7 +166,7 @@ export function ExitRaceSimulator({
           />
           <Metric
             label={t("Net cash P/L")}
-            value={`${scenario.pnlXcpEquivalent >= 0 ? "+" : ""}${fixed2(scenario.pnlXcpEquivalent, num)} XCP-eq`}
+            value={`${scenario.pnlXcpEquivalent >= 0 ? "+" : ""}${num.fixed(scenario.pnlXcpEquivalent, 2)} XCP-eq`}
             hint={inCurrency(scenario.pnlXcpEquivalent * xcpUsd, code, rate, num, true)}
             negative={scenario.pnlXcpEquivalent < 0}
           />
@@ -188,7 +175,7 @@ export function ExitRaceSimulator({
         <p className="mt-3 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
           {t(
             "Cash accounting values the {n}M unsold tokens at zero. It is intentionally not a mark-to-market portfolio return.",
-            { n: fixed2(scenario.retainedMillions, num) },
+            { n: num.fixed(scenario.retainedMillions, 2) },
           )}
         </p>
 
@@ -434,10 +421,7 @@ function ExitRaceChart({
               className="fill-gray-900 dark:fill-gray-100"
             >
               {t("coordinated break-even ≈ {n}", {
-                n: thresholds.breakEven.toLocaleString(num.intl, {
-                  minimumFractionDigits: 1,
-                  maximumFractionDigits: 1,
-                }),
+                n: num.fixed(thresholds.breakEven, 1),
               })}
             </text>
           )}

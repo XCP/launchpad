@@ -920,8 +920,5 @@ function priceText(
   num: Numbers,
 ): string {
   if (big(tokenRaw) === 0n) return "—";
-  return (ratio(xcpRaw, tokenRaw) / (divisible ? 1 : 1e8)).toLocaleString(num.intl, {
-    minimumFractionDigits: 8,
-    maximumFractionDigits: 8,
-  });
+  return num.fixed(ratio(xcpRaw, tokenRaw) / (divisible ? 1 : 1e8), 8);
 }

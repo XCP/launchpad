@@ -81,6 +81,23 @@ export function fixedRaw(raw: RawLike | null | undefined, decimals = 8, locale =
   }, intlLocale(locale));
 }
 
+/**
+ * A number to an exact number of decimal places, grouped.
+ *
+ * The shape that was being hand-written all over the app: the minimum and
+ * maximum fraction digits set to the same value. {@link commas} caps at eight
+ * places and drops the ones it does not need, which is right for a quantity
+ * and wrong for a column — 1.5 beside 1.50 reads as two different
+ * measurements taken to different precisions.
+ */
+export function fixed(n: number, places = 2, locale = "en"): string {
+  if (!Number.isFinite(n)) return "—";
+  return n.toLocaleString(intlLocale(locale), {
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
+  });
+}
+
 /** Sub-cent-safe price formatting with significant digits. */
 export function price(n: number, locale = "en"): string {
   if (n === 0) return "0";
@@ -278,6 +295,8 @@ export interface Numbers {
   commasRaw: (raw: RawLike | null | undefined, decimals?: number) => string;
   /** Grouped raw quantity padded to full precision, for aligned columns. */
   fixedRaw: (raw: RawLike | null | undefined, decimals?: number) => string;
+  /** A plain number to an exact number of places: 1.5 at 2 places is "1.50". */
+  fixed: (n: number, places?: number) => string;
   /** Sub-cent-safe price. */
   price: (n: number) => string;
   /** A fee rate in sat/vB. */
@@ -295,6 +314,7 @@ export function bindNumbers(locale: string): Numbers {
     commas: (n) => commas(n, locale),
     commasRaw: (raw, decimals) => commasRaw(raw, decimals, locale),
     fixedRaw: (raw, decimals) => fixedRaw(raw, decimals, locale),
+    fixed: (n, places) => fixed(n, places, locale),
     price: (n) => price(n, locale),
     satsPerVb: (n) => satsPerVb(n, locale),
     percent: (fraction, options) => percent(fraction, options, locale),

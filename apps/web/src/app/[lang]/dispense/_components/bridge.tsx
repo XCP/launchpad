@@ -30,6 +30,7 @@ import {
   big,
   parseUnitsToRaw,
   percentOf,
+  ratio,
   SATS,
   SATS_PER_UNIT,
 } from "@/lib/numeric";
@@ -942,9 +943,10 @@ function UnloadCard({
           {rich(t, "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles ~5 blocks after it confirms and returns the rest.", {
             lead: <span className="font-semibold">{t("Currently unloading:")}</span>,
             n: num.commas(existing.give_remaining / SATS),
-            sats: num.commas(
-              Math.round((existing.satoshirate / existing.give_quantity) * SATS),
-            ),
+            // Divided in the numeric layer rather than in doubles: both
+            // operands are raw quantities off the API, and the rate they
+            // make is the number a seller reads their own price off.
+            sats: num.commas(Math.round(ratio(existing.satoshirate, existing.give_quantity) * SATS)),
           })}
         </p>
         {compose.status === "error" && (

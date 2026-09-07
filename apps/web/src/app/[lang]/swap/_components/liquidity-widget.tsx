@@ -208,19 +208,14 @@ export function LiquidityWidget({
         )
       : big(tokenBalance ?? 0);
   // A share of the pool. The "%" is ours rather than a translation's, so it
-  // goes through Intl with the number — French and Russian space it off.
-  const pctOf = (x: number) =>
-    (x / 100).toLocaleString(num.intl, {
-      style: "percent",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
+  // goes through `num.percent` with the number — French and Russian space it
+  // off. `x` arrives already multiplied out, so it goes back to a ratio.
   const pctFmt = (x: number) =>
     x >= 100
       ? num.percent(1, { digits: 0 })
       : x >= 0.01
-        ? pctOf(x)
-        : `<${pctOf(0.01)}`;
+        ? num.percent(x / 100, { digits: 2, minDigits: 2 })
+        : `<${num.percent(0.01 / 100, { digits: 2, minDigits: 2 })}`;
   const lpToRemove = percentOf(lpBalance ?? 0, pct);
   const debouncedLp = useDebounced(approx(lpToRemove), 250);
 

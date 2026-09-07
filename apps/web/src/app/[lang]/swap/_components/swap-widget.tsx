@@ -257,15 +257,6 @@ export function SwapWidget({
     { refreshInterval: 60_000 },
   );
 
-  // Percent digits on their own, for the strings whose "%" belongs to the
-  // translation — the translated text places the sign and any space itself,
-  // so only the number is localized here.
-  const pctDigits = (n: number) =>
-    n.toLocaleString(num.intl, {
-      minimumFractionDigits: 1,
-      maximumFractionDigits: 1,
-    });
-
   const staleQuote = isValidating || amountRaw !== debouncedRaw;
   const outRaw: Raw = quote && amountRaw > 0 ? quote.estimated_output : 0;
   const out = approx(outRaw) / SATS;
@@ -688,7 +679,9 @@ export function SwapWidget({
                       : "text-gray-400 dark:text-gray-500"
                 }
               >
-                {t("Price impact {pct}%", { pct: pctDigits(impact) })}
+                {/* The "%" belongs to the translation, which places it and any
+                    space itself, so only the number is localized here. */}
+                {t("Price impact {pct}%", { pct: num.fixed(impact, 1) })}
               </span>
             )}
             {mempoolQuote && (
@@ -700,17 +693,13 @@ export function SwapWidget({
                 }
                 title={
                   mempoolQuote.pendingCount === 1
-                    ? t("{n} unconfirmed order on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: pctDigits(mempoolDrop) })
-                    : t("{n} unconfirmed orders on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: pctDigits(mempoolDrop) })
+                    ? t("{n} unconfirmed order on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: num.fixed(mempoolDrop, 1) })
+                    : t("{n} unconfirmed orders on this pair in the same direction. If they confirm first, this trade gets about {pct}% less than the quote. Auto slippage allows for it.", { n: mempoolQuote.pendingCount, pct: num.fixed(mempoolDrop, 1) })
                 }
               >
                 {t("{n} ahead in mempool", { n: mempoolQuote.pendingCount })}
                 {mempoolDrop > 0 &&
-                  ` · −${(mempoolDrop / 100).toLocaleString(num.intl, {
-                    style: "percent",
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  })}`}
+                  ` · −${num.percent(mempoolDrop / 100, { minDigits: 1 })}`}
               </span>
             )}
             {rateText && (
@@ -766,11 +755,7 @@ export function SwapWidget({
               <div className="flex justify-between">
                 <dt>{t("LP fee")}</dt>
                 <dd>
-                  {(quote.fee_bps / 10_000).toLocaleString(num.intl, {
-                    style: "percent",
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2,
-                  })}
+                  {num.percent(quote.fee_bps / 10_000, { digits: 2, minDigits: 2 })}
                 </dd>
               </div>
             )}

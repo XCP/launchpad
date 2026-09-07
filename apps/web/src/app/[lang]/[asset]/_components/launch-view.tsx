@@ -698,10 +698,7 @@ export function LaunchView({
               </div>
               <div className="mt-1 text-2xl font-bold text-gray-400 dark:text-gray-500">
                 {t("reached {pct}%", {
-                  pct: (progress * 100).toLocaleString(num.intl, {
-                    minimumFractionDigits: 1,
-                    maximumFractionDigits: 1,
-                  }),
+                  pct: num.fixed(progress * 100, 1),
                 })}
               </div>
             </div>
@@ -784,10 +781,7 @@ export function LaunchView({
             {t(
               "Reached {pct}% with {n} participants. A classic fairminter — no pool, no locked liquidity; distribution only.",
               {
-                pct: (progress * 100).toLocaleString(num.intl, {
-                  minimumFractionDigits: 1,
-                  maximumFractionDigits: 1,
-                }),
+                pct: num.fixed(progress * 100, 1),
                 n: num.commas(participants),
               },
             )}
@@ -827,11 +821,7 @@ export function LaunchView({
  * rounded away. The unit is never dropped: an unlabelled sub-one number in a
  * crypto UI reads as bitcoin to most people, and these are XCP.
  */
-const xcpPriceLabel = (xcpPrice: number, num: Numbers) =>
-  `${xcpPrice.toLocaleString(num.intl, {
-    minimumFractionDigits: 8,
-    maximumFractionDigits: 8,
-  })} XCP`;
+const xcpPriceLabel = (xcpPrice: number, num: Numbers) => `${num.fixed(xcpPrice, 8)} XCP`;
 
 /** Facts that still move, before those settled at launch. */
 const LIVE_FACTS = 3;

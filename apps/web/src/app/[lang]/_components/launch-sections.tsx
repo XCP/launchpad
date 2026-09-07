@@ -973,9 +973,7 @@ const progressPercent = (fraction: number, num: Numbers) =>
  *  not have, since both legs move with every block. */
 const paceCell = (row: SectionRow, height: number, num: Numbers) => {
   const pace = mintPace(row, height);
-  return pace === null
-    ? "—"
-    : pace.toLocaleString(num.intl, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return pace === null ? "—" : num.fixed(pace, 2);
 };
 
 const DENOMINATIONS: readonly Denomination[] = ["usd", "xcp"];
@@ -1088,13 +1086,6 @@ function launchReturns(
   };
 }
 
-/** Full eight places. These prices sit far below 1 XCP, so the usual two or
- *  four decimals would round most of them to the same number. */
-const priceLabel = (xcpPrice: number, num: Numbers) =>
-  xcpPrice > 0
-    ? xcpPrice.toLocaleString(num.intl, { minimumFractionDigits: 8, maximumFractionDigits: 8 })
-    : "—";
-
 const age = (announceBlock: number, height: number, t: T) =>
   announceBlock > 0 ? blocksDuration(height - announceBlock, t) : "—";
 
@@ -1136,7 +1127,9 @@ function LaunchTable({
     capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${num.compact(capXcp)} XCP`) : "—";
   // A token price sits far below a cent, so it needs more places than `fiat`
   // gives — but it is still the visitor's currency. The old form wrote a
-  // dollar sign over a figure the row beside it was quoting in euros.
+  // dollar sign over a figure the row beside it was quoting in euros. In XCP
+  // the price gets its full eight places, since two or four would round most
+  // of these to the same number.
   const priceCell = (priceXcp: number) =>
     priceXcp > 0
       ? inUsd
@@ -1146,7 +1139,7 @@ function LaunchTable({
             minimumFractionDigits: 2,
             maximumFractionDigits: 8,
           })
-        : `${priceLabel(priceXcp, num)} XCP`
+        : `${num.fixed(priceXcp, 8)} XCP`
       : "—";
   const returnCell = (value: number | null, suffix?: string) =>
     value === null ? (
