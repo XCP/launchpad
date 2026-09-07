@@ -17,6 +17,7 @@ import {
   fetchBtcUsd30dAgo,
   fetchXcpUsd,
   fetchXcpUsd30dAgo,
+  fetchXcpUsdDayAgo,
 } from "@/lib/api/price";
 import { priceChangePercent } from "@/lib/market";
 import { big } from "@/lib/numeric";
@@ -64,6 +65,7 @@ export default async function HomePage() {
     btcUsd,
     btcUsd30dAgo,
     xcpUsd30dAgo,
+    xcpUsdDayAgo,
     ...first
   ] = await Promise.all([
     fetchBlockHeight(),
@@ -71,6 +73,7 @@ export default async function HomePage() {
     fetchBtcUsd(),
     fetchBtcUsd30dAgo(),
     fetchXcpUsd30dAgo(),
+    fetchXcpUsdDayAgo(),
     // No `sort`: the API's own default for each phase, so the ordering has one
     // definition rather than a copy here that could drift from it.
     ...SECTIONS.map((phase) => fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0)),
@@ -231,6 +234,7 @@ export default async function HomePage() {
         paged={paged}
         height={blockHeight}
         xcpUsd={xcpUsd}
+        xcpUsdDayAgo={xcpUsdDayAgo}
       />
     </div>
   );

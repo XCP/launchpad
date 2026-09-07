@@ -17,6 +17,7 @@
  */
 import { q } from "#api/db";
 import { fetchXcpUsd } from "#api/integrations/price";
+import { dayAgoBucket, hourlyCloseAt, openingPrice } from "#api/queries/candles";
 import { circulatingSupplyRaw } from "@launchpad/xcp69/xcp69";
 import {
   MIN_TOKENS,
@@ -70,6 +71,10 @@ interface LaunchRow {
   last_mint_block: number | null;
   launch_xcp_usd: number | null;
   burned_quantity: string;
+  /** The raise and the reserve it was pooled against: the opening ratio a
+   *  24h change falls back to when the pair had not traded a day ago. */
+  paid_quantity: string | null;
+  pool_quantity: string | null;
 }
 
 interface MintRow {
@@ -158,7 +163,7 @@ export async function buildBacklog(
       db,
       `SELECT tx_hash, asset, announce_block, start_block, phase, soft_cap,
               hard_cap, earned_quantity, mints, minters, last_mint_block,
-              launch_xcp_usd, burned_quantity
+              launch_xcp_usd, burned_quantity, paid_quantity, pool_quantity
          FROM launches WHERE conforming = 1`,
     ),
     q<MintRow>(
@@ -365,11 +370,21 @@ export async function buildBacklog(
 
   // One cached quote for the whole batch, and no request at all on the usual
   // tick where there are no qualifying transaction totals to announce.
-  const xcpUsd = [...groupedTrades.values()].some(
+  const announced = [...groupedTrades.values()].filter(
     (t) => wholeTokens(t.tokenRaw) >= MIN_TOKENS,
-  )
-    ? await fetchXcpUsd()
-    : null;
+  );
+  const xcpUsd = announced.length > 0 ? await fetchXcpUsd() : null;
+  // Where each announced pair stood a day ago — one candle seek per asset,
+  // and none on the usual tick. A pair with no candle by then had not traded
+  // yet, and was still at the ratio its pool opened with.
+  const dayAgoClose = await hourlyCloseAt(
+    db,
+    announced.map((t) => t.asset),
+    dayAgoBucket(),
+  );
+  const openingPriceOf = new Map(
+    launches.map((l) => [l.asset, openingPrice(l.paid_quantity, l.pool_quantity)]),
+  );
 
   for (const t of groupedTrades.values()) {
     if (wholeTokens(t.tokenRaw) < MIN_TOKENS) continue;
@@ -394,6 +409,7 @@ export async function buildBacklog(
         marketXcpRaw: t.lastXcpRaw,
         xcpUsd,
         launchXcpUsd: launchXcpUsdOf.get(t.asset) ?? null,
+        priceDayAgoRaw: dayAgoClose.get(t.asset) ?? openingPriceOf.get(t.asset) ?? null,
         supplyRaw: circulatingSupplyOf.get(t.asset),
         txHash: t.txHash,
         address: t.address,

@@ -20,7 +20,7 @@ import {
 } from "@/lib/launch-row";
 import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xcp69";
 import { ratio } from "@/lib/numeric";
-import { usdPriceChangePercent } from "@/lib/market";
+import { priceChangePercent, usdPriceChangePercent } from "@/lib/market";
 import { useWallet } from "@/lib/wallet/wallet-context";
 
 type View = "grid" | "table";
@@ -127,6 +127,19 @@ const comparePerformance = (a: SectionRow, b: SectionRow): number => {
   return aRank === bRank ? 0 : bRank > aRank ? 1 : -1;
 };
 
+/** The day's move as a plain TOKEN/XCP ratio, matching SORT_SQL's
+ *  performance_24h. Rows with no day-ago price belong last. */
+const recentRank = (r: SectionRow): number =>
+  r.priceXcp > 0 && r.priceDayAgoXcp !== null && r.priceDayAgoXcp > 0
+    ? r.priceXcp / r.priceDayAgoXcp
+    : Number.NEGATIVE_INFINITY;
+
+const compareRecent = (a: SectionRow, b: SectionRow): number => {
+  const aRank = recentRank(a);
+  const bRank = recentRank(b);
+  return aRank === bRank ? 0 : bRank > aRank ? 1 : -1;
+};
+
 /**
  * Each phase is judged by its own measure, so each gets its own sort menu
  * rather than one shared list where two thirds of the options are inert.
@@ -146,7 +159,8 @@ const comparePerformance = (a: SectionRow, b: SectionRow): number => {
 const SORTS: Record<string, SortOption[]> = {
   graduated: [
     { id: "mcap", label: "Market cap", by: (a, b) => b.marketCapXcp - a.marketCapXcp },
-    { id: "performance", label: "Performance", by: comparePerformance },
+    { id: "performance", label: "Performance (All)", by: comparePerformance },
+    { id: "performance_24h", label: "Performance (24h)", by: compareRecent },
     { id: "minters", label: "Minters", by: (a, b) => minterRank(b) - minterRank(a) },
     { id: "newest", label: "Newest", by: (a, b) => announced(b) - announced(a) },
   ],
@@ -201,11 +215,17 @@ export interface InitialPages {
   scheduled: LaunchPage;
 }
 
+/** What the graduated returns, prices and caps are quoted in. One choice for
+ *  the page, like `View`, and USD by default because that is what the price
+ *  chart defaults to. */
+export type Denomination = "usd" | "xcp";
+
 export function LaunchSections({
   initial,
   paged,
   height,
   xcpUsd,
+  xcpUsdDayAgo,
 }: {
   initial: InitialPages;
   /**
@@ -221,11 +241,14 @@ export function LaunchSections({
   paged: boolean;
   height: number;
   xcpUsd: number | null;
+  /** Yesterday's XCP/USD daily mark: the dollar leg of a 24-hour return. */
+  xcpUsdDayAgo: number | null;
 }) {
   // One choice for the whole page: picking Table in one section and finding
   // the next still in cards reads as a bug, not a setting. Sections that
   // can't tabulate simply ignore it.
   const [view, setView] = useState<View>("grid");
+  const [denomination, setDenomination] = useState<Denomination>("usd");
   const { address, status: walletStatus } = useWallet();
   // The wallet itself is desktop-only (the header hides it below `sm`), and
   // this control follows the same boundary. Keep the data guard here too: CSS
@@ -251,6 +274,9 @@ export function LaunchSections({
         pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
+        xcpUsdDayAgo={xcpUsdDayAgo}
+        denomination={denomination}
+        onDenomination={setDenomination}
         view={view}
         onView={setView}
         walletAddress={null}
@@ -317,6 +343,9 @@ function Section({
   pendingMints,
   height,
   xcpUsd,
+  xcpUsdDayAgo = null,
+  denomination = "usd",
+  onDenomination,
   view,
   onView,
   walletAddress,
@@ -330,6 +359,10 @@ function Section({
   pendingMints: Map<string, number>;
   height: number;
   xcpUsd: number | null;
+  /** Only the graduated section quotes returns, so only it receives these. */
+  xcpUsdDayAgo?: number | null;
+  denomination?: Denomination;
+  onDenomination?: (d: Denomination) => void;
   view: View;
   onView: (v: View) => void;
   /** Connected wallet eligible for the live-launch filter. Null hides it. */
@@ -565,6 +598,34 @@ function Section({
 
         {showControls && (
           <div className="flex shrink-0 items-center gap-2">
+            {/* USD or XCP for every return, price and cap in this section: the
+                same switch the price chart has, with the same default. Shown
+                on phones too, unlike the Trading Data link beside it, because
+                it changes the numbers on the cards rather than leading
+                somewhere else. */}
+            {onDenomination && (
+              <div
+                role="group"
+                aria-label="Quote returns and prices in"
+                className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 text-xs font-medium dark:border-gray-800 dark:bg-gray-900"
+              >
+                {DENOMINATIONS.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-pressed={denomination === d}
+                    onClick={() => onDenomination(d)}
+                    className={`rounded-full px-2.5 py-1 transition-colors ${
+                      denomination === d
+                        ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+                        : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+                    }`}
+                  >
+                    {d.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
             {phase === "graduated" && (
               <a
                 href="https://opreturn.art/"
@@ -652,6 +713,8 @@ function Section({
               offset={current * perPage}
               height={height}
               xcpUsd={xcpUsd}
+              xcpUsdDayAgo={xcpUsdDayAgo}
+              denomination={denomination}
             />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
@@ -661,6 +724,8 @@ function Section({
                   row={r}
                   height={height}
                   xcpUsd={xcpUsd}
+                  xcpUsdDayAgo={xcpUsdDayAgo}
+                  denomination={denomination}
                   pending={pendingMints.get(r.fm.asset) ?? 0}
                   fresh={r.fm.asset === fresh}
                 />
@@ -820,6 +885,124 @@ function Pager({
   );
 }
 
+/** A change with its sign, to a tenth: +12.5%, −3%, 0%. Both chips on the
+ *  graduated card use it, so they cannot round differently. */
+const signedPercent = (n: number) =>
+  `${n > 0 ? "+" : ""}${n.toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  })}%`;
+
+const DENOMINATIONS: readonly Denomination[] = ["usd", "xcp"];
+
+/** One return in the card's stat row: a caption/value line from `sm` up, a
+ *  labelled pill below it. Both from one component so the two breakpoints
+ *  cannot show different numbers. */
+function StatLine({
+  label,
+  value,
+  up,
+  title,
+  pillLabel = true,
+}: {
+  label: string;
+  value: string | null;
+  up: boolean;
+  title: string;
+  /** Whether the phone pill carries its label. The all-time pill goes
+   *  without one: it is the bigger number and sits first, and on a 79px
+   *  half-card the word costs more than it explains — the 24h pill under it
+   *  is the one that needs saying. */
+  pillLabel?: boolean;
+}) {
+  const tone = up ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400";
+  const pill = up
+    ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400"
+    : "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400";
+  return (
+    <>
+      <div className="hidden items-baseline justify-between gap-1 text-[11px] tabular-nums sm:flex" title={title}>
+        <span className={STAT_CAPTION}>{label}</span>
+        <span className={`font-semibold ${tone}`}>{value ?? "—"}</span>
+      </div>
+      <span
+        className={`self-end whitespace-nowrap rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums sm:hidden ${
+          value === null ? "bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500" : pill
+        }`}
+        title={title}
+      >
+        {value ?? "—"}
+        {pillLabel && <span className="font-medium opacity-60"> {label.toLowerCase()}</span>}
+      </span>
+    </>
+  );
+}
+
+/** The caption over a card stat. It must never wrap: two cells side by side
+ *  share a baseline only while both captions are one line, and at 360px a
+ *  card is 158px wide, so the tracking and size step down there. */
+const STAT_CAPTION =
+  "whitespace-nowrap text-[9px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 sm:text-[10px] sm:tracking-wider";
+
+/**
+ * A graduated launch's two returns, in the chosen denomination.
+ *
+ * Since mint: the token's move from what minters paid. In dollars it carries
+ * XCP's own move too, each side at the XCP/USD rate that applied then; in
+ * XCP it is the TOKEN/XCP ratio alone.
+ *
+ * Recent: the move over the window that has actually elapsed. A market
+ * younger than a day is measured from the price its pool opened at, and
+ * saying "24h" over a six-hour-old pool would claim a day that has not
+ * happened, so the label is the market's age until it reaches one, in the
+ * same block-derived hours as the "6h ago" line under the card. The final
+ * mint is what graduates a launch, so its block is when the market opened.
+ * That same fact chooses the dollar baseline: yesterday's XCP/USD mark for a
+ * full day, or the graduation mark for a younger market.
+ *
+ * The day-ago dollar mark is a daily close from the explorer's calendar,
+ * where the live rate is the dispenser ask; on a one-day window that
+ * mismatch can be a few points of the number, which is why XCP is offered as
+ * the exact reading and neither is silently substituted for the other. No
+ * mark means no number, not a fallback to the other denomination.
+ */
+function launchReturns(
+  row: SectionRow,
+  height: number,
+  xcpUsd: number | null,
+  xcpUsdDayAgo: number | null,
+  denomination: Denomination,
+): { sinceMint: number | null; recent: number | null; window: string } {
+  const launchPriceXcp = ratio(row.fm.price, row.fm.quantity_by_price);
+  const marketAgeBlocks = height - (row.lastMintBlock ?? row.announceBlock);
+  const youngMarket = marketAgeBlocks > 0 && marketAgeBlocks < 144;
+  const window = youngMarket ? `${Math.max(1, Math.round(marketAgeBlocks / 6))}h` : "24h";
+  const finite = (n: number | null) => (n !== null && Number.isFinite(n) ? n : null);
+  if (denomination === "xcp") {
+    return {
+      sinceMint: finite(priceChangePercent(row.priceXcp, launchPriceXcp)),
+      recent:
+        row.priceDayAgoXcp !== null
+          ? finite(priceChangePercent(row.priceXcp, row.priceDayAgoXcp))
+          : null,
+      window,
+    };
+  }
+  const recentUsdBaseline = youngMarket ? row.launchXcpUsd : xcpUsdDayAgo;
+  return {
+    sinceMint: finite(
+      usdPriceChangePercent(row.priceXcp, xcpUsd, launchPriceXcp, row.launchXcpUsd),
+    ),
+    recent:
+      row.priceDayAgoXcp !== null
+        ? finite(
+            usdPriceChangePercent(row.priceXcp, xcpUsd, row.priceDayAgoXcp, recentUsdBaseline),
+          )
+        : null,
+    window,
+  };
+}
+
 /** Full eight places. These prices sit far below 1 XCP, so the usual two or
  *  four decimals would round most of them to the same number. */
 const priceLabel = (xcpPrice: number) =>
@@ -841,20 +1024,51 @@ function LaunchTable({
   offset,
   height,
   xcpUsd,
+  xcpUsdDayAgo = null,
+  denomination = "usd",
 }: {
   rows: SectionRow[];
   phase: LaunchPhase;
   offset: number;
   height: number;
   xcpUsd: number | null;
+  xcpUsdDayAgo?: number | null;
+  denomination?: Denomination;
 }) {
   const graduated = phase === "graduated";
   const scheduled = phase === "scheduled";
-  // Scheduled has no progress and no raise — nothing has been minted — so it
-  // lines up the only three facts it actually has rather than padding the row
-  // with columns of zero.
+  // The graduated columns follow the section's USD/XCP switch: cap and price
+  // are quoted in it, and the two returns are computed in it, by the same
+  // function the cards use. Scheduled has no progress and no raise — nothing
+  // has been minted — so it lines up the only three facts it actually has
+  // rather than padding the row with columns of zero.
+  const inUsd = denomination === "usd" && xcpUsd !== null && xcpUsd > 0;
+  const capCell = (capXcp: number) =>
+    capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${compact(capXcp)} XCP`) : "—";
+  const priceCell = (priceXcp: number) =>
+    priceXcp > 0
+      ? inUsd
+        ? `$${(priceXcp * xcpUsd).toLocaleString("en-US", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 8,
+          })}`
+        : `${priceLabel(priceXcp)} XCP`
+      : "—";
+  const returnCell = (value: number | null, suffix?: string) =>
+    value === null ? (
+      "—"
+    ) : (
+      <span
+        className={
+          value >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+        }
+      >
+        {signedPercent(value)}
+        {suffix && <span className="text-gray-400 dark:text-gray-500"> {suffix}</span>}
+      </span>
+    );
   const head = graduated
-    ? ["Market cap", "Price", "Graduated", "Holders"]
+    ? ["Market cap", "Price", "All-time", "24h", "Graduated", "Holders"]
     : scheduled
       ? ["Opens", "Closes", "Announced"]
       : ["Progress", "Raised", "Minters", "Closes"];
@@ -862,7 +1076,7 @@ function LaunchTable({
   return (
     // Its own scroller: a wide table must never make the page scroll sideways.
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
-      <table className="w-full min-w-[38rem] text-sm">
+      <table className={`w-full text-sm ${graduated ? "min-w-[48rem]" : "min-w-[38rem]"}`}>
         <thead>
           <tr className="border-b border-gray-100 dark:border-gray-800">
             <th scope="col" className={`px-3 py-2.5 text-left ${LABEL}`}>
@@ -878,6 +1092,9 @@ function LaunchTable({
         <tbody>
           {rows.map((r, i) => {
             const deadline = r.fm.soft_cap_deadline_block || r.fm.end_block;
+            const returns = graduated
+              ? launchReturns(r, height, xcpUsd, xcpUsdDayAgo, denomination)
+              : null;
             return (
               <tr key={r.fm.tx_hash} className="border-b border-gray-50 dark:border-gray-800 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-800/60">
                 <td className="px-3 py-2.5">
@@ -901,14 +1118,17 @@ function LaunchTable({
                 </td>
                 {graduated ? (
                   <>
+                    <Cell>{capCell(r.marketCapXcp)}</Cell>
+                    <Cell>{priceCell(r.priceXcp)}</Cell>
+                    <Cell>{returnCell(returns?.sinceMint ?? null)}</Cell>
+                    {/* A market younger than a day says so beside its number,
+                        since the column header promises a day. */}
                     <Cell>
-                      {r.marketCapXcp > 0
-                        ? xcpUsd
-                          ? usd(r.marketCapXcp * xcpUsd)
-                          : `${compact(r.marketCapXcp)} XCP`
-                        : "—"}
+                      {returnCell(
+                        returns?.recent ?? null,
+                        returns && returns.window !== "24h" ? returns.window : undefined,
+                      )}
                     </Cell>
-                    <Cell>{priceLabel(r.priceXcp)}</Cell>
                     <Cell>{age(r.lastMintBlock ?? r.announceBlock, height)}</Cell>
                     <Cell>{holderText(r.holders)}</Cell>
                   </>
@@ -991,12 +1211,16 @@ function Card({
   row,
   height,
   xcpUsd,
+  xcpUsdDayAgo,
+  denomination,
   pending,
   fresh,
 }: {
   row: SectionRow;
   height: number;
   xcpUsd: number | null;
+  xcpUsdDayAgo: number | null;
+  denomination: Denomination;
   /** Unconfirmed mints queued for this asset right now. */
   pending: number;
   /** This is the section's front slot — see the pin in Section. */
@@ -1004,23 +1228,13 @@ function Card({
 }) {
   const { fm, phase, conforming } = row;
   const deadline = fm.soft_cap_deadline_block || fm.end_block;
-  const launchPriceXcp = ratio(fm.price, fm.quantity_by_price);
-  const performance =
-    phase === "graduated"
-      ? usdPriceChangePercent(
-          row.priceXcp,
-          xcpUsd,
-          launchPriceXcp,
-          row.launchXcpUsd,
-        )
-      : null;
-  const performanceLabel =
-    performance !== null && Number.isFinite(performance)
-      ? `${performance > 0 ? "+" : ""}${performance.toLocaleString("en-US", {
-          minimumFractionDigits: 0,
-          maximumFractionDigits: 1,
-        })}%`
-      : null;
+  const returns =
+    phase === "graduated" ? launchReturns(row, height, xcpUsd, xcpUsdDayAgo, denomination) : null;
+  const performance = returns?.sinceMint ?? null;
+  const performanceLabel = performance !== null ? signedPercent(performance) : null;
+  const dayChange = returns?.recent ?? null;
+  const dayChangeLabel = dayChange !== null ? signedPercent(dayChange) : null;
+  const windowLabel = returns?.window ?? "24h";
 
   const chip =
     phase === "scheduled" ? (
@@ -1029,16 +1243,16 @@ function Card({
       <Chip tone="blue">Minting</Chip>
     ) : null;
 
+  // Graduated cards carry their market cap in the stat row under the art,
+  // where it leads, in whichever denomination the section is switched to.
   const headline =
-    phase === "graduated"
-      ? row.marketCapXcp > 0
-        ? xcpUsd
-          ? usd(row.marketCapXcp * xcpUsd)
-          : `${compact(row.marketCapXcp)} XCP`
-        : undefined
-      : phase === "minting"
-        ? `${(row.progress * 100).toFixed(1)}%`
-        : undefined;
+    phase === "minting" ? `${(row.progress * 100).toFixed(1)}%` : undefined;
+  const capLabel =
+    row.marketCapXcp > 0
+      ? denomination === "usd" && xcpUsd
+        ? usd(row.marketCapXcp * xcpUsd)
+        : `${compact(row.marketCapXcp)} XCP`
+      : "—";
 
   // Bottom-left. Participation for the phases that have it: XCP-69 caps one
   // address at 1M of a 69M soft cap, so a launch needs 69 distinct minters to
@@ -1157,15 +1371,6 @@ function Card({
           className="size-full object-cover transition-transform duration-300 group-hover:scale-105"
         />
         {chip && <div className="absolute left-2 top-2">{chip}</div>}
-        {performanceLabel && (
-          <div className="absolute right-2 top-2">
-            <Chip tone={performance !== null && performance >= 0 ? "green" : "dark"}>
-              <span title="USD return from the mint price at launch">
-                {performanceLabel}
-              </span>
-            </Chip>
-          </div>
-        )}
         {/* Top-right, opposite the phase chip: a crown, and how long it has
             worn it.
 
@@ -1233,6 +1438,49 @@ function Card({
           </div>
         )}
       </div>
+
+      {/* The market's numbers, off the art, market cap first. The returns used
+          to be a pill over the image — one number, no label, and nothing to
+          say how it had been trading lately, which made +5,000% read as a
+          claim rather than a market — and for a while they were the row's
+          two cells, which made a percentage the card's biggest fact and the
+          cap a footnote. Cap leads now; the two returns are its context, in
+          the right half: "All" from the mint price, and the window that has
+          actually elapsed ("24h", or "6h" on a market younger than a day —
+          see windowLabel).
+
+          Two renderings of that right half, by breakpoint. On a wide card
+          they are two caption/value lines. A phone card is 158px wide, and
+          79px cannot hold "ALL +5,161.6%" as caption plus value, so there
+          the returns are two tinted pills that carry their label inside —
+          the colour does the reading from arm's length. */}
+      {phase === "graduated" && (
+        <div className="grid grid-cols-2 divide-x divide-gray-100 border-b border-gray-100 dark:divide-gray-800 dark:border-gray-800">
+          <div className="px-2 py-2 sm:px-3">
+            <div className={STAT_CAPTION}>Market cap</div>
+            <div className="text-[15px] font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-base">
+              {capLabel}
+            </div>
+          </div>
+          <div className="flex flex-col justify-center gap-0.5 px-2 py-2 sm:px-3">
+            <StatLine
+              label="All"
+              value={performanceLabel}
+              up={performance !== null && performance >= 0}
+              title={`${denomination === "usd" ? "USD" : "XCP"} return from the mint price at launch`}
+              pillLabel={false}
+            />
+            <StatLine
+              label={windowLabel}
+              value={dayChangeLabel}
+              up={dayChange !== null && dayChange >= 0}
+              title={`Change in ${denomination === "usd" ? "USD" : "XCP"} over the last ${
+                windowLabel === "24h" ? "24 hours" : `${windowLabel}, since the pool opened`
+              }`}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center justify-between gap-2">

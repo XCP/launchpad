@@ -9,7 +9,8 @@
 import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
 import type { MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
-import type { Raw } from "@/lib/numeric";
+import { PRICE_SCALE } from "@launchpad/xcp69/candles";
+import { type Raw, ratio } from "@/lib/numeric";
 
 /**
  * The custom domain remains the canonical browser API origin and the host in
@@ -100,6 +101,10 @@ interface ApiLaunchRow {
   launch_xcp_usd?: number | null;
   /** Optional during the API/web rolling deploy. */
   display_description?: string | null;
+  /** Graduated only: the price 24 hours ago in the candle unit (XCP sats per
+   *  whole token × PRICE_SCALE), or the pool's opening ratio for a launch
+   *  younger than that. Optional during the API/web rolling deploy. */
+  price_24h_ago?: string | null;
 }
 
 export interface IndexedLaunch {
@@ -124,6 +129,9 @@ export interface IndexedLaunch {
    *  historical XCP/USD mark instead of cancelling XCP's own move. */
   launchTime: number | null;
   launchXcpUsd: number | null;
+  /** XCP per whole token 24 hours ago — the 24h change's baseline. Null
+   *  before graduation, and from a worker that does not send it yet. */
+  priceDayAgoXcp: number | null;
   /** Creator prose from D1; null until the bounded metadata worklist resolves it. */
   displayDescription: string | null;
   /** Launch tokens actually destroyed, net of any pre-graduation pool reservation. */
@@ -696,6 +704,9 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
     lastMintBlock: row.last_mint_block ?? null,
     launchTime: row.launch_time ?? null,
     launchXcpUsd: row.launch_xcp_usd ?? null,
+    // The candle unit divided by the scale the candles route also reports,
+    // so this baseline and the chart's closes are the same number.
+    priceDayAgoXcp: row.price_24h_ago ? ratio(row.price_24h_ago, PRICE_SCALE) : null,
     displayDescription: row.display_description?.trim() || null,
     burnedQuantity: row.burned_quantity ?? "0",
   };

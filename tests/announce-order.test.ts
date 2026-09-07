@@ -40,6 +40,9 @@ const fakeDb = (rows: Rows) => {
         first: async () => pick(sql)[0] ?? null,
       }),
     }),
+    // The day-ago candle lookup batches one seek per announced asset. No
+    // candles here: the pair's 24h window is not what this file tests.
+    batch: async (statements: unknown[]) => statements.map(() => ({ results: [] })),
   } as unknown as D1Database;
 };
 

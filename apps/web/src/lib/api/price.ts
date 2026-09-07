@@ -10,6 +10,7 @@ interface Ticker {
   btc: number | null;
   btcUsd30dAgo: number | null;
   xcpUsd30dAgo: number | null;
+  xcpUsdDayAgo: number | null;
 }
 
 export interface DailyXcpUsd {
@@ -36,35 +37,43 @@ async function fetchTicker(): Promise<Ticker> {
         btc: null,
         btcUsd30dAgo: null,
         xcpUsd30dAgo: null,
+        xcpUsdDayAgo: null,
       };
     }
     const result = (await res.json())?.result;
     const num = (v: unknown) => (typeof v === "number" && v > 0 ? v : null);
     const xcpDay =
       typeof result?.xcp?.day === "string" ? result.xcp.day : null;
-    const monthAgo = xcpDay
-      ? new Date(Date.parse(`${xcpDay}T00:00:00Z`) - 30 * 86_400_000)
-          .toISOString()
-          .slice(0, 10)
-      : null;
-    const monthAgoRow = Array.isArray(result?.history)
-      ? [...result.history]
-          .reverse()
-          .find(
-            (row: unknown) =>
-              typeof row === "object" &&
-              row !== null &&
-              typeof (row as { day?: unknown }).day === "string" &&
-              monthAgo !== null &&
-              (row as { day: string }).day <= monthAgo &&
-              num((row as { usd?: unknown }).usd) !== null,
-          )
-      : null;
+    // The newest daily row at or before a calendar day, `days` before the
+    // ticker's own day. Walked from the newest end because the calendar runs
+    // back to 2014 and the answer is always near the front of it.
+    const rowDaysAgo = (days: number) => {
+      const target = xcpDay
+        ? new Date(Date.parse(`${xcpDay}T00:00:00Z`) - days * 86_400_000)
+            .toISOString()
+            .slice(0, 10)
+        : null;
+      return Array.isArray(result?.history) && target !== null
+        ? [...result.history]
+            .reverse()
+            .find(
+              (row: unknown) =>
+                typeof row === "object" &&
+                row !== null &&
+                typeof (row as { day?: unknown }).day === "string" &&
+                (row as { day: string }).day <= target &&
+                num((row as { usd?: unknown }).usd) !== null,
+            )
+        : null;
+    };
+    const monthAgoRow = rowDaysAgo(30);
+    const dayAgoRow = rowDaysAgo(1);
     return {
       xcp: num(result?.xcp?.usd),
       btc: num(result?.btc?.usd),
       btcUsd30dAgo: num(monthAgoRow?.btc),
       xcpUsd30dAgo: num(monthAgoRow?.usd),
+      xcpUsdDayAgo: num(dayAgoRow?.usd),
     };
   } catch {
     return {
@@ -72,6 +81,7 @@ async function fetchTicker(): Promise<Ticker> {
       btc: null,
       btcUsd30dAgo: null,
       xcpUsd30dAgo: null,
+      xcpUsdDayAgo: null,
     };
   }
 }
@@ -90,6 +100,15 @@ export async function fetchBtcUsd30dAgo(): Promise<number | null> {
 /** XCP/USD daily close from 30 days before the current ticker day. */
 export async function fetchXcpUsd30dAgo(): Promise<number | null> {
   return (await fetchTicker()).xcpUsd30dAgo;
+}
+
+/** XCP/USD daily close from the day before the current ticker day: the
+ *  dollar leg of a graduated launch's 24-hour return. The calendar's mark and
+ *  the live dispenser ask are different feeds, which is why the card offers
+ *  this as a switch off an XCP-denominated default rather than as the only
+ *  reading. */
+export async function fetchXcpUsdDayAgo(): Promise<number | null> {
+  return (await fetchTicker()).xcpUsdDayAgo;
 }
 
 /**

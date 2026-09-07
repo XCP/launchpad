@@ -128,7 +128,9 @@ describe("messages", () => {
     });
     expect(m.text).toContain("0.00004000 XCP/token · $50.00");
     expect(m.text).toContain("MCap: 4,000 XCP · $10,000.00");
-    expect(m.text).toContain("Performance: +700.0%");
+    // No day-ago price was supplied, so the day's window is a dash, not 0%.
+    expect(m.text).toContain("24 Hours: —");
+    expect(m.text).toContain("All-Time: +700.0%");
     expect(m.text).toContain(`https://xcp.io/tx/${"ab".repeat(32)}`);
     expect(m.text).toContain("1KacrY…6hC9");
     expect(m.text).toContain("https://xcp.fun/profile/1KacrYMuQW5eqLbrYUotQ1mdsVpxin6hC9");
@@ -333,7 +335,7 @@ describe("multi-fill trade messages", () => {
     expect(m.text).toContain("2,991,199 tokens · 120.98 XCP filled · 3 fills");
     expect(m.text).toContain("Avg 0.00004044 XCP/token");
     expect(m.text).toContain("MCap: 4,533.34 XCP");
-    expect(m.text).toContain("Performance: +353.3%");
+    expect(m.text).toContain("All-Time: +353.3%");
   });
 });
 
@@ -383,7 +385,7 @@ describe("trade performance", () => {
       launchXcpUsd: 3,
     });
     // Token/XCP is +300%, while XCP/USD halved: dollar performance is +100%.
-    expect(m.text).toContain("Performance: +100.0%");
+    expect(m.text).toContain("All-Time: +100.0%");
   });
 
   it("keeps XCP-only performance when an old launch has no USD baseline", () => {
@@ -395,7 +397,46 @@ describe("trade performance", () => {
       venue: "pool",
       xcpUsd: 1.5,
     });
-    expect(m.text).toContain("Performance: +300.0%");
+    expect(m.text).toContain("All-Time: +300.0%");
+  });
+
+  it("reports the day's move in XCP beside the all-time dollar return", () => {
+    const m = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      venue: "pool",
+      xcpUsd: 1.5,
+      launchXcpUsd: 3,
+      // 20 XCP for 500k tokens is 4,000 in the candle unit; a day ago 2,000.
+      priceDayAgoRaw: 2_000n,
+    });
+    // The day is measured in XCP and ignores XCP's own dollar move, which the
+    // all-time figure (halved by XCP/USD falling from 3 to 1.5) still carries.
+    expect(m.text).toContain("24 Hours: +100.0%");
+    expect(m.text).toContain("All-Time: +100.0%");
+  });
+
+  it("signs a day's fall with a minus and a flat day with nothing", () => {
+    const down = trade({
+      asset: "A",
+      buy: false,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      venue: "pool",
+      priceDayAgoRaw: 5_000n,
+    });
+    expect(down.text).toContain("24 Hours: −20.0%");
+    const flat = trade({
+      asset: "A",
+      buy: true,
+      tokenRaw: raw(500_000n),
+      xcpRaw: raw(20n),
+      venue: "pool",
+      priceDayAgoRaw: 4_000n,
+    });
+    expect(flat.text).toContain("24 Hours: 0.0%");
   });
 });
 

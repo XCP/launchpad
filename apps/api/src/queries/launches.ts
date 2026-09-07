@@ -1,4 +1,5 @@
 import { one, q } from "#api/db";
+import { dayAgoBucket, openingPrice } from "#api/queries/candles";
 import type { LaunchPhase } from "@launchpad/xcp69/xcp69";
 
 export interface LaunchRow {
@@ -52,6 +53,12 @@ export interface LaunchRow {
   /** Creator prose mirrored from hosted metadata. Empty means checked with no
    *  safe prose; null means the metadata worklist has not reached it yet. */
   display_description: string | null;
+  /** What a graduated launch traded at 24 hours ago, in the candle table's
+   *  unit (XCP sats per whole token × PRICE_SCALE). Only the site's list and
+   *  detail reads carry it — see priceDayAgoColumn — and only graduated rows
+   *  with a pool have a value; a launch that graduated within the day is
+   *  measured from the price its pool opened at. */
+  price_24h_ago?: string | null;
 }
 
 const BASE_COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisible,
@@ -66,6 +73,45 @@ const BASE_COLUMNS = `tx_hash, tx_index, asset, asset_longname, source, divisibl
 
 /** Detail reads get the full creator prose. */
 const COLUMNS = `${BASE_COLUMNS}, display_description`;
+
+/**
+ * A graduated launch's price 24 hours ago, as one more column on the reads
+ * that render a card: the close of the newest hourly candle that had started
+ * by `at`, in the candle table's own unit.
+ *
+ * Correlated rather than joined. With idx_price_candles_series it is one seek
+ * per graduated row that stops at its first hit, so a page of twelve cards
+ * reads twelve candle rows; the other phases get NULL without touching the
+ * table at all. NULL for a graduated pool that had not traded by then, too —
+ * the read layer fills that in from the launch's own reserves
+ * (`withPriceDayAgo`), because that answer is not in this table.
+ *
+ * `at` is inlined as a literal. It comes from the clock, never from a
+ * request, and D1 binds are positional — the statements this joins already
+ * number their own placeholders differently, so a bound cutoff would need a
+ * different index in each.
+ */
+function priceDayAgoColumn(at: number): string {
+  if (!Number.isSafeInteger(at) || at < 0) throw new Error(`bad candle cutoff ${at}`);
+  return `CASE WHEN phase = 'graduated' THEN (
+    SELECT c.close FROM price_candles c
+     WHERE c.asset = launches.asset AND c.resolution = '1h' AND c.bucket_start <= ${at}
+     ORDER BY c.bucket_start DESC
+     LIMIT 1
+  ) END AS price_24h_ago`;
+}
+
+/** A graduated pool that had not traded by the cutoff was still sitting at
+ *  the ratio it opened with. Without a pool there is no price at all. */
+function withPriceDayAgo<T extends LaunchRow>(row: T): T {
+  if (row.phase !== "graduated" || row.price_24h_ago != null || !row.pool_token_reserve) {
+    return row;
+  }
+  return {
+    ...row,
+    price_24h_ago: openingPrice(row.paid_quantity, row.pool_quantity)?.toString() ?? null,
+  };
+}
 
 /** Lists only need the one-line card copy, and only graduated cards render it.
  *  This bounds the cached homepage payload even if an issuer used the full
@@ -110,11 +156,12 @@ export async function listLaunches(
   db: D1Database,
   perPhase: number,
 ): Promise<LaunchRow[]> {
+  const dayAgo = priceDayAgoColumn(dayAgoBucket());
   const perPhaseRows = await db.batch<LaunchRow>(
     PHASE_ORDER.map((phase) =>
       db
         .prepare(
-          `SELECT ${LIST_COLUMNS} FROM launches
+          `SELECT ${LIST_COLUMNS}, ${dayAgo} FROM launches
             WHERE conforming = 1 AND phase = ?1
             ORDER BY ${phase === "graduated" ? "market_cap_rank" : "rank_key"} DESC,
                      tx_index DESC
@@ -126,7 +173,7 @@ export async function listLaunches(
   // Concatenated in PHASE_ORDER, which is what the old query's trailing
   // ORDER BY CASE phase ... produced — the ordering is now structural rather
   // than something the database has to sort for.
-  return perPhaseRows.flatMap((r) => r.results);
+  return perPhaseRows.flatMap((r) => r.results.map(withPriceDayAgo));
 }
 
 /** Is this string one of the four phases? The paged route takes the phase from
@@ -182,6 +229,27 @@ const SORT_SQL = {
      AND launch_xcp_usd > 0
     THEN (CAST(pool_xcp_reserve AS REAL) / CAST(pool_token_reserve AS REAL))
        / ((CAST(price AS REAL) / CAST(quantity_by_price AS REAL)) * launch_xcp_usd)
+    ELSE NULL
+  END DESC`,
+  // The day's move in XCP: current TOKEN/XCP over the close of the newest
+  // hourly candle that had started a day ago, or the pool's opening ratio
+  // when it had not traded by then — the fallback withPriceDayAgo applies to
+  // the column, restated here because a sort key has to be SQL. It is XCP
+  // rather than dollars on purpose: the dollar leg of a day's return is a
+  // common factor for every market older than a day, so the order is the
+  // same; only markets younger than a day can differ, and only slightly.
+  //
+  // `price_24h_ago` is the result column priceDayAgoColumn adds to the page
+  // read, resolved here by alias, which SQLite permits inside an ORDER BY
+  // expression. So this key is only valid on a statement that selects it.
+  performance_24h: `CASE
+    WHEN CAST(pool_xcp_reserve AS REAL) > 0
+     AND CAST(pool_token_reserve AS REAL) > 0
+     AND CAST(pool_quantity AS REAL) > 0
+    THEN (CAST(pool_xcp_reserve AS REAL) / CAST(pool_token_reserve AS REAL))
+       / (COALESCE(CAST(price_24h_ago AS REAL),
+                   CAST(paid_quantity AS REAL) * 100000000.0 / CAST(pool_quantity AS REAL))
+          / 100000000.0)
     ELSE NULL
   END DESC`,
   closing: "current_deadline_block ASC",
@@ -316,7 +384,7 @@ export async function listLaunchPage(
   const statements = [
     db
       .prepare(
-        `SELECT ${LIST_COLUMNS} FROM launches
+        `SELECT ${LIST_COLUMNS}, ${priceDayAgoColumn(dayAgoBucket())} FROM launches
           WHERE conforming = 1 AND phase = ?1${notMintedPage}
           ORDER BY ${order}
           LIMIT ?2 OFFSET ?3`,
@@ -356,7 +424,7 @@ export async function listLaunchPage(
   const [page, count, king] = await db.batch<LaunchRow & { n: number }>(statements);
 
   return {
-    rows: page.results as LaunchRow[],
+    rows: (page.results as LaunchRow[]).map(withPriceDayAgo),
     total: (count.results[0] as { n: number } | undefined)?.n ?? 0,
     king: wantsKing ? ((king?.results[0] as LaunchRow | undefined) ?? null) : null,
   };
@@ -480,19 +548,21 @@ export function countByPhase(db: D1Database): Promise<PhaseCount[]> {
   );
 }
 
-export function getLaunch(db: D1Database, asset: string): Promise<LaunchRow | null> {
+export async function getLaunch(db: D1Database, asset: string): Promise<LaunchRow | null> {
   // A ticker can be re-launched (migration 0016), so this pick is a policy,
   // not a lookup: the conforming record is the one this site has an opinion
   // about, and between two the newer fairminter is the live story. A pending
   // verdict (NULL) ranks below a settled conforming row, so a relaunch takes
   // the page over only once it has actually passed the predicate.
-  return one<LaunchRow>(
+  const row = await one<LaunchRow>(
     db,
-    `SELECT ${COLUMNS} FROM launches WHERE asset = ?1
+    `SELECT ${COLUMNS}, ${priceDayAgoColumn(dayAgoBucket())} FROM launches
+      WHERE asset = ?1
       ORDER BY (conforming IS 1) DESC, tx_index DESC
       LIMIT 1`,
     asset,
   );
+  return row ? withPriceDayAgo(row) : null;
 }
 
 /** A wallet's own launches, newest-announced first. Non-conforming launches

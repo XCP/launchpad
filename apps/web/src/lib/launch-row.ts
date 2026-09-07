@@ -39,6 +39,9 @@ export interface SectionRow {
   lastMintBlock: number | null;
   /** XCP/USD fixed when the token graduated and its market launched. */
   launchXcpUsd: number | null;
+  /** XCP per whole token a day ago; null until graduated, or on a path that
+   *  cannot answer it. The card's 24h change is measured against this. */
+  priceDayAgoXcp: number | null;
   /** Creator prose for the graduated card, already mirrored into D1. */
   displayDescription: string | null;
   /** Launch tokens actually destroyed, net of any pre-graduation pool reservation. */
@@ -66,6 +69,8 @@ export interface RowSource {
   lastMintBlock?: number | null;
   /** Optional on the live Counterparty fallback and older API workers. */
   launchXcpUsd?: number | null;
+  /** Optional on the live Counterparty fallback and older API workers. */
+  priceDayAgoXcp?: number | null;
   /** Optional because the launch index tracks minters, not current owners. */
   holders?: number | null;
   /** Optional on the live Counterparty fallback and older API workers. */
@@ -100,6 +105,7 @@ export function toSectionRow(p: RowSource): SectionRow {
     // Undefined on the live-derivation path, which has no index to ask.
     lastMintBlock: p.lastMintBlock ?? null,
     launchXcpUsd: p.launchXcpUsd ?? null,
+    priceDayAgoXcp: p.priceDayAgoXcp ?? null,
     displayDescription: p.displayDescription?.trim() || null,
     burnedQuantity: p.burnedQuantity ?? "0",
   };
