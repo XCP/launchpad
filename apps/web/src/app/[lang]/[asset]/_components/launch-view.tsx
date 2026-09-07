@@ -19,19 +19,11 @@ import type { ChartCandle, FeeSummary } from "@/lib/api/launchpad-api";
 import type { ChartResolution } from "@/lib/candles";
 import { LABEL } from "@/components/ui/tokens";
 import { LaunchRoomProvider } from "@/app/[lang]/[asset]/_components/launch-room";
-import {
-  blocksEta,
-  commas,
-  commasRaw,
-  compact,
-  fromSats,
-  price as formatPrice,
-  shortAddress,
-  tokenQty,
-} from "@/lib/format";
+import { blocksEta, fromSats, shortAddress, tokenQty } from "@/lib/format";
 import { big, rawEquals } from "@/lib/numeric";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import { usdPriceChangePercent } from "@/lib/market";
 import {
   circulatingSupplyRaw,
@@ -99,6 +91,7 @@ export function LaunchView({
   displayDescription: string | null;
   burnedQuantity: string;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const progress = saleProgress(fm);
@@ -164,32 +157,32 @@ export function LaunchView({
   /* The stat strip: dense, phase-specific, no prose. */
   const strip: [string, string][] = pool
     ? [
-        [t("24h volume"), `${commas(fromSats(poolVolume["24h"].volumeXcpRaw))} XCP`],
+        [t("24h volume"), `${num.commas(fromSats(poolVolume["24h"].volumeXcpRaw))} XCP`],
         [
           // No "LP burned" here: the launch's own LP was burned, but anyone can
           // add liquidity on top afterwards, so the claim doesn't hold for the
           // live total. It belongs on the locked pool row in Holders, which is
           // about the burned position specifically.
           t("Liquidity"),
-          `${commas(Math.round(poolXcp))} XCP${xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""}`,
+          `${num.commas(Math.round(poolXcp))} XCP${xcpUsd ? ` (${usd(poolXcp * xcpUsd)})` : ""}`,
         ],
-        [t("In pool"), `${compact(poolTokens)} ${asset}`],
+        [t("In pool"), `${num.compact(poolTokens)} ${asset}`],
         [
           t("Holders"),
-          `${commas(holderCount ?? participants)}${
-            participants ? ` · ${t("{n} minted", { n: commas(participants) })}` : ""
+          `${num.commas(holderCount ?? participants)}${
+            participants ? ` · ${t("{n} minted", { n: num.commas(participants) })}` : ""
           }`,
         ],
         // Two numbers that say whether the supply is spread or held. A creator
         // at 0% is the strongest thing this page can state about them, and it
         // sits next to the B/S markers on the chart saying the same thing.
-        [t("Top 10"), concentration ? `${concentration.top10Pct.toFixed(1)}%` : "—"],
+        [t("Top 10"), concentration ? num.percent(concentration.top10Pct / 100) : "—"],
         [
           t("Creator holds"),
           concentration
             ? concentration.devPct === 0
               ? t("nothing")
-              : `${concentration.devPct.toFixed(1)}%`
+              : num.percent(concentration.devPct / 100)
             : "—",
         ],
         // "Raised" and "Opened at" were dropped: for a CONFORMING launch both
@@ -200,22 +193,22 @@ export function LaunchView({
         [
           t("Sold out in"),
           fm.soft_cap_deadline_block - fm.start_block === 1
-            ? t("{n} block", { n: commas(fm.soft_cap_deadline_block - fm.start_block) })
-            : t("{n} blocks", { n: commas(fm.soft_cap_deadline_block - fm.start_block) }),
+            ? t("{n} block", { n: num.commas(fm.soft_cap_deadline_block - fm.start_block) })
+            : t("{n} blocks", { n: num.commas(fm.soft_cap_deadline_block - fm.start_block) }),
         ],
       ]
     : // A classic fairminter that met its target — "graduated" without a
       // pool to show a spot price for.
       [
-        [t("Reached"), `${(progress * 100).toFixed(1)}%`],
+        [t("Reached"), num.percent(progress)],
         [
           t("Holders"),
-          `${commas(holderCount ?? participants)}${
-            participants ? ` · ${t("{n} minted", { n: commas(participants) })}` : ""
+          `${num.commas(holderCount ?? participants)}${
+            participants ? ` · ${t("{n} minted", { n: num.commas(participants) })}` : ""
           }`,
         ],
-        [t("Raised"), `${commasRaw(fm.paid_quantity)} XCP`],
-        [t("Supply"), compact(supplyTokens)],
+        [t("Raised"), `${num.commasRaw(fm.paid_quantity)} XCP`],
+        [t("Supply"), num.compact(supplyTokens)],
       ];
 
   // Scheduled: a poster, not a terminal — nothing has happened yet, so
@@ -433,7 +426,7 @@ export function LaunchView({
               </div>
               <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
                 {fm.soft_cap_deadline_block - blockHeight > 0
-                  ? t("Block {n}", { n: commas(fm.soft_cap_deadline_block) })
+                  ? t("Block {n}", { n: num.commas(fm.soft_cap_deadline_block) })
                   : t("closing")}
               </div>
             </div>
@@ -518,7 +511,7 @@ export function LaunchView({
                 {t("Refunded")}
               </div>
               <div className="mt-1 text-3xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
-                {commasRaw(fm.paid_quantity)}{" "}
+                {num.commasRaw(fm.paid_quantity)}{" "}
                 <span className="text-base font-semibold text-gray-400 dark:text-gray-500">XCP</span>
               </div>
             </div>
@@ -531,7 +524,7 @@ export function LaunchView({
               {t("Holders")}
             </div>
             <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-              {participants}
+              {num.commas(participants)}
             </div>
           </div>
           <div>
@@ -539,7 +532,7 @@ export function LaunchView({
               {t("Mints")}
             </div>
             <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-              {mints.length}
+              {num.commas(mints.length)}
             </div>
           </div>
           <div>
@@ -547,7 +540,7 @@ export function LaunchView({
               {t("Reached")}
             </div>
             <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-              {(progress * 100).toFixed(1)}%
+              {num.percent(progress)}
             </div>
           </div>
           <div>
@@ -568,7 +561,7 @@ export function LaunchView({
             <WhoWasHere
               addresses={topMinters}
               issuerSource={fm.source}
-              amount={(source) => `${commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))} ${asset}`}
+              amount={(source) => `${num.commas(tokenQty(byAddress.get(source) ?? 0n, fm.divisible))} ${asset}`}
             />
             {extraMinters > 0 && (
               <a
@@ -577,7 +570,7 @@ export function LaunchView({
                 rel="noreferrer"
                 className="mt-3 inline-block text-xs font-medium text-purple-600 dark:text-purple-400 hover:underline"
               >
-                {t("+{n} more on the explorer ↗", { n: extraMinters })}
+                {t("+{n} more on the explorer ↗", { n: num.commas(extraMinters) })}
               </a>
             )}
           </div>
@@ -618,7 +611,7 @@ export function LaunchView({
               <div className="shrink-0 sm:absolute sm:right-7 sm:top-7">
                 <ShareButton
                   asset={asset}
-                  headline={pool ? `${formatPrice(spot)} XCP` : t("minted out")}
+                  headline={pool ? `${num.price(spot)} XCP` : t("minted out")}
                   subline={
                     conforming
                       ? t("0.01 XCP / 1,000 · sells out or refunds")
@@ -642,8 +635,8 @@ export function LaunchView({
               {holderCount !== null && (
                 <span className="rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/60 px-2 py-0.5 text-[11px] text-gray-600 dark:text-gray-400 tabular-nums">
                   {holderCount === 1
-                    ? t("{n} holder", { n: commas(holderCount) })
-                    : t("{n} holders", { n: commas(holderCount) })}
+                    ? t("{n} holder", { n: num.commas(holderCount) })
+                    : t("{n} holders", { n: num.commas(holderCount) })}
                 </span>
               )}
               {isOurMetadata(fm.description) ? (
@@ -671,15 +664,15 @@ export function LaunchView({
                 label={t("Market cap")}
                 value={mcapUsd ? usd(mcapUsd) : "—"}
                 sub={t("{cap} XCP · {supply} supply", {
-                  cap: compact(spot * supplyTokens),
-                  supply: compact(supplyTokens),
+                  cap: num.compact(spot * supplyTokens),
+                  supply: num.compact(supplyTokens),
                 })}
               />
               {/* The mint multiple moved to the rail: four numbers here against
                   two on the left was what made the pair look lopsided. */}
               <Factoid
                 label={t("Price")}
-                value={xcpPriceLabel(spot)}
+                value={xcpPriceLabel(spot, num)}
                 // The change lives on the sub line: at eight decimals the
                 // price is the widest thing on the row, and hanging a
                 // percentage off it made it wider still.
@@ -691,8 +684,7 @@ export function LaunchView({
                       <span
                         className={change >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
                       >
-                        {change >= 0 ? "+" : ""}
-                        {change.toFixed(1)}% {t("since mint")}
+                        {num.percent(change / 100, { signed: true })} {t("since mint")}
                       </span>
                     )}
                   </>
@@ -705,7 +697,12 @@ export function LaunchView({
                 {t("Minted out")}
               </div>
               <div className="mt-1 text-2xl font-bold text-gray-400 dark:text-gray-500">
-                {t("reached {pct}%", { pct: (progress * 100).toFixed(1) })}
+                {t("reached {pct}%", {
+                  pct: (progress * 100).toLocaleString(num.intl, {
+                    minimumFractionDigits: 1,
+                    maximumFractionDigits: 1,
+                  }),
+                })}
               </div>
             </div>
           )}
@@ -723,7 +720,7 @@ export function LaunchView({
             </div>
             <span className="shrink-0 text-xs text-gray-500 dark:text-gray-400 tabular-nums">
               {athPct >= 99.5 ? t("at ATH") : t("{pct}% of ATH", { pct: athPct.toFixed(0) })}{" "}
-              <span className="text-gray-400 dark:text-gray-500">{xcpPriceLabel(athPrice)}</span>
+              <span className="text-gray-400 dark:text-gray-500">{xcpPriceLabel(athPrice, num)}</span>
             </span>
           </div>
         )}
@@ -786,7 +783,13 @@ export function LaunchView({
           <p className="mt-1.5 text-sm text-gray-600 dark:text-gray-400">
             {t(
               "Reached {pct}% with {n} participants. A classic fairminter — no pool, no locked liquidity; distribution only.",
-              { pct: (progress * 100).toFixed(1), n: participants },
+              {
+                pct: (progress * 100).toLocaleString(num.intl, {
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                }),
+                n: num.commas(participants),
+              },
             )}
           </p>
         </div>
@@ -824,8 +827,8 @@ export function LaunchView({
  * rounded away. The unit is never dropped: an unlabelled sub-one number in a
  * crypto UI reads as bitcoin to most people, and these are XCP.
  */
-const xcpPriceLabel = (xcpPrice: number) =>
-  `${xcpPrice.toLocaleString("en-US", {
+const xcpPriceLabel = (xcpPrice: number, num: Numbers) =>
+  `${xcpPrice.toLocaleString(num.intl, {
     minimumFractionDigits: 8,
     maximumFractionDigits: 8,
   })} XCP`;

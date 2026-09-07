@@ -12,6 +12,7 @@ import { usePortfolio } from "@/app/[lang]/profile/_lib/use-portfolio";
 import { totalPnlXcpSats } from "@/lib/positions";
 import { WITHHELD_COPY } from "@/lib/withheld-copy";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 
 type Denom = "usd" | "xcp";
 
@@ -21,11 +22,11 @@ type Denom = "usd" | "xcp";
  * are whole by construction (a mint buys round lots), except below one, where
  * dropping them would render the whole holding as "0".
  */
-function holding(n: number): string {
+function holding(n: number, num: Numbers): string {
   if (n > 0 && n < 1) {
-    return n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    return n.toLocaleString(num.intl, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return n.toLocaleString(num.intl, { maximumFractionDigits: 0 });
 }
 
 function Pnl({
@@ -85,6 +86,7 @@ function ValueOverWindow({ values, format }: { values: number[]; format: (v: num
 
 export function PositionsTab({ address }: { address: string }) {
   const t = useT();
+  const num = useNumbers();
   const usd = useFiat();
   const { code } = useFxRate();
   const { portfolio, isLoading } = usePortfolio(address);
@@ -106,7 +108,7 @@ export function PositionsTab({ address }: { address: string }) {
   const money = (sats: bigint): string => {
     const xcp = fromSats(sats.toString());
     if (showing === "usd" && xcpUsd) return usd(xcp * xcpUsd);
-    return `${xcp.toLocaleString("en-US", { maximumFractionDigits: 2 })} XCP`;
+    return `${xcp.toLocaleString(num.intl, { maximumFractionDigits: 2 })} XCP`;
   };
 
   const totalXcpSats = open.reduce((sum, p) => sum + p.valueXcpSats, 0n);
@@ -139,7 +141,7 @@ export function PositionsTab({ address }: { address: string }) {
     return xcp * (rateAt(p.block) ?? xcpUsd ?? 0);
   });
   const chartLabel = (v: number) =>
-    showing === "usd" ? usd(v) : `${v.toLocaleString("en-US", { maximumFractionDigits: 2 })} XCP`;
+    showing === "usd" ? usd(v) : `${v.toLocaleString(num.intl, { maximumFractionDigits: 2 })} XCP`;
 
   return (
     <div className="space-y-4">
@@ -223,7 +225,7 @@ export function PositionsTab({ address }: { address: string }) {
                       <span className="truncate font-medium">{p.asset}</span>
                     </LazyLink>
                     <span className="text-right tabular-nums text-gray-600 dark:text-gray-400">
-                      {holding(tokenQty(p.balance.toString(), div))}
+                      {holding(tokenQty(p.balance.toString(), div), num)}
                     </span>
                     <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
                       {money(p.valueXcpSats)}

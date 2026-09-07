@@ -12,9 +12,9 @@ import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
-import { commasRaw, price as formatPrice, satsPerVb } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { rich } from "@/lib/i18n/rich";
 import {
   approx,
@@ -84,6 +84,7 @@ export function LiquidityWidget({
   assets: string[];
   xcpUsd: number | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
@@ -206,8 +207,20 @@ export function LiquidityWidget({
             reserveXcp,
         )
       : big(tokenBalance ?? 0);
+  // A share of the pool. The "%" is ours rather than a translation's, so it
+  // goes through Intl with the number — French and Russian space it off.
+  const pctOf = (x: number) =>
+    (x / 100).toLocaleString(num.intl, {
+      style: "percent",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   const pctFmt = (x: number) =>
-    x >= 100 ? "100%" : x >= 0.01 ? `${x.toFixed(2)}%` : "<0.01%";
+    x >= 100
+      ? num.percent(1, { digits: 0 })
+      : x >= 0.01
+        ? pctOf(x)
+        : `<${pctOf(0.01)}`;
   const lpToRemove = percentOf(lpBalance ?? 0, pct);
   const debouncedLp = useDebounced(approx(lpToRemove), 250);
 
@@ -367,7 +380,7 @@ export function LiquidityWidget({
     <div className="flex justify-between">
       <dt>{t("TX fee")}</dt>
       <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
-        {satsPerVb(feeRate)} sat/vB
+        {num.satsPerVb(feeRate)} sat/vB
         {btcUsd != null && (
           <span className="text-gray-400 dark:text-gray-500">
             {" "}
@@ -381,7 +394,7 @@ export function LiquidityWidget({
   const gasRow = (gasFee ?? 0) > 0 && (
     <div className="flex justify-between">
       <dt>{t("Protocol gas fee")}</dt>
-      <dd>{commasRaw(gasFee ?? 0)} XCP</dd>
+      <dd>{num.commasRaw(gasFee ?? 0)} XCP</dd>
     </div>
   );
 
@@ -425,7 +438,7 @@ export function LiquidityWidget({
                       }}
                       className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                     >
-                      {p === 100 ? t("Max") : `${p}%`}
+                      {p === 100 ? t("Max") : num.percent(p / 100, { digits: 0 })}
                     </button>
                   ))}
                 </span>
@@ -452,7 +465,7 @@ export function LiquidityWidget({
                       setTokenAmount(fmtAmount(approx(maxDepositRaw) / SATS));
                     }}
                   >
-                    {t("Balance: {n}", { n: commasRaw(tokenBalance) })}
+                    {t("Balance: {n}", { n: num.commasRaw(tokenBalance) })}
                   </button>
                 )}
                 {tokenBalance === undefined && <BalanceUnavailable error={tokenBalanceError} />}
@@ -517,7 +530,7 @@ export function LiquidityWidget({
                         );
                       }}
                     >
-                      {t("Balance: {n}", { n: commasRaw(xcpBalance) })}
+                      {t("Balance: {n}", { n: num.commasRaw(xcpBalance) })}
                     </button>
                   )}
                   {xcpBalance === undefined && <BalanceUnavailable error={xcpBalanceError} />}
@@ -559,8 +572,8 @@ export function LiquidityWidget({
                 className="text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               >
                 {rateInverted
-                  ? `1 XCP = ${formatPrice(1 / spotRate)} ${asset}`
-                  : `1 ${asset} = ${formatPrice(spotRate)} XCP`}
+                  ? `1 XCP = ${num.price(1 / spotRate)} ${asset}`
+                  : `1 ${asset} = ${num.price(spotRate)} XCP`}
                 {xcpUsd && (
                   <span className="text-gray-400 dark:text-gray-500">
                     {" "}
@@ -578,13 +591,13 @@ export function LiquidityWidget({
                 <div className="flex justify-between">
                   <dt>{t("LP minted (est.)")}</dt>
                   <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
-                    {commasRaw(depositQuote.quantity_minted_estimate)}
+                    {num.commasRaw(depositQuote.quantity_minted_estimate)}
                   </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>{t("Min LP · slippage {pct}%", { pct: lqSlippage })}</dt>
+                  <dt>{t("Min LP · slippage {pct}%", { pct: num.commas(lqSlippage) })}</dt>
                   <dd className="tabular-nums">
-                    {commasRaw(
+                    {num.commasRaw(
                       reduceByPercent(
                         depositQuote.quantity_minted_estimate,
                         lqSlippage,
@@ -617,10 +630,10 @@ export function LiquidityWidget({
               {rich(t, "Your position: {position} · {pct} of the pool", {
                 position: (
                   <span className="font-medium text-gray-700 dark:text-gray-300">
-                    {commasRaw((big(lpBalance ?? 0) * reserveToken) / lpSupply)}{" "}
+                    {num.commasRaw((big(lpBalance ?? 0) * reserveToken) / lpSupply)}{" "}
                     {asset}
                     {" + "}
-                    {commasRaw((big(lpBalance ?? 0) * reserveXcp) / lpSupply)}{" "}
+                    {num.commasRaw((big(lpBalance ?? 0) * reserveXcp) / lpSupply)}{" "}
                     XCP
                   </span>
                 ),
@@ -634,7 +647,9 @@ export function LiquidityWidget({
           <div className="rounded-2xl bg-gray-50 dark:bg-gray-800/60 p-4">
             <div className="flex items-baseline justify-between text-xs text-gray-500 dark:text-gray-400">
               <span>{t("Amount to remove")}</span>
-              <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">{pct}%</span>
+              <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+                {num.percent(pct / 100, { digits: 0 })}
+              </span>
             </div>
             <input
               type="range"
@@ -657,7 +672,7 @@ export function LiquidityWidget({
                       : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-600"
                   }`}
                 >
-                  {p === 100 ? t("Max") : `${p}%`}
+                  {p === 100 ? t("Max") : num.percent(p / 100, { digits: 0 })}
                 </button>
               ))}
             </div>
@@ -667,13 +682,13 @@ export function LiquidityWidget({
               <div className="flex justify-between">
                 <dt>{t("Your LP balance")}</dt>
                 <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
-                  {commasRaw(lpBalance ?? 0)}
+                  {num.commasRaw(lpBalance ?? 0)}
                 </dd>
               </div>
               <div className="flex justify-between">
                 <dt>{t("You receive (est.)")}</dt>
                 <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
-                  {commasRaw(outTokenRaw)} {asset} + {commasRaw(outXcpRaw)} XCP
+                  {num.commasRaw(outTokenRaw)} {asset} + {num.commasRaw(outXcpRaw)} XCP
                   {xcpUsd && approx(outXcpRaw) > 0 ? (
                     <span className="font-normal text-gray-400 dark:text-gray-500">
                       {" "}
@@ -684,11 +699,11 @@ export function LiquidityWidget({
               </div>
               {approx(outTokenRaw) > 0 && (
                 <div className="flex justify-between">
-                  <dt>{t("Min received · slippage {pct}%", { pct: lqSlippage })}</dt>
+                  <dt>{t("Min received · slippage {pct}%", { pct: num.commas(lqSlippage) })}</dt>
                   <dd className="tabular-nums">
-                    {commasRaw(reduceByPercent(outTokenRaw, lqSlippage))}{" "}
+                    {num.commasRaw(reduceByPercent(outTokenRaw, lqSlippage))}{" "}
                     {asset} +{" "}
-                    {commasRaw(reduceByPercent(outXcpRaw, lqSlippage))} XCP
+                    {num.commasRaw(reduceByPercent(outXcpRaw, lqSlippage))} XCP
                   </dd>
                 </div>
               )}

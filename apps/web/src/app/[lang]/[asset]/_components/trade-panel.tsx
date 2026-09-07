@@ -12,9 +12,9 @@ import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
-import { commasRaw, price as formatPrice, satsPerVb } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import {
   approx,
   parseUnitsToRaw,
@@ -83,6 +83,7 @@ export function TradePanel({
   /** Controlled Buy/Sell (the /limit page owns the tabs); hides the pills. */
   side?: "buy" | "sell";
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
@@ -414,8 +415,7 @@ export function TradePanel({
                       limitFillsNow ? "text-green-700 dark:text-green-400" : "text-gray-500 dark:text-gray-400"
                     }
                   >
-                    {priceDelta > 0 ? "+" : ""}
-                    {priceDelta.toFixed(1)}% {t("vs pool")}
+                    {num.percent(priceDelta / 100, { signed: true })} {t("vs pool")}
                   </span>
                 ) : (
                   <span>&nbsp;</span>
@@ -428,7 +428,7 @@ export function TradePanel({
                     className="text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
                     onClick={() => setLimitPrice(fmtPriceInput(spot))}
                   >
-                    {t("Pool:")} {formatPrice(spot)}
+                    {t("Pool:")} {num.price(spot)}
                   </button>
                 )}
                 {bookRef !== null && (
@@ -437,7 +437,7 @@ export function TradePanel({
                     className="text-gray-500 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400"
                     onClick={() => setLimitPrice(fmtPriceInput(bookRef))}
                   >
-                    {side === "buy" ? t("Ask") : t("Bid")}: {formatPrice(bookRef)}
+                    {side === "buy" ? t("Ask") : t("Bid")}: {num.price(bookRef)}
                   </button>
                 )}
               </span>
@@ -447,7 +447,7 @@ export function TradePanel({
           <AmountInput
             value={limitPrice}
             onChange={setLimitPrice}
-            placeholder={spot ? formatPrice(spot) : "0"}
+            placeholder={spot ? num.price(spot) : "0"}
             ariaLabel={t("Limit price in XCP per {asset}", { asset })}
             className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           />
@@ -518,7 +518,7 @@ export function TradePanel({
                           setAmountStr(fmtAmount(approx(tokenBalance) / SATS));
                         }}
                       >
-                        {t("Balance:")} {commasRaw(tokenBalance)}
+                        {t("Balance:")} {num.commasRaw(tokenBalance)}
                       </button>
                     )}
                     {tokenBalance === undefined && <BalanceUnavailable error={tokenBalanceError} />}
@@ -570,7 +570,7 @@ export function TradePanel({
                           setTotalStr(fmtAmount(approx(xcpBalance) / SATS));
                         }}
                       >
-                        {t("Balance:")} {commasRaw(xcpBalance)}
+                        {t("Balance:")} {num.commasRaw(xcpBalance)}
                       </button>
                     )}
                     {xcpBalance === undefined && <BalanceUnavailable error={xcpBalanceError} />}
@@ -608,8 +608,8 @@ export function TradePanel({
               <dt>{t("Min received")}</dt>
               <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                 {side === "buy"
-                  ? `${commasRaw(limitAmountExact)} ${asset}`
-                  : `${commasRaw(limitTotalExact)} XCP`}
+                  ? `${num.commasRaw(limitAmountExact)} ${asset}`
+                  : `${num.commasRaw(limitTotalExact)} XCP`}
               </dd>
             </div>
             {fillPct !== null && (
@@ -637,7 +637,7 @@ export function TradePanel({
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
-                  {satsPerVb(feeRate)} sat/vB
+                  {num.satsPerVb(feeRate)} sat/vB
                   {btcUsd != null && (
                     <span className="text-gray-400 dark:text-gray-500">
                       {" "}

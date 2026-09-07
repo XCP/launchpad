@@ -10,14 +10,7 @@ import {
   type Fairmint,
 } from "@/lib/api/counterparty";
 import { BURN_ADDRESS } from "@/lib/inscriber/constants";
-import {
-  commas,
-  commasRaw,
-  compact,
-  fixedRaw,
-  shortAddress,
-  tokenQty,
-} from "@/lib/format";
+import { shortAddress, tokenQty } from "@/lib/format";
 import { big, compareRawDesc, type Raw, ratio, sumRaw } from "@/lib/numeric";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import { isBusy } from "@/hooks/use-busy";
@@ -37,6 +30,7 @@ import {
 } from "@/components/address-hover-card";
 import { useMempool } from "@/hooks/use-mempool";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import {
   fetchAssetTradesPage,
@@ -52,6 +46,10 @@ import {
 } from "@/lib/holders";
 
 const PER_PAGE = 25;
+
+/** Eight-place XCP, the shape `fixedRaw` writes — for the handful of values
+ *  that arrive as already-divided doubles rather than raw satoshi. */
+const EIGHT_PLACES = { minimumFractionDigits: 8, maximumFractionDigits: 8 } as const;
 
 /**
  * Column layout shared by the Trades and Orders tables, which render the same
@@ -128,6 +126,7 @@ export function ActivityTabs({
    *  itself locked — see splitPoolByLock. */
   lpAsset?: string | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const { address } = useWallet();
   const { orders: mempoolOrders } = useMempool(30_000);
@@ -283,8 +282,8 @@ export function ActivityTabs({
       o,
       isBuy,
       price: ratio(xcp, tokens),
-      amountText: compact(tokenQty(tokens, divisible)),
-      xcpText: fixedRaw(xcp),
+      amountText: num.compact(tokenQty(tokens, divisible)),
+      xcpText: num.fixedRaw(xcp),
     };
   });
   const bids = book.filter((r) => r.isBuy).sort((a, b) => b.price - a.price);
@@ -325,16 +324,16 @@ export function ActivityTabs({
             isPool: true as const,
             isBuy: false,
             price: poolSpot / (1 - POOL_FEE),
-            amountText: compact(poolTok * (1 - 1 / Math.sqrt(1 + POOL_BAND))),
-            xcpText: (poolXcp * (Math.sqrt(1 + POOL_BAND) - 1)).toFixed(8),
+            amountText: num.compact(poolTok * (1 - 1 / Math.sqrt(1 + POOL_BAND))),
+            xcpText: (poolXcp * (Math.sqrt(1 + POOL_BAND) - 1)).toLocaleString(num.intl, EIGHT_PLACES),
           },
           {
             o: null,
             isPool: true as const,
             isBuy: true,
             price: poolSpot * (1 - POOL_FEE),
-            amountText: compact(poolTok * (1 / Math.sqrt(1 - POOL_BAND) - 1)),
-            xcpText: (poolXcp * (1 - Math.sqrt(1 - POOL_BAND))).toFixed(8),
+            amountText: num.compact(poolTok * (1 / Math.sqrt(1 - POOL_BAND) - 1)),
+            xcpText: (poolXcp * (1 - Math.sqrt(1 - POOL_BAND))).toLocaleString(num.intl, EIGHT_PLACES),
           },
         ]
       : [];
@@ -590,10 +589,10 @@ export function ActivityTabs({
                           )}
                         </span>
                         <span className="relative z-10 text-right tabular-nums text-gray-900 dark:text-gray-100">
-                          {commas(tokenQty(r.earned, divisible))}
+                          {num.commas(tokenQty(r.earned, divisible))}
                         </span>
                         <span className="relative z-10 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                          {commasRaw(r.paid)} XCP
+                          {num.commasRaw(r.paid)} XCP
                         </span>
                         <span className="relative z-10 text-right tabular-nums text-gray-500 dark:text-gray-400">
                           {r.mints === 1 ? t("{n} TX", { n: r.mints }) : t("{n} TXs", { n: r.mints })}
@@ -651,7 +650,7 @@ export function ActivityTabs({
                       rel="noreferrer"
                       className="relative z-10 shrink-0 text-right text-gray-900 dark:text-gray-100 hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                     >
-                      {compact(tokenQty(p.quantity, divisible))}{" "}
+                      {num.compact(tokenQty(p.quantity, divisible))}{" "}
                       <span className="text-gray-400 dark:text-gray-500">{t("pending")}</span>
                     </a>
                   </li>
@@ -753,13 +752,13 @@ export function ActivityTabs({
                           {trade.buy ? t("↗ Buy") : t("↘ Sell")}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                          {(ratio(trade.xcpRaw, trade.tokenRaw) / (divisible ? 1 : 1e8)).toFixed(8)}
+                          {(ratio(trade.xcpRaw, trade.tokenRaw) / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
-                          {compact(tokens)}
+                          {num.compact(tokens)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
-                          {fixedRaw(trade.xcpRaw)}
+                          {num.fixedRaw(trade.xcpRaw)}
                         </td>
                         <td className="px-3 py-2">
                           <span className="flex items-center gap-1.5 whitespace-nowrap">
@@ -784,8 +783,8 @@ export function ActivityTabs({
                             rel="noreferrer"
                             title={
                               at
-                                ? t("{time} · block {n}", { time: at.toUTCString(), n: commas(trade.block) })
-                                : t("Block {n}", { n: commas(trade.block) })
+                                ? t("{time} · block {n}", { time: at.toUTCString(), n: num.commas(trade.block) })
+                                : t("Block {n}", { n: num.commas(trade.block) })
                             }
                             className="hover:text-purple-700 dark:hover:text-purple-300 hover:underline"
                           >
@@ -795,12 +794,12 @@ export function ActivityTabs({
                                 {timeAgo(trade.time, t)}
                               </time>
                             ) : (
-                              commas(trade.block)
+                              num.commas(trade.block)
                             )}
                             {at && coarse && (
                               <span className="text-gray-400 dark:text-gray-500">
                                 {" "}
-                                · {commas(trade.block)}
+                                · {num.commas(trade.block)}
                               </span>
                             )}
                           </a>
@@ -839,8 +838,8 @@ export function ActivityTabs({
                 const displayedQuantity = tokenQty(h.quantity, divisible);
                 const quantityText =
                   displayedQuantity > 0 && displayedQuantity < 0.01
-                    ? commasRaw(h.quantity, divisible ? 8 : 0)
-                    : compact(displayedQuantity);
+                    ? num.commasRaw(h.quantity, divisible ? 8 : 0)
+                    : num.compact(displayedQuantity);
                 return (
                   <li
                     key={h.address}
@@ -933,7 +932,7 @@ export function ActivityTabs({
                         <>
                           {quantityText}{" "}
                           <span className="text-gray-400 dark:text-gray-500">
-                            ({pct >= 0.1 ? pct.toFixed(1) : "<0.1"}%)
+                            ({pct >= 0.1 ? num.percent(pct / 100) : `<${num.percent(0.001)}`})
                           </span>
                         </>
                       )}
@@ -990,15 +989,20 @@ export function ActivityTabs({
                           <td colSpan={6} className="px-4 py-1.5 text-center text-[11px] text-gray-500 dark:text-gray-400">
                             {t("spread")}{" "}
                             <span className="tabular-nums text-gray-700 dark:text-gray-300">
-                              {(bestBid / (divisible ? 1 : 1e8)).toFixed(8)}
+                              {(bestBid / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
                             </span>{" "}
                             →{" "}
                             <span className="tabular-nums text-gray-700 dark:text-gray-300">
-                              {(bestAsk / (divisible ? 1 : 1e8)).toFixed(8)}
+                              {(bestAsk / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
                             </span>
                             {bestBid > 0 && (
                               <span className="ml-1.5 text-gray-400 dark:text-gray-500">
-                                ({t("{n}× apart", { n: (bestAsk / bestBid).toFixed(2) })})
+                                ({t("{n}× apart", {
+                                  n: (bestAsk / bestBid).toLocaleString(num.intl, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2,
+                                  }),
+                                })})
                               </span>
                             )}
                           </td>
@@ -1013,7 +1017,7 @@ export function ActivityTabs({
                           {pool ? t("◆ Pool") : isBuy ? t("↗ Bid") : t("↘ Ask")}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                          {(price / (divisible ? 1 : 1e8)).toFixed(8)}
+                          {(price / (divisible ? 1 : 1e8)).toLocaleString(num.intl, EIGHT_PLACES)}
                         </td>
                         <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-900 dark:text-gray-100">
                           {amountText}
@@ -1064,8 +1068,8 @@ export function ActivityTabs({
                             </button>
                           ) : (
                             <>
-                              {(filled * 100).toFixed(0)}% ·{" "}
-                              {o!.expire_index === null ? "GTC" : commas(o!.expire_index)}
+                              {num.percent(filled, { digits: 0 })} ·{" "}
+                              {o!.expire_index === null ? "GTC" : num.commas(o!.expire_index)}
                             </>
                           )}
                         </td>

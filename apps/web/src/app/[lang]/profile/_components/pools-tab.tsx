@@ -13,6 +13,7 @@ import { fromSats, tokenQty } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { big, ratio } from "@/lib/numeric";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 
 type Denom = "usd" | "xcp";
 
@@ -29,14 +30,14 @@ interface PoolPosition {
   poolSharePct: number | null;
 }
 
-function holding(n: number): string {
+function holding(n: number, num: Numbers): string {
   if (n > 0 && n < 1) {
-    return n.toLocaleString("en-US", {
+    return n.toLocaleString(num.intl, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     });
   }
-  return n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+  return n.toLocaleString(num.intl, { maximumFractionDigits: 0 });
 }
 
 async function loadPosition(
@@ -94,6 +95,7 @@ export function PoolsTab({
   xcp69Assets: Set<string>;
 }) {
   const t = useT();
+  const num = useNumbers();
   const usd = useFiat();
   const { code } = useFxRate();
   const [denom, setDenom] = useState<Denom>("usd");
@@ -130,7 +132,7 @@ export function PoolsTab({
   const money = (sats: bigint): string => {
     const xcp = fromSats(sats);
     if (showing === "usd" && xcpUsd) return usd(xcp * xcpUsd);
-    return `${xcp.toLocaleString("en-US", { maximumFractionDigits: 2 })} XCP`;
+    return `${xcp.toLocaleString(num.intl, { maximumFractionDigits: 2 })} XCP`;
   };
   const total = positions.reduce((sum, position) => sum + (position.valueXcpSats ?? 0n), 0n);
   const hasKnownValue = positions.some((position) => position.valueXcpSats !== null);
@@ -144,7 +146,7 @@ export function PoolsTab({
             {hasKnownValue ? (incomplete ? t("Known LP value") : t("LP value")) : t("LP positions")}
           </p>
           <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100">
-            {hasKnownValue ? money(total) : positions.length.toLocaleString("en-US")}
+            {hasKnownValue ? money(total) : num.commas(positions.length)}
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {hasKnownValue
@@ -195,7 +197,7 @@ export function PoolsTab({
               </LazyLink>
               <p className="mt-1 truncate pl-9 text-xs tabular-nums text-gray-500 dark:text-gray-400">
                 {position.amountA !== null && position.amountB !== null
-                  ? `${holding(tokenQty(position.amountA, position.divisibleA))} ${position.assetA} + ${holding(tokenQty(position.amountB, position.divisibleB))} ${position.assetB}`
+                  ? `${holding(tokenQty(position.amountA, position.divisibleA), num)} ${position.assetA} + ${holding(tokenQty(position.amountB, position.divisibleB), num)} ${position.assetB}`
                   : t("Underlying amounts unavailable")}
               </p>
             </div>
@@ -207,7 +209,12 @@ export function PoolsTab({
                 {position.poolSharePct === null
                   ? t("Share unavailable")
                   : position.poolSharePct >= 0.01
-                    ? t("{pct}% of pool", { pct: position.poolSharePct.toFixed(2) })
+                    ? t("{pct}% of pool", {
+                        pct: position.poolSharePct.toLocaleString(num.intl, {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        }),
+                      })
                     : t("<0.01% of pool")}
               </p>
             </div>

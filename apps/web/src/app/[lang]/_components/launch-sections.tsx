@@ -9,9 +9,10 @@ import { TokenImage } from "@/components/token-image";
 import { PendingDot } from "@/components/pending-dot";
 import { useMempool } from "@/hooks/use-mempool";
 import { LABEL } from "@/components/ui/tokens";
-import { blocksDuration, blocksEta, commas, compact, fromSats, shortAddress } from "@/lib/format";
+import { blocksDuration, blocksEta, fromSats, shortAddress } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import { fetchHolderCount, type MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
@@ -99,8 +100,8 @@ const minterRank = (r: SectionRow) => r.minters ?? -1;
 /** The count as a cell or a card reads it: an em dash for "not counted",
  *  which is the same convention the market-cap and deadline columns already
  *  use for a figure that isn't there. */
-const minterText = (n: number | null) => (n === null ? "—" : commas(n));
-const holderText = (n: number | null) => (n === null ? "—" : commas(n));
+const minterText = (n: number | null, num: Numbers) => (n === null ? "—" : num.commas(n));
+const holderText = (n: number | null, num: Numbers) => (n === null ? "—" : num.commas(n));
 
 /**
  * Dollar-performance rank with the sitewide current XCP/USD factor removed.
@@ -372,6 +373,7 @@ function Section({
   /** Connected wallet eligible for the live-launch filter. Null hides it. */
   walletAddress: string | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const { code } = useFxRate();
   const options = SORTS[phase] ?? SORTS.scheduled!;
@@ -597,7 +599,7 @@ function Section({
           {title}
           {total > 0 && (
             <span className="text-sm font-medium text-gray-400 dark:text-gray-500 tabular-nums">
-              {commas(total)}
+              {num.commas(total)}
             </span>
           )}
         </h2>
@@ -899,12 +901,23 @@ function Pager({
 }
 
 /** A change with its sign, to a tenth: +12.5%, −3%, 0%. Both chips on the
- *  graduated card use it, so they cannot round differently. */
-const signedPercent = (n: number) =>
-  `${n > 0 ? "+" : ""}${n.toLocaleString("en-US", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
-  })}%`;
+ *  graduated card use it, so they cannot round differently. The number
+ *  arrives already multiplied out, so it goes back to a ratio for Intl,
+ *  which is what places the sign and the space before the "%" the way the
+ *  language does. */
+const signedPercent = (n: number, num: Numbers) =>
+  num.percent(n / 100, { digits: 1, signed: true });
+
+/**
+ * A ratio as a percentage to one decimal, keeping the trailing zero: a
+ * progress bar that reads 50% next to one reading 49.4% looks like two
+ * different measures, so this column never drops the place.
+ *
+ * The place is pinned rather than trimmed, so a row reading 50% never sits
+ * beside one reading 49.4% looking like a different measure.
+ */
+const progressPercent = (fraction: number, num: Numbers) =>
+  num.percent(fraction, { minDigits: 1 });
 
 const DENOMINATIONS: readonly Denomination[] = ["usd", "xcp"];
 
@@ -1018,9 +1031,9 @@ function launchReturns(
 
 /** Full eight places. These prices sit far below 1 XCP, so the usual two or
  *  four decimals would round most of them to the same number. */
-const priceLabel = (xcpPrice: number) =>
+const priceLabel = (xcpPrice: number, num: Numbers) =>
   xcpPrice > 0
-    ? xcpPrice.toLocaleString("en-US", { minimumFractionDigits: 8, maximumFractionDigits: 8 })
+    ? xcpPrice.toLocaleString(num.intl, { minimumFractionDigits: 8, maximumFractionDigits: 8 })
     : "—";
 
 const age = (announceBlock: number, height: number, t: T) =>
@@ -1048,6 +1061,7 @@ function LaunchTable({
   xcpUsdDayAgo?: number | null;
   denomination?: Denomination;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const graduated = phase === "graduated";
@@ -1059,15 +1073,15 @@ function LaunchTable({
   // rather than padding the row with columns of zero.
   const inUsd = denomination === "usd" && xcpUsd !== null && xcpUsd > 0;
   const capCell = (capXcp: number) =>
-    capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${compact(capXcp)} XCP`) : "—";
+    capXcp > 0 ? (inUsd ? usd(capXcp * xcpUsd) : `${num.compact(capXcp)} XCP`) : "—";
   const priceCell = (priceXcp: number) =>
     priceXcp > 0
       ? inUsd
-        ? `$${(priceXcp * xcpUsd).toLocaleString("en-US", {
+        ? `$${(priceXcp * xcpUsd).toLocaleString(num.intl, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 8,
           })}`
-        : `${priceLabel(priceXcp)} XCP`
+        : `${priceLabel(priceXcp, num)} XCP`
       : "—";
   const returnCell = (value: number | null, suffix?: string) =>
     value === null ? (
@@ -1078,7 +1092,7 @@ function LaunchTable({
           value >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
         }
       >
-        {signedPercent(value)}
+        {signedPercent(value, num)}
         {suffix && <span className="text-gray-400 dark:text-gray-500"> {suffix}</span>}
       </span>
     );
@@ -1145,7 +1159,7 @@ function LaunchTable({
                       )}
                     </Cell>
                     <Cell>{age(r.lastMintBlock ?? r.announceBlock, height, t)}</Cell>
-                    <Cell>{holderText(r.holders)}</Cell>
+                    <Cell>{holderText(r.holders, num)}</Cell>
                   </>
                 ) : scheduled ? (
                   <>
@@ -1155,9 +1169,9 @@ function LaunchTable({
                   </>
                 ) : (
                   <>
-                    <Cell>{(r.progress * 100).toFixed(1)}%</Cell>
-                    <Cell>{compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
-                    <Cell>{minterText(r.minters)}</Cell>
+                    <Cell>{progressPercent(r.progress, num)}</Cell>
+                    <Cell>{num.compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
+                    <Cell>{minterText(r.minters, num)}</Cell>
                     <Cell>{deadline > 0 ? blocksEta(deadline - height, t) : "—"}</Cell>
                   </>
                 )}
@@ -1241,6 +1255,7 @@ function Card({
   /** This is the section's front slot — see the pin in Section. */
   fresh: boolean;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const { fm, phase, conforming } = row;
@@ -1248,9 +1263,9 @@ function Card({
   const returns =
     phase === "graduated" ? launchReturns(row, height, xcpUsd, xcpUsdDayAgo, denomination) : null;
   const performance = returns?.sinceMint ?? null;
-  const performanceLabel = performance !== null ? signedPercent(performance) : null;
+  const performanceLabel = performance !== null ? signedPercent(performance, num) : null;
   const dayChange = returns?.recent ?? null;
-  const dayChangeLabel = dayChange !== null ? signedPercent(dayChange) : null;
+  const dayChangeLabel = dayChange !== null ? signedPercent(dayChange, num) : null;
   const windowLabel = returns?.window ?? "24h";
 
   const chip =
@@ -1263,12 +1278,12 @@ function Card({
   // Graduated cards carry their market cap in the stat row under the art,
   // where it leads, in whichever denomination the section is switched to.
   const headline =
-    phase === "minting" ? `${(row.progress * 100).toFixed(1)}%` : undefined;
+    phase === "minting" ? progressPercent(row.progress, num) : undefined;
   const capLabel =
     row.marketCapXcp > 0
       ? denomination === "usd" && xcpUsd
         ? usd(row.marketCapXcp * xcpUsd)
-        : `${compact(row.marketCapXcp)} XCP`
+        : `${num.compact(row.marketCapXcp)} XCP`
       : "—";
 
   // Bottom-left. Participation for the phases that have it: XCP-69 caps one
@@ -1291,16 +1306,16 @@ function Card({
       ? minters === null
         ? t("— minters")
         : minters >= XCP69_MIN_PARTICIPANTS
-          ? t("{n} minters", { n: commas(minters) })
-          : t("{n} of {min} minters", { n: commas(minters), min: XCP69_MIN_PARTICIPANTS })
+          ? t("{n} minters", { n: num.commas(minters) })
+          : t("{n} of {min} minters", { n: num.commas(minters), min: XCP69_MIN_PARTICIPANTS })
       : phase === "graduated"
         ? row.displayDescription ??
           (minters === null
             ? t("XCP-69 market")
             : minters === 1
-              ? t("{n} minter", { n: commas(minters) })
-              : t("{n} minters", { n: commas(minters) }))
-        : t("Opens at Block {block}", { block: fm.start_block.toLocaleString() });
+              ? t("{n} minter", { n: num.commas(minters) })
+              : t("{n} minters", { n: num.commas(minters) }))
+        : t("Opens at Block {block}", { block: num.commas(fm.start_block) });
 
   // Bottom-right, always a time — the one axis every phase shares, pointing
   // backwards for the finished and forwards for the rest.

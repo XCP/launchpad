@@ -7,9 +7,10 @@ import { TokenImage } from "@/components/token-image";
 import { Tabs, TabsContent, SegmentedList, SegmentedTrigger } from "@/components/ui/tabs";
 import { FOCUS } from "@/components/ui/tokens";
 import { useMempool } from "@/hooks/use-mempool";
-import { commas, fromSats, shortAddress, tokenQty } from "@/lib/format";
+import { fromSats, shortAddress, tokenQty } from "@/lib/format";
 import { groupMintsByAddress } from "@/lib/mempool";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 /** The page is being watched, so it polls hard. */
 const REFRESH_MS = 10_000;
@@ -17,6 +18,7 @@ const REFRESH_MS = 10_000;
 type Tab = "mints" | "orders" | "fairminters";
 
 export function MempoolView() {
+  const num = useNumbers();
   const t = useT();
   const { fairminters, mints, orders, isLoading, refresh } = useMempool(REFRESH_MS);
 
@@ -102,12 +104,12 @@ export function MempoolView() {
                         ))}
                       </div>
                     </td>
-                    <td className="p-3 text-right tabular-nums">{commas(g.mints)}</td>
+                    <td className="p-3 text-right tabular-nums">{num.commas(g.mints)}</td>
                     <td className="p-3 text-right tabular-nums">
-                      {commas(tokenQty(g.tokensRaw, g.divisible))}
+                      {num.commas(tokenQty(g.tokensRaw, g.divisible))}
                     </td>
                     <td className="p-3 text-right font-medium tabular-nums">
-                      {commas(fromSats(g.xcpRaw))}
+                      {num.commas(fromSats(g.xcpRaw))}
                     </td>
                   </tr>
                 ))}
@@ -191,7 +193,7 @@ export function MempoolView() {
                 </div>
                 <div className="shrink-0 text-right">
                   <div className="text-xs font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-                    {t("opens {block}", { block: commas(fm.start_block) })}
+                    {t("opens {block}", { block: num.commas(fm.start_block) })}
                   </div>
                   <div className="text-[11px] text-gray-400 dark:text-gray-500">{t("unconfirmed")}</div>
                 </div>

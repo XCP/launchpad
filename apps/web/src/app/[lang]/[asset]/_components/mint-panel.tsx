@@ -14,9 +14,9 @@ import { fetchBtcUsd } from "@/lib/api/price-client";
 import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
 import { fetchAddressFairmints } from "@/lib/client";
 import { fetchMempoolSnapshot } from "@/lib/api/launchpad-api";
-import { commas, commasRaw, satsPerVb } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { approx, big } from "@/lib/numeric";
 import { trackTx } from "@/lib/analytics";
 import {
@@ -47,6 +47,7 @@ export function MintPanel({
   asset: string;
   xcpUsd?: number | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
@@ -158,7 +159,7 @@ export function MintPanel({
       registerPending({
         txid: compose.txid,
         kind: "mint",
-        label: t("Mint {amount} {asset}", { amount: mintTokens.toLocaleString(), asset }),
+        label: t("Mint {amount} {asset}", { amount: num.commas(mintTokens), asset }),
         address: address ?? undefined,
         spends: [{ asset: "XCP", raw: costRaw.toString() }],
       });
@@ -175,6 +176,7 @@ export function MintPanel({
     costXcp,
     xcpUsd,
     t,
+    num,
   ]);
 
   // A balance that could not be read does not block the mint — see
@@ -196,7 +198,7 @@ export function MintPanel({
         ? t("Checking balance…")
       : insufficient
         ? t("Insufficient XCP balance")
-        : t("Mint {amount} {asset}", { amount: commas(mintTokens), asset });
+        : t("Mint {amount} {asset}", { amount: num.commas(mintTokens), asset });
 
   return (
     <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-2">
@@ -230,7 +232,7 @@ export function MintPanel({
               {adjusted && lots > 0 && (
                 <span className="text-amber-600 dark:text-amber-400">
                   {" "}
-                  · {t("adjusts to {n}", { n: commas(mintTokens) })}
+                  · {t("adjusts to {n}", { n: num.commas(mintTokens) })}
                 </span>
               )}
               {/* Said plainly, because the alternative is a transaction that
@@ -242,21 +244,20 @@ export function MintPanel({
               )}
             </span>
             <span>
-              {((mintTokens / SUPPLY_TOKENS) * 100).toLocaleString("en-US", {
-                maximumFractionDigits: 3,
-              })}
-              % {t("of supply")}
+              {num.percent(mintTokens / SUPPLY_TOKENS, { digits: 3 })} {t("of supply")}
             </span>
           </>
         }
       >
-        {/* Integer-only, so the input can carry real digit grouping —
-            unlike decimal AmountInputs, where a comma means a decimal point. */}
+        {/* Integer-only, so the input can carry real digit grouping — in the
+            page's own separator, since every non-digit is stripped straight
+            back out on the way into state. Decimal AmountInputs cannot do
+            this: there a comma has to stay available as a decimal point. */}
         <input
           type="text"
           inputMode="numeric"
           autoComplete="off"
-          value={typedTokens > 0 ? typedTokens.toLocaleString("en-US") : tokens}
+          value={typedTokens > 0 ? num.commas(typedTokens) : tokens}
           onChange={(e) => setTokens(e.target.value.replace(/[^0-9]/g, ""))}
           placeholder="0"
           aria-label={t("{asset} to mint", { asset })}
@@ -290,7 +291,7 @@ export function MintPanel({
                     )
                   }
                 >
-                  {t("Balance:")} {commasRaw(xcpBalance)}
+                  {t("Balance:")} {num.commasRaw(xcpBalance)}
                 </button>
               )}
               {xcpBalance === undefined && <BalanceUnavailable error={balanceError} />}
@@ -324,14 +325,14 @@ export function MintPanel({
             <div className="flex justify-between">
               <dt>{t("Lots")}</dt>
               <dd>
-                {lots.toLocaleString()} × {t("{n} tokens", { n: commas(TOKENS_PER_LOT) })}
+                {num.commas(lots)} × {t("{n} tokens", { n: num.commas(TOKENS_PER_LOT) })}
               </dd>
             </div>
             {medianFeeRate !== undefined && (
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
                 <dd>
-                  {satsPerVb(medianFeeRate)} sat/vB
+                  {num.satsPerVb(medianFeeRate)} sat/vB
                   {btcUsd != null && (
                     <span className="text-gray-500 dark:text-gray-400">
                       {" "}

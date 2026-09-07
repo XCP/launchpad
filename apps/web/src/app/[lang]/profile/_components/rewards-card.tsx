@@ -2,10 +2,10 @@
 
 import { LazyLink } from "@/components/lazy-link";
 import type { RewardAccount } from "@/lib/api/launchpad-api";
-import { commas, commasRaw } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
 import { MINTS_PER_MINT } from "@/lib/rewards";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 /**
  * What this address has earned from the rewards programme.
@@ -26,6 +26,7 @@ export function RewardsCard({
   isSelf: boolean;
   onOpenHistory?: () => void;
 }) {
+  const num = useNumbers();
   const t = useT();
   if (!account || account.earnedMints === 0) return null;
 
@@ -47,7 +48,7 @@ export function RewardsCard({
 
       <div className="mt-1 flex items-baseline gap-2">
         <span className="text-2xl font-bold text-gray-900 dark:text-gray-100 tabular-nums">
-          {commasRaw(account.lifetimeEarnedQuantity)}
+          {num.commasRaw(account.lifetimeEarnedQuantity)}
         </span>
         <span className="text-sm font-medium text-gray-500 dark:text-gray-400">MINTS</span>
       </div>
@@ -56,17 +57,17 @@ export function RewardsCard({
         {t("{mints} across {launches} · {xcp} XCP committed", {
           mints:
             account.earnedMints === 1
-              ? t("{n} mint", { n: commas(account.earnedMints) })
-              : t("{n} mints", { n: commas(account.earnedMints) }),
+              ? t("{n} mint", { n: num.commas(account.earnedMints) })
+              : t("{n} mints", { n: num.commas(account.earnedMints) }),
           launches:
             account.launches === 1
-              ? t("{n} launch", { n: commas(account.launches) })
-              : t("{n} launches", { n: commas(account.launches) }),
-          xcp: commasRaw(account.committedXcp),
+              ? t("{n} launch", { n: num.commas(account.launches) })
+              : t("{n} launches", { n: num.commas(account.launches) }),
+          xcp: num.commasRaw(account.committedXcp),
         })}
       </p>
       <p className="mt-1 text-[11px] text-gray-400 dark:text-gray-500">
-        {t("{n} MINTS per mint · all-time program total, not your wallet balance.", { n: commas(MINTS_PER_MINT) })}
+        {t("{n} MINTS per mint · all-time program total, not your wallet balance.", { n: num.commas(MINTS_PER_MINT) })}
       </p>
     </div>
   );

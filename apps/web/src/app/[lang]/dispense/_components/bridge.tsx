@@ -20,9 +20,10 @@ import {
   fetchPendingXcpDispenses,
   type Dispenser,
 } from "@/lib/api/counterparty";
-import { commas, commasRaw, satsPerVb, shortAddress } from "@/lib/format";
+import { shortAddress } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { rich } from "@/lib/i18n/rich";
 import {
   approx,
@@ -234,6 +235,7 @@ function LoadCard({
   customFee: number;
   hiddenCount: number;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
@@ -428,10 +430,10 @@ function LoadCard({
       <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4">
         <div className="text-sm font-semibold text-gray-900 dark:text-gray-100">
           {allDone
-            ? t("{n} XCP incoming", { n: commas(totalXcp) })
+            ? t("{n} XCP incoming", { n: num.commas(totalXcp) })
             : router.legs.length === 1
-              ? t("Buying {n} XCP · {routes} route", { n: commas(totalXcp), routes: router.legs.length })
-              : t("Buying {n} XCP · {routes} routes", { n: commas(totalXcp), routes: router.legs.length })}
+              ? t("Buying {n} XCP · {routes} route", { n: num.commas(totalXcp), routes: router.legs.length })
+              : t("Buying {n} XCP · {routes} routes", { n: num.commas(totalXcp), routes: router.legs.length })}
         </div>
         <ul className="mt-3 space-y-2">
           {router.legs.map((leg, i) => (
@@ -441,7 +443,7 @@ function LoadCard({
             >
               <span className="min-w-0 truncate">
                 <span className="font-medium text-gray-900 dark:text-gray-100">
-                  {commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
+                  {num.commas(leg.units * (leg.dispenser.give_quantity / SATS))} XCP
                 </span>
                 <span className="text-gray-400 dark:text-gray-500">
                   {" "}
@@ -496,7 +498,7 @@ function LoadCard({
         {allDone ? (
           <>
             <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-              {t("{n} XCP lands on your Counterparty balance as each payment confirms — ready to mint with.", { n: commas(doneXcp) })}
+              {t("{n} XCP lands on your Counterparty balance as each payment confirms — ready to mint with.", { n: num.commas(doneXcp) })}
             </p>
             <button
               type="button"
@@ -541,8 +543,8 @@ function LoadCard({
       : armed && plan.length > 1
         ? t("Sign {n} transactions", { n: plan.length })
         : plan.length > 1
-          ? t("Buy {n} XCP · {routes} routes", { n: commas(snapped), routes: plan.length })
-          : t("Buy {n} XCP", { n: commas(snapped) });
+          ? t("Buy {n} XCP · {routes} routes", { n: num.commas(snapped), routes: plan.length })
+          : t("Buy {n} XCP", { n: num.commas(snapped) });
 
   return (
     <div className="contents">
@@ -586,13 +588,13 @@ function LoadCard({
                 snappedRaw !== typedXcpRaw && (
                   <span className="text-amber-600 dark:text-amber-400">
                     {" "}
-                    {t("· adjusts to {n}", { n: commas(snapped) })}
+                    {t("· adjusts to {n}", { n: num.commas(snapped) })}
                   </span>
                 )}
             </span>
             {xcpBalance !== undefined && (
               <span className="text-gray-500 dark:text-gray-400">
-                {t("Balance: {n}", { n: commasRaw(xcpBalance) })}
+                {t("Balance: {n}", { n: num.commasRaw(xcpBalance) })}
               </span>
             )}
           </>
@@ -653,12 +655,12 @@ function LoadCard({
       <div className="px-2 pt-2">
         <div className="flex items-center justify-between text-xs">
           <span className="text-gray-600 dark:text-gray-400">
-            1 XCP = {commasRaw(blendedRaw, 0)} sats
+            1 XCP = {num.commasRaw(blendedRaw, 0)} sats
             {perXcpUsd && <span className="text-gray-400 dark:text-gray-500"> ({usdFmt(perXcpUsd)})</span>}
             {vsFloor !== null && vsFloor >= 1 && (
               <span className="font-medium text-amber-600 dark:text-amber-400">
                 {" "}
-                {t("· {pct}% over floor", { pct: vsFloor.toFixed(0) })}
+                {t("· {pct}% over floor", { pct: num.commas(Math.round(vsFloor)) })}
               </span>
             )}
           </span>
@@ -673,7 +675,7 @@ function LoadCard({
                     n: plan.length,
                     amounts: plan
                       .map((leg) =>
-                        commas(leg.units * (leg.dispenser.give_quantity / SATS)),
+                        num.commas(leg.units * (leg.dispenser.give_quantity / SATS)),
                       )
                       .join(" + "),
                   })
@@ -688,7 +690,7 @@ function LoadCard({
             <div className="flex justify-between">
               <dt>{plan.length > 1 ? t("TX fees · {n} txs", { n: plan.length }) : t("TX fees")}</dt>
               <dd>
-                ~{(plan.length * legFeeSats).toLocaleString()} sats
+                ~{num.commas(plan.length * legFeeSats)} sats
                 {btcUsd
                   ? ` (≈${usdFmt(((plan.length * legFeeSats) / SATS) * btcUsd)})`
                   : ""}
@@ -719,7 +721,7 @@ function LoadCard({
                 <ul className="mt-1 space-y-0.5">
                   {plan.map((leg, i) => (
                     <li key={leg.dispenser.source}>
-                      {i + 1}. {commas(leg.units * (leg.dispenser.give_quantity / SATS))}{" "}
+                      {i + 1}. {num.commas(leg.units * (leg.dispenser.give_quantity / SATS))}{" "}
                       XCP · {fmtBtc(leg.btcSats)} BTC →{" "}
                       {shortAddress(leg.dispenser.source)}
                     </li>
@@ -783,6 +785,7 @@ function UnloadCard({
   flips: number;
   customFee: number;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
   const { address, status: walletStatus } = useWallet();
@@ -919,11 +922,11 @@ function UnloadCard({
         <p className="mt-2">
           {rich(t, "It can still sell until {when}, then the remaining {amount} returns automatically.", {
             when: existing.close_block_index
-              ? t("block {n}", { n: existing.close_block_index.toLocaleString() })
+              ? t("block {n}", { n: num.commas(existing.close_block_index) })
               : t("the close settles (~5 blocks)"),
             amount: (
               <span className="font-semibold">
-                {commas(existing.give_remaining / SATS)} XCP
+                {num.commas(existing.give_remaining / SATS)} XCP
               </span>
             ),
           })}
@@ -938,10 +941,10 @@ function UnloadCard({
         <p>
           {rich(t, "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles ~5 blocks after it confirms and returns the rest.", {
             lead: <span className="font-semibold">{t("Currently unloading:")}</span>,
-            n: commas(existing.give_remaining / SATS),
-            sats: Math.round(
-              (existing.satoshirate / existing.give_quantity) * SATS,
-            ).toLocaleString(),
+            n: num.commas(existing.give_remaining / SATS),
+            sats: num.commas(
+              Math.round((existing.satoshirate / existing.give_quantity) * SATS),
+            ),
           })}
         </p>
         {compose.status === "error" && (
@@ -973,7 +976,7 @@ function UnloadCard({
         ? t("Insufficient XCP balance")
         : escrowRaw < SATS
           ? t("Minimum 1 XCP")
-          : t("Sell {n} XCP", { n: commas(escrowRaw / SATS) });
+          : t("Sell {n} XCP", { n: num.commas(escrowRaw / SATS) });
 
   return (
     <div className="contents">
@@ -1002,7 +1005,7 @@ function UnloadCard({
                   title={t("Ten percent above the cheapest open dispenser")}
                   className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
-                  +10%
+                  {num.percent(0.1, { digits: 0, signed: true })}
                 </button>
                 <button
                   type="button"
@@ -1035,8 +1038,8 @@ function UnloadCard({
                     }
                   >
                     {vsFloor > 0
-                      ? t("+{pct}% over floor · waits", { pct: vsFloor.toFixed(0) })
-                      : t("−{pct}% under floor · sells first", { pct: Math.abs(vsFloor).toFixed(0) })}
+                      ? t("+{pct}% over floor · waits", { pct: num.commas(Math.round(vsFloor)) })
+                      : t("−{pct}% under floor · sells first", { pct: num.commas(Math.round(Math.abs(vsFloor))) })}
                   </span>
                 ) : vsFloor !== null ? (
                   <span>{t("at the floor")}</span>
@@ -1054,7 +1057,7 @@ function UnloadCard({
                       it. Naming it for the number it reports rather than the
                       one it writes, because the reported number is the fact —
                       the undercut is just how you beat it. */}
-                  {t("Floor: {n}", { n: floorSats.toLocaleString() })}
+                  {t("Floor: {n}", { n: num.commas(floorSats) })}
                 </button>
               )}
             </>
@@ -1086,7 +1089,7 @@ function UnloadCard({
                   }
                   className="rounded-md border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 px-1.5 py-0.5 text-[10px] font-medium text-gray-500 dark:text-gray-400 transition-colors hover:border-purple-400 dark:hover:border-purple-500 hover:text-purple-600 dark:hover:text-purple-400 active:scale-95"
                 >
-                  {p === 100 ? t("Max") : `${p}%`}
+                  {p === 100 ? t("Max") : num.percent(p / 100, { digits: 0 })}
                 </button>
               ))}
             </span>
@@ -1114,7 +1117,7 @@ function UnloadCard({
                 }`}
                 onClick={() => setEscrow(String(Math.floor(approx(balance) / SATS)))}
               >
-                {t("Balance: {n}", { n: commasRaw(balance) })}
+                {t("Balance: {n}", { n: num.commasRaw(balance) })}
               </button>
             )}
           </>
@@ -1148,9 +1151,7 @@ function UnloadCard({
             btcIfSold > 0 ? "text-gray-900 dark:text-gray-100" : "text-gray-300 dark:text-gray-600"
           }`}
         >
-          {btcIfSold > 0
-            ? `≤ ${btcIfSold.toFixed(8).replace(/0+$/, "").replace(/\.$/, "")}`
-            : "0"}
+          {btcIfSold > 0 ? `≤ ${num.commas(btcIfSold)}` : "0"}
         </div>
       </Well>
 
@@ -1162,19 +1163,19 @@ function UnloadCard({
               <dt>{t("Queue")}</dt>
               <dd className="font-medium tabular-nums text-gray-700 dark:text-gray-300">
                 {queueAheadXcp > 0
-                  ? t("{n} XCP ahead of you", { n: queueAheadXcp.toLocaleString() })
+                  ? t("{n} XCP ahead of you", { n: num.commas(queueAheadXcp) })
                   : t("first at this price")}
               </dd>
             </div>
             <div className="flex justify-between">
               <dt>{t("Vends")}</dt>
-              <dd>{t("{n} × 1 XCP", { n: wholeEscrow.toLocaleString() })}</dd>
+              <dd>{t("{n} × 1 XCP", { n: num.commas(wholeEscrow) })}</dd>
             </div>
             {sellFeeRate !== null && (
               <div className="flex justify-between">
                 <dt>{t("TX fee")}</dt>
                 <dd className={customFee > 0 ? "font-medium text-purple-600 dark:text-purple-400" : ""}>
-                  {satsPerVb(sellFeeRate)} sat/vB
+                  {num.satsPerVb(sellFeeRate)} sat/vB
                   {btcUsd !== null && (
                     <span className="text-gray-400 dark:text-gray-500">
                       {" "}
@@ -1227,6 +1228,7 @@ function RouteBook({
   plan: PlannedLeg[];
   hiddenCount: number;
 }) {
+  const num = useNumbers();
   const t = useT();
   const rows = open.slice(0, 10);
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
@@ -1257,7 +1259,7 @@ function RouteBook({
               />
               <span className="relative z-10 flex items-center justify-between gap-2">
                 <span className="font-medium text-gray-900 dark:text-gray-100">
-                  {commasRaw(perXcpSats(r), 0)}{" "}
+                  {num.commasRaw(perXcpSats(r), 0)}{" "}
                   <span className="font-normal text-gray-400 dark:text-gray-500">sats</span>
                 </span>
                 <span className="flex items-center gap-2">
@@ -1266,12 +1268,12 @@ function RouteBook({
                       ? rich(t, "{taken} of {total} XCP", {
                           taken: (
                             <span className="font-semibold text-purple-700 dark:text-purple-300">
-                              {commas(units * (r.give_quantity / SATS))}
+                              {num.commas(units * (r.give_quantity / SATS))}
                             </span>
                           ),
-                          total: commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0),
+                          total: num.commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0),
                         })
-                      : `${commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP`}
+                      : `${num.commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP`}
                   </span>
                   <ExplorerLink txHash={r.tx_hash} />
                 </span>
@@ -1310,6 +1312,7 @@ function SellBook({
   active: boolean;
   onPick: (sats: number) => void;
 }) {
+  const num = useNumbers();
   const t = useT();
   const rows = open.slice(0, 10);
   const maxDepth = Math.max(1, ...rows.map((r) => r.give_remaining));
@@ -1324,11 +1327,11 @@ function SellBook({
     >
       <span className="relative z-10 flex items-center justify-between gap-2">
         <span className="font-semibold text-amber-800 dark:text-amber-300">
-          {yourPriceSats.toLocaleString()}{" "}
+          {num.commas(yourPriceSats)}{" "}
           <span className="font-normal text-amber-600 dark:text-amber-400">sats</span>
         </span>
         <span className="font-medium text-amber-700 dark:text-amber-400">
-          {yourEscrowXcp > 0 ? t("you · {n} XCP", { n: commas(yourEscrowXcp) }) : t("you")}
+          {yourEscrowXcp > 0 ? t("you · {n} XCP", { n: num.commas(yourEscrowXcp) }) : t("you")}
         </span>
       </span>
     </li>
@@ -1363,6 +1366,7 @@ function SellRow({
   maxDepth: number;
   onPick: (sats: number) => void;
 }) {
+  const num = useNumbers();
   return (
     <li className="relative">
       <button
@@ -1377,10 +1381,10 @@ function SellRow({
         />
         <span className="relative z-10 flex items-center justify-between gap-2">
           <span className="font-medium text-gray-900 dark:text-gray-100">
-            {commasRaw(perXcpSats(r), 0)}{" "}
+            {num.commasRaw(perXcpSats(r), 0)}{" "}
             <span className="font-normal text-gray-400 dark:text-gray-500">sats</span>
           </span>
-          <span className="text-gray-500 dark:text-gray-400">{commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP</span>
+          <span className="text-gray-500 dark:text-gray-400">{num.commasRaw(big(r.give_remaining) / SATS_PER_UNIT, 0)} XCP</span>
         </span>
       </button>
       <span className="absolute inset-y-0 right-2 flex items-center">

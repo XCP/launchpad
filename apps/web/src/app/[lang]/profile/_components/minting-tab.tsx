@@ -7,9 +7,9 @@ import {
   fetchMempoolSnapshot,
   fetchMintsBySource,
 } from "@/lib/api/launchpad-api";
-import { commasRaw } from "@/lib/format";
 import { big } from "@/lib/numeric";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 interface OpenMint {
   asset: string;
@@ -23,6 +23,7 @@ interface OpenMint {
 }
 
 export function MintingTab({ address }: { address: string }) {
+  const num = useNumbers();
   const t = useT();
   const { data: mints, isLoading } = useSWR(
     ["open-mints", address],
@@ -97,7 +98,7 @@ export function MintingTab({ address }: { address: string }) {
         </p>
         <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
-            {commasRaw(committed)} XCP
+            {num.commasRaw(committed)} XCP
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {rows.filter((row) => row.paid > 0n).length === 1
@@ -107,7 +108,7 @@ export function MintingTab({ address }: { address: string }) {
         </div>
         {pending > 0n && (
           <p className="mt-1 text-xs tabular-nums text-amber-700 dark:text-amber-400">
-            {t("+ {amount} XCP waiting to confirm", { amount: commasRaw(pending) })}
+            {t("+ {amount} XCP waiting to confirm", { amount: num.commasRaw(pending) })}
           </p>
         )}
         <p className="mt-2 text-xs leading-relaxed text-gray-600 dark:text-gray-400">
@@ -146,16 +147,16 @@ export function MintingTab({ address }: { address: string }) {
                   {row.pendingMints > 0 ? ` +${row.pendingMints}` : ""}
                 </span>
                 <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
-                  {commasRaw(
+                  {num.commasRaw(
                     row.earned + row.pendingEarned,
                     row.divisible ? 8 : 0,
                   )}
                 </span>
                 <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
-                  {commasRaw(row.paid)}
+                  {num.commasRaw(row.paid)}
                   {row.pendingPaid > 0n && (
                     <span className="block text-[10px] text-amber-600 dark:text-amber-400">
-                      {t("+{amount} pending", { amount: commasRaw(row.pendingPaid) })}
+                      {t("+{amount} pending", { amount: num.commasRaw(row.pendingPaid) })}
                     </span>
                   )}
                 </span>

@@ -1,8 +1,7 @@
 import { CollectionChip } from "@/components/collection-chip";
 import { collectionByTag } from "@/lib/collections";
 import type { Communities } from "@/lib/api/launchpad-api";
-import { commas } from "@/lib/format";
-import { getT } from "@/lib/i18n/server";
+import { getNumbers, getT } from "@/lib/i18n/server";
 import { big } from "@/lib/numeric";
 import { LABEL } from "@/components/ui/tokens";
 import { Stat } from "@/app/[lang]/stats/_components/stat";
@@ -23,6 +22,7 @@ function percent(part: string | undefined, whole: string | undefined): number | 
  * and the share of all XCP minted that its members put in.
  */
 export async function CommunitiesSection({ data }: { data: Communities }) {
+  const num = await getNumbers();
   const t = await getT();
   const rows = data.communities.filter((row) => row.members > 0);
   if (rows.length === 0 || data.minters === 0) return null;
@@ -36,15 +36,15 @@ export async function CommunitiesSection({ data }: { data: Communities }) {
       <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat
           label={t("Represented")}
-          value={commas(data.represented)}
+          value={num.commas(data.represented)}
           hint={t("of {n} minters, {pct}%", {
-            n: commas(data.minters),
+            n: num.commas(data.minters),
             pct: Math.round((data.represented / data.minters) * 100),
           })}
         />
-        <Stat label={t("Communities")} value={commas(rows.length)} hint={t("collections with a minter in them")} />
-        <Stat label={t("Creators")} value={commas(data.creators ?? 0)} hint={t("made a card in one")} />
-        <Stat label={t("Collectors")} value={commas(data.collectors ?? 0)} hint={t("hold one, made none")} />
+        <Stat label={t("Communities")} value={num.commas(rows.length)} hint={t("collections with a minter in them")} />
+        <Stat label={t("Creators")} value={num.commas(data.creators ?? 0)} hint={t("made a card in one")} />
+        <Stat label={t("Collectors")} value={num.commas(data.collectors ?? 0)} hint={t("hold one, made none")} />
       </div>
       <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
         <table className="w-full min-w-[560px] text-sm">
@@ -78,24 +78,31 @@ export async function CommunitiesSection({ data }: { data: Communities }) {
                   <td className="px-3 py-2 font-medium text-gray-900 dark:text-gray-100" title={row.tag}>
                     {name}
                   </td>
-                  <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">{commas(row.creators)}</td>
-                  <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">{commas(row.collectors)}</td>
+                  <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">{num.commas(row.creators)}</td>
+                  <td className="px-3 py-2 text-right text-gray-600 dark:text-gray-400">{num.commas(row.collectors)}</td>
                   <td className="px-3 py-2">
                     <span className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                       <span
                         className="h-1.5 w-24 shrink-0 rounded-full bg-gray-100 dark:bg-gray-800"
-                        title={t("{n} of {total} minters", { n: row.members, total: data.minters })}
+                        title={t("{n} of {total} minters", {
+                          n: num.commas(row.members),
+                          total: num.commas(data.minters),
+                        })}
                       >
                         <span
                           className="block h-1.5 rounded-full bg-purple-400 dark:bg-purple-500"
                           style={{ width: `${Math.max(2, (row.members / widest) * 100)}%` }}
                         />
                       </span>
-                      <span className="w-8 text-right">{pct}%</span>
+                      <span className="w-8 text-right">{num.percent(pct / 100, { digits: 0 })}</span>
                     </span>
                   </td>
                   <td className="pr-4 py-2 text-right text-gray-600 dark:text-gray-400">
-                    {paidPct === null ? <span aria-hidden="true">—</span> : `${paidPct}%`}
+                    {paidPct === null ? (
+                      <span aria-hidden="true">—</span>
+                    ) : (
+                      num.percent(paidPct / 100, { digits: 0 })
+                    )}
                   </td>
                 </tr>
               );

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useFxRate } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import {
   btcSatsToXcp,
   continuousThresholds,
@@ -12,14 +13,30 @@ import {
   scenarioCashFlow,
 } from "@/app/[lang]/research/_lib/economics";
 
-const money = (value: number, signed = false) =>
-  `${signed && value >= 0 ? "+" : ""}${value.toFixed(2)} XCP`;
+/** A figure to two decimals, for the labels that write their own unit.
+ *  Module scope, so the page's formatters are passed in rather than reached
+ *  for with a hook. */
+const fixed2 = (value: number, num: Numbers) =>
+  value.toLocaleString(num.intl, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+
+/** An XCP figure to the cent. */
+const money = (value: number, num: Numbers, signed = false) =>
+  `${signed && value >= 0 ? "+" : ""}${fixed2(value, num)} XCP`;
 
 /** A dollar figure in the visitor's currency, to that currency's own minor
  *  units, with an explicit sign when the caller asks for one. */
-const inCurrency = (value: number, code: string, rate: number, signed = false) => {
+const inCurrency = (
+  value: number,
+  code: string,
+  rate: number,
+  num: Numbers,
+  signed = false,
+) => {
   const sign = signed && value >= 0 ? "+" : value < 0 ? "−" : "";
-  return `${sign}${(Math.abs(value) * rate).toLocaleString("en-US", {
+  return `${sign}${(Math.abs(value) * rate).toLocaleString(num.intl, {
     style: "currency",
     currency: code,
   })}`;
@@ -34,6 +51,7 @@ export function ExitRaceSimulator({
   btcUsd: number;
   priceContext: string;
 }) {
+  const num = useNumbers();
   const t = useT();
   const { code, rate } = useFxRate();
   const [addresses, setAddresses] = useState(20);
@@ -88,7 +106,7 @@ export function ExitRaceSimulator({
           />
           <Slider
             label={t("Share of controlled holdings sold")}
-            valueLabel={`${sellPct}%`}
+            valueLabel={num.percent(sellPct / 100, { digits: 0 })}
             value={sellPct}
             min={0}
             max={100}
@@ -97,7 +115,7 @@ export function ExitRaceSimulator({
           />
           <Slider
             label={t("BTC overhead per address")}
-            valueLabel={`${overheadSats.toLocaleString()} sats`}
+            valueLabel={`${num.commas(overheadSats)} sats`}
             value={overheadSats}
             min={0}
             max={3000}
@@ -111,8 +129,8 @@ export function ExitRaceSimulator({
             "{code} context: 1 XCP = {xcp} · 1 BTC = {btc} · {priceContext}. The 700-sat default is an illustrative low-fee lifecycle, not a measured all-in cost. Observed mint-only median: 232 sats; P90: 697.",
             {
               code,
-              xcp: inCurrency(xcpUsd, code, rate),
-              btc: inCurrency(btcUsd, code, rate),
+              xcp: inCurrency(xcpUsd, code, rate, num),
+              btc: inCurrency(btcUsd, code, rate, num),
               priceContext,
             },
           )}
@@ -122,7 +140,12 @@ export function ExitRaceSimulator({
           <div className="flex items-baseline justify-between gap-3 text-xs">
             <span className="font-medium text-gray-600 dark:text-gray-400">{t("Public allocation captured")}</span>
             <span className="font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-              {addresses}M / 69M · {capturedPct.toFixed(1)}%
+              {addresses}M / 69M ·{" "}
+              {(capturedPct / 100).toLocaleString(num.intl, {
+                style: "percent",
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 1,
+              })}
             </span>
           </div>
           <div
@@ -146,18 +169,18 @@ export function ExitRaceSimulator({
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Metric
             label={t("Capital + BTC overhead")}
-            value={`${(scenario.capitalXcp + scenario.overheadXcp).toFixed(2)} XCP-eq`}
-            hint={`${scenario.capitalXcp.toFixed(0)} XCP + ${totalOverheadSats.toLocaleString()} sats`}
+            value={`${fixed2(scenario.capitalXcp + scenario.overheadXcp, num)} XCP-eq`}
+            hint={`${scenario.capitalXcp.toFixed(0)} XCP + ${num.commas(totalOverheadSats)} sats`}
           />
           <Metric
             label={t("Cash sale proceeds")}
-            value={money(scenario.proceedsXcp)}
-            hint={inCurrency(scenario.proceedsXcp * xcpUsd, code, rate)}
+            value={money(scenario.proceedsXcp, num)}
+            hint={inCurrency(scenario.proceedsXcp * xcpUsd, code, rate, num)}
           />
           <Metric
             label={t("Net cash P/L")}
-            value={`${scenario.pnlXcpEquivalent >= 0 ? "+" : ""}${scenario.pnlXcpEquivalent.toFixed(2)} XCP-eq`}
-            hint={inCurrency(scenario.pnlXcpEquivalent * xcpUsd, code, rate, true)}
+            value={`${scenario.pnlXcpEquivalent >= 0 ? "+" : ""}${fixed2(scenario.pnlXcpEquivalent, num)} XCP-eq`}
+            hint={inCurrency(scenario.pnlXcpEquivalent * xcpUsd, code, rate, num, true)}
             negative={scenario.pnlXcpEquivalent < 0}
           />
         </div>
@@ -165,7 +188,7 @@ export function ExitRaceSimulator({
         <p className="mt-3 text-xs leading-relaxed text-gray-400 dark:text-gray-500">
           {t(
             "Cash accounting values the {n}M unsold tokens at zero. It is intentionally not a mark-to-market portfolio return.",
-            { n: scenario.retainedMillions.toFixed(2) },
+            { n: fixed2(scenario.retainedMillions, num) },
           )}
         </p>
 
@@ -248,6 +271,7 @@ function ExitRaceChart({
   selectedPnl: number;
   overheadXcpPerAddress: number;
 }) {
+  const num = useNumbers();
   const t = useT();
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(680);
@@ -399,7 +423,7 @@ function ExitRaceChart({
             fontWeight="600"
             className="fill-gray-900 dark:fill-gray-100"
           >
-            {money(selectedPnl, true)}
+            {money(selectedPnl, num, true)}
           </text>
           {width >= 560 && (
             <text
@@ -409,7 +433,12 @@ function ExitRaceChart({
               fontWeight="600"
               className="fill-gray-900 dark:fill-gray-100"
             >
-              {t("coordinated break-even ≈ {n}", { n: thresholds.breakEven.toFixed(1) })}
+              {t("coordinated break-even ≈ {n}", {
+                n: thresholds.breakEven.toLocaleString(num.intl, {
+                  minimumFractionDigits: 1,
+                  maximumFractionDigits: 1,
+                }),
+              })}
             </text>
           )}
           <text

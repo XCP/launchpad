@@ -185,8 +185,9 @@ export function rawToDecimalString(
 export function formatExact(
   decimal: string,
   options: Intl.NumberFormatOptions = {},
+  locale = "en-US",
 ): string {
-  const format = new Intl.NumberFormat("en-US", options).format as (
+  const format = new Intl.NumberFormat(locale, options).format as (
     input: string | number,
   ) => string;
   return format(decimal);

@@ -10,8 +10,9 @@ import {
   type ResearchLaunchBehavior,
   type ResearchBehaviorSnapshot,
 } from "@/lib/api/launchpad-api";
-import { compact, fromSats } from "@/lib/format";
+import { fromSats } from "@/lib/format";
 import { useT } from "@/lib/i18n/client";
+import { type Numbers, useNumbers } from "@/lib/i18n/numbers";
 import type { T } from "@/lib/i18n/t";
 import { big, ratio } from "@/lib/numeric";
 import { circulatingSupplyRaw } from "@/lib/xcp69";
@@ -101,6 +102,7 @@ export function SellerSummary({
 }: {
   cohorts: ResearchBehaviorSnapshot["cohorts"];
 }) {
+  const num = useNumbers();
   const t = useT();
   const redeployed = cohorts.redeployAndHold + cohorts.redeployAndExit;
 
@@ -116,7 +118,7 @@ export function SellerSummary({
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400 sm:text-right">
             <strong className="text-gray-900 dark:text-gray-100">{redeployed}</strong> {t("minted again")} ·{" "}
-            <strong className="text-gray-900 dark:text-gray-100">{compact(fromSats(cohorts.redeployedPaid))} XCP</strong> {t("redeployed")}
+            <strong className="text-gray-900 dark:text-gray-100">{num.compact(fromSats(cohorts.redeployedPaid))} XCP</strong> {t("redeployed")}
           </p>
         </div>
       </div>
@@ -171,6 +173,7 @@ function MatrixValue({
 }
 
 function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
+  const num = useNumbers();
   const t = useT();
   const transactions = rows.reduce((sum, [, row]) => sum + row.sellTransactions, 0);
   const wallets = rows.reduce((sum, [, row]) => sum + row.sellWallets, 0);
@@ -205,7 +208,7 @@ function PendingSellTape({ rows }: { rows: [string, PendingPressure][] }) {
           >
             <strong className="text-gray-900 dark:text-gray-100">{asset}</strong>
             <span className="ml-2 font-semibold text-red-700 dark:text-red-400">
-              {t("{n} tokens", { n: compact(fromSats(row.sellQuantity)) })}
+              {t("{n} tokens", { n: num.compact(fromSats(row.sellQuantity)) })}
             </span>
             <span className="ml-1 text-gray-500 dark:text-gray-400">
               {t("· {wallets} wallets · {txs} txs", { wallets: row.sellWallets, txs: row.sellTransactions })}
@@ -356,6 +359,7 @@ function LaunchCard({
   rank: number;
   pending: PendingPressure;
 }) {
+  const num = useNumbers();
   const t = useT();
   const behavior = row.behavior;
 
@@ -367,12 +371,12 @@ function LaunchCard({
           <MobileStat label={t("Minters")} value={String(behavior.trackedMinters)} detail={t("unique addresses")} />
           <MobileStat
             label={t("Dumpers")}
-            value={allocationShare(behavior.knownFastInventory, row.earnedQuantity)}
+            value={allocationShare(behavior.knownFastInventory, row.earnedQuantity, num)}
             detail={t("{n} addresses", { n: behavior.knownFastMinters })}
           />
           <MobileStat
             label={t("Repeat dumpers")}
-            value={allocationShare(behavior.repeatDumpInventory, row.earnedQuantity)}
+            value={allocationShare(behavior.repeatDumpInventory, row.earnedQuantity, num)}
             detail={t("{n} addresses", { n: behavior.repeatDumpMinters })}
           />
         </div>
@@ -404,6 +408,7 @@ function LaunchName({
   rank: number;
   pending: PendingPressure;
 }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <div>
@@ -413,13 +418,13 @@ function LaunchName({
           {row.asset}
         </LazyLink>
       </div>
-      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{rankSignal(row, t)}</div>
+      <div className="mt-1 text-xs text-gray-500 dark:text-gray-400">{rankSignal(row, t, num)}</div>
       {pending.sellTransactions > 0 && (
         <div className="mt-1 text-xs font-semibold text-red-700 dark:text-red-400">
           {t("{sells} pending sells · {wallets} wallets · {tokens} tokens", {
             sells: pending.sellTransactions,
             wallets: pending.sellWallets,
-            tokens: compact(fromSats(pending.sellQuantity)),
+            tokens: num.compact(fromSats(pending.sellQuantity)),
           })}
         </div>
       )}
@@ -428,12 +433,13 @@ function LaunchName({
 }
 
 function Allocation({ count, quantity, total }: { count: number; quantity: string; total: string | null }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <div>
-      <strong className="tabular-nums text-red-600 dark:text-red-400">{allocationShare(quantity, total)}</strong>
+      <strong className="tabular-nums text-red-600 dark:text-red-400">{allocationShare(quantity, total, num)}</strong>
       <div className="text-xs text-gray-500 dark:text-gray-400">{t("{n} unique addresses", { n: count })}</div>
-      <div className="text-xs text-gray-400 dark:text-gray-500">{t("{n} tokens", { n: compact(fromSats(quantity)) })}</div>
+      <div className="text-xs text-gray-400 dark:text-gray-500">{t("{n} tokens", { n: num.compact(fromSats(quantity)) })}</div>
     </div>
   );
 }
@@ -458,6 +464,7 @@ function OutcomeLine({ row }: { row: ResearchLaunchBehavior }) {
 }
 
 function Inventory({ row }: { row: ResearchLaunchBehavior }) {
+  const num = useNumbers();
   const t = useT();
   const behavior = row.behavior;
   if (big(behavior.sellerBalance) <= 0n) {
@@ -467,12 +474,12 @@ function Inventory({ row }: { row: ResearchLaunchBehavior }) {
   return (
     <div className="mt-1 text-xs leading-relaxed">
       <strong className="text-amber-700 dark:text-amber-400">
-        {t("{pct} of supply", { pct: allocationShare(behavior.sellerBalance, row.hardCap) })}
+        {t("{pct} of supply", { pct: allocationShare(behavior.sellerBalance, row.hardCap, num) })}
       </strong>
       <div className="text-gray-500 dark:text-gray-400">{t("held by {n} sellers", { n: behavior.sellersHolding })}</div>
       {big(behavior.dumperBalance) > 0n && (
         <div className="text-gray-400 dark:text-gray-500">
-          {t("{pct} held by dumpers", { pct: allocationShare(behavior.dumperBalance, row.hardCap) })}
+          {t("{pct} held by dumpers", { pct: allocationShare(behavior.dumperBalance, row.hardCap, num) })}
         </div>
       )}
       {behavior.dispenserSellers > 0 && (
@@ -494,19 +501,33 @@ function MobileStat({ label, value, detail }: { label: string; value: string; de
   );
 }
 
-function rankSignal(row: ResearchLaunchBehavior, t: T): string {
+function rankSignal(row: ResearchLaunchBehavior, t: T, num: Numbers): string {
   if (row.phase === "minting") {
-    return t("{pct}% minted", { pct: Math.min(100, ratio(row.earnedQuantity, row.softCap) * 100).toFixed(1) });
+    return t("{pct}% minted", {
+      pct: Math.min(100, ratio(row.earnedQuantity, row.softCap) * 100).toLocaleString(num.intl, {
+        minimumFractionDigits: 1,
+        maximumFractionDigits: 1,
+      }),
+    });
   }
   const tokenReserve = big(row.poolTokenReserve);
   if (tokenReserve <= 0n) return "—";
   const marketCapRaw =
     (circulatingSupplyRaw(row.hardCap, row.burnedQuantity) * big(row.poolXcpReserve)) /
     tokenReserve;
-  return t("{cap} XCP market cap", { cap: compact(fromSats(marketCapRaw)) });
+  return t("{cap} XCP market cap", { cap: num.compact(fromSats(marketCapRaw)) });
 }
 
-function allocationShare(part: string, whole: string | null): string {
-  if (big(whole) <= 0n) return "0.0%";
-  return `${Math.min(100, ratio(part, whole) * 100).toFixed(1)}%`;
+/**
+ * A share of an allocation. The "%" is ours rather than a translation's — the
+ * whole string is substituted into `{pct}` placeholders — so Intl writes the
+ * sign as well as the digits, and French and Russian space it off.
+ */
+function allocationShare(part: string, whole: string | null, num: Numbers): string {
+  const share = big(whole) <= 0n ? 0 : Math.min(1, ratio(part, whole));
+  return share.toLocaleString(num.intl, {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  });
 }

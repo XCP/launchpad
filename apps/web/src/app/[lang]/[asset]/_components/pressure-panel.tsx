@@ -4,9 +4,10 @@ import { msg } from "@/lib/i18n/t";
 import { useState } from "react";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
 import type { ActivityWindow, PairActivity } from "@/lib/api/counterparty";
-import { commas, compact, fromSats } from "@/lib/format";
+import { fromSats } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { big } from "@/lib/numeric";
 
 /**
@@ -34,6 +35,7 @@ export function PressurePanel({
   activity: PairActivity;
   xcpUsd: number | null;
 }) {
+  const num = useNumbers();
   const t = useT();
   const usd = useFiat();
   const [window, setWindow] = useState<ActivityWindow>("24h");
@@ -43,7 +45,7 @@ export function PressurePanel({
 
   const buyVol = fromSats(volume.buyVolXcpRaw);
   const sellVol = fromSats(volume.sellVolXcpRaw);
-  const money = (xcp: number) => (xcpUsd ? usd(xcp * xcpUsd) : `${compact(xcp)} XCP`);
+  const money = (xcp: number) => (xcpUsd ? usd(xcp * xcpUsd) : `${num.compact(xcp)} XCP`);
 
   if (volume.trades === 0) {
     return (
@@ -55,8 +57,8 @@ export function PressurePanel({
 
   const rows: { left: string; right: string; leftN: number; rightN: number }[] = [
     {
-      left: t("{n} buys", { n: commas(volume.buys) }),
-      right: t("{n} sells", { n: commas(volume.sells) }),
+      left: t("{n} buys", { n: num.commas(volume.buys) }),
+      right: t("{n} sells", { n: num.commas(volume.sells) }),
       leftN: volume.buys,
       rightN: volume.sells,
     },
@@ -67,8 +69,8 @@ export function PressurePanel({
       rightN: Number(big(volume.sellVolXcpRaw)),
     },
     {
-      left: t("{n} buyers", { n: commas(volume.buyers) }),
-      right: t("{n} sellers", { n: commas(volume.sellers) }),
+      left: t("{n} buyers", { n: num.commas(volume.buyers) }),
+      right: t("{n} sellers", { n: num.commas(volume.sellers) }),
       leftN: volume.buyers,
       rightN: volume.sellers,
     },
@@ -81,7 +83,7 @@ export function PressurePanel({
           than a second grammar invented for this one panel. */}
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm font-medium text-gray-900 dark:text-gray-100 tabular-nums">
-          {commas(volume.trades)}{" "}
+          {num.commas(volume.trades)}{" "}
           <span className="font-normal text-gray-500 dark:text-gray-400">
             {volume.trades === 1 ? t("trade") : t("trades")}
           </span>

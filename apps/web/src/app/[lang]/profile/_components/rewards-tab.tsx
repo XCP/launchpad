@@ -1,9 +1,10 @@
 "use client";
 
 import type { RewardAccount } from "@/lib/api/launchpad-api";
-import { commas, commasRaw, shortAddress } from "@/lib/format";
+import { shortAddress } from "@/lib/format";
 import { LABEL } from "@/components/ui/tokens";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 const statusTone = {
   confirmed: "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-400",
@@ -13,13 +14,14 @@ const statusTone = {
 /** Transaction-backed reward history. The parent only mounts this component
  * after at least one payout has a real tx hash. */
 export function RewardsTab({ account }: { account: RewardAccount }) {
+  const num = useNumbers();
   const t = useT();
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-xl bg-gray-50 dark:bg-gray-800/60 p-4">
         <span className={LABEL}>{t("Lifetime earned")}</span>
         <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-gray-100">
-          {commasRaw(account.lifetimeEarnedQuantity)}{" "}
+          {num.commasRaw(account.lifetimeEarnedQuantity)}{" "}
           <span className="text-xs font-medium text-gray-500 dark:text-gray-400">MINTS</span>
         </p>
       </div>
@@ -44,15 +46,15 @@ export function RewardsTab({ account }: { account: RewardAccount }) {
               >
                 <div className="min-w-0">
                   <p className="truncate font-medium text-gray-900 dark:text-gray-100">
-                    {t("Mints {from}–{to}", { from: commas(payout.firstMintNumber), to: commas(payout.cutoffMintNumber) })}
+                    {t("Mints {from}–{to}", { from: num.commas(payout.firstMintNumber), to: num.commas(payout.cutoffMintNumber) })}
                   </p>
                   <p className="truncate text-xs text-gray-400 dark:text-gray-500">{payout.batchId}</p>
                 </div>
                 <span className="text-right tabular-nums text-gray-900 dark:text-gray-100">
-                  {commasRaw(payout.quantity)} MINTS
+                  {num.commasRaw(payout.quantity)} MINTS
                 </span>
                 <span className="text-right tabular-nums text-gray-500 dark:text-gray-400">
-                  {commas(payout.mintCount)}
+                  {num.commas(payout.mintCount)}
                 </span>
                 <span className="flex items-center justify-end gap-2">
                   <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusTone[payout.status]}`}>

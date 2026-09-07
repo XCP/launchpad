@@ -6,8 +6,9 @@ import { TokenImage } from "@/components/token-image";
 import { fetchAssetBalance, fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchEventsBySource, fetchMintsBySource, fetchSearchIndex } from "@/lib/api/launchpad-api";
 import { computeActivity, reconcileActivity, type ActivityKind } from "@/lib/activity";
-import { blocksEta, compact, fromSats, tokenQty } from "@/lib/format";
+import { blocksEta, fromSats, tokenQty } from "@/lib/format";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 import { msg } from "@/lib/i18n/t";
 
 const LABEL: Record<ActivityKind, string> = {
@@ -33,6 +34,7 @@ const TONE: Record<ActivityKind, string> = {
 /** Blocks land about every ten minutes, so distance from the tip is a decent
  *  age — an estimate, and labelled as one. */
 export function ActivityTab({ address }: { address: string }) {
+  const num = useNumbers();
   const t = useT();
   const { data, isLoading } = useSWR(
     ["activity", address],
@@ -110,7 +112,7 @@ export function ActivityTab({ address }: { address: string }) {
                     ) : (
                       <>
                         {tokensIn ? "+" : "−"}
-                        {compact(tokens)}
+                        {num.compact(tokens)}
                       </>
                     )}
                   </span>
@@ -120,7 +122,7 @@ export function ActivityTab({ address }: { address: string }) {
                     ) : (
                       <>
                         {xcpOut ? "−" : "+"}
-                        {compact(xcp)}
+                        {num.compact(xcp)}
                       </>
                     )}
                   </span>

@@ -1,10 +1,10 @@
 "use client";
 
 import useSWR from "swr";
-import { commasRaw } from "@/lib/format";
 import { parseJsonLossless, type Raw, ratio } from "@/lib/numeric";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { useT } from "@/lib/i18n/client";
+import { useNumbers } from "@/lib/i18n/numbers";
 
 interface OrderRow {
   status: string;
@@ -32,6 +32,7 @@ export function OrderTracker({
   onCancel?: (hash: string) => void;
   busy?: boolean;
 }) {
+  const num = useNumbers();
   const { data: order } = useSWR<OrderRow | null>(
     `${COUNTERPARTY_API_BASE}/orders/${txHash}`,
     async (url: string) => {
@@ -70,7 +71,7 @@ export function OrderTracker({
     return (
       <p className="mt-2 text-sm text-green-700 dark:text-green-400">
         {t("Expired — the unfilled {amount} {asset} was refunded automatically.", {
-          amount: commasRaw(order.give_remaining),
+          amount: num.commasRaw(order.give_remaining),
           asset: order.give_asset,
         })}
       </p>
@@ -86,11 +87,11 @@ export function OrderTracker({
         {filledPct > 0
           ? t("{pct}% filled — the rest is resting on the book with {amount} {asset} escrowed.", {
               pct: filledPct.toFixed(0),
-              amount: commasRaw(order.give_remaining),
+              amount: num.commasRaw(order.give_remaining),
               asset: order.give_asset,
             })
           : t("Confirmed — resting on the book with {amount} {asset} escrowed.", {
-              amount: commasRaw(order.give_remaining),
+              amount: num.commasRaw(order.give_remaining),
               asset: order.give_asset,
             })}
       </p>
