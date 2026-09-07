@@ -7,6 +7,7 @@ import {
 } from "@launchpad/xcp69/candles";
 import { mergePairTrades, type PairTrade } from "@launchpad/xcp69/trades";
 import { q } from "#api/db";
+import { CounterpartyReadDeferred } from "#api/integrations/cooldown";
 import {
   fetchNewestOrderMatchBlock,
   fetchOrderMatches,
@@ -300,10 +301,16 @@ const FIRST_RUNS_PER_TICK = 1;
 const cursorKey = (asset: string) => `events_hw:${asset}`;
 const poolRevisionKey = (asset: string) => `events_pool:${asset}`;
 
+export interface EventSyncProgress {
+  failed: number;
+  deferred: number;
+}
+
 export async function syncAssetEvents(
   db: D1Database,
   targets: GraduatedTarget[],
   height: number,
+  progress: EventSyncProgress = { failed: 0, deferred: 0 },
 ): Promise<number> {
   if (targets.length === 0) return 0;
 
@@ -345,9 +352,14 @@ export async function syncAssetEvents(
     targets
       .filter((t) => !poolNeedsSync(t) && cursors.has(cursorKey(t.asset)))
       .map(async (t) => {
-        const newest = await fetchNewestOrderMatchBlock(t.asset);
-        if (newest !== null && newest > cursors.get(cursorKey(t.asset))!) {
-          bookChanged.add(t.asset);
+        try {
+          const newest = await fetchNewestOrderMatchBlock(t.asset, true);
+          if (newest !== null && newest > cursors.get(cursorKey(t.asset))!) {
+            bookChanged.add(t.asset);
+          }
+        } catch (error) {
+          if (error instanceof CounterpartyReadDeferred) progress.deferred++;
+          else progress.failed++;
         }
       }),
   );
@@ -364,7 +376,10 @@ export async function syncAssetEvents(
     // unchanged reserve and would otherwise never be indexed at all.
     if (!firstRun && !poolNeedsSync(target) && !bookChanged.has(target.asset)) continue;
     if (firstRun) {
-      if (firstRuns >= FIRST_RUNS_PER_TICK) continue; // next tick takes it
+      if (firstRuns >= FIRST_RUNS_PER_TICK) {
+        progress.deferred++;
+        continue; // next tick takes it
+      }
       firstRuns += 1;
     }
 
@@ -382,16 +397,34 @@ export async function syncAssetEvents(
         fetchPoolMatches(target.asset, sinceBlock),
         fetchOrderMatches(target.asset, sinceBlock),
       ]);
-    } catch {
+    } catch (error) {
+      if (error instanceof CounterpartyReadDeferred) progress.deferred++;
+      else progress.failed++;
       continue;
     }
 
+    const enrichmentErrors: unknown[] = [];
     const mergedTrades = await mergePairTrades(
       target.asset,
       poolMatches,
       orderMatches,
-      fetchTransactionEvents,
+      async txHash => {
+        try {
+          return await fetchTransactionEvents(txHash);
+        } catch (error) {
+          enrichmentErrors.push(error);
+          throw error;
+        }
+      },
     );
+    // The shared browser merger can display its deterministic fallback, but
+    // an index must not acknowledge unread transaction ordering permanently.
+    // Retry the complete asset window without writing provisional identities.
+    if (enrichmentErrors.length > 0) {
+      if (enrichmentErrors.every(error => error instanceof CounterpartyReadDeferred)) progress.deferred++;
+      else progress.failed++;
+      continue;
+    }
     const rows = toIndexedRows(target.asset, mergedTrades);
 
     // Same fills, folded a second way. A pool match has one trader and a book

@@ -6,27 +6,42 @@ import { parseJsonLossless, rawEquals, SATS_PER_UNIT } from "@launchpad/xcp69/nu
 import type { PendingDispense } from "@launchpad/xcp69/dispenser-price";
 import type { MempoolMint, MempoolOrder } from "@launchpad/xcp69/mempool";
 import type { CounterpartyEvent } from "@launchpad/xcp69/trades";
+import {
+  acquireCounterpartyRead,
+  assertCounterpartyReadAllowed,
+  CounterpartyReadDeferred,
+  recordCounterpartyCooldown,
+} from "#api/integrations/cooldown";
 
 const BASE = "https://api.counterparty.io:4000/v2";
 
 async function get<T>(path: string): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    signal: AbortSignal.timeout(15_000),
-  });
-  if (!res.ok) {
-    // A Worker holds six outbound connections, and a Response whose body is
-    // neither read nor cancelled keeps its slot until collection. One indexer
-    // tick makes many of these calls, so a throw that leaves the body open
-    // costs a connection that some later, unrelated request pays for: past
-    // six, the runtime cancels the OLDEST in-flight response and logs a
-    // stalled-response warning against whichever request happened to be it.
-    await res.body?.cancel().catch(() => undefined);
-    throw new Error(`Counterparty ${path} -> HTTP ${res.status}`);
+  const signal = AbortSignal.timeout(15_000);
+  const release = await acquireCounterpartyRead(signal);
+  try {
+    // A concurrent response may establish a cooldown after this read joined
+    // the queue. Check again immediately before starting its own request.
+    assertCounterpartyReadAllowed();
+    signal.throwIfAborted();
+    const res = await fetch(`${BASE}${path}`, { signal });
+    if (!res.ok) {
+      if (res.status === 429) recordCounterpartyCooldown(res.headers.get("retry-after"));
+      // A Worker holds six outbound connections, and a Response whose body is
+      // neither read nor cancelled keeps its slot until collection. One indexer
+      // tick makes many of these calls, so a throw that leaves the body open
+      // costs a connection that some later, unrelated request pays for: past
+      // six, the runtime cancels the OLDEST in-flight response and logs a
+      // stalled-response warning against whichever request happened to be it.
+      await res.body?.cancel().catch(() => undefined);
+      throw new Error(`Counterparty ${path} -> HTTP ${res.status}`);
+    }
+    // Native res.json() rounds integers past 2^53 — exactly what XCP-69's 1e16
+    // hard cap sits above. Parse losslessly so unsafe magnitudes survive as
+    // strings instead of silently drifting, the same way the web app does.
+    return parseJsonLossless<T>(await res.text());
+  } finally {
+    release();
   }
-  // Native res.json() rounds integers past 2^53 — exactly what XCP-69's 1e16
-  // hard cap sits above. Parse losslessly so unsafe magnitudes survive as
-  // strings instead of silently drifting, the same way the web app does.
-  return parseJsonLossless<T>(await res.text());
 }
 
 export interface CpFairminter {
@@ -605,7 +620,7 @@ export interface CpPool {
  * A pool that does not exist answers 404. Anything else — a timeout, a 429, a 503 — is the node
  * declining to say, which is not the same as saying no. Only the first is an answer.
  */
-export type PoolLookup = { known: true; pool: CpPool | null } | { known: false };
+export type PoolLookup = { known: true; pool: CpPool | null } | { known: false; deferred?: boolean };
 
 export async function fetchPool(asset: string): Promise<PoolLookup> {
   const path = `/pools/${encodeURIComponent(asset)}/XCP?verbose=true`;
@@ -618,7 +633,7 @@ export async function fetchPool(asset: string): Promise<PoolLookup> {
     if (error instanceof Error && error.message.endsWith("HTTP 404")) {
       return { known: true, pool: null };
     }
-    return { known: false };
+    return { known: false, deferred: error instanceof CounterpartyReadDeferred };
   }
 }
 
@@ -757,8 +772,8 @@ export function fetchOrderMatches(asset: string, sinceBlock: number): Promise<Cp
 
 /**
  * The newest completed book match's block, or null when the pair has never
- * traded on the book (or the probe failed — the caller treats both as "no
- * news", and the next tick asks again).
+ * traded on the book. Legacy callers can treat a failed probe as no news;
+ * the indexer requests strict failure reporting so its partial pass is visible.
  *
  * This is the cheap question behind the indexer's gate: a fill between two
  * resting orders moves no pool reserve, so the reserve check alone left book
@@ -766,13 +781,14 @@ export function fetchOrderMatches(asset: string, sinceBlock: number): Promise<Cp
  * feed and same descending-order guarantee `fetchMatches` already relies on;
  * one request, one row, no verbose.
  */
-export async function fetchNewestOrderMatchBlock(asset: string): Promise<number | null> {
+export async function fetchNewestOrderMatchBlock(asset: string, strict = false): Promise<number | null> {
   try {
     const data: { result: CpMatch[] } = await get(
       `/orders/${encodeURIComponent(asset)}/XCP/matches?status=completed&limit=1`,
     );
     return data.result?.[0]?.block_index ?? null;
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return null;
   }
 }
