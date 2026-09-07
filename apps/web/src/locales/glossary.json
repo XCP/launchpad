@@ -92,7 +92,7 @@
     },
     "LP burned": {
       "note": "The pool's LP tokens were destroyed, so liquidity is locked forever. ZH: 销毁 is the one Chinese word for burn; there is no バーン/焼却 split.",
-      "ja": "LP焼却済み",
+      "ja": "LP バーン済み",
       "zh": "LP 已销毁",
       "zh-tw": "LP 已銷毀",
       "zh-hk": "LP 已銷毀"
@@ -176,7 +176,7 @@
       "zh": "分发器",
       "zh-tw": "分發器",
       "zh-hk": "分發器",
-      "note": "Chinese press (Sohu on Counterparty NFTs) writes 分配器; the community also says 自动售货机 (vending machine). 分发器 is used here; a reviewer may prefer 分配器."
+      "note": "DECIDED 2026-09-07: 分发器. No Chinese Counterparty community text uses any one word; press wrote 分配器 once (Sohu) and vending-machine explainers say 自动售货机. 分发器 (distributor) reads correctly for “send BTC, receive XCP” and fits a nav label; 分配器 means an allocator in Chinese software."
     },
     "activity": {
       "ja": "アクティビティ",
@@ -288,7 +288,7 @@
     },
     "burn": {
       "ja": "バーン",
-      "note": "OPEN QUESTION for the reviewer: the site currently uses バーン for the burn tab and burn address, 焼却 for LP burned, and 破棄 for consensus destroying escrowed supply after a refund (Counterparty’s destroy message; Zaif writes 破壊 for proof of burn). Proposal: バーン for everything the community calls a burn including LP, 破棄 only for the protocol destroy. Decide, then apply in one pass. ZH: OpenCC emits 銷燬; the normal Traditional form is 銷毀.",
+      "note": "DECIDED 2026-09-07: Japanese press heads the term as バーン（焼却）everywhere (CoinPost glossary, Coincheck, CoinDesk Japan), so バーン is used for every burn on the site including LP バーン済み; 破棄 is kept only for Counterparty’s destroy message, where consensus destroys escrowed supply after a refund. Chinese is 销毁 in every sense; OpenCC emits 銷燬 and the derivation script restores 銷毀.",
       "zh": "销毁",
       "zh-tw": "銷毀",
       "zh-hk": "銷毀"
