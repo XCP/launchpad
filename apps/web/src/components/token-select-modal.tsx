@@ -7,20 +7,22 @@ import { Dialog } from "@/components/ui/dialog";
 import { fetchBalance } from "@/lib/client";
 import { useT } from "@/lib/i18n/client";
 import { commasRaw } from "@/lib/format";
+import { mapWithLimit } from "@/lib/net";
 
 async function fetchBalances(
   address: string,
   assets: string[],
 ): Promise<Record<string, bigint>> {
-  const entries = await Promise.all(
-    assets.map(async (a) => {
-      try {
-        return [a, await fetchBalance(address, a)] as const;
-      } catch {
-        return [a, 0n] as const;
-      }
-    }),
-  );
+  // One balance request per listed token, and the list is every tradeable
+  // asset on the site. Opening the picker used to fire all of them at once at
+  // the same public node the whole app shares.
+  const entries = await mapWithLimit(assets, async (a) => {
+    try {
+      return [a, await fetchBalance(address, a)] as const;
+    } catch {
+      return [a, 0n] as const;
+    }
+  });
   return Object.fromEntries(entries);
 }
 

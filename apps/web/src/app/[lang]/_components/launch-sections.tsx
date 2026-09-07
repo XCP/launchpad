@@ -25,6 +25,7 @@ import { type LaunchPhase, saleProgress, XCP69_MIN_PARTICIPANTS } from "@/lib/xc
 import { ratio } from "@/lib/numeric";
 import { priceChangePercent, usdPriceChangePercent } from "@/lib/market";
 import { useWallet } from "@/lib/wallet/wallet-context";
+import { mapWithLimit } from "@/lib/net";
 
 type View = "grid" | "table";
 
@@ -492,9 +493,7 @@ function Section({
     holderAssets.length > 0 ? ["graduated-holders", ...holderAssets] : null,
     async () =>
       Object.fromEntries(
-        await Promise.all(
-          holderAssets.map(async (asset) => [asset, await fetchHolderCount(asset)] as const),
-        ),
+        await mapWithLimit(holderAssets, async (asset) => [asset, await fetchHolderCount(asset)] as const),
       ),
     { dedupingInterval: 300_000, refreshInterval: 300_000, revalidateOnFocus: false },
   );

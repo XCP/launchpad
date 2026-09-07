@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { XCP_API_BASE } from "@/lib/constants";
+import { discard } from "@/lib/net";
 
 /**
  * BTC/USD history for the homepage market modal.
@@ -22,7 +23,10 @@ async function fetchXcpMarket(days: number): Promise<PricePoint[]> {
     signal: AbortSignal.timeout(6_000),
     next: { revalidate: 300 },
   });
-  if (!response.ok) return [];
+  if (!response.ok) {
+    await discard(response);
+    return [];
+  }
 
   const data = (await response.json()) as {
     result?: {
@@ -81,7 +85,10 @@ async function fetchCoinGecko(days: number): Promise<PricePoint[]> {
     signal: AbortSignal.timeout(5_000),
     next: { revalidate: 300 },
   });
-  if (!response.ok) return [];
+  if (!response.ok) {
+    await discard(response);
+    return [];
+  }
 
   const data = (await response.json()) as { prices?: unknown[] };
   return (data.prices ?? [])

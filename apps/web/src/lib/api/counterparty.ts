@@ -21,6 +21,16 @@ interface Paginated<T> {
   result_count: number;
 }
 
+/**
+ * How patient to be with a throttled node.
+ *
+ * Deliberately modest, and the same at build time as at request time. Waiting
+ * longer during static generation was tried and made things worse: Next gives
+ * a page 60 seconds, so patience per request turns a fast 429 into a slow
+ * timeout and costs the build three attempts instead of one. The way to
+ * survive a throttle here is to ask for less, which is what the deduplication
+ * below and the bounded fan-outs elsewhere do.
+ */
 /** Attempts after the first, when the node asks us to come back later. */
 const THROTTLE_RETRIES = 2;
 /** The longest we will wait on one of those, whatever Retry-After says. */

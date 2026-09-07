@@ -22,6 +22,7 @@ import {
   inscriptionId,
   inscriptionPageUrl,
 } from "@/lib/constants";
+import { discard } from "@/lib/net";
 
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
@@ -51,7 +52,10 @@ async function assetHasRealFairminter(asset: string): Promise<boolean> {
       `${COUNTERPARTY_API_BASE}/assets/${asset}/fairminters?limit=100&verbose=true`,
       { cache: "no-store" },
     );
-    if (!res.ok) return true; // Can't confirm it's safe — fail closed.
+    if (!res.ok) {
+      await discard(res);
+      return true; // Can't confirm it's safe — fail closed.
+    }
     const data = (await res.json()) as { result?: { status?: string }[] };
     return (data.result ?? []).some((fm) => !fm.status?.startsWith("invalid"));
   } catch {
@@ -91,7 +95,10 @@ async function fetchRealFairminter(
       `${COUNTERPARTY_API_BASE}/assets/${asset}/fairminters?limit=100&verbose=true`,
       { cache: "no-store" },
     );
-    if (!res.ok) return null;
+    if (!res.ok) {
+      await discard(res);
+      return null;
+    }
     const data = (await res.json()) as {
       result?: { tx_hash?: string; mime_type?: string; status?: string }[];
     };
@@ -321,6 +328,7 @@ export async function PUT(request: Request) {
     cache: "no-store",
   });
   if (!assetRes.ok) {
+    await discard(assetRes);
     return NextResponse.json({ error: "Asset lookup failed" }, { status: 502 });
   }
   const assetInfo = (await assetRes.json()).result as

@@ -13,6 +13,7 @@ import { fromSats, tokenQty } from "@/lib/format";
 import { useFiat, useFxRate } from "@/lib/currency";
 import { big, ratio } from "@/lib/numeric";
 import { useT } from "@/lib/i18n/client";
+import { mapWithLimit } from "@/lib/net";
 
 type Denom = "usd" | "xcp";
 
@@ -112,7 +113,7 @@ export function PoolsTab({
         )
         .join(","),
     ],
-    () => Promise.all(pools.map((pool) => loadPosition(pool, xcp69Assets))),
+    () => mapWithLimit(pools, (pool) => loadPosition(pool, xcp69Assets)),
     // Pool state changes only on a block. There is no reason to requote it
     // faster than the rest of the profile.
     { refreshInterval: 600_000, revalidateOnFocus: false },

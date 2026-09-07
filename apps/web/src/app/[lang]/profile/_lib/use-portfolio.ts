@@ -18,6 +18,7 @@ import {
   type PriceSnapshot,
 } from "@/lib/portfolio-chart";
 import { computePositions, type ClosedPosition, type PairedDelta, type Position, type PositionInput } from "@/lib/positions";
+import { mapWithLimit } from "@/lib/net";
 
 export interface Portfolio {
   open: Position[];
@@ -101,11 +102,9 @@ export function usePortfolio(address: string) {
       // this address holds was 1,766 rows to answer a question about at most a
       // handful of assets.
       const balances = new Map<string, string>();
-      await Promise.all(
-        universe.map(async (u) => {
-          balances.set(u.asset, await fetchAssetBalance(address, u.asset));
-        }),
-      );
+      await mapWithLimit(universe, async (u) => {
+        balances.set(u.asset, await fetchAssetBalance(address, u.asset));
+      });
 
       let positions = computePositions(paired, universe, balances);
       const issuesFor = (result: typeof positions) => [
@@ -180,10 +179,10 @@ export function usePortfolio(address: string) {
       // includes a token moved out during the window, not just today's holdings.
       const held = new Set(deltas.map((d) => d.asset));
       const prices = new Map<string, PriceSnapshot[]>();
-      await Promise.all(
-        graduated
-          .filter((l) => held.has(l.asset))
-          .map(async (l) => {
+      // Five pages each, so this is the heaviest fan-out on the page.
+      await mapWithLimit(
+        graduated.filter((l) => held.has(l.asset)),
+        async (l) => {
             const xcpIsA = (s: PoolSnapshot) => s.asset_a === "XCP";
             const snaps = await fetchPoolPriceHistory(l.asset);
             prices.set(
@@ -197,7 +196,7 @@ export function usePortfolio(address: string) {
                 }))
                 .sort((a, b) => a.block - b.block),
             );
-          }),
+        },
       );
 
       if (externalFlows.length > 0) {

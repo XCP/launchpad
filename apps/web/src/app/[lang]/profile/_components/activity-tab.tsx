@@ -9,6 +9,7 @@ import { computeActivity, reconcileActivity, type ActivityKind } from "@/lib/act
 import { blocksEta, compact, fromSats, tokenQty } from "@/lib/format";
 import { useT } from "@/lib/i18n/client";
 import { msg } from "@/lib/i18n/t";
+import { mapWithLimit } from "@/lib/net";
 
 const LABEL: Record<ActivityKind, string> = {
   mint: msg("Minted"),
@@ -48,10 +49,10 @@ export function ActivityTab({ address }: { address: string }) {
       const universe = new Map((launches ?? []).map((l) => [l.asset, true]));
       const focused = computeActivity(events ?? [], mints ?? [], universe);
       const assets = [...new Set(focused.map((row) => row.asset))];
+      // One balance per distinct asset in the address's history, which for an
+      // active trader is a long list.
       const balances = new Map(
-        await Promise.all(
-          assets.map(async (asset) => [asset, await fetchAssetBalance(address, asset)] as const),
-        ),
+        await mapWithLimit(assets, async (asset) => [asset, await fetchAssetBalance(address, asset)] as const),
       );
       return { rows: reconcileActivity(focused, balances), height };
     },

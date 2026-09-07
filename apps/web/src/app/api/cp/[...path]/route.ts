@@ -72,6 +72,13 @@ export async function GET(
   // that the client parses losslessly, and re-encoding JSON here would round
   // them. Status travels with it, so a 404 stays a 404 rather than becoming
   // an empty success.
+  // The whole reason this route exists is that a browser can read a status here
+  // where Cloud Armor's direct 429 carries no CORS headers. That is only half
+  // an answer without the node's own Retry-After: without it the client knows
+  // it was throttled but not for how long, and guesses — which is how a
+  // throttled visitor turns into a retrying one.
+  const retryAfter = upstream.headers.get("retry-after");
+
   return new Response(upstream.body, {
     status: upstream.status,
     headers: {
@@ -80,6 +87,7 @@ export async function GET(
       // per-address and per-moment; a shared cache holding them would serve
       // one visitor's balance to another.
       "cache-control": upstream.headers.get("cache-control") ?? "no-store",
+      ...(retryAfter ? { "retry-after": retryAfter } : {}),
     },
   });
 }
