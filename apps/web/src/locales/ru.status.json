@@ -728,7 +728,7 @@
     "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.",
     "Try again",
     "Two bounties are claimed — one is still open for the next launch to graduate.",
-    "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every round trip leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.",
+    "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.",
     "Type",
     "Unconfirmed and provisional — mempool mints can exceed what's left, get replaced, or never confirm. Only what lands on-chain counts.",
     "Unconfirmed and provisional — these orders join the book only after confirmation.",

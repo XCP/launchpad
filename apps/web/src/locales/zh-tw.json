@@ -1119,7 +1119,7 @@
   "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.": "Counterparty 上無需信任的代幣發射。全有或全無的鑄造，流動性由共識鎖定，沒有平台託管。",
   "Try again": "重試",
   "Two bounties are claimed — one is still open for the next launch to graduate.": "兩份賞金已被領取 — 還有一份留給下一個畢業的發射。",
-  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every round trip leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": "兩點坦白說明。這個滑塊是一個邊界包絡 — 純粹的單向流動，要麼全是賣家，要麼全是買家，沒有交錯。真實市場是雙向混合的，而且每一次來回都會在池中留下 50 bps，所以真實路徑嚴格位於這兩個極端之內。另外，市值 = 價格 × 流通供應量 — 已發行供應量減去已銷毀代幣。這是慣例，不是承諾。",
+  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": "兩點坦白說明。這個滑塊是一個邊界包絡 — 純粹的單向流動，要麼全是賣家，要麼全是買家，沒有交錯。真實市場是雙向混合的，而且每次兌換都會在池中留下 50 bps，所以真實路徑嚴格位於這兩個極端之內。另外，市值 = 價格 × 流通供應量 — 已發行供應量減去已銷毀代幣。這是慣例，不是承諾。",
   "TX fee": "礦工費",
   "TX fees": "礦工費",
   "TX fees · {n} txs": "礦工費 · {n} 筆",

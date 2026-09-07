@@ -1123,7 +1123,7 @@
   "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.": "Counterparty의 신뢰 불필요 토큰 런칭. 전부 아니면 전무인 민팅, 합의로 잠긴 유동성, 플랫폼 커스터디 없음.",
   "Try again": "다시 시도",
   "Two bounties are claimed — one is still open for the next launch to graduate.": "바운티 2개가 지급되었고, 다음에 졸업하는 런칭을 위해 1개가 남아 있습니다.",
-  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every round trip leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": "솔직한 주석 두 가지. 이 슬라이더는 바깥 경계선입니다 — 순수한 한 방향 흐름으로, 전원 매도 아니면 전원 매수이며 섞이지 않습니다. 실제 시장은 양방향이 섞이고, 왕복할 때마다 50 bps가 풀에 남으므로 실제 경로는 반드시 이 양극단 안쪽에 있습니다. 그리고 시가총액 = 가격 × 유통 공급량 — 발행량에서 소각된 토큰을 뺀 값입니다. 관례일 뿐 약속이 아닙니다.",
+  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": "솔직한 주석 두 가지. 이 슬라이더는 바깥 경계선입니다 — 순수한 한 방향 흐름으로, 전원 매도 아니면 전원 매수이며 섞이지 않습니다. 실제 시장은 양방향이 섞이고, 스왑할 때마다 50 bps가 풀에 남으므로 실제 경로는 반드시 이 양극단 안쪽에 있습니다. 그리고 시가총액 = 가격 × 유통 공급량 — 발행량에서 소각된 토큰을 뺀 값입니다. 관례일 뿐 약속이 아닙니다.",
   "TX fee": "TX 수수료",
   "TX fees": "TX 수수료",
   "TX fees · {n} txs": "TX 수수료 · {n} tx",

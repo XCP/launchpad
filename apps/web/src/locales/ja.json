@@ -1119,7 +1119,7 @@
   "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.": "Counterparty 上のトラストレスなトークンローンチ。オール・オア・ナッシングのミント、コンセンサスでロックされる流動性、プラットフォームによる資産管理なし。",
   "Try again": "再試行",
   "Two bounties are claimed — one is still open for the next launch to graduate.": "報奨金 2 つは獲得済み — 次に卒業するローンチのために 1 つが残っています。",
-  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every round trip leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": "正直な注記を 2 つ。このスライダーは外側の包絡線です — 純粋な一方向の流れで、全員が売るか全員が買うかのどちらかで、混ざりません。実際の市場は両方向が混ざり、往復のたびに 50 bps がプールに残るので、実際の経路は必ずこの両極の内側にあります。また、時価総額 = 価格 × 流通供給量（発行量からバーン分を引いたもの）です。慣例であって約束ではありません。",
+  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": "正直な注記を 2 つ。このスライダーは外側の包絡線です — 純粋な一方向の流れで、全員が売るか全員が買うかのどちらかで、混ざりません。実際の市場は両方向が混ざり、スワップのたびに 50 bps がプールに残るので、実際の経路は必ずこの両極の内側にあります。また、時価総額 = 価格 × 流通供給量（発行量からバーン分を引いたもの）です。慣例であって約束ではありません。",
   "TX fee": "TX 手数料",
   "TX fees": "TX 手数料",
   "TX fees · {n} txs": "TX 手数料 · {n} tx",
