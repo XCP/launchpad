@@ -58,25 +58,52 @@ interface WorkerBinding {
  */
 const BUILD_DEADLINE_MS = 20_000;
 
+/**
+ * How long a server render may reuse an answer from this API when the caller
+ * names no window of its own.
+ *
+ * Thirty seconds because the routes behind it are edge-cached for fifteen to
+ * sixty on the API's side already, so a tighter number here buys freshness the
+ * upstream is not offering anyway. Browsers are unaffected: they keep whatever
+ * `cache` the caller set, which for the polled routes is `no-store`.
+ */
+const SERVER_REVALIDATE_S = 30;
+
 async function launchpadApiFetch(path: string, init: NextFetchInit = {}): Promise<Response> {
   const url = `${API_BASE}${path}`;
-  if (process.env.NEXT_PHASE === "phase-production-build") {
+  if (typeof window === "undefined") {
     // `cache: "no-store"` is here for polled routes, so a browser re-asking
-    // every few seconds is actually re-asking. Static generation is the one
-    // context where it is not merely pointless but harmful: Next will not
-    // perform an uncached read while prerendering, so the call never happens,
-    // the helper sees a failure, and the page silently takes its live-
-    // derivation fallback instead.
+    // every few seconds is actually re-asking. On the server it is wrong in
+    // two different ways, and both were live.
     //
-    // That is not hypothetical. It is why the home page has never once used
-    // this API during a build — measured, zero `/v2/launches?phase=` requests
-    // in a full production build — and fell back every time to three reads per
-    // launch over every launch on the chain, against a public node.
+    // During static generation Next will not perform an uncached read at all,
+    // so the call never happens, the helper sees a failure, and the page
+    // silently takes its live-derivation fallback. Measured: zero
+    // `/v2/launches?phase=` requests in a full production build, every build,
+    // while the home page derived the same answer from a public node at three
+    // reads per launch over every launch on the chain.
+    //
+    // During revalidation it is worse than useless, it throws: "Page changed
+    // from static to dynamic at runtime /en/rewards, reason: revalidate: 0
+    // fetch", observed in production. A page that declares `revalidate` cannot
+    // contain a no-store read, and every caller here sits on one.
+    //
+    // So: no-store is a browser instruction. On the server the page's own
+    // freshness window governs, and a caller that wants something tighter says
+    // so with `next.revalidate`.
     const rest = { ...init };
     delete rest.cache;
-    init = { ...rest, signal: AbortSignal.timeout(BUILD_DEADLINE_MS) };
+    init = rest;
     if (init.next?.revalidate === undefined) {
-      init.next = { ...init.next, revalidate: 60 };
+      init.next = { ...init.next, revalidate: SERVER_REVALIDATE_S };
+    }
+    // Only a build gets the longer deadline. Static generation saturates every
+    // core, so a three-second timer there can expire before its fetch is even
+    // issued — a 0ms "aborted due to timeout" that costs the page its indexed
+    // read. A revalidation render has a visitor waiting behind it and keeps
+    // the deadline its caller chose.
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+      init.signal = AbortSignal.timeout(BUILD_DEADLINE_MS);
     }
   }
 

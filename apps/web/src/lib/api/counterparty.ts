@@ -189,7 +189,22 @@ function attemptFetch(path: string, revalidate: number): Promise<Response> {
   });
 }
 
+/**
+ * The longest one logical read may spend on retries and shared pauses before
+ * it gives up, at request time.
+ *
+ * Retrying is only kind to a visitor while they are still there. Three
+ * attempts at an eight-second deadline, with a shared pause between each, adds
+ * to more than half a minute — and it showed: /zh/swap and /ko/swap were
+ * cancelled after 40 seconds of wall time having burned 4ms of CPU, waiting.
+ * A build has no such limit because nobody is waiting and the page budget is
+ * 180 seconds.
+ */
+const RUNTIME_BUDGET_MS = 12_000;
+
 async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
+  const building = process.env.NEXT_PHASE === "phase-production-build";
+  const deadline = building ? Infinity : Date.now() + RUNTIME_BUDGET_MS;
   for (let attempt = 0; ; attempt++) {
     await clearance();
     // A read can fail without ever producing a response: the node closes the
@@ -207,7 +222,7 @@ async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
       res = await attemptFetch(path, revalidate);
       if (res.ok) body = await res.text();
     } catch (error) {
-      if (attempt >= THROTTLE_RETRIES) throw error;
+      if (attempt >= THROTTLE_RETRIES || Date.now() >= deadline) throw error;
       const backoff = Math.min(250 * 2 ** attempt, MAX_THROTTLE_WAIT_MS);
       pause(backoff * (0.5 + Math.random() / 2));
       await clearance();
@@ -233,7 +248,7 @@ async function fetchThrottled<T>(path: string, revalidate: number): Promise<T> {
     // once, which is how one slow upstream stalls a whole render.
     await discard(res);
 
-    if (!throttled || attempt >= THROTTLE_RETRIES) {
+    if (!throttled || attempt >= THROTTLE_RETRIES || Date.now() >= deadline) {
       throw throttled
         ? new CounterpartyThrottled(path)
         : new Error(`Counterparty API ${res.status}: ${path}`);
