@@ -8,6 +8,7 @@ import {
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
+import { discard } from "@/lib/net";
 
 /**
  * Resolves a launch's hero art wherever it actually lives: an owner-authorized
@@ -94,6 +95,10 @@ export async function GET(
         },
       });
     }
+    // A placeholder or a miss still arrived with a body. Falling through
+    // without releasing it holds a connection slot on the commonest answer
+    // this route gives; see lib/net.ts.
+    await discard(cdn);
   } catch {
     // cdn.xcp.io unreachable — fall through to the honest miss below
   }

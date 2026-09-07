@@ -4,6 +4,7 @@ import {
   getMetadataRuntime,
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
+import { discard } from "@/lib/net";
 
 /**
  * Clean permanent URL for the 48x48 icon: /icon/<ASSET>. Performs the
@@ -62,10 +63,16 @@ export async function GET(
   } as RequestInit;
   let res = await fetch(source, init).catch(() => new Response(null, { status: 504 }));
   if (!res.ok || !(res.headers.get("content-type") ?? "").startsWith("image/")) {
+    // The reassignment below drops the only reference to the first response,
+    // which is not the same as closing it.
+    await discard(res);
     res = await fetch(source, { signal: AbortSignal.timeout(6_000) })
       .catch(() => new Response(null, { status: 504 }));
   }
-  if (!res.ok) return new Response("Not found", { status: 404 });
+  if (!res.ok) {
+    await discard(res);
+    return new Response("Not found", { status: 404 });
+  }
   return new Response(res.body, {
     headers: {
       "content-type": res.headers.get("content-type") ?? "image/png",

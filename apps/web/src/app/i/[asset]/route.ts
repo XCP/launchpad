@@ -10,6 +10,7 @@ import {
   resolveMetadataArtLocation,
 } from "@/lib/metadata";
 import { CDN_BASE } from "@/lib/constants";
+import { discard } from "@/lib/net";
 
 /**
  * A replaceable image cannot be `immutable`. The edit panel rewrites this
@@ -173,6 +174,9 @@ export async function GET(
         },
       });
     }
+    // Anything else — a non-image content type, an error status — falls
+    // through to R2 below with this response still holding a slot.
+    await discard(res);
   }
 
   // Cache API entries are local to a Cloudflare edge location. Deleting the

@@ -1,5 +1,6 @@
 import { COUNTERPARTY_API_BASE, XCP_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
+import { discard } from "@/lib/net";
 import { coalesceHolderBalances, type HolderRow, type LpBalance } from "@/lib/holders";
 import type { Raw } from "@/lib/numeric";
 
@@ -59,7 +60,10 @@ export async function fetchAddressLedgerSince(
       `${XCP_API_BASE}/addresses/${encodeURIComponent(address)}/ledger?limit=100&offset=${offset}`,
       { signal: AbortSignal.timeout(5_000) },
     );
-    if (!res.ok) throw new Error(`xcp.io ledger ${res.status}`);
+    if (!res.ok) {
+      await discard(res);
+      throw new Error(`xcp.io ledger ${res.status}`);
+    }
     const page = (await res.json()) as LedgerPage;
     if (!Array.isArray(page.result)) throw new Error("xcp.io ledger malformed response");
     for (const row of page.result) {

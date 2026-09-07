@@ -9,6 +9,7 @@ import { HomeToolbar } from "@/app/[lang]/_components/home-toolbar";
 import { type InitialPages, LaunchSections } from "@/app/[lang]/_components/launch-sections";
 import { type LaunchPage, PER_PAGE, toSectionRow } from "@/lib/launch-row";
 import { fetchLaunchPage } from "@/lib/api/launchpad-api";
+import { mapWithLimit } from "@/lib/net";
 import {
   fetchAllFairminters,
   fetchBlockHeight,
@@ -137,9 +138,13 @@ export default async function HomePage() {
     // Newest first; the pool row is the graduated-vs-refunded oracle, only
     // worth a lookup for closed pool fairminters.
     listed.sort((a, b) => b.block_index - a.block_index);
+    // Three reads per launch, over every launch on the chain. This branch only
+    // runs when the API has already failed, so firing them all at once is a
+    // burst aimed at something that is by definition unwell; see lib/net.ts.
     return (
-      await Promise.all(
-        listed.map(async (fm) => {
+      await mapWithLimit(
+        listed,
+        async (fm) => {
           const closed = fm.status === "closed";
           const [pool, original, minters] = await Promise.all([
             closed && big(fm.pool_quantity) > 0n
@@ -186,7 +191,7 @@ export default async function HomePage() {
             // that as an em dash instead of inventing a number for it.
             minters,
           };
-        }),
+        },
       )
     ).filter((p) => p.conforming);
   };
@@ -205,12 +210,10 @@ export default async function HomePage() {
     // positive-balance holder count. The balance pages are cached for five
     // minutes, so this is one shared refresh per asset rather than a scan per
     // visitor — and unlike an explorer rollup it cannot count sold-out rows.
-    graduated.rows = await Promise.all(
-      graduated.rows.map(async (row) => ({
-        ...row,
-        holders: await fetchHolderCount(row.fm.asset),
-      })),
-    );
+    graduated.rows = await mapWithLimit(graduated.rows, async (row) => ({
+      ...row,
+      holders: await fetchHolderCount(row.fm.asset),
+    }));
     initial = { graduated, minting, scheduled };
     paged = true;
     count = graduated.total + minting.total + scheduled.total;

@@ -10,6 +10,7 @@ import type { Fairminter, LaunchPhase } from "@/lib/xcp69";
 import type { MempoolMint } from "@/lib/api/counterparty";
 import type { MempoolOrder } from "@launchpad/xcp69/mempool";
 import { PRICE_SCALE } from "@launchpad/xcp69/candles";
+import { discard } from "@/lib/net";
 import { type Raw, ratio } from "@/lib/numeric";
 
 /**
@@ -50,13 +51,25 @@ async function launchpadApiFetch(path: string, init: NextFetchInit = {}): Promis
       const { env, cf } = await getCloudflareContext({ async: true });
       const binding = (env as typeof env & { LAUNCHPAD_API?: WorkerBinding }).LAUNCHPAD_API;
 
-      if (cf && binding) return binding.fetch(new Request(url, init));
+      if (cf && binding) return drained(await binding.fetch(new Request(url, init)));
     } catch {
       // Next development and static generation use the configured public URL.
     }
   }
 
-  return fetch(url, init);
+  return drained(await fetch(url, init));
+}
+
+/**
+ * Every caller of `launchpadApiFetch` answers a failure with `return null` or
+ * `return []` and never looks at the body — two dozen of them. Releasing the
+ * connection here rather than at each call site means the next one added is
+ * right by default. A successful response is untouched: the caller still owns
+ * and reads it.
+ */
+async function drained(response: Response): Promise<Response> {
+  if (!response.ok) await discard(response);
+  return response;
 }
 
 interface ApiLaunchRow {

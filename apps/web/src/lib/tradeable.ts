@@ -3,6 +3,7 @@ import {
   fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
+import { mapWithLimit } from "@/lib/net";
 import { big, compareRawDesc, type Raw } from "@/lib/numeric";
 import { isXcp69, windowIsExact, xcp69Params } from "@/lib/xcp69";
 import { orderTradeAssets } from "@/lib/trade-selection";
@@ -29,30 +30,30 @@ export async function fetchTradeableAssets(): Promise<string[]> {
   const closedPoolFms = fairminters.filter(
     (fm) => fm.status === "closed" && big(fm.pool_quantity) > 0n,
   );
-  const withPools = await Promise.all(
-    closedPoolFms.map(async (fm) => {
-      const pool = await fetchPool(fm.asset);
-      if (!pool) return null;
-      const original = xcp69Params(fm)
-        ? await fetchOriginalRecord(fm.tx_hash)
-        : { deadline: null, announceBlock: null };
-      const conforming =
-        isXcp69(fm, original.announceBlock) &&
-        windowIsExact(fm, original.deadline);
-      if (!conforming) return null;
-      const xcpDepth = pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b;
-      return { asset: fm.asset, xcpDepth };
-    }),
-  );
+  // Two reads per element against a list that grows with every graduated
+  // launch. Unbounded, this alone asks for hundreds of subrequests at once and
+  // spends the render cancelling itself; see lib/net.ts.
+  const withPools = await mapWithLimit(closedPoolFms, async (fm) => {
+    const pool = await fetchPool(fm.asset);
+    if (!pool) return null;
+    const original = xcp69Params(fm)
+      ? await fetchOriginalRecord(fm.tx_hash)
+      : { deadline: null, announceBlock: null };
+    const conforming =
+      isXcp69(fm, original.announceBlock) &&
+      windowIsExact(fm, original.deadline);
+    if (!conforming) return null;
+    const xcpDepth = pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b;
+    return { asset: fm.asset, xcpDepth };
+  });
   const graduates = withPools
     .filter((p): p is { asset: string; xcpDepth: Raw } => p !== null)
     .sort((a, b) => compareRawDesc(a.xcpDepth, b.xcpDepth))
     .map((p) => p.asset);
   const specials = (
-    await Promise.all(
-      SPECIAL_POOLS.filter((a) => !graduates.includes(a)).map(async (a) =>
-        (await fetchPool(a)) ? a : null,
-      ),
+    await mapWithLimit(
+      SPECIAL_POOLS.filter((a) => !graduates.includes(a)),
+      async (a) => ((await fetchPool(a)) ? a : null),
     )
   ).filter((a): a is string => a !== null);
   return orderTradeAssets([...graduates, ...specials]);

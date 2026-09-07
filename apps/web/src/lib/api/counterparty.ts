@@ -11,6 +11,7 @@ import {
   fetchTopLpBalances,
 } from "@/lib/api/explorer";
 import type { LpBalance } from "@/lib/holders";
+import { discard } from "@/lib/net";
 import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
 
@@ -20,19 +21,54 @@ interface Paginated<T> {
   result_count: number;
 }
 
+/** Attempts after the first, when the node asks us to come back later. */
+const THROTTLE_RETRIES = 2;
+/** The longest we will wait on one of those, whatever Retry-After says. */
+const MAX_THROTTLE_WAIT_MS = 4_000;
+
 async function get<T>(path: string, revalidate = 60): Promise<T> {
-  const res = await fetch(`${COUNTERPARTY_API_BASE}${path}`, {
-    // Counterparty is a third party we do not run, and this is the shared
-    // client behind every server-rendered read. Without a deadline a stalled
-    // node holds the Worker invocation open and delays the HTML for everyone
-    // on that route; the throw below is what callers already handle.
-    signal: AbortSignal.timeout(8_000),
-    next: { revalidate },
-  });
-  if (!res.ok) throw new Error(`Counterparty API ${res.status}: ${path}`);
-  // Not res.json(): JSON.parse rounds integers above 2^53-1; oversized
-  // integers arrive as strings instead.
-  return parseJsonLossless<T>(await res.text());
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(`${COUNTERPARTY_API_BASE}${path}`, {
+      // Counterparty is a third party we do not run, and this is the shared
+      // client behind every server-rendered read. Without a deadline a stalled
+      // node holds the Worker invocation open and delays the HTML for everyone
+      // on that route; the throw below is what callers already handle.
+      signal: AbortSignal.timeout(8_000),
+      next: { revalidate },
+    });
+
+    if (res.ok) {
+      // Not res.json(): JSON.parse rounds integers above 2^53-1; oversized
+      // integers arrive as strings instead.
+      return parseJsonLossless<T>(await res.text());
+    }
+
+    // 429 is the node asking to be retried, not a refusal, and it is the one
+    // status a public Counterparty node returns under exactly the conditions
+    // where we most want the read to succeed: a build generating 186 pages, or
+    // a burst of renders. Treating it as fatal is what turned one throttled
+    // read into a failed homepage — and, during a build, a failed build.
+    const throttled = res.status === 429;
+    const retryAfter = Number.parseInt(res.headers.get("retry-after") ?? "", 10);
+
+    // The body is dead weight from here and holds one of the Worker's six
+    // outbound slots until collection. Under a throttle that is every read at
+    // once, which is how one slow upstream stalls a whole render.
+    await discard(res);
+
+    if (!throttled || attempt >= THROTTLE_RETRIES) {
+      throw new Error(`Counterparty API ${res.status}: ${path}`);
+    }
+
+    // Honour the node's own number when it gives one, and back off otherwise.
+    // Capped because a render is waiting: past a few seconds the honest answer
+    // to the visitor is the error, not a longer blank page.
+    const requested =
+      Number.isSafeInteger(retryAfter) && retryAfter >= 0
+        ? retryAfter * 1_000
+        : 250 * 2 ** attempt;
+    await new Promise((resolve) => setTimeout(resolve, Math.min(requested, MAX_THROTTLE_WAIT_MS)));
+  }
 }
 
 /** One balance-changing entry. Credits and debits are the same fact with
@@ -258,18 +294,54 @@ export async function fetchAssetBalance(address: string, asset: string): Promise
  * limit=200 silently dropped a third of the records). The XCP-69 universe is
  * small; pages are cached per-URL by Next's fetch cache.
  */
+/**
+ * One in-flight fetch of the whole fairminter list per isolate, reused for a
+ * short window.
+ *
+ * Next's own fetch cache cannot help here: a page of this endpoint is over 2MB,
+ * which Next refuses to cache ("items over 2MB can not be cached"), so every
+ * caller went to the public node for the full list every time. A production
+ * build generates 186 pages across 15 parallel workers and eleven locales, and
+ * both the homepage fallback and /swap ask for this list — which is how a build
+ * throttles the node it depends on and then fails on its own 429.
+ *
+ * The window is deliberately short and matches the caller's `revalidate`: this
+ * is deduplication, not a second cache layer. Storing the promise rather than
+ * the result means concurrent callers share one request instead of racing to
+ * start several.
+ */
+let fairmintersInFlight: { at: number; revalidate: number; promise: Promise<Fairminter[]> } | null = null;
+
 export async function fetchAllFairminters(revalidate = 60): Promise<Fairminter[]> {
-  const all: Fairminter[] = [];
-  let cursor: number | null = null;
-  do {
-    const page: Paginated<Fairminter> = await get(
-      `/fairminters?limit=1000&verbose=true${cursor !== null ? `&cursor=${cursor}` : ""}`,
-      revalidate,
-    );
-    all.push(...page.result);
-    cursor = page.next_cursor;
-  } while (cursor !== null);
-  return all;
+  const now = Date.now();
+  if (
+    fairmintersInFlight &&
+    fairmintersInFlight.revalidate === revalidate &&
+    now - fairmintersInFlight.at < revalidate * 1_000
+  ) {
+    return fairmintersInFlight.promise;
+  }
+
+  const promise = (async () => {
+    const all: Fairminter[] = [];
+    let cursor: number | null = null;
+    do {
+      const page: Paginated<Fairminter> = await get(
+        `/fairminters?limit=1000&verbose=true${cursor !== null ? `&cursor=${cursor}` : ""}`,
+        revalidate,
+      );
+      all.push(...page.result);
+      cursor = page.next_cursor;
+    } while (cursor !== null);
+    return all;
+  })();
+
+  fairmintersInFlight = { at: now, revalidate, promise };
+  // A failed read must not be remembered as the answer for the next minute.
+  promise.catch(() => {
+    if (fairmintersInFlight?.promise === promise) fairmintersInFlight = null;
+  });
+  return promise;
 }
 
 /** Fairminters opened on an asset; the XCP-69 one (if any) is what we show. */
@@ -912,7 +984,10 @@ export async function fetchBlockHeight(): Promise<number> {
       signal: AbortSignal.timeout(8_000),
       next: { revalidate: 30 },
     });
-    if (!res.ok) throw new Error(`XCP API ${res.status}: /`);
+    if (!res.ok) {
+      await discard(res);
+      throw new Error(`XCP API ${res.status}: /`);
+    }
     const data = parseJsonLossless<{
       result?: { tip?: number | string; indexed_block?: number | string };
     }>(await res.text());

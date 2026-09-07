@@ -4,6 +4,7 @@ import {
 } from "@/lib/api/counterparty";
 import { XCP_API_BASE } from "@/lib/constants";
 import { bestAskUsd } from "@launchpad/xcp69/dispenser-price";
+import { discard } from "@/lib/net";
 
 interface Ticker {
   xcp: number | null;
@@ -32,6 +33,7 @@ async function fetchTicker(): Promise<Ticker> {
       next: { revalidate: 600 },
     });
     if (!res.ok) {
+      await discard(res);
       return {
         xcp: null,
         btc: null,
@@ -133,7 +135,10 @@ export async function fetchXcpUsdHistory(): Promise<DailyXcpUsd[]> {
       signal: AbortSignal.timeout(6_000),
       next: { revalidate: 900 },
     });
-    if (!res.ok) return [];
+    if (!res.ok) {
+      await discard(res);
+      return [];
+    }
     const result = (await res.json())?.result as
       | { history?: { day?: unknown; usd?: unknown }[] }
       | undefined;
