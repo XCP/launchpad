@@ -1231,7 +1231,7 @@ export function LaunchTable({
                         {r.fm.asset}
                       </span>
                       <span className="block truncate text-[11px] text-gray-400 dark:text-gray-500">
-                        by {shortAddress(r.fm.source)}
+                        {t("by {address}", { address: shortAddress(r.fm.source) })}
                       </span>
                     </span>
                   </LazyLink>

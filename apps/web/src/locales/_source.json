@@ -1096,6 +1096,8 @@
   ],
   "by {address}": [
     "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "components/address-hover-card.tsx"
   ],
   "Can I launch on a token name that already exists?": [
