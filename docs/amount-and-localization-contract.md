@@ -1,6 +1,6 @@
 # Amount entry and localization contract
 
-The interface language, display number format, and fiat currency are independent preferences. Number format follows the selected language until explicitly overridden. USD remains selectable in every language. Formatting helpers are presentation-only and must never feed editable values or compose parameters.
+The interface language, display number format, and fiat currency are separate preferences. Deliberately selecting a language also selects its suggested fiat currency, replacing any previous currency choice. Selecting a currency changes only currency. Number format follows the selected language until explicitly overridden; selecting a language never resets that override. USD remains selectable in every language. Formatting helpers are presentation-only and must never feed editable values or compose parameters.
 
 ## Exact inputs and Core fields
 
@@ -22,6 +22,10 @@ The direct dispenser router also uses the SDK's field serializers. It checks rev
 The inscription Create flow uses Core's actual `/utxos/<outpoint>/balances` endpoint. Only a successful complete empty result authorizes a candidate as having no confirmed Counterparty balances; failed or ambiguous reads block the operation. The selected prevout is checked against its hash-verified parent bytes, amount and source script, and balances are reread after commit signing. Commit/reveal signed PSBTs and finalized raw transactions must retain their original Bitcoin envelopes. These checks cover confirmed Counterparty state, not an inventory of every Bitcoin metaprotocol. A rejected reveal stops the second broadcast; it cannot undo an already-broadcast commit.
 
 ## Preferences and terminology
+
+Language selections suggest JPY for Japanese, CNY for Simplified Chinese, HKD for Hong Kong Traditional Chinese, KRW for Korean, BRL for Brazilian Portuguese, and EUR for French. English and the shared Latin American Spanish catalog suggest USD. Taiwan Traditional Chinese, Russian and Ukrainian also suggest USD because the current FX feed does not support TWD, RUB or UAH. These are defaults, not a restriction on available currency choices.
+
+Only a deliberate language action applies this suggestion: header/menu choices, the homepage footer, its English link, and acceptance of a language suggestion. Opening a localized URL, reloading, using browser history, or returning through a remembered-language redirect preserves a later currency override. Auto remains an explicit currency option that uses browser detection. Currency has its own header dropdown from 1340px; the adjacent language control expands from a globe to its native name at 1536px. Narrower layouts keep currency accessible in the existing menu.
 
 The separate number-format picker includes German and Spanish regional number conventions, including Spain and Venezuela. The Spanish message catalog remains shared until reviewed regional vocabulary warrants overrides. Chinese script and regional catalogs remain distinct. This change does not claim that model-authored text was reviewed by native speakers.
 

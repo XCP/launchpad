@@ -4,20 +4,22 @@ import { DropdownMenu as DM } from "radix-ui";
 import { usePathname } from "next/navigation";
 import { LazyLink } from "@/components/lazy-link";
 import { trackEvent } from "@/lib/analytics";
-import { CURRENCIES, setCurrency, useCurrency } from "@/lib/currency";
+import { CURRENCIES, currencyForLocale, setCurrency, useCurrency } from "@/lib/currency";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { LOCALE_INFO, LOCALES, type Locale, splitLocale } from "@/lib/i18n/locales";
 
 export const LOCALE_PREF_KEY = "xcpfun:locale:v1";
 
-/** Remembered so a return visit to the front door can go straight to the
- *  language chosen last time — see LocaleSuggest. */
+/** A deliberate language choice also selects its suggested currency.
+ * Remember it for return visits, which must preserve any later currency
+ * override rather than replay this action — see LocaleSuggest. */
 export function rememberLocale(locale: Locale) {
   try {
     localStorage.setItem(LOCALE_PREF_KEY, locale);
   } catch {
     // Private mode: the URL still carries the choice for this visit.
   }
+  setCurrency(currencyForLocale(locale));
   // Every way of choosing a language ends here, so this is the one place
   // the choice is counted: which languages people actually switch to.
   trackEvent(`language chosen: ${locale}`);
@@ -27,21 +29,24 @@ export const MENU_ITEM =
   "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 outline-none data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-800 data-[highlighted]:text-gray-900 dark:data-[highlighted]:text-gray-100 data-[state=open]:bg-gray-100 dark:data-[state=open]:bg-gray-800";
 
 /**
- * The language menu: a globe and the current language's own name, with the
- * currency beneath it.
+ * The language menu: a globe and the current language's own name.
  *
  * A visitor who cannot read the page has to find this without reading, and
  * the globe is the one control every web user recognises regardless of
  * language. Each language is written in its own name, never as a flag —
  * flags are countries, and Chinese alone spans three. Choosing navigates to
- * the same path under the other prefix, so nothing about the page is lost.
+ * the same path under the other prefix.
  *
- * Currency has its own choice: Auto uses the browser's regional preference,
- * and an explicit currency stays selected when the page language changes
- * (see lib/currency). It is a submenu rather than a second list so thirty
- * currencies never swallow the language choices.
+ * When there is no room for a separate currency control, include its
+ * submenu. The wide header renders CurrencySwitch beside this menu instead.
  */
-export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
+export function LanguageSwitch({
+  compact = false,
+  includeCurrency = true,
+}: {
+  compact?: boolean;
+  includeCurrency?: boolean;
+}) {
   const t = useT();
   const locale = useLocale();
   const pathname = usePathname();
@@ -66,8 +71,12 @@ export function LanguageSwitch({ compact = false }: { compact?: boolean }) {
           className="modal-pop z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] w-52 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
           <LanguageItems path={path} />
-          <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
-          <CurrencySubmenu />
+          {includeCurrency && (
+            <>
+              <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
+              <CurrencySubmenu />
+            </>
+          )}
         </DM.Content>
       </DM.Portal>
     </DM.Root>
@@ -166,8 +175,7 @@ export function LanguageSubmenu({ path }: { path: string }) {
  */
 export function CurrencySubmenu({ overlap = false }: { overlap?: boolean } = {}) {
   const t = useT();
-  const { code, auto, detected } = useCurrency();
-  const item = `${MENU_ITEM} text-xs`;
+  const { code } = useCurrency();
   return (
     <DM.Sub>
       <DM.SubTrigger className={MENU_ITEM}>
@@ -188,20 +196,58 @@ export function CurrencySubmenu({ overlap = false }: { overlap?: boolean } = {})
           collisionPadding={12}
           className="modal-pop z-50 max-h-80 w-44 overflow-y-auto rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
-          <DM.Item className={item} onSelect={() => setCurrency("auto")}>
-            {t("Auto ({code})", { code: detected })}
-            {auto && <Tick />}
-          </DM.Item>
-          <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
-          {CURRENCIES.map((c) => (
-            <DM.Item key={c} className={item} onSelect={() => setCurrency(c)}>
-              {c}
-              {!auto && c === code && <Tick />}
-            </DM.Item>
-          ))}
+          <CurrencyItems />
         </DM.SubContent>
       </DM.Portal>
     </DM.Sub>
+  );
+}
+
+/** A visible currency choice beside the language control on wide screens. */
+export function CurrencySwitch() {
+  const t = useT();
+  const { code } = useCurrency();
+  return (
+    <DM.Root>
+      <DM.Trigger
+        aria-label={`${t("Currency")}: ${code}`}
+        className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100"
+      >
+        <span>{code}</span>
+        <span aria-hidden>▾</span>
+      </DM.Trigger>
+      <DM.Portal>
+        <DM.Content
+          align="end"
+          sideOffset={8}
+          collisionPadding={12}
+          className="modal-pop z-50 max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height,20rem))] w-44 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
+        >
+          <CurrencyItems />
+        </DM.Content>
+      </DM.Portal>
+    </DM.Root>
+  );
+}
+
+function CurrencyItems() {
+  const t = useT();
+  const { code, auto, detected } = useCurrency();
+  const item = `${MENU_ITEM} text-xs`;
+  return (
+    <>
+      <DM.Item className={item} onSelect={() => setCurrency("auto")}>
+        {t("Auto ({code})", { code: detected })}
+        {auto && <Tick />}
+      </DM.Item>
+      <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
+      {CURRENCIES.map((c) => (
+        <DM.Item key={c} className={item} onSelect={() => setCurrency(c)}>
+          {c}
+          {!auto && c === code && <Tick />}
+        </DM.Item>
+      ))}
+    </>
   );
 }
 

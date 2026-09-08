@@ -89,7 +89,7 @@ function storageEvent(key: string | null, newValue: string | null) {
 }
 
 describe("currency preferences", () => {
-  it("keeps page language independent of Auto and preserves explicit USD", async () => {
+  it("keeps passive locale navigation independent of Auto and preserves explicit USD", async () => {
     page.pathname = "/ja";
     const api = await load();
     mount(api);

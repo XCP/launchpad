@@ -83,6 +83,9 @@ export const revalidate = 60;
 const SECTIONS = ["graduated", "minting", "scheduled"] as const;
 
 export default async function HomePage() {
+  // Reuse the height read: only Mint Pace must wait for it before requesting
+  // page one. Other sections and prices still load in parallel.
+  const heightPromise = fetchBlockHeight();
   const [
     blockHeight,
     xcpUsd,
@@ -92,15 +95,21 @@ export default async function HomePage() {
     xcpUsdDayAgo,
     ...first
   ] = await Promise.all([
-    fetchBlockHeight(),
+    heightPromise,
     fetchXcpUsd(),
     fetchBtcUsd(),
     fetchBtcUsd30dAgo(),
     fetchXcpUsd30dAgo(),
     fetchXcpUsdDayAgo(),
-    // No `sort`: the API's own default for each phase, so the ordering has one
-    // definition rather than a copy here that could drift from it.
-    ...SECTIONS.map((phase) => fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0)),
+    // Minting uses the homepage's explicit pace default. The public API's
+    // defaults, used by the other phases, remain unchanged.
+    ...SECTIONS.map((phase) =>
+      phase === "minting"
+        ? heightPromise.then((height) =>
+            fetchLaunchPage(phase, "pace", PER_PAGE[phase], 0, undefined, height),
+          )
+        : fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0),
+    ),
   ]);
   const btcChange30d =
     btcUsd !== null && btcUsd30dAgo !== null

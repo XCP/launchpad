@@ -5,6 +5,7 @@ import { trackEvent } from "@/lib/analytics";
 import { fetchFxRates } from "@/lib/api/launchpad-api";
 import { fiat } from "@/lib/format";
 import { useNumberLocale } from "@/lib/number-preference";
+import type { Locale } from "@/lib/i18n/locales";
 
 /**
  * Which currency the site's fiat figures are shown in.
@@ -12,7 +13,8 @@ import { useNumberLocale } from "@/lib/number-preference";
  * Every money figure on the site is computed in dollars — XCP times the
  * XCP/USD mark — and stays that way; this decides only how the dollars are
  * shown. A visitor whose browser says it is in Japan sees yen, and can
- * override that in the footer, where every other currency is on offer too.
+ * override that in the currency picker. Deliberately choosing a language
+ * also selects its suggested currency; visiting a translated URL does not.
  * The choice is one more factor and a symbol,
  * applied at the moment of formatting by `useFiat`, so the arithmetic, the
  * returns and the sorts never see it.
@@ -64,6 +66,28 @@ export const CURRENCIES = [
 
 export type Currency = (typeof CURRENCIES)[number];
 
+/** Suggestions use only currencies quoted by our FX feed. Spanish serves
+ * the Americas as a whole, so USD avoids assuming Mexico or Spain. Taiwan,
+ * Russian and Ukrainian locales also use USD until their currencies are
+ * supported. A later currency choice remains independent of language. */
+const LANGUAGE_CURRENCY: Record<Locale, Currency> = {
+  en: "USD",
+  ja: "JPY",
+  zh: "CNY",
+  "zh-tw": "USD",
+  "zh-hk": "HKD",
+  es: "USD",
+  ko: "KRW",
+  pt: "BRL",
+  fr: "EUR",
+  ru: "USD",
+  uk: "USD",
+};
+
+export function currencyForLocale(locale: Locale): Currency {
+  return LANGUAGE_CURRENCY[locale];
+}
+
 export interface CurrencyState {
   /** What the visitor should see: their choice, or what was detected. */
   code: Currency;
@@ -98,9 +122,10 @@ function isCurrency(value: unknown): value is Currency {
 
 /**
  * Auto uses the browser's language and timezone, with dollars as the
- * fallback. The page's language is independent: reading a translation
- * never changes the currency. An explicit choice, including USD, overrides
- * detection. `maximize()` gives a bare browser tag such as "ja" its region.
+ * fallback. Opening a translated URL does not change an existing choice.
+ * Choosing a language in the UI explicitly sets its suggested currency;
+ * selecting Auto returns to browser detection. `maximize()` gives a bare
+ * browser tag such as "ja" its region.
  */
 const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD", KR: "KRW", BR: "BRL", FR: "EUR", BE: "EUR", LU: "EUR", MC: "EUR" };
 const TIMEZONE_CURRENCY: Record<string, Currency> = {
