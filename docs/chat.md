@@ -43,7 +43,10 @@ existing mutes and bans from matching those wallets.
 
 The shared `@launchpad/chat` protocol applies a 280-codepoint, three-line limit
 to plain text. User text renders as text, with no HTML, embeds, or arbitrary URL
-links. The exception is a `$ASSET` mention confirmed against the site's cached
+links. Each message clips its own painted content so extreme combining marks
+cannot obscure neighboring messages. Over-limit drafts are preserved and
+cannot be submitted; they are never silently truncated. The exception to plain
+links is a `$ASSET` mention confirmed against the site's cached
 launch search index: it links to the canonical, locale-preserving asset page.
 Unknown names and unsupported routes stay plain text. `$XCP` is an explicit
 exception that opens the current language's `/dispense` page in a new tab,

@@ -104,7 +104,7 @@ function ChatContent({ messages, status, connections, acceptMessage, identity, d
         className={`min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2 ${FOCUS}`}>
         {shown.length === 0 && <p className="py-3 text-gray-500 dark:text-gray-400">{t("No messages to show.")}</p>}
         {shown.map((message) => (
-          <p key={message.id} title={new Date(message.createdAt).toLocaleString(num.intl, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} className="group py-1 leading-relaxed [overflow-wrap:anywhere]">
+          <p key={message.id} title={new Date(message.createdAt).toLocaleString(num.intl, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} className="group -mx-1 overflow-clip px-1 py-1 leading-relaxed [overflow-wrap:anywhere]">
             <button type="button" onClick={() => composer.current?.mention(message.handle)} title={t("Mention {name}", { name: message.handle })} aria-label={t("Mention {name}", { name: message.handle })}
               className={`font-semibold hover:underline ${message.authorId === identity?.authorId ? "text-purple-600 dark:text-purple-400" : "text-gray-700 dark:text-gray-200"} ${FOCUS}`}>{message.handle}</button>
             <DM.Root>
