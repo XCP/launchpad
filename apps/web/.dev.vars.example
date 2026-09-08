@@ -1,0 +1,4 @@
+# Copy to .dev.vars for local development only. Generate independent random
+# values of at least 32 characters; never reuse or commit production secrets.
+SESSION_SECRET=
+CHAT_HANDLE_SECRET=

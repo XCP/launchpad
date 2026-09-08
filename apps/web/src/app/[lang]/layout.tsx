@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { SitePresenceBadge } from "@/components/site-presence";
 import { SessionProvider } from "@/providers/session-context";
+import { ChatProvider } from "@/providers/chat-context";
 import { SwrProvider } from "@/providers/swr-provider";
 import { LocaleProvider } from "@/lib/i18n/client";
 import { isLocale, LOCALE_INFO, LOCALES } from "@/lib/i18n/locales";
@@ -83,6 +84,7 @@ export default async function RootLayout({
         <SwrProvider>
         <WalletProvider>
         <SessionProvider>
+        <ChatProvider>
         <SiteHeader />
         {/* The one line of the page that reacts to the browser's language:
             an offer to switch, never a switch. */}
@@ -96,6 +98,7 @@ export default async function RootLayout({
             moving bottom-right. */}
         <SitePresenceBadge />
         <PendingDock />
+        </ChatProvider>
         </SessionProvider>
         </WalletProvider>
         </SwrProvider>

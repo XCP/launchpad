@@ -1,5 +1,23 @@
 @import "tailwindcss";
 
+/* Active asset pages retain their 672px main panel. The sidebar appears
+   only when both columns and their gap fit inside the existing 992px frame. */
+.chat-launch-layout { margin-inline: auto; max-width: 672px; padding-bottom: 5rem; }
+.chat-bubble, .chat-pending-dock, .chat-presence-badge {
+  bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
+}
+.chat-sheet {
+  height: min(36rem, calc(100dvh - 2rem));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+body:has([data-launch-chat] .chat-bubble) .chat-pending-dock {
+  bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+}
+@media (min-width: 1024px) {
+  .chat-launch-layout:has(.chat-sidebar) { display: grid; grid-template-columns: 672px 288px; gap: 32px; max-width: 992px; }
+  .chat-sidebar { position: sticky; top: 6rem; height: min(40rem, calc(100dvh - 8rem)); min-height: 280px; }
+}
+
 @theme {
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: ui-monospace, "Cascadia Code", "Source Code Pro", monospace;

@@ -7,6 +7,11 @@ name = "launchpad"
 main = ".open-next/worker.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
+
+# Moderation is granted only after this address's signed session is verified.
+# Addresses are public configuration; this is independent of private secrets.
+[vars]
+CHAT_ADMIN_ADDRESSES = "19QWXpMXeLkoEKEJv2xo9rn8wkPCyxACSX"
 # NOTE: the xcp.fun zone lives in a DIFFERENT Cloudflare account than this
 # worker, so routes cannot attach from here (error 10083). Until the account
 # question is settled, the zone-side fix is a tiny proxy worker in the
@@ -46,6 +51,17 @@ service = "launchpad"
 [[durable_objects.bindings]]
 name = "NEXT_CACHE_DO_QUEUE"
 class_name = "DOQueueHandler"
+
+# Chat writes use the wallet session on this origin. Only this trusted binding
+# can publish; the public API WebSocket is a read-only feed.
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+script_name = "launchpad-api"
+
+# Provision CHAT_HANDLE_SECRET with `wrangler secret put` before enabling
+# production posting. Keep it stable and separate from SESSION_SECRET so
+# session rotation does not rename chat participants or invalidate mutes.
 
 [[migrations]]
 tag = "launchpad-isr-v1"

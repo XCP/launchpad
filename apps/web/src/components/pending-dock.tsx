@@ -188,9 +188,9 @@ export function PendingDock() {
   const overflow = ordered.length - shown.length;
 
   return (
-    <div className="fixed bottom-4 right-4 z-40">
+    <div className="chat-pending-dock fixed right-4 z-40">
       {open ? (
-        <div className="modal-pop w-80 rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 p-3 shadow-lg backdrop-blur">
+        <div className="modal-pop w-80 max-w-[calc(100vw-2rem)] rounded-2xl border border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 p-3 shadow-lg backdrop-blur">
           <div className="flex items-center justify-between px-1 pb-2">
             <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
               {pending.length > 0

@@ -30,6 +30,8 @@ enabled = true
 # `wrangler secret put TELEGRAM_BOT_TOKEN`.
 [vars]
 TELEGRAM_CHAT_ID = "-1004326432550"
+CHAT_ENABLED = "true"
+# Optional CHAT_MUTED_AUTHORS contains comma-separated opaque author IDs.
 
 # Blocks land every ~10 minutes, and Counterparty's /fairminters list has no
 # server-side filter beyond status — every tick re-lists the chain's ENTIRE
@@ -75,6 +77,11 @@ class_name = "LaunchRoom"
 name = "SITE_PRESENCE"
 class_name = "SitePresence"
 
+# One shared, read-only subscription stream. Authenticated web writes use RPC.
+[[durable_objects.bindings]]
+name = "CHAT_ROOM"
+class_name = "ChatRoom"
+
 # The Telegram queue. Also one fixed instance: it exists to hold a rate limit
 # that belongs to the channel, and a second one would only race the first.
 [[durable_objects.bindings]]
@@ -88,3 +95,7 @@ new_sqlite_classes = ["LaunchRoom", "SitePresence"]
 [[migrations]]
 tag = "v2"
 new_sqlite_classes = ["Announcer"]
+
+[[migrations]]
+tag = "v3"
+new_sqlite_classes = ["ChatRoom"]

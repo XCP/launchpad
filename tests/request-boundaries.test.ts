@@ -2,15 +2,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST as upload, PUT as edit } from "@/app/api/launches/route";
 import { POST as session } from "@/app/api/session/route";
 import { getMetadataBucket } from "@/lib/metadata";
-import { issueSession, sameOrigin } from "@/lib/session";
+import { issueSession, readSessionDetails, sameOrigin, SESSION_COOKIE } from "@/lib/session";
 import { validateProof } from "@xcp/wallet-sdk";
 
 vi.mock("@/lib/metadata", async importOriginal => ({
   ...await importOriginal<typeof import("@/lib/metadata")>(), getMetadataBucket: vi.fn(),
 }));
-vi.mock("@/lib/session", async importOriginal => ({
-  ...await importOriginal<typeof import("@/lib/session")>(), issueSession: vi.fn(), sameOrigin: vi.fn(),
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: async () => ({ env: { SESSION_SECRET: "request-boundary-test-secret-not-for-production" } }),
 }));
+vi.mock("@/lib/session", async importOriginal => {
+  const actual = await importOriginal<typeof import("@/lib/session")>();
+  return { ...actual, issueSession: vi.fn(actual.issueSession), sameOrigin: vi.fn() };
+});
 vi.mock("@xcp/wallet-sdk", async importOriginal => ({
   ...await importOriginal<typeof import("@xcp/wallet-sdk")>(), validateProof: vi.fn(),
 }));
@@ -31,7 +35,6 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async () => Response.json({ result: [] })));
   vi.mocked(getMetadataBucket).mockResolvedValue({ put } as unknown as Awaited<ReturnType<typeof getMetadataBucket>>);
   vi.mocked(sameOrigin).mockReturnValue(true);
-  vi.mocked(issueSession).mockResolvedValue("session-token");
   vi.mocked(validateProof).mockResolvedValue({ valid: true });
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -86,6 +89,11 @@ describe("upload and session request boundaries", () => {
     const valid = await session(request(JSON.stringify({ proof: { address: "address", message: "message", signature: "signature" } })));
     expect(valid.status).toBe(200);
     expect(issueSession).toHaveBeenCalledExactlyOnceWith("address");
+    const cookie = valid.headers.get("set-cookie")!.split(";")[0];
+    expect(cookie.startsWith(`${SESSION_COOKIE}=`)).toBe(true);
+    const details = await readSessionDetails(cookie.slice(SESSION_COOKIE.length + 1));
+    expect(details?.address).toBe("address");
+    expect(await valid.json()).toMatchObject({ address: "address", expires_at: details!.expiresAt });
     const malformed = await session(request("not JSON"));
     expect(malformed.status).toBe(400);
     expect(await malformed.json()).toEqual({ error: "Malformed body" });

@@ -8,12 +8,28 @@ import {
   SESSION_COOKIE,
   SESSION_TTL_SECONDS,
   issueSession,
+  readCookie,
+  readSessionDetails,
   sameOrigin,
   sessionCookie,
 } from "@/lib/session";
 
+const PRIVATE_HEADERS = { "cache-control": "private, no-store", vary: "Cookie" };
 // A connection proof is small; allow 64 KiB for supported wallet formats.
 const MAX_PROOF_BODY_BYTES = 64 * 1024;
+
+/** Restore only the identity attested by a currently valid HttpOnly cookie. */
+export async function GET(request: Request) {
+  const session = await readSessionDetails(readCookie(request, SESSION_COOKIE));
+  return NextResponse.json(
+    {
+      address: session?.address ?? null,
+      expires_at: session?.expiresAt ?? null,
+      expires_in: session ? session.expiresAt - Math.floor(Date.now() / 1000) : 0,
+    },
+    { headers: PRIVATE_HEADERS },
+  );
+}
 
 /**
  * Exchange a wallet connection proof for a session.
@@ -98,9 +114,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Sessions unavailable" }, { status: 503 });
   }
 
+  const session = await readSessionDetails(token);
+  if (!session) {
+    return NextResponse.json({ error: "Sessions unavailable" }, { status: 503 });
+  }
   return NextResponse.json(
-    { address, expires_in: SESSION_TTL_SECONDS },
-    { headers: { "set-cookie": sessionCookie(token, SESSION_TTL_SECONDS) } },
+    { address, expires_at: session.expiresAt, expires_in: session.expiresAt - Math.floor(Date.now() / 1000) },
+    { headers: { ...PRIVATE_HEADERS, "set-cookie": sessionCookie(token, SESSION_TTL_SECONDS) } },
   );
 }
 
@@ -111,6 +131,6 @@ export async function DELETE(request: Request) {
   }
   return NextResponse.json(
     { ok: true },
-    { headers: { "set-cookie": `${SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0` } },
+    { headers: { ...PRIVATE_HEADERS, "set-cookie": sessionCookie("", 0) } },
   );
 }

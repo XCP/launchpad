@@ -1,8 +1,8 @@
 /**
  * Address sessions: the connection proof, promoted to a login.
  *
- * The wallet auto-signs a BIP-322 proof at connect time with no user prompt.
- * Verified SERVER-side, that proof is as good as a password — it demonstrates
+ * A supported wallet supplies a signed connection proof. Verified SERVER-side,
+ * that proof demonstrates
  * control of the address's key, bound to this origin and a timestamp. So we
  * check it once and hand back a cookie, instead of asking the wallet to sign
  * every individual write.
@@ -11,14 +11,19 @@
  * nothing to store, expire, or bill (D1 charges per row touched, and a session
  * read on every request is exactly the kind of write-amplification this repo
  * avoids). The cost of statelessness is that a session can't be revoked before
- * it expires — acceptable because it grants only metadata edits, and the write
- * path still re-checks live on-chain ownership on every request, so a session
- * for an address that has since sold the asset can't do anything.
+ * it expires. It establishes address identity; individual write paths must
+ * still enforce their own permissions, such as current asset ownership.
  */
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const SESSION_COOKIE = "xcpfun_session";
 export const SESSION_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+export interface SessionDetails {
+  address: string;
+  /** Unix seconds, from the signed cookie payload. */
+  expiresAt: number;
+}
 
 async function signingKey(): Promise<CryptoKey> {
   const { env } = await getCloudflareContext({ async: true });
@@ -60,21 +65,24 @@ export async function issueSession(address: string): Promise<string> {
 /** The address this token attests to, or null for anything not currently
  *  valid — including an unset SESSION_SECRET, so a missing secret degrades to
  *  "no sessions exist" and the per-edit signature path still works. */
-export async function readSession(token: string | undefined): Promise<string | null> {
-  if (!token) return null;
+export async function readSessionDetails(token: string | undefined): Promise<SessionDetails | null> {
+  if (!token || token.length > 4096 || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)) return null;
   const [payload, sig] = token.split(".");
-  if (!payload || !sig) return null;
   try {
     const bytes = unb64url(payload);
     const ok = await crypto.subtle.verify("HMAC", await signingKey(), unb64url(sig), bytes);
     if (!ok) return null;
     const { a, e } = JSON.parse(new TextDecoder().decode(bytes)) as { a?: unknown; e?: unknown };
-    if (typeof a !== "string" || typeof e !== "number") return null;
-    if (e < Math.floor(Date.now() / 1000)) return null;
-    return a;
+    if (typeof a !== "string" || !a || typeof e !== "number" || !Number.isSafeInteger(e)) return null;
+    if (e <= Math.floor(Date.now() / 1000)) return null;
+    return { address: a, expiresAt: e };
   } catch {
     return null;
   }
+}
+
+export async function readSession(token: string | undefined): Promise<string | null> {
+  return (await readSessionDetails(token))?.address ?? null;
 }
 
 export function readCookie(request: Request, name: string): string | undefined {

@@ -398,6 +398,9 @@
   "{n} XCP lands on your Counterparty balance as each payment confirms — ready to mint with.": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
+  "{n}/{max}": [
+    "components/chat-panel.tsx"
+  ],
   "{n}+ addresses to sell out": [
     "app/[lang]/faq/page.tsx"
   ],
@@ -549,6 +552,9 @@
   ],
   "{xcp} XCP{usd} of net buying — and all of it joins the locked reserve.": [
     "app/[lang]/faq/_components/explainer.tsx"
+  ],
+  "@you": [
+    "components/chat-panel.tsx"
   ],
   "← Prev": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
@@ -746,6 +752,9 @@
   "Across {n} pools": [
     "app/[lang]/profile/_components/pools-tab.tsx"
   ],
+  "Actions for {name}": [
+    "components/chat-panel.tsx"
+  ],
   "Active escrow": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
@@ -872,6 +881,9 @@
   "API base:": [
     "app/[lang]/docs/page.tsx"
   ],
+  "Approximate number of open chat connections.": [
+    "components/chat-panel.tsx"
+  ],
   "Are all Counterparty fairminters like this?": [
     "app/[lang]/faq/page.tsx"
   ],
@@ -930,6 +942,15 @@
     "app/[lang]/dispense/_components/bridge.tsx",
     "app/[lang]/swap/_components/liquidity-widget.tsx",
     "app/[lang]/swap/_components/swap-widget.tsx"
+  ],
+  "Ban from chat": [
+    "components/chat-panel.tsx"
+  ],
+  "Banned ({n})": [
+    "components/chat-panel.tsx"
+  ],
+  "Banned users": [
+    "components/chat-panel.tsx"
   ],
   "before": [
     "app/[lang]/docs/page.tsx"
@@ -1153,6 +1174,21 @@
   "Change in {currency} over the last 24 hours": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
+  "Chat": [
+    "components/chat-panel.tsx"
+  ],
+  "Chat connections: {n}": [
+    "components/chat-panel.tsx"
+  ],
+  "Chat is disabled.": [
+    "components/chat-panel.tsx"
+  ],
+  "Chat is temporarily unavailable.": [
+    "components/chat-panel.tsx"
+  ],
+  "Chat messages": [
+    "components/chat-panel.tsx"
+  ],
   "Check the amount, units, and decimal places.": [
     "components/compose-error.tsx"
   ],
@@ -1191,6 +1227,9 @@
     "app/[lang]/_components/market-pulse.tsx",
     "components/ui/dialog.tsx"
   ],
+  "Close chat": [
+    "components/chat-panel.tsx"
+  ],
   "Closed": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
     "app/[lang]/all/_components/all-launches-view.tsx",
@@ -1211,11 +1250,17 @@
   "Collapse": [
     "components/pending-dock.tsx"
   ],
+  "Collapse chat": [
+    "components/chat-panel.tsx"
+  ],
   "collections with a minter in them": [
     "app/[lang]/stats/_components/communities.tsx"
   ],
   "Collectors": [
     "app/[lang]/stats/_components/communities.tsx"
+  ],
+  "Commands: /mute @name, /unmute @name, /help.": [
+    "components/chat-panel.tsx"
   ],
   "committed": [
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -1298,6 +1343,9 @@
     "components/connect-button.tsx",
     "components/header-wallet.tsx"
   ],
+  "Connect a wallet to chat.": [
+    "components/chat-panel.tsx"
+  ],
   "Connect Wallet": [
     "components/connect-button.tsx"
   ],
@@ -1306,6 +1354,9 @@
   ],
   "Connecting needs a wallet browser extension, and no mobile browser can run one yet. Everything here is readable on a phone — launches, prices, holders — but minting and trading need a desktop.": [
     "components/connect-button.tsx"
+  ],
+  "Connecting…": [
+    "components/chat-panel.tsx"
   ],
   "Consensus enforces the standard's coherence at parse time: {softCap} must equal {formula} whenever {poolQuantity} > 0 — all-or-nothing is a protocol rule, not site policy. The issuer's address must hold the 0.5 XCP name-registration fee plus the pooldeposit gas fee on-ledger; both debit at confirmation, so settlement later costs nothing. Pick {lpAsset} with real randomness: numeric issuance is free, and a predictable name lets anyone pre-register it between broadcast and confirmation, invalidating the launch.": [
     "app/[lang]/docs/page.tsx"
@@ -1355,9 +1406,15 @@
   "Corrections": [
     "app/[lang]/research/page.tsx"
   ],
+  "Could not load banned users.": [
+    "components/chat-panel.tsx"
+  ],
   "Could not refresh the quote. Try again.": [
     "app/[lang]/dispense/_lib/use-dispense-router.ts",
     "app/[lang]/swap/_components/swap-widget.tsx"
+  ],
+  "Could not update this ban.": [
+    "components/chat-panel.tsx"
   ],
   "Couldn't check the {give}/{get} pool. Quotes may still use the order book.": [
     "app/[lang]/swap/_components/swap-widget.tsx"
@@ -1375,6 +1432,9 @@
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
+  ],
+  "Couldn't send. Your message is still here.": [
+    "components/chat-panel.tsx"
   ],
   "Counterparty": [
     "app/[lang]/_components/market-pulse.tsx"
@@ -1914,6 +1974,9 @@
   "inscription": [
     "app/[lang]/[asset]/_components/launch-metadata.tsx"
   ],
+  "Insert {emoji}": [
+    "components/chat-panel.tsx"
+  ],
   "Install ↗": [
     "components/connect-button.tsx"
   ],
@@ -2078,6 +2141,9 @@
   "Liquidity settings": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
+  "Live": [
+    "components/chat-panel.tsx"
+  ],
   "LIVE · {asset}": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
   ],
@@ -2138,7 +2204,8 @@
   ],
   "Loading…": [
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx",
+    "components/chat-panel.tsx"
   ],
   "locked forever": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -2222,8 +2289,17 @@
   "Mempool@@chip": [
     "components/mempool-chip.tsx"
   ],
+  "Mention {name}": [
+    "components/chat-panel.tsx"
+  ],
+  "Message": [
+    "components/chat-panel.tsx"
+  ],
   "Message format": [
     "app/[lang]/docs/page.tsx"
+  ],
+  "Message must be 1–{max} characters.": [
+    "components/chat-panel.tsx"
   ],
   "Method and limits": [
     "app/[lang]/research/page.tsx"
@@ -2379,6 +2455,15 @@
   "More than one wallet is installed. Pick the one to connect with.": [
     "components/connect-button.tsx"
   ],
+  "Mute {name}": [
+    "components/chat-panel.tsx"
+  ],
+  "Muted ({n})": [
+    "components/chat-panel.tsx"
+  ],
+  "Muted {name} for you.": [
+    "components/chat-panel.tsx"
+  ],
   "Name": [
     "app/[lang]/create/page.tsx"
   ],
@@ -2427,6 +2512,9 @@
   "No active {give}/{get} pool liquidity. A resting order can still fill through the order book.": [
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
+  "No banned users.": [
+    "components/chat-panel.tsx"
+  ],
   "No closed positions yet.": [
     "app/[lang]/profile/_components/history-tab.tsx"
   ],
@@ -2467,6 +2555,9 @@
   ],
   "No meaningful balance": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
+  ],
+  "No messages to show.": [
+    "components/chat-panel.tsx"
   ],
   "No mints from that address. Search matches a full address exactly.": [
     "app/[lang]/rewards/_components/earners-table.tsx"
@@ -2645,6 +2736,9 @@
   "Off-chain by default: the chain permanently carries the URL of the asset-info JSON, and the content behind it is curatable by the asset's current owner (wallet-signature gated). Taproot creators can instead inscribe the image on-chain as the permanent description — no off-chain dependency at all. Either way, nothing economic depends on hosted content.": [
     "app/[lang]/faq/page.tsx"
   ],
+  "Offline": [
+    "components/chat-panel.tsx"
+  ],
   "On other launchpads, graduation is a threshold inside a live market: the token trades on a curve while everyone hopes it reaches the magic number. XCP-69 graduation is {binary} and happens before any trading exists. Sell out the 69M sale within 1,000 blocks and the launch graduates — pool seeded, LP burned, supply locked, trading live in the same block's resolution phase. Miss it and the launch never trades at all.": [
     "app/[lang]/docs/page.tsx"
   ],
@@ -2686,6 +2780,9 @@
   ],
   "Open Bitcoin price": [
     "app/[lang]/_components/market-pulse.tsx"
+  ],
+  "Open chat": [
+    "components/chat-panel.tsx"
   ],
   "open LP": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -2950,6 +3047,9 @@
   "Public allocation captured": [
     "app/[lang]/research/_components/exit-race-simulator.tsx"
   ],
+  "Public chat": [
+    "components/chat-panel.tsx"
+  ],
   "Public sale": [
     "app/[lang]/faq/page.tsx"
   ],
@@ -3019,6 +3119,12 @@
   "Reconnect your wallet and try again.": [
     "components/compose-error.tsx"
   ],
+  "Reconnect your wallet to verify again.": [
+    "components/chat-panel.tsx"
+  ],
+  "Reconnecting…": [
+    "components/chat-panel.tsx"
+  ],
   "redeployed": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
@@ -3080,6 +3186,9 @@
   ],
   "Retry": [
     "app/[lang]/dispense/_components/bridge.tsx"
+  ],
+  "Retry verification": [
+    "components/chat-panel.tsx"
   ],
   "Reward": [
     "app/[lang]/profile/_components/rewards-tab.tsx"
@@ -3215,7 +3324,11 @@
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "Send": [
-    "app/[lang]/rewards/_components/rewards-content.tsx"
+    "app/[lang]/rewards/_components/rewards-content.tsx",
+    "components/chat-panel.tsx"
+  ],
+  "Sending…": [
+    "components/chat-panel.tsx"
   ],
   "Settles when it confirms — usually the next block.": [
     "app/[lang]/swap/_components/liquidity-widget.tsx"
@@ -3646,6 +3759,9 @@
   "Type": [
     "app/[lang]/profile/_components/activity-tab.tsx"
   ],
+  "Unban {name}": [
+    "components/chat-panel.tsx"
+  ],
   "unconfirmed": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
@@ -3668,6 +3784,15 @@
   ],
   "Units unavailable": [
     "components/order-tracker.tsx"
+  ],
+  "Unknown command. Type /help.": [
+    "components/chat-panel.tsx"
+  ],
+  "Unmute {name}": [
+    "components/chat-panel.tsx"
+  ],
+  "Unmuted {name}.": [
+    "components/chat-panel.tsx"
   ],
   "unsigned": [
     "app/[lang]/docs/page.tsx"
@@ -3693,11 +3818,17 @@
   "Upload token image": [
     "app/[lang]/create/page.tsx"
   ],
+  "Use at most {max} lines.": [
+    "components/chat-panel.tsx"
+  ],
   "Use digits and a dot, with up to {n} decimal places.": [
     "components/amount-input.tsx"
   ],
   "Use whole numbers only.": [
     "components/amount-input.tsx"
+  ],
+  "User not found. Use a name from this chat.": [
+    "components/chat-panel.tsx"
   ],
   "Value": [
     "app/[lang]/profile/_components/positions-tab.tsx"
@@ -3716,6 +3847,12 @@
   ],
   "Verdict pending": [
     "app/[lang]/profile/_components/launches-tab.tsx"
+  ],
+  "Verify your wallet to chat.": [
+    "components/chat-panel.tsx"
+  ],
+  "Verifying wallet…": [
+    "components/chat-panel.tsx"
   ],
   "via {wallet}": [
     "components/header-wallet.tsx"
@@ -3740,6 +3877,12 @@
   ],
   "vs pool": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
+  ],
+  "Wait {n}s": [
+    "components/chat-panel.tsx"
+  ],
+  "Wait {n}s before sending again.": [
+    "components/chat-panel.tsx"
   ],
   "waiting": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -3906,6 +4049,12 @@
   ],
   "you · {n} XCP": [
     "app/[lang]/dispense/_components/bridge.tsx"
+  ],
+  "You are banned from chat.": [
+    "components/chat-panel.tsx"
+  ],
+  "You cannot post in chat right now.": [
+    "components/chat-panel.tsx"
   ],
   "you have minted this launch’s max": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"

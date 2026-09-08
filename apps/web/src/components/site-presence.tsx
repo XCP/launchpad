@@ -103,7 +103,7 @@ export function SitePresenceBadge() {
   if (count === null || count < MIN_TO_SHOW) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 z-40">
+    <div className="chat-presence-badge fixed left-4 z-40">
       <Hint
         content={t(
           "People with xcp.fun open right now, including you. Several tabs from the same browser count once. Closing the tab removes you.",

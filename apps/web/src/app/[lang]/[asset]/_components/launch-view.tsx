@@ -1,6 +1,8 @@
 "use client";
 
 import { LazyLink } from "@/components/lazy-link";
+import { ChatPanel } from "@/components/chat-panel";
+import { useChatRoute } from "@/providers/chat-context";
 import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[lang]/[asset]/_components/launch-chrome";
 import {
   HostedDescription,
@@ -94,6 +96,7 @@ export function LaunchView({
   const num = useNumbers();
   const t = useT();
   const usd = useFiat();
+  useChatRoute(asset, phase === "scheduled" || phase === "minting" || phase === "graduated");
   const progress = saleProgress(fm);
   // An inscribed launch's description IS its content (hex-encoded on the
   // wire) rather than our hosted JSON URL — mime_type is the only signal
@@ -283,7 +286,8 @@ export function LaunchView({
       ) : null;
     return (
       <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
-      <div className="mx-auto max-w-2xl">
+      <div data-launch-chat className="chat-launch-layout">
+      <div className="min-w-0">
         {/* Identity, on its own — separate from the countdown/mint-form
             card below it, the same way every other phase keeps its header
             apart from its content. */}
@@ -446,6 +450,8 @@ export function LaunchView({
           </div>
         )}
       </div>
+      <ChatPanel />
+      </div>
       </LaunchRoomProvider>
     );
   }
@@ -580,7 +586,8 @@ export function LaunchView({
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div data-launch-chat className="chat-launch-layout">
+    <div className="min-w-0">
       {/* Identity, same shape every other phase uses: compact art with its
           own lightbox, issuer line with copy + hover card, announced-ago,
           issuer chips, share button in the standard corner. Only the "one
@@ -809,6 +816,8 @@ export function LaunchView({
       </LaunchRoomProvider>
       </div>
       </div>
+    </div>
+    <ChatPanel />
     </div>
   );
 }
