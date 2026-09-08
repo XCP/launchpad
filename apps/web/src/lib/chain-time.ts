@@ -41,10 +41,12 @@ export const monthYear = (unixSec: number, locale = "en") =>
  *
  * Takes the Intl tag rather than our locale id, because every caller is a
  * component that already holds one as `num.intl`. Optionally carries the
- * time, for a chart bucketed by the hour.
+ * time, for a chart bucketed by the hour. Candle buckets use UTC, so keep
+ * their date and time stable between server renders and every browser zone.
  */
 export const monthDay = (unixMs: number, intl = "en-US", withTime = false) =>
   new Date(unixMs).toLocaleString(intl, {
+    timeZone: "UTC",
     month: "short",
     day: "numeric",
     ...(withTime ? { hour: "numeric", minute: "2-digit" } : {}),
