@@ -9,12 +9,12 @@ import {
   txidFromRawTx,
 } from "@/lib/inscriber";
 import { prepareFairminterInscriptionPsbt } from "@/lib/inscriber/fairminter";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { BITCOIN_API_BASE, COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { WalletSdkError } from "@xcp/wallet-sdk";
 import { parseRawInteger } from "@xcp/wallet-sdk/amounts";
 import { assertSameTransaction, readPsbt, readTransaction } from "@/lib/transaction-verification";
 
-const ELECTRS_API_BASE = "https://api.counterparty.io:3000";
+const ELECTRS_API_BASE = BITCOIN_API_BASE;
 
 export type InscribeStep =
   | "preparing"

@@ -16,10 +16,13 @@ import "@/lib/wallet/sdk-config";
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchJson(url: string, timeoutMs = 10_000): Promise<any> {
-  // relayingFetch is a no-op for anything that is not Counterparty, so this
-  // stays the plain shared reader it has always been for every other host.
+  // Transaction-time node requests retain the SDK's same-origin fallback;
+  // first-party indexed and compatibility API URLs pass through directly.
   const res = await relayingFetch(url, timeoutMs);
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  if (!res.ok) {
+    await res.body?.cancel().catch(() => undefined);
+    throw new Error(`HTTP ${res.status}`);
+  }
   // Not res.json(): JSON.parse rounds integers above 2^53-1. Oversized
   // integers arrive as strings (type quantity fields as Raw); safe-range
   // values keep their shape.

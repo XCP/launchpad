@@ -46,24 +46,34 @@ const mockFetch = (body: unknown, ok = true) =>
 afterEach(() => vi.unstubAllGlobals());
 
 describe("fetchBlockHeight", () => {
-  it("falls back to the existing xcp.io tip when Counterparty is throttled", async () => {
+  it("uses the parsed xcp.io status height without treating an ahead-of-parser tip as ready", async () => {
+    const fetchMock = vi.fn(async () => Response.json({ result: { tip: 964330, indexed_block: "964329" } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await fetchBlockHeight()).toBe(964329);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.xcp.io/v2/status");
+  });
+
+  it("falls back to the first-party live gateway if the index is unavailable", async () => {
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce({
-        ok: false,
-        status: 429,
-        text: async () => "rate limited",
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        text: async () => '{"result":{"tip":964330,"indexed_block":"964330"}}',
-      });
+      .mockResolvedValueOnce(new Response("unavailable", { status: 503 }))
+      .mockResolvedValueOnce(Response.json({ result: { counterparty_height: 964330 } }));
     vi.stubGlobal("fetch", fetchMock);
 
     expect(await fetchBlockHeight()).toBe(964330);
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.xcp.io/v2/");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("https://api.xcp.io/v2/status");
+    expect(fetchMock.mock.calls[1]?.[0]).toBe("https://api.xcp.fun/node/v2/");
+  });
+
+  it("uses the live fallback when Explorer reports its parser is behind", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ result: { tip: 964330, indexed_block: "964320", synced: false } }))
+      .mockResolvedValueOnce(Response.json({ result: { counterparty_height: 964330 } }));
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await fetchBlockHeight()).toBe(964330);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
 

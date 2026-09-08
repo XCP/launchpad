@@ -1,4 +1,4 @@
-import { COUNTERPARTY_API_BASE, XCP_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE, XCP_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
 import { discard } from "@/lib/net";
 import { coalesceHolderBalances, type HolderRow, type LpBalance } from "@/lib/holders";
@@ -183,7 +183,7 @@ async function explorerFirst<Body, T>(
   path: string,
   pick: (body: Body) => T | null | undefined,
 ): Promise<T | null> {
-  for (const base of [XCP_API_BASE, COUNTERPARTY_API_BASE]) {
+  for (const base of [XCP_API_BASE, COUNTERPARTY_READ_API_BASE]) {
     try {
       const value = pick((await fetchJson(`${base}${path}`)) as Body);
       if (value !== null && value !== undefined) return value;

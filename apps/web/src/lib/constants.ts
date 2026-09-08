@@ -1,4 +1,8 @@
+/** Authoritative, uncached transaction-time reads and broadcasts. */
 export const COUNTERPARTY_API_BASE = "https://api.counterparty.io:4000/v2";
+export const BITCOIN_API_BASE = "https://api.counterparty.io:3000";
+/** Read-only compatibility fallback after indexed view APIs. */
+export const COUNTERPARTY_READ_API_BASE = "https://api.xcp.fun/node/v2";
 export const XCP_API_BASE = "https://api.xcp.io/v2";
 export const CDN_BASE = "https://cdn.xcp.io";
 /** Counterparty's canonical unspendable address. */

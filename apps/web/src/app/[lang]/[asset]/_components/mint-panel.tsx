@@ -16,7 +16,8 @@ import { BalanceUnavailable } from "@/components/ui/balance-unavailable";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { Well } from "@/components/ui/well";
 import { fetchBtcUsd } from "@/lib/api/price-client";
-import { fetchFairmintersByAsset } from "@/lib/api/counterparty";
+import { fetchAssetLaunch } from "@/lib/api/asset-launch";
+import { fetchLiveMintFairminter } from "@/lib/api/mint-fairminter";
 import { fetchAddressFairmints } from "@/lib/client";
 import { fetchMempoolSnapshot } from "@/lib/api/launchpad-api";
 import { useFiat } from "@/lib/currency";
@@ -32,7 +33,7 @@ import { useSpendableBalance } from "@xcp/wallet-sdk/react/use-spendable-balance
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { remainingLotsForAddress, saleTarget, xcp69Params, XCP69 } from "@/lib/xcp69";
+import { remainingLotsForAddress, saleTarget, XCP69 } from "@/lib/xcp69";
 
 const SATS = 1e8;
 const MINT_VBYTES = 250;
@@ -63,14 +64,16 @@ export function MintPanel({
   } | null>(null);
   const [tokens, setTokens] = useState("10000");
 
-  // The conforming fairminter for this ticker, read once and shared by both
-  // ceilings below. They used to fetch it independently on the same cadence,
-  // which was two identical Counterparty reads every twenty seconds per tab
-  // for one answer.
+  // Browsing reuses indexed launch data. A connected mint form keeps the
+  // original twenty-second live allowance read: the index's five-minute
+  // repair cadence is not a substitute for transaction-time freshness.
+  // Separate keys force a live read on connect and never label an indexed
+  // snapshot as a fresh node response.
+  const liveAllowance = Boolean(address && walletStatus === "connected");
   const { data: fairminter } = useSWR(
-    ["mint-fairminter", asset],
-    async () => (await fetchFairmintersByAsset(asset)).find((f) => xcp69Params(f)) ?? null,
-    { refreshInterval: 20_000, revalidateOnFocus: false },
+    ["mint-fairminter", asset, liveAllowance],
+    async () => liveAllowance ? fetchLiveMintFairminter(asset) : (await fetchAssetLaunch(asset)).fm,
+    { refreshInterval: 20_000, revalidateOnFocus: false, keepPreviousData: false },
   );
   // How many lots are actually left to mint — core rejects a fairmint whose
   // quantity would push the asset past hard_cap outright (no partial fill

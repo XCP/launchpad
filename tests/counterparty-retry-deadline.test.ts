@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// These tests exercise pacing and retries; service-binding discovery has its
+// own transport suite and must not introduce real module I/O into fake time.
+vi.mock("@/lib/api/node", () => ({
+  nodeApiFetch: (path: string, init: RequestInit) => fetch(`https://api.xcp.fun/node/v2${path}`, init),
+}));
+
 const NOW = Date.UTC(2026, 8, 7);
 
 beforeEach(() => {

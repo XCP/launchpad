@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { LazyLink } from "@/components/lazy-link";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { fetchJson } from "@/lib/client";
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
@@ -45,7 +45,7 @@ export function OrdersTab({
   const t = useT();
   const compose = useCompose();
   const { data: orders, mutate } = useSWR<OpenOrder[]>(
-    `${COUNTERPARTY_API_BASE}/addresses/${encodeURIComponent(address)}/orders?status=open&limit=100`,
+    `${COUNTERPARTY_READ_API_BASE}/addresses/${encodeURIComponent(address)}/orders?status=open&limit=100`,
     async (url: string) => (await fetchJson(url)).result as OpenOrder[],
     { refreshInterval: 15_000 },
   );

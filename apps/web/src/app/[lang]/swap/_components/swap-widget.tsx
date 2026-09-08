@@ -49,7 +49,7 @@ import { useSpendableBalance } from "@xcp/wallet-sdk/react/use-spendable-balance
 import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_API_BASE, COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { useSwapSettings } from "@/app/[lang]/swap/_components/swap-settings";
 import {
   defaultTradeAsset,
@@ -202,7 +202,7 @@ export function SwapWidget({
       : null,
     () =>
       fetchJson(
-        `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(giveAsset)}/${encodeURIComponent(getAsset)}`,
+        `${COUNTERPARTY_READ_API_BASE}/pools/${encodeURIComponent(giveAsset)}/${encodeURIComponent(getAsset)}`,
       )
         .then((d) => d.result ?? null)
         .catch((error: unknown) => {
@@ -255,7 +255,7 @@ export function SwapWidget({
     pendingAhead.length > 0 ? [giveAsset, getAsset, "swap-resting-book"] : null,
     () =>
       fetchJson(
-        `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(getAsset)}/${encodeURIComponent(giveAsset)}?status=open&limit=1000`,
+        `${COUNTERPARTY_READ_API_BASE}/orders/${encodeURIComponent(getAsset)}/${encodeURIComponent(giveAsset)}?status=open&limit=1000`,
       ).then((d) =>
         ((d.result ?? []) as CpBookOrder[])
           .filter((o) => o.give_asset === getAsset && o.get_asset === giveAsset)

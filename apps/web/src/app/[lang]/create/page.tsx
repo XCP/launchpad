@@ -14,6 +14,8 @@ import { GearPopover } from "@/components/ui/popover";
 import { trackTx } from "@/lib/analytics";
 import { fileIsAnimatedWebp } from "@/lib/animated-webp";
 import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
+import { fetchBlockHeight } from "@/lib/api/counterparty";
+import { fetchIndexedLaunch } from "@/lib/api/launchpad-api";
 import { COUNTERPARTY_API_BASE } from "@/lib/constants";
 import { fromSats } from "@/lib/format";
 import { useFiat } from "@/lib/currency";
@@ -37,6 +39,7 @@ import {
   XCP69,
   XCP69_EXACT,
   XCP69_RAISE_SATS,
+  xcp69Params,
 } from "@/lib/xcp69";
 
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
@@ -65,6 +68,12 @@ function ViewLaunchLink({ asset }: { asset: string }) {
   const { data: visible } = useSWR(
     ["launch-visible", asset],
     async () => {
+      // Apply the page's identity/conformance evidence requirements before
+      // exposing a link. Incomplete rows still need live discovery.
+      const indexed = await fetchIndexedLaunch(asset);
+      if (indexed?.fm.asset === asset && indexed.fm.tx_hash &&
+          (indexed.fm.status !== "pending" || indexed.announceBlock !== null) &&
+          xcp69Params({ ...indexed.fm, block_index: indexed.announceBlock ?? indexed.fm.block_index })) return true;
       // Confirmed first: a launch that made it into a block on the very next
       // one shouldn't be reported as still pending.
       const confirmed = await fetch(
@@ -259,10 +268,7 @@ export default function CreatePage() {
   const { data: xcpUsd } = useSWR("xcp-usd", fetchXcpUsd, { refreshInterval: 60_000 });
   const { data: blockHeight } = useSWR(
     "block-height",
-    async () => {
-      const res = await fetch(`${COUNTERPARTY_API_BASE}/`);
-      return (await res.json()).result.counterparty_height as number;
-    },
+    fetchBlockHeight,
     { refreshInterval: 30_000 },
   );
   // Default to the standard fee — true for almost everyone — rather than a
@@ -289,7 +295,13 @@ export default function CreatePage() {
     setIneligibleReason(null);
     try {
       const res = await fetch(`${COUNTERPARTY_API_BASE}/assets/${value}`);
+      // A throttled/unavailable protocol read is not proof a name is free.
+      if (!res.ok && res.status !== 404) {
+        await res.body?.cancel();
+        throw new Error(`Asset lookup failed: HTTP ${res.status}`);
+      }
       const data = res.ok ? await res.json() : { result: null };
+      if (data.error || !Object.hasOwn(data, "result")) throw new Error("Invalid asset lookup response");
       const a = data.result;
       if (!a) {
         setNameCheck("available");
