@@ -376,7 +376,6 @@
   "Closed": "已结束",
   "Closes": "结束",
   "closes@@chart": "收盘价",
-  "closing": "即将结束",
   "Closing soonest": "最快结束",
   "Collapse": "收起",
   "collections with a minter in them": "有铸造者参与的收藏集",
@@ -451,7 +450,6 @@
   "Daily": "日线",
   "Data": "数据来源",
   "day": "日",
-  "Deadline": "截止区块",
   "Deposit": "存入",
   "Deposit broadcast — {tx}": "存入已广播 — {tx}",
   "Description": "描述",
@@ -1285,5 +1283,12 @@
   "Could not load banned users.": "无法加载已禁言用户。",
   "Could not update this ban.": "无法更新禁言设置。",
   "You are banned from chat.": "你已被禁止在聊天中发言。",
-  "Banned ({n})": "已禁言（{n}）"
+  "Banned ({n})": "已禁言（{n}）",
+  "Time remaining": "剩余时间",
+  "Closes at block {n}, or earlier if sold out.": "在区块 {n} 结束，售罄则提前结束。",
+  "New asset": "新资产",
+  "{year} asset": "{year} 年资产",
+  "Created by this fairminter.": "由此公平铸造合约创建。",
+  "Asset name first registered in {year}.": "资产名称于 {year} 年首次注册。",
+  "If it fails, every minter’s XCP is automatically refunded.": "若发行失败，每位铸造参与者投入的全部 XCP 都会自动退还。"
 }

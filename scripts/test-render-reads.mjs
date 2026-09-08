@@ -87,6 +87,11 @@ function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false } = {}) {
     if (url.hostname === "api.counterparty.io") {
       if (url.pathname === "/v2/") return Response.json({ result: { counterparty_height: 899970 } });
       if (url.pathname === "/v2/assets/TESTCOIN/fairminters") return Response.json({ result: [fairminter] });
+      if (url.pathname === "/v2/assets/TESTCOIN/issuances") return Response.json({ result_count: 1, result: [{
+        asset: fairminter.asset, tx_hash: fairminter.tx_hash, tx_index: fairminter.tx_index,
+        msg_index: 0, block_index: fairminter.block_index, block_time: 1749798000,
+        asset_events: "open_fairminter", status: "valid",
+      }] });
       if (url.pathname === "/v2/assets/XCP/dispensers") return Response.json({ result: dispenser ? [{ tx_hash: "dispense", give_remaining: 100000000, give_quantity: 100000000, satoshirate: 1000 }] : [] });
       if (url.pathname === "/v2/mempool/events/DISPENSE") return Response.json({ result: [] });
     }

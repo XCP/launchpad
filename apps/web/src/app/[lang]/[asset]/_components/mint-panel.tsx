@@ -368,15 +368,13 @@ export function MintPanel({
             {buttonLabel}
           </CTA>
         )}
-        {insufficient && (
-          <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">
-            {t("Need XCP?")}{" "}
-            <LazyLink href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
-              {t("Buy some with BTC")}
-            </LazyLink>
-            .
-          </p>
-        )}
+        <p className="mt-2 text-center text-[11px] text-gray-500 dark:text-gray-400">
+          {t("Need XCP?")}{" "}
+          <LazyLink href="/dispense" className="text-purple-600 dark:text-purple-400 underline">
+            {t("Buy some with BTC")}
+          </LazyLink>
+          .
+        </p>
         {compose.status === "confirmed" && (
           <div className="mt-2 rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 p-4 text-sm">
             <div className="flex items-center justify-between">

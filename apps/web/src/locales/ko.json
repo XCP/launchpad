@@ -376,7 +376,6 @@
   "Closed": "종료",
   "Closes": "마감",
   "closes@@chart": "종가",
-  "closing": "마감 임박순",
   "Closing soonest": "마감 임박순",
   "Collapse": "접기",
   "collections with a minter in them": "민터가 속한 컬렉션",
@@ -451,7 +450,6 @@
   "Daily": "일봉",
   "Data": "데이터",
   "day": "일",
-  "Deadline": "마감 블록",
   "Deposit": "예치",
   "Deposit broadcast — {tx}": "예치 브로드캐스트 완료 — {tx}",
   "Description": "설명",
@@ -1285,5 +1283,12 @@
   "Could not load banned users.": "채팅 금지된 사용자를 불러오지 못했습니다.",
   "Could not update this ban.": "채팅 금지 설정을 변경하지 못했습니다.",
   "You are banned from chat.": "채팅이 금지되어 메시지를 보낼 수 없습니다.",
-  "Banned ({n})": "채팅 금지 ({n})"
+  "Banned ({n})": "채팅 금지 ({n})",
+  "Time remaining": "남은 시간",
+  "Closes at block {n}, or earlier if sold out.": "블록 {n}에서 마감되며, 매진되면 조기 마감됩니다.",
+  "New asset": "새 자산",
+  "{year} asset": "{year}년 자산",
+  "Created by this fairminter.": "이 페어민터가 생성한 자산입니다.",
+  "Asset name first registered in {year}.": "자산 이름이 {year}년에 처음 등록되었습니다.",
+  "If it fails, every minter’s XCP is automatically refunded.": "출시가 실패하면 모든 민팅 참여자가 지불한 XCP 전액이 자동으로 환불됩니다."
 }

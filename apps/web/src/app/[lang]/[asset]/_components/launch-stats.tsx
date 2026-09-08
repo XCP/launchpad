@@ -224,6 +224,24 @@ export function RaisedStat({
   );
 }
 
+/** The fixed XCP-69 raise, following the sidebar's denomination toggle. */
+export function MintTargetStat({ xcpUsd }: { xcpUsd: number | null }) {
+  const num = useNumbers();
+  const t = useT();
+  const usd = useFiat();
+  const denom = useDenomination();
+  return (
+    <div>
+      <div className={LABEL}>{t("Target")}</div>
+      <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
+        {denom === "USD" && xcpUsd !== null
+          ? usd(fromSats(XCP69_RAISE_SATS) * xcpUsd)
+          : `${num.commasRaw(XCP69_RAISE_SATS)} XCP`}
+      </div>
+    </div>
+  );
+}
+
 /** Bitcoin-side cost of the launch's mints so far — sats by default, USD
  *  when the site-wide toggle is on and a BTC/USD rate is available. Hosts
  *  the denom toggle on mobile (see DenomToggle's own doc comment). */

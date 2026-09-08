@@ -376,7 +376,6 @@
   "Closed": "終了",
   "Closes": "終了",
   "closes@@chart": "終値",
-  "closing": "まもなく終了",
   "Closing soonest": "終了が近い順",
   "Collapse": "折りたたむ",
   "collections with a minter in them": "ミンターがいるコレクション",
@@ -451,7 +450,6 @@
   "Daily": "日足",
   "Data": "データ元",
   "day": "日",
-  "Deadline": "締切",
   "Deposit": "預け入れ",
   "Deposit broadcast — {tx}": "預け入れをブロードキャスト — {tx}",
   "Description": "説明文",
@@ -1285,5 +1283,12 @@
   "Could not load banned users.": "投稿禁止中のユーザーを読み込めませんでした。",
   "Could not update this ban.": "投稿禁止の設定を更新できませんでした。",
   "You are banned from chat.": "チャットへの投稿が禁止されています。",
-  "Banned ({n})": "投稿禁止（{n}）"
+  "Banned ({n})": "投稿禁止（{n}）",
+  "Time remaining": "残り時間",
+  "Closes at block {n}, or earlier if sold out.": "ブロック {n} で終了（完売時は早期終了）。",
+  "New asset": "新しいアセット",
+  "{year} asset": "{year}年のアセット",
+  "Created by this fairminter.": "このフェアミンターによって作成されました。",
+  "Asset name first registered in {year}.": "アセット名は{year}年に初めて登録されました。",
+  "If it fails, every minter’s XCP is automatically refunded.": "成立しなかった場合、すべての参加者に拠出したXCPが自動的に全額返還されます。"
 }

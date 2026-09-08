@@ -376,7 +376,6 @@
   "Closed": "Завершён",
   "Closes": "Закроется",
   "closes@@chart": "цены закрытия",
-  "closing": "по времени закрытия",
   "Closing soonest": "Закроются раньше всех",
   "Collapse": "Свернуть",
   "collections with a minter in them": "коллекций, в которых есть минтер",
@@ -451,7 +450,6 @@
   "Daily": "Дневные",
   "Data": "Данные",
   "day": "день",
-  "Deadline": "Крайний блок",
   "Deposit": "Внесение",
   "Deposit broadcast — {tx}": "Внесение транслировано — {tx}",
   "Description": "Описание",
@@ -1285,5 +1283,12 @@
   "Could not load banned users.": "Не удалось загрузить список заблокированных пользователей.",
   "Could not update this ban.": "Не удалось изменить блокировку.",
   "You are banned from chat.": "Вы заблокированы и не можете писать в чате.",
-  "Banned ({n})": "Заблокированы ({n})"
+  "Banned ({n})": "Заблокированы ({n})",
+  "Time remaining": "Осталось времени",
+  "Closes at block {n}, or earlier if sold out.": "Завершится в блоке {n} или раньше, если всё будет продано.",
+  "New asset": "Новый актив",
+  "{year} asset": "Актив {year} года",
+  "Created by this fairminter.": "Создан этим fairminter.",
+  "Asset name first registered in {year}.": "Название актива впервые зарегистрировано в {year} году.",
+  "If it fails, every minter’s XCP is automatically refunded.": "Если запуск не состоится, все внесённые XCP автоматически возвращаются каждому участнику."
 }

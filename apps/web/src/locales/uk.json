@@ -376,7 +376,6 @@
   "Closed": "Завершено",
   "Closes": "Закривається",
   "closes@@chart": "ціни закриття",
-  "closing": "за часом закриття",
   "Closing soonest": "Найближче закриття",
   "Collapse": "Згорнути",
   "collections with a minter in them": "колекцій, у яких є мінтер",
@@ -451,7 +450,6 @@
   "Daily": "Денні",
   "Data": "Дані",
   "day": "день",
-  "Deadline": "Дедлайн",
   "Deposit": "Внесення",
   "Deposit broadcast — {tx}": "Внесення надіслано в мережу — {tx}",
   "Description": "Опис",
@@ -1285,5 +1283,12 @@
   "Could not load banned users.": "Не вдалося завантажити список заблокованих користувачів.",
   "Could not update this ban.": "Не вдалося змінити блокування.",
   "You are banned from chat.": "Вас заблоковано, і ви не можете писати в чаті.",
-  "Banned ({n})": "Заблоковано ({n})"
+  "Banned ({n})": "Заблоковано ({n})",
+  "Time remaining": "Залишилося часу",
+  "Closes at block {n}, or earlier if sold out.": "Завершиться в блоці {n} або раніше, якщо все буде продано.",
+  "New asset": "Новий актив",
+  "{year} asset": "Актив {year} року",
+  "Created by this fairminter.": "Створений цим fairminter.",
+  "Asset name first registered in {year}.": "Назву активу вперше зареєстровано у {year} році.",
+  "If it fails, every minter’s XCP is automatically refunded.": "Якщо запуск не відбудеться, усі внесені XCP автоматично повертаються кожному учаснику."
 }
