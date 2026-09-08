@@ -23,12 +23,15 @@ import {
   inscriptionPageUrl,
 } from "@/lib/constants";
 import { discard } from "@/lib/net";
+import { BodyTooLarge, boundedFormData } from "@/lib/bounded-body";
 
 /** Counterparty named assets: start B-Z, 4-12 uppercase letters. */
 const ASSET_NAME_REGEX = /^[B-Z][A-Z]{3,11}$/;
 const IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "image/gif"]);
 const MAX_IMAGE_MB = 4;
 const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+// Preserve the full image allowance, with room for multipart fields and proof.
+const MAX_UPLOAD_BODY_BYTES = MAX_IMAGE_BYTES + 64 * 1024;
 /** Written from the limit rather than beside it — the two error strings below
  *  both used to spell the number out, which is two more places to miss when
  *  the ceiling moves. The label in create/page.tsx is the one copy that can't
@@ -132,7 +135,15 @@ function parseVerification(raw: FormDataEntryValue | null): ConnectionProof["ver
 }
 
 export async function POST(request: Request) {
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await boundedFormData(request, MAX_UPLOAD_BODY_BYTES);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof BodyTooLarge ? "Request body too large" : "Malformed form data" },
+      { status: error instanceof BodyTooLarge ? 413 : 400 },
+    );
+  }
   const asset = String(form.get("asset") ?? "").toUpperCase();
   const name = String(form.get("name") ?? "").trim().slice(0, 127);
   const description = String(form.get("description") ?? "").trim();
@@ -240,7 +251,15 @@ const EDIT_MAX_FUTURE_SKEW_SECONDS = 60;
  * the Counterparty API.
  */
 export async function PUT(request: Request) {
-  const form = await request.formData();
+  let form: FormData;
+  try {
+    form = await boundedFormData(request, MAX_UPLOAD_BODY_BYTES);
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof BodyTooLarge ? "Request body too large" : "Malformed form data" },
+      { status: error instanceof BodyTooLarge ? 413 : 400 },
+    );
+  }
   const asset = String(form.get("asset") ?? "").toUpperCase();
   const name = String(form.get("name") ?? "").trim().slice(0, 127);
   const description = String(form.get("description") ?? "").trim();
