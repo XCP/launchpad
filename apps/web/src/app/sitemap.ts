@@ -14,7 +14,7 @@ import { METADATA_ORIGIN } from "@/lib/metadata";
  */
 export const revalidate = 3600;
 
-const STATIC_PATHS = ["/", "/faq", "/docs", "/stats", "/activity", "/swap", "/limit", "/dispense", "/rewards", "/mempool", "/graveyard", "/research", "/create"];
+const STATIC_PATHS = ["/", "/graduated", "/minting", "/scheduled", "/faq", "/docs", "/stats", "/activity", "/swap", "/limit", "/dispense", "/rewards", "/mempool", "/graveyard", "/research", "/create"];
 
 /** The homepage is `https://xcp.fun`, no trailing slash — exactly as the
  *  page's own canonical writes it. A sitemap that says `/` while the page

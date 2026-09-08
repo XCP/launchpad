@@ -31,9 +31,9 @@ const SLIPPAGE_PRESETS = [0.5, 1, 2];
 const LQ_SLIPPAGE_PRESETS = [0.5, 1, 2.5];
 /** Resting-order lifetimes, in blocks. */
 export const LIMIT_EXPIRATIONS = [
-  { blocks: 144, label: msg("~1 day") },
-  { blocks: 1000, label: msg("~1 week") },
-  { blocks: 5000, label: msg("~5 weeks") },
+  { blocks: 144, label: msg("1 day") },
+  { blocks: 1000, label: msg("1 week") },
+  { blocks: 5000, label: msg("5 weeks") },
 ];
 
 /**
@@ -234,7 +234,7 @@ export function SwapSettingsGear() {
       </div>
       {!parseBoundedSetting(s.customSlippage, 50).valid ? null : s.slippageAuto ? (
         <p className="mt-2 text-[11px] text-gray-400 dark:text-gray-500">
-          {t("Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.", { pct: num.commas(s.autoValue) })}
+          {t("Auto sizes slippage to the trade: what this quote needs, currently {pct}%.", { pct: num.commas(s.autoValue) })}
         </p>
       ) : s.slippage >= 20 ? (
         <p className="mt-2 text-[11px] font-medium text-red-600 dark:text-red-400">
@@ -250,7 +250,7 @@ export function SwapSettingsGear() {
         </p>
       ) : s.slippage > s.autoValue ? (
         <p className="mt-2 text-[11px] text-amber-600 dark:text-amber-400">
-          {t("Higher than this trade needs (~{pct}%).", { pct: num.commas(s.autoValue) })}
+          {t("Higher than this trade needs ({pct}%).", { pct: num.commas(s.autoValue) })}
         </p>
       ) : null}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-y-2">

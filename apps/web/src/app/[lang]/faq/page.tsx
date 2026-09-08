@@ -45,7 +45,7 @@ const PARAMS: [string, string][] = [
   [msg("Price"), msg("0.01 XCP per 1,000-token lot")],
   [msg("Per-address cap"), msg("1,000,000 tokens (10 XCP)")],
   [msg("Start"), msg("a future block — announced on-chain before minting can open")],
-  [msg("Mint window"), msg("exactly 1,000 blocks (~7 days) from start")],
+  [msg("Mint window"), msg("exactly 1,000 blocks (7 days) from start")],
   [msg("Premine / commission"), msg("none — the creator mints like everyone else")],
   [msg("Asset"), msg("named assets only, divisible")],
 ];
@@ -196,7 +196,7 @@ export default async function StandardPage() {
               {t("Does a refund make me whole?")}
             </summary>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {t("In XCP terms, exactly. In fiat terms, only if XCP's price held during the ~week-long window. Refunds return quantity, not value.")}
+              {t("In XCP terms, exactly. In fiat terms, only if XCP's price held during the week-long window. Refunds return quantity, not value.")}
             </p>
           </details>
           <details className="p-4">

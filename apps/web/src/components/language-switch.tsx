@@ -1,8 +1,10 @@
 "use client";
 
 import { DropdownMenu as DM } from "radix-ui";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 import { LazyLink } from "@/components/lazy-link";
+import { phaseForPath } from "@/lib/launch-directory";
 import { trackEvent } from "@/lib/analytics";
 import { CURRENCIES, currencyForLocale, setCurrency, useCurrency } from "@/lib/currency";
 import { useLocale, useT } from "@/lib/i18n/client";
@@ -70,7 +72,7 @@ export function LanguageSwitch({
           collisionPadding={12}
           className="modal-pop z-50 max-h-[var(--radix-dropdown-menu-content-available-height)] w-52 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
-          <LanguageItems path={path} />
+          <Suspense fallback={null}><LanguageItems path={path} /></Suspense>
           {includeCurrency && (
             <>
               <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
@@ -87,12 +89,15 @@ export function LanguageSwitch({
  *  list itself, shared by the desktop globe menu and the phone's submenu. */
 export function LanguageItems({ path }: { path: string }) {
   const locale = useLocale();
+  const query = useSearchParams().toString();
+  // Keep listing sort and display choices when choosing another translation.
+  const target = (phaseForPath(path) || path === "/all") && query ? `${path}?${query}` : path;
   return (
     <>
       {LOCALES.map((l) => (
         <DM.Item key={l} asChild>
           <LazyLink
-            href={path}
+            href={target}
             locale={l}
             lang={LOCALE_INFO[l].tag}
             hrefLang={LOCALE_INFO[l].tag}
@@ -161,7 +166,7 @@ export function LanguageSubmenu({ path }: { path: string }) {
           collisionPadding={12}
           className="modal-pop z-50 max-h-[min(20rem,var(--radix-dropdown-menu-content-available-height,20rem))] w-48 overflow-y-auto overscroll-contain rounded-2xl border border-gray-200 bg-white p-1.5 shadow-lg dark:border-gray-800 dark:bg-gray-900"
         >
-          <LanguageItems path={path} />
+          <Suspense fallback={null}><LanguageItems path={path} /></Suspense>
         </DM.SubContent>
       </DM.Portal>
     </DM.Sub>
@@ -169,9 +174,8 @@ export function LanguageSubmenu({ path }: { path: string }) {
 }
 
 /**
- * The currency, as a submenu: "Currency · JPY ▸" opens the full list with
- * Auto at the top. Auto shows what it currently resolves to, so a visitor
- * can see why the numbers are in yen before deciding whether to change it.
+ * The currency, as a submenu: "Currency · JPY ▸" opens the currency codes.
+ * Language selection supplies the default; this list is an explicit override.
  */
 export function CurrencySubmenu({ overlap = false }: { overlap?: boolean } = {}) {
   const t = useT();
@@ -231,20 +235,14 @@ export function CurrencySwitch() {
 }
 
 function CurrencyItems() {
-  const t = useT();
-  const { code, auto, detected } = useCurrency();
+  const { code } = useCurrency();
   const item = `${MENU_ITEM} text-xs`;
   return (
     <>
-      <DM.Item className={item} onSelect={() => setCurrency("auto")}>
-        {t("Auto ({code})", { code: detected })}
-        {auto && <Tick />}
-      </DM.Item>
-      <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
       {CURRENCIES.map((c) => (
         <DM.Item key={c} className={item} onSelect={() => setCurrency(c)}>
           {c}
-          {!auto && c === code && <Tick />}
+          {c === code && <Tick />}
         </DM.Item>
       ))}
     </>

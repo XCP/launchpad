@@ -239,12 +239,12 @@ export function TradePanel({
   //   buy:  x XCP in until marginal = P  →  x = (√(P·Rt·Rx·(1−f)) − Rx)/(1−f)
   //   sell: y tok in until marginal = P  →  y = (√(Rx·Rt·(1−f)/P) − Rt)/(1−f)
   // Book part sums resting counter-orders priced within your limit. An
-  // estimate (state moves every block), hence the ~.
+  // estimate because state moves every block.
   const fillableTokensRaw = (() => {
     if (limitPriceNum <= 0) return 0;
     let fillable = 0;
     if (pool && spot !== null) {
-      // Doubles: the curve solve is an estimate by nature (shown as "~").
+      // Doubles: the curve solve is an estimate by nature.
       const Rx = approx(pool.asset_a === "XCP" ? pool.reserve_a : pool.reserve_b);
       const Rt = approx(pool.asset_a === asset ? pool.reserve_a : pool.reserve_b);
       const f = POOL_FEE;
@@ -606,10 +606,10 @@ export function TradePanel({
                   className={limitFillsNow ? "font-medium text-green-700 dark:text-green-400" : ""}
                 >
                   {fillPct >= 100
-                    ? t("~100% at confirmation")
+                    ? t("100% at confirmation")
                     : fillPct === 0
                       ? t("0% — rests until a counter-order takes it")
-                      : t("~{pct}% · remainder rests at your limit", { pct: fillPct })}
+                      : t("{pct}% · remainder rests at your limit", { pct: fillPct })}
                 </dd>
               </div>
             )}
@@ -627,7 +627,7 @@ export function TradePanel({
                   {btcUsd != null && (
                     <span className="text-gray-400 dark:text-gray-500">
                       {" "}
-                      (~{usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
+                      ({usdFmt(((feeRate * ORDER_VBYTES) / SATS) * btcUsd)})
                     </span>
                   )}
                 </dd>

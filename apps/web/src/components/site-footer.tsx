@@ -99,7 +99,7 @@ function FooterSettings() {
   const locale = useLocale();
   const router = useRouter();
   const pathname = usePathname();
-  const { code, auto, detected } = useCurrency();
+  const { code } = useCurrency();
   const select =
     "rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300";
   return (
@@ -127,10 +127,9 @@ function FooterSettings() {
         <span className="sr-only">{t("Currency")}</span>
         <select
           className={select}
-          value={auto ? "auto" : code}
-          onChange={(e) => setCurrency(e.target.value as Currency | "auto")}
+          value={code}
+          onChange={(e) => setCurrency(e.target.value as Currency)}
         >
-          <option value="auto">{t("Auto ({code})", { code: detected })}</option>
           {CURRENCIES.map((c) => (
             <option key={c} value={c}>
               {c}

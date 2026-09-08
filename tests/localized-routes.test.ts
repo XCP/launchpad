@@ -5,6 +5,7 @@ import { localeAlternates } from "@/lib/i18n/seo";
 vi.mock("next/root-params", () => ({ lang: async () => "en" }));
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: vi.fn() }));
 vi.mock("@/app/[lang]/profile/_components/profile-view", () => ({ ProfileView: () => null }));
+vi.mock("@/app/[lang]/all/_components/all-launches-view", () => ({ AllLaunchesView: () => null }));
 vi.mock("@/lib/api/launchpad-api", () => ({ fetchSearchIndex: vi.fn() }));
 
 import { generateMetadata as createMetadata } from "@/app/[lang]/create/layout";
@@ -13,6 +14,10 @@ import HomePage from "@/app/[lang]/home/page";
 import LaunchesPage from "@/app/[lang]/launches/page";
 import sitemap from "@/app/sitemap";
 import { fetchSearchIndex } from "@/lib/api/launchpad-api";
+import AllLaunchesPage from "@/app/[lang]/all/page";
+import { directoryMetadata } from "@/app/[lang]/_components/launch-directory-page";
+import { PHASE_PATHS } from "@/lib/launch-directory";
+import type { LaunchPhase } from "@/lib/xcp69";
 
 const ADDRESS = "1CounterpartyXXXXXXXXXXXXXXXUWLpVr";
 
@@ -55,6 +60,29 @@ describe("legacy profile redirects", () => {
   });
 });
 
+describe("launch directory routes", () => {
+  it.each(LOCALES)("redirects old listing links and preserves %s display preferences", async (lang) => {
+    for (const phase of Object.keys(PHASE_PATHS) as LaunchPhase[]) {
+      await expect(AllLaunchesPage({
+        params: Promise.resolve({ lang }),
+        searchParams: Promise.resolve({ phase, sort: "minters", view: "table", denomination: "xcp" }),
+      })).rejects.toMatchObject({
+        digest: `NEXT_REDIRECT;replace;${localePath(lang, PHASE_PATHS[phase])}?sort=minters&view=table&denomination=xcp;308;`,
+      });
+      const metadata = await directoryMetadata(phase, { params: Promise.resolve({ lang }) });
+      expect(metadata.alternates).toEqual(localeAlternates(lang, PHASE_PATHS[phase]));
+      expect(metadata.robots).toBeUndefined();
+      expect(metadata.title).toContain("xcp.fun");
+    }
+  });
+
+  it.each([undefined, "unknown", "constructor", ["minting", "scheduled"]])("defaults an absent/invalid old phase to graduated: %s", async (phase) => {
+    await expect(AllLaunchesPage({
+      params: Promise.resolve({ lang: "en" }), searchParams: Promise.resolve({ phase }),
+    })).rejects.toMatchObject({ digest: "NEXT_REDIRECT;replace;/graduated;308;" });
+  });
+});
+
 describe("multilingual sitemap", () => {
   beforeEach(() => {
     vi.mocked(fetchSearchIndex).mockReset();
@@ -66,7 +94,7 @@ describe("multilingual sitemap", () => {
     const urls = new Set(rows.map((row) => row.url));
     expect(urls.size).toBe(rows.length);
 
-    for (const path of ["/", "/create", "/PEPE"]) {
+    for (const path of ["/", "/create", "/PEPE", ...Object.values(PHASE_PATHS)]) {
       for (const locale of LOCALES) {
         const localized = localePath(locale, path);
         const url = `https://xcp.fun${localized === "/" ? "" : localized}`;
@@ -81,6 +109,7 @@ describe("multilingual sitemap", () => {
         }
       }
     }
+    for (const locale of LOCALES) expect(urls.has(`https://xcp.fun${localePath(locale, "/all")}`)).toBe(false);
   });
 
   it("keeps all static language versions when the asset index is unavailable", async () => {

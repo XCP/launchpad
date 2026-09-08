@@ -13,10 +13,9 @@ compatibility_flags = ["nodejs_compat"]
 
 # Custom domain (same mechanism as img-cdn's cdn.xcp.io route): Cloudflare
 # provisions and manages the DNS record itself on deploy, nothing manual.
-# workers_dev stays on: apps/web still calls launchpad-api.me-bbe.workers.dev
-# directly (HTTP fetches and the LaunchRoom/SitePresence WebSockets) — adding
-# a custom route silently disables the workers.dev URL unless told not to,
-# which would have broken every one of those calls in production.
+# Keep the original workers.dev host available for older clients. Current
+# HTTP reads and LaunchRoom/SitePresence WebSockets use api.xcp.fun, but
+# an already-open tab can still reconnect using a previous bundle's URL.
 workers_dev = true
 routes = [
   { pattern = "api.xcp.fun", custom_domain = true },

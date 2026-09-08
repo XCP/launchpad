@@ -18,7 +18,7 @@ export const PREDICATE_SNIPPET = `export const XCP69 = {
   /** 1M tokens = 10 XCP per address; 69M ÷ 1M = 69 participants */
   MAX_MINT_PER_ADDRESS: 100_000_000_000_000,
   MAX_MINT_PER_TX: 100_000_000_000_000,
-  /** Mint window: soft_cap_deadline_block − start_block, exactly (~7 days) */
+  /** Mint window: soft_cap_deadline_block − start_block, exactly (7 days) */
   DEADLINE_BLOCKS: 1_000,
 } as const;
 

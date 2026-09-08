@@ -26,7 +26,7 @@ core v11.2.0+). There is no factory contract, no admin key, no platform
 custody: the protocol is the platform. Every launch is identical — 100M
 supply, 69M public sale at 0.01 XCP per 1,000-token lot, 31M reserved for
 the pool, 10 XCP per-address cap, an on-chain pre-announcement before
-minting opens, and a 1,000-block (~7 day) window.
+minting opens, and a 1,000-block (7 day) window.
 
 ## Launch mechanism
 

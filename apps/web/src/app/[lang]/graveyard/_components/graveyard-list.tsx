@@ -112,7 +112,7 @@ export function GraveyardList({
   );
 }
 
-function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
+export function GraveyardCard({ row, height }: { row: SectionRow; height: number }) {
   const num = useNumbers();
   const t = useT();
   const { fm } = row;

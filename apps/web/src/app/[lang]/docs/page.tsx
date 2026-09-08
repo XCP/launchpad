@@ -199,7 +199,7 @@ export default async function DocsPage() {
           <li>
             {rich(
               t,
-              "{mint} A 1,000-block window (~7 days) from {startBlock}. Anyone can mint whole 1,000-token lots at 0.01 XCP per lot, up to 1,000,000 tokens (10 XCP) per address. Both the paid XCP and the minted tokens sit in escrow at the unspendable address — nobody holds anything until the launch resolves. The window length only ever delays failure: a sell-out settles the moment it fills, while a miss frees every minter's XCP within about a week.",
+              "{mint} A 1,000-block window (7 days) from {startBlock}. Anyone can mint whole 1,000-token lots at 0.01 XCP per lot, up to 1,000,000 tokens (10 XCP) per address. Both the paid XCP and the minted tokens sit in escrow at the unspendable address — nobody holds anything until the launch resolves. The window length only ever delays failure: a sell-out settles the moment it fills, while a miss frees every minter's XCP within about a week.",
               { mint: <strong>{t("Mint.")}</strong>, startBlock: <Code>start_block</Code> },
             )}
           </li>
@@ -303,7 +303,7 @@ export default async function DocsPage() {
           <li>
             {rich(
               t,
-              "{claim} If XCP's price moves during the ~7-day window, a refund makes you whole in XCP terms only.",
+              "{claim} If XCP's price moves during the 7-day window, a refund makes you whole in XCP terms only.",
               { claim: <strong>{t("Refunds return XCP quantity, not fiat value.")}</strong> },
             )}
           </li>

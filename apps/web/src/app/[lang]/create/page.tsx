@@ -164,9 +164,9 @@ type NameCheck =
  */
 const PREANNOUNCE_FLOOR_BLOCKS = 36;
 const PREANNOUNCE_PRESETS = [
-  { id: "short", blocks: 36, label: msg("~6 hours") },
-  { id: "day", blocks: 144, label: msg("~1 day") },
-  { id: "week", blocks: 1008, label: msg("~7 days") },
+  { id: "short", blocks: 36, label: msg("6 hours") },
+  { id: "day", blocks: 144, label: msg("1 day") },
+  { id: "week", blocks: 1008, label: msg("7 days") },
 ] as const;
 type PreannounceOption = (typeof PREANNOUNCE_PRESETS)[number]["id"] | "custom";
 
@@ -193,10 +193,10 @@ const TIGHT_LEAD_FEE_MULTIPLIER = 2;
 function estimateFromBlocks(blocksFromNow: number, t: T): string {
   if (blocksFromNow <= 0) return t("not far enough in the future");
   const minutes = blocksFromNow * 10;
-  if (minutes < 90) return t("~{n} minutes", { n: minutes });
+  if (minutes < 90) return t("{n} minutes", { n: minutes });
   const hours = minutes / 60;
-  if (hours < 48) return t("~{n} hours", { n: Math.round(hours) });
-  return t("~{n} days", { n: Math.round(hours / 24) });
+  if (hours < 48) return t("{n} hours", { n: Math.round(hours) });
+  return t("{n} days", { n: Math.round(hours / 24) });
 }
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
@@ -480,7 +480,7 @@ export default function CreatePage() {
           <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
             {rich(
               t,
-              "Broadcast as {tx}. Minting opens at block {block} ({when}) — until then the launch is announced on-chain and nobody, you included, can mint. Then it runs for 1,000 blocks (~7 days): it sells out, or everyone is refunded.",
+              "Broadcast as {tx}. Minting opens at block {block} ({when}) — until then the launch is announced on-chain and nobody, you included, can mint. Then it runs for 1,000 blocks (7 days): it sells out, or everyone is refunded.",
               {
                 tx: (
                   <a
@@ -736,7 +736,7 @@ export default function CreatePage() {
                     {btcUsd !== null && btcUsd !== undefined && (
                       <span className="text-gray-400 dark:text-gray-500">
                         {" "}
-                        (~
+                        (
                         {usd(
                           (launchCostSats(feeRate, launchDescription) / SATS) *
                             btcUsd,
@@ -993,14 +993,14 @@ function ScheduleGear({
           {customBlock === "" ? (
             <p className="mt-1.5 text-[11px] leading-relaxed text-gray-400 dark:text-gray-500">
               {t(
-                "Any future block, {floor} — tighter than the presets go. Under ~2 hours pays double the network fee.",
-                { floor: minBlock ? t("{n} or later", { n: num.commas(minBlock) }) : t("at least ~1 hour out") },
+                "Any future block, {floor} — tighter than the presets go. Under 2 hours pays double the network fee.",
+                { floor: minBlock ? t("{n} or later", { n: num.commas(minBlock) }) : t("at least 1 hour out") },
               )}
             </p>
           ) : tooSoon ? (
             <p className="mt-1.5 text-[11px] font-medium text-red-600 dark:text-red-400">
               {t(
-                "Too soon — needs to be block {n} or later (~1 hour out). The launch has to confirm before it opens.",
+                "Too soon — needs to be block {n} or later (1 hour out). The launch has to confirm before it opens.",
                 { n: minBlock ? num.commas(minBlock) : "…" },
               )}
             </p>

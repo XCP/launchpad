@@ -18,7 +18,7 @@ import { useNumbers } from "@/lib/i18n/numbers";
 import { NUMBER_PREF_KEY, setNumberLocale } from "@/lib/number-preference";
 
 const navigation = vi.hoisted(() => ({
-  pathname: "/", segment: null as string | null,
+  pathname: "/", query: "", segment: null as string | null,
   push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(),
 }));
 
@@ -26,6 +26,7 @@ const navigation = vi.hoisted(() => ({
 // LazyLink click handlers, currency store, number store and amount input are real.
 vi.mock("next/navigation", () => ({
   usePathname: () => navigation.pathname,
+  useSearchParams: () => new URLSearchParams(navigation.query),
   useSelectedLayoutSegment: () => navigation.segment,
   useRouter: () => navigation,
 }));
@@ -74,7 +75,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   localStorage.clear(); sessionStorage.clear();
   setCurrency("USD"); setNumberLocale("auto");
-  navigation.pathname = "/"; navigation.segment = null;
+  navigation.pathname = "/"; navigation.query = ""; navigation.segment = null;
   vi.spyOn(navigator, "languages", "get").mockReturnValue(["en-US"]);
   vi.spyOn(navigator, "language", "get").mockReturnValue("en-US");
   container = document.createElement("div"); document.body.append(container);
@@ -167,6 +168,24 @@ describe("deliberate language selection", () => {
     expect(localStorage.getItem(LOCALE_PREF_KEY)).toBe("ja");
   });
 
+  it.each([
+    ["/minting", "en", "/ja/minting?sort=pace&view=table"],
+    ["/fr/scheduled", "fr", "/ja/scheduled?sort=pace&view=table"],
+    ["/graduated", "en", "/ja/graduated?sort=pace&view=table"],
+    ["/fr/graveyard", "fr", "/ja/graveyard?sort=pace&view=table"],
+    ["/swap", "en", "/ja/swap"],
+  ] as const)("preserves listing controls only for language links from %s", async (pathname, locale, href) => {
+    navigation.pathname = pathname; navigation.query = "sort=pace&view=table";
+    await render(<LanguageSwitch includeCurrency={false} />, locale);
+    await openMenu("Language");
+    const japanese = menuItem("日本語");
+    expect(japanese.getAttribute("href")).toBe(href);
+    await click(japanese);
+    expect(navigation.push).toHaveBeenLastCalledWith(href);
+    expect(localStorage.getItem(LOCALE_PREF_KEY)).toBe("ja");
+    expect(value("currency")).toBe("JPY");
+  });
+
   it("keeps the compact currency submenu independent of the selected language", async () => {
     rememberLocale("ja"); navigation.pathname = "/ja/limit";
     await render(<LanguageSwitch compact />, "ja");
@@ -246,6 +265,30 @@ describe("deliberate language selection", () => {
     expect(navigation.push).not.toHaveBeenCalled();
     expect(navigation.replace).not.toHaveBeenCalled();
   });
+});
+
+describe("explicit currency controls", () => {
+  it.each([["en-US", "USD"], ["ja-JP", "JPY"]] as const)(
+    "shows and checks the detected %s currency %s without offering Auto",
+    async (browserLanguage, expected) => {
+      vi.spyOn(navigator, "languages", "get").mockReturnValue([browserLanguage]);
+      vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ timeZone: "UTC" } as Intl.ResolvedDateTimeFormatOptions);
+      setCurrency("auto");
+      await render(<><CurrencySwitch /><SiteFooter /></>);
+      expect(container.querySelector('[data-probe="currency"]')!.getAttribute("data-auto")).toBe("true");
+      expect(value("currency")).toBe(expected);
+      expect(localStorage.getItem(CURRENCY_PREF_KEY)).toBeNull();
+      await openMenu(`Currency: ${expected}`);
+      const menuItems = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')];
+      expect(menuItems.map(node => node.textContent!.replace("✓", "").trim())).toEqual([...CURRENCIES]);
+      expect(menuItems.filter(node => node.textContent!.includes("✓")).map(node => node.textContent!.replace("✓", "").trim())).toEqual([expected]);
+      const selects = container.querySelectorAll<HTMLSelectElement>("footer select");
+      expect(selects[1].value).toBe(expected);
+      expect([...selects[1].options].map(option => option.value)).toEqual([...CURRENCIES]);
+      // Number formatting retains its separate follow-language option.
+      expect(selects[2].querySelector('option[value="auto"]')!.textContent).toBe("Follow language");
+    },
+  );
 });
 
 describe("selection safety", () => {

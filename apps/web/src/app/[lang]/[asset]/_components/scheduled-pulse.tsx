@@ -136,12 +136,12 @@ export function ScheduledPulse({
   // Nearest first: the next block sits against the divider, the forecast
   // runs away to the left.
   const upcoming = Array.from({ length: RUN }, (_, i) => tipHeight + 1 + i);
-  // Minutes, not blocksEta: three tiles in a row reading "~1h" said less
+  // Minutes, not blocksEta: three tiles in a row reading "1h" said less
   // than nothing.
   const pendingEta = (blocks: number) =>
     blocks * 10 < 60
-      ? t("~{n}m", { n: blocks * 10 })
-      : t("~{n}h", {
+      ? t("{n}m", { n: blocks * 10 })
+      : t("{n}h", {
           n: num.fixed((blocks * 10) / 60, 1),
         });
 

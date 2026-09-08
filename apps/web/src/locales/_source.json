@@ -101,7 +101,7 @@
   "{claim} By default the chain permanently carries the URL of the asset-info JSON (via {lockDescription}) while the image and info are hosted off-chain, editable only by the asset's current on-chain owner via a wallet-signed message. If that hosting ever vanished, the token's economics — supply, pool, refunds — are untouched; only the artwork would be. Creators launching from a taproot wallet can remove the dependency entirely by inscribing the image on-chain as the permanent description.": [
     "app/[lang]/docs/page.tsx"
   ],
-  "{claim} If XCP's price moves during the ~7-day window, a refund makes you whole in XCP terms only.": [
+  "{claim} If XCP's price moves during the 7-day window, a refund makes you whole in XCP terms only.": [
     "app/[lang]/docs/page.tsx"
   ],
   "{claim} The cap is per address, not per person. It raises the cost of faking a crowd of {n}; it cannot prevent one.": [
@@ -150,13 +150,13 @@
   "{label} Counterparty on Bitcoin mainnet. XCP-69 launches are ordinary Bitcoin transactions carrying Counterparty messages.": [
     "app/[lang]/docs/page.tsx"
   ],
-  "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles ~5 blocks after it confirms and returns the rest.": [
+  "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles 5 blocks after it confirms and returns the rest.": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "{market} price history with {n} points": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
-  "{mint} A 1,000-block window (~7 days) from {startBlock}. Anyone can mint whole 1,000-token lots at 0.01 XCP per lot, up to 1,000,000 tokens (10 XCP) per address. Both the paid XCP and the minted tokens sit in escrow at the unspendable address — nobody holds anything until the launch resolves. The window length only ever delays failure: a sell-out settles the moment it fills, while a miss frees every minter's XCP within about a week.": [
+  "{mint} A 1,000-block window (7 days) from {startBlock}. Anyone can mint whole 1,000-token lots at 0.01 XCP per lot, up to 1,000,000 tokens (10 XCP) per address. Both the paid XCP and the minted tokens sit in escrow at the unspendable address — nobody holds anything until the launch resolves. The window length only ever delays failure: a sell-out settles the moment it fills, while a miss frees every minter's XCP within about a week.": [
     "app/[lang]/docs/page.tsx"
   ],
   "{mints} across {launches} · {xcp} XCP committed": [
@@ -210,6 +210,9 @@
   "{n} conforming launches · chain tip {height}": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
+  "{n} days": [
+    "app/[lang]/create/page.tsx"
+  ],
   "{n} fill": [
     "components/address-hover-card.tsx"
   ],
@@ -227,6 +230,9 @@
   ],
   "{n} holders": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
+  "{n} hours": [
+    "app/[lang]/create/page.tsx"
   ],
   "{n} in the last {days} days": [
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -273,6 +279,9 @@
   ],
   "{n} MINTS per mint · all-time program total, not your wallet balance.": [
     "app/[lang]/profile/_components/rewards-card.tsx"
+  ],
+  "{n} minutes": [
+    "app/[lang]/create/page.tsx"
   ],
   "{n} moved": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
@@ -406,12 +415,14 @@
     "lib/chain-time.ts"
   ],
   "{n}h": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx",
     "lib/format.ts"
   ],
   "{n}h ago": [
     "lib/chain-time.ts"
   ],
   "{n}m": [
+    "app/[lang]/[asset]/_components/scheduled-pulse.tsx",
     "lib/format.ts"
   ],
   "{n}m ago": [
@@ -443,6 +454,9 @@
   ],
   "{pct} of supply": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
+  ],
+  "{pct}% · remainder rests at your limit": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
   "{pct}% filled": [
     "app/[lang]/activity/_components/activity-view.tsx",
@@ -524,6 +538,12 @@
   "{trap} {deadline} is {rewritten} when a launch sells out early — core pulls it forward to the fill block so the pool seeds at that block's end-of-block phase. On a closed record the field is the settlement block, not the original deadline. Countdown UIs are only meaningful while status is {open}. The composed value survives in the append-only event history: {endpoint} returns the original bindings (the rewrite is a separate {update} event), which is how this site verifies the exact window for closed launches.": [
     "app/[lang]/docs/page.tsx"
   ],
+  "{xcp} XCP · {n}-mint median": [
+    "app/[lang]/rewards/_components/rewards-content.tsx"
+  ],
+  "{xcp} XCP · estimate": [
+    "app/[lang]/rewards/_components/rewards-content.tsx"
+  ],
   "{xcp} XCP or refund": [
     "app/[lang]/create/page.tsx"
   ],
@@ -570,52 +590,6 @@
   ],
   "<0.01% of pool": [
     "app/[lang]/profile/_components/pools-tab.tsx"
-  ],
-  "~{duration}": [
-    "lib/format.ts"
-  ],
-  "~{n} days": [
-    "app/[lang]/create/page.tsx"
-  ],
-  "~{n} hours": [
-    "app/[lang]/create/page.tsx"
-  ],
-  "~{n} minutes": [
-    "app/[lang]/create/page.tsx"
-  ],
-  "~{n}h": [
-    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
-  ],
-  "~{n}m": [
-    "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
-  ],
-  "~{pct}% · remainder rests at your limit": [
-    "app/[lang]/[asset]/_components/trade-panel.tsx"
-  ],
-  "~{xcp} XCP · {n}-mint median": [
-    "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
-  "~{xcp} XCP · estimate": [
-    "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
-  "~1 day": [
-    "app/[lang]/create/page.tsx",
-    "app/[lang]/swap/_components/swap-settings.tsx"
-  ],
-  "~1 week": [
-    "app/[lang]/swap/_components/swap-settings.tsx"
-  ],
-  "~100% at confirmation": [
-    "app/[lang]/[asset]/_components/trade-panel.tsx"
-  ],
-  "~5 weeks": [
-    "app/[lang]/swap/_components/swap-settings.tsx"
-  ],
-  "~6 hours": [
-    "app/[lang]/create/page.tsx"
-  ],
-  "~7 days": [
-    "app/[lang]/create/page.tsx"
   ],
   "−{pct}% under floor · sells first": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -671,11 +645,21 @@
   "1 · The launch is binary": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
+  "1 day": [
+    "app/[lang]/create/page.tsx",
+    "app/[lang]/swap/_components/swap-settings.tsx"
+  ],
+  "1 week": [
+    "app/[lang]/swap/_components/swap-settings.tsx"
+  ],
   "1,000,000 tokens (10 XCP)": [
     "app/[lang]/faq/page.tsx"
   ],
   "100,000,000 — locked at close": [
     "app/[lang]/faq/page.tsx"
+  ],
+  "100% at confirmation": [
+    "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
   "2 · The liquidity is locked": [
     "app/[lang]/faq/_components/explainer.tsx"
@@ -702,11 +686,20 @@
   "4-12 letters, A-Z": [
     "app/[lang]/create/page.tsx"
   ],
+  "5 weeks": [
+    "app/[lang]/swap/_components/swap-settings.tsx"
+  ],
   "50 bps": [
     "app/[lang]/docs/page.tsx"
   ],
+  "6 hours": [
+    "app/[lang]/create/page.tsx"
+  ],
   "69,000,000 (the soft cap IS the whole sale)": [
     "app/[lang]/faq/page.tsx"
+  ],
+  "7 days": [
+    "app/[lang]/create/page.tsx"
   ],
   "a future block — announced on-chain before minting can open": [
     "app/[lang]/faq/page.tsx"
@@ -870,7 +863,7 @@
   "announced, not open": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
-  "Any future block, {floor} — tighter than the presets go. Under ~2 hours pays double the network fee.": [
+  "Any future block, {floor} — tighter than the presets go. Under 2 hours pays double the network fee.": [
     "app/[lang]/create/page.tsx"
   ],
   "Any unfilled amount is returned at expiry. The order enforces your limit price.": [
@@ -897,7 +890,7 @@
   "at ATH": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
-  "at least ~1 hour out": [
+  "at least 1 hour out": [
     "app/[lang]/create/page.tsx"
   ],
   "at the floor": [
@@ -909,11 +902,7 @@
   "Auto": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
-  "Auto ({code})": [
-    "components/language-switch.tsx",
-    "components/site-footer.tsx"
-  ],
-  "Auto sizes slippage to the trade: what this quote needs, currently ~{pct}%.": [
+  "Auto sizes slippage to the trade: what this quote needs, currently {pct}%.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
   "available": [
@@ -1004,7 +993,7 @@
   "Broadcast": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
-  "Broadcast as {tx}. Minting opens at block {block} ({when}) — until then the launch is announced on-chain and nobody, you included, can mint. Then it runs for 1,000 blocks (~7 days): it sells out, or everyone is refunded.": [
+  "Broadcast as {tx}. Minting opens at block {block} ({when}) — until then the launch is announced on-chain and nobody, you included, can mint. Then it runs for 1,000 blocks (7 days): it sells out, or everyone is refunded.": [
     "app/[lang]/create/page.tsx"
   ],
   "Broadcast, waiting to confirm. Its page and editing open up once it lands in a block.": [
@@ -1024,6 +1013,9 @@
     "app/[lang]/[asset]/_components/trade-panel.tsx",
     "app/[lang]/create/page.tsx",
     "app/[lang]/swap/_components/swap-widget.tsx"
+  ],
+  "Browse XCP-69 launches by phase: graduated, minting, scheduled, and refunded.": [
+    "app/[lang]/_components/launch-directory-page.tsx"
   ],
   "BTC market · cached 5 min": [
     "app/[lang]/_components/market-pulse.tsx"
@@ -1199,6 +1191,7 @@
   ],
   "Closed": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/profile-view.tsx"
   ],
   "Closes": [
@@ -1370,9 +1363,6 @@
   "Couldn't confirm this signature. Updating your wallet and reconnecting usually sorts it.": [
     "components/header-wallet.tsx"
   ],
-  "Couldn't load page {n}. Showing the last page that loaded.": [
-    "app/[lang]/_components/launch-sections.tsx"
-  ],
   "Couldn't reach the launch index — try again shortly.": [
     "app/[lang]/profile/_components/launches-tab.tsx"
   ],
@@ -1380,6 +1370,8 @@
     "app/[lang]/profile/_components/minting-tab.tsx"
   ],
   "Couldn't refresh this page. Showing the last version that loaded.": [
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
   ],
   "Counterparty": [
@@ -1636,7 +1628,7 @@
   "Everything this site displays comes from public APIs. You can build your own launchpad, bot, or dashboard on the same data — nothing below requires our permission.": [
     "app/[lang]/docs/page.tsx"
   ],
-  "exactly 1,000 blocks (~7 days) from start": [
+  "exactly 1,000 blocks (7 days) from start": [
     "app/[lang]/faq/page.tsx"
   ],
   "Expiration": [
@@ -1671,10 +1663,12 @@
     "app/[lang]/dispense/_lib/use-dispense-router.ts"
   ],
   "failed {age} ago": [
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
   ],
   "Failed on": [
-    "app/[lang]/[asset]/_components/launch-view.tsx"
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx"
   ],
   "fairmint pools": [
     "app/[lang]/docs/page.tsx"
@@ -1769,9 +1763,11 @@
   ],
   "Graduated": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/_components/launch-directory-page.tsx",
     "app/[lang]/_components/launch-search.tsx",
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
@@ -1788,10 +1784,9 @@
     "app/[lang]/docs/page.tsx"
   ],
   "Graveyard": [
+    "app/[lang]/_components/launch-directory-page.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
-  ],
-  "Graveyard — xcp.fun": [
-    "app/[lang]/graveyard/page.tsx"
   ],
   "Graveyard pages": [
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
@@ -1817,7 +1812,7 @@
   "Hide minted": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
-  "Higher than this trade needs (~{pct}%).": [
+  "Higher than this trade needs ({pct}%).": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
   "hold one, made none": [
@@ -1908,7 +1903,7 @@
   "in the mempool — waiting for a block": [
     "components/pending-dock.tsx"
   ],
-  "In XCP terms, exactly. In fiat terms, only if XCP's price held during the ~week-long window. Refunds return quantity, not value.": [
+  "In XCP terms, exactly. In fiat terms, only if XCP's price held during the week-long window. Refunds return quantity, not value.": [
     "app/[lang]/faq/page.tsx"
   ],
   "Inscribe the image on-chain.": [
@@ -2109,7 +2104,8 @@
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "Loading launches…": [
-    "app/[lang]/_components/launch-search.tsx"
+    "app/[lang]/_components/launch-search.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx"
   ],
   "Loading mempool…": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -2301,6 +2297,7 @@
   ],
   "Minters": [
     "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/research/_components/live-behavior-dashboard.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
@@ -2309,9 +2306,11 @@
   ],
   "Minting": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/_components/launch-directory-page.tsx",
     "app/[lang]/_components/launch-search.tsx",
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/profile/_components/profile-view.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -2443,6 +2442,7 @@
     "app/[lang]/_components/launch-search.tsx"
   ],
   "No launches in this phase.": [
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
   "No launches queued. Every XCP-69 launch broadcast so far has confirmed.": [
@@ -2936,7 +2936,8 @@
     "app/[lang]/profile/_components/rewards-card.tsx"
   ],
   "Progress": [
-    "app/[lang]/_components/launch-sections.tsx"
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx"
   ],
   "Protocol feature:": [
     "app/[lang]/docs/page.tsx"
@@ -3040,6 +3041,7 @@
   "Refunded": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/activity-tab.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -3134,9 +3136,11 @@
   ],
   "Scheduled": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx",
+    "app/[lang]/_components/launch-directory-page.tsx",
     "app/[lang]/_components/launch-search.tsx",
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
@@ -3305,7 +3309,8 @@
     "app/[lang]/_components/launch-sections.tsx"
   ],
   "Sort {section}": [
-    "app/[lang]/_components/launch-sections.tsx"
+    "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx"
   ],
   "Sort:": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -3421,7 +3426,7 @@
   "The book is empty — no resting orders on any XCP-69 pair.": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
-  "the close settles (~5 blocks)": [
+  "the close settles (5 blocks)": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "The commission clause is the one naive checks miss. The protocol allows a fairminter to skim up to 99% of every mint back to the creator — a premine with extra steps — and no other field catches it. XCP-69 requires it to be exactly 0.": [
@@ -3476,6 +3481,7 @@
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "The service is busy or unavailable. Try again shortly.": [
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "components/compose-error.tsx"
   ],
   "The standard removes the rug pull and the premine. It does not remove risk, and we won't pretend otherwise:": [
@@ -3522,6 +3528,7 @@
   ],
   "Token": [
     "app/[lang]/_components/launch-sections.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/activity-tab.tsx",
     "app/[lang]/profile/_components/minting-tab.tsx",
     "app/[lang]/profile/_components/positions-tab.tsx"
@@ -3541,7 +3548,7 @@
   "Tokens minted": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
-  "Too soon — needs to be block {n} or later (~1 hour out). The launch has to confirm before it opens.": [
+  "Too soon — needs to be block {n} or later (1 hour out). The launch has to confirm before it opens.": [
     "app/[lang]/create/page.tsx"
   ],
   "Top 10": [
@@ -3610,7 +3617,8 @@
     "app/[lang]/layout.tsx"
   ],
   "Try again": [
-    "app/[lang]/_components/market-pulse.tsx"
+    "app/[lang]/_components/market-pulse.tsx",
+    "app/[lang]/all/_components/all-launches-view.tsx"
   ],
   "Two bounties are claimed — one is still open for the next launch to graduate.": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
@@ -3712,6 +3720,9 @@
   ],
   "View {asset} artwork full size": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx"
+  ],
+  "View all": [
+    "app/[lang]/_components/launch-sections.tsx"
   ],
   "View dispenser on xcp.io": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -3860,7 +3871,7 @@
     "components/site-footer.tsx"
   ],
   "XCP-69 launches that closed below their soft cap and refunded participants.": [
-    "app/[lang]/graveyard/page.tsx"
+    "app/[lang]/_components/launch-directory-page.tsx"
   ],
   "XCP-69 launches that closed below their soft cap. Their temporary token supply was destroyed and every participant's escrowed XCP was repaid by the protocol.": [
     "app/[lang]/graveyard/_components/graveyard-list.tsx"

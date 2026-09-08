@@ -327,7 +327,7 @@ export function MintPanel({
                   {btcUsd != null && (
                     <span className="text-gray-500 dark:text-gray-400">
                       {" "}
-                      (~{usdFmt(((medianFeeRate * MINT_VBYTES) / SATS) * btcUsd)})
+                      ({usdFmt(((medianFeeRate * MINT_VBYTES) / SATS) * btcUsd)})
                     </span>
                   )}
                 </dd>

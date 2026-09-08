@@ -79,7 +79,7 @@ export function useLaunchRoom(): RoomContextValue {
   return useContext(LaunchRoomContext);
 }
 
-const WS_BASE = "wss://launchpad-api.me-bbe.workers.dev";
+const WS_BASE = "wss://api.xcp.fun";
 const MAX_BACKOFF_MS = 30_000;
 /**
  * How often a viewer nudges the room. A graduated launch's room holds no

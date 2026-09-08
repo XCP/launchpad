@@ -267,10 +267,10 @@ export function blocksDuration(blocks: number, t: T = ENGLISH): string {
   return t("{n}d", { n: Math.round(hours / 24) });
 }
 
-/** The same span as an estimate: ~40m, ~7h, ~3d, or "now" once it has passed. */
+/** Estimated time remaining, or "now" once the target block has passed. */
 export function blocksEta(blocks: number, t: T = ENGLISH): string {
   if (blocks <= 0) return t("now");
-  return t("~{duration}", { duration: blocksDuration(blocks, t) });
+  return blocksDuration(blocks, t);
 }
 
 /**

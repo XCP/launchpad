@@ -27,8 +27,9 @@ import { ratio } from "@/lib/numeric";
 import { priceChangePercent, usdPriceChangePercent } from "@/lib/market";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { mapWithLimit } from "@/lib/net";
+import { directoryHref } from "@/lib/launch-directory";
 
-type View = "grid" | "table";
+export type View = "grid" | "table";
 
 /**
  * How often a section re-asks for the page it is showing.
@@ -68,7 +69,7 @@ function pendingByAsset(mints: MempoolMint[], orders: MempoolOrder[]): Map<strin
   return counts;
 }
 
-interface SortOption {
+export interface SortOption {
   id: string;
   label: string;
   /** Every ordering but pace is a level and ignores the tip. */
@@ -90,6 +91,7 @@ interface SortOption {
  * a number yet.
  */
 function mintPace(row: SectionRow, height: number): number | null {
+  if (!(height > 0)) return null;
   const deadline = row.fm.soft_cap_deadline_block || row.fm.end_block;
   const window = deadline - row.fm.start_block;
   const elapsed = height - row.fm.start_block;
@@ -189,7 +191,7 @@ const compareRecent = (a: SectionRow, b: SectionRow): number => {
  * `paged` prop on Section. The two must agree, so a change to one of these
  * comparators is a change to the SQL beside it.
  */
-const SORTS: Record<string, SortOption[]> = {
+export const SORTS: Record<string, SortOption[]> = {
   graduated: [
     { id: "mcap", label: msg("Market cap"), by: (a, b) => b.marketCapXcp - a.marketCapXcp },
     { id: "performance", label: msg("Performance (All)"), by: comparePerformance },
@@ -241,7 +243,7 @@ const TABULAR = new Set(["graduated", "minting", "scheduled"]);
 /**
  * PER_PAGE is now the LIMIT on a query as well as the width of a slice, which
  * is why it lives in lib/launch-row.ts beside the row shapes — the server
- * renders page one with it and this fetches the rest with it.
+ * renders the first-page preview with it and this refreshes that preview.
  *
  * There used to be a second number: a table page held 25 where a grid page
  * held 24. With paging server-side that would mean toggling the view silently
@@ -270,11 +272,12 @@ export function LaunchSections({
 }: {
   initial: InitialPages;
   /**
-   * Whether more pages can be asked for.
+   * Whether the launch index can be queried for the preview.
    *
-   * True in the normal case: each `LaunchPage` is page one of a phase and the
-   * rest are a request away. False when the API was unreachable and the page
-   * derived every launch live from Counterparty — then each `rows` already IS
+   * True in the normal case: each `LaunchPage` is page one of a phase and
+   * sorting asks the index for its first page. False when the API was
+   * unreachable and the page derived every launch live from Counterparty —
+   * then each `rows` already IS
    * the whole phase, and the sections sort and slice it themselves. The
    * distinction is not cosmetic: paging a set that is already complete would
    * ask an API that just failed for rows it already has.
@@ -333,6 +336,7 @@ export function LaunchSections({
         pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
+        denomination={denomination}
         view={view}
         onView={setView}
         // Only a live launch is an opportunity someone can still act on.
@@ -351,6 +355,7 @@ export function LaunchSections({
         pendingMints={pendingMints}
         height={height}
         xcpUsd={xcpUsd}
+        denomination={denomination}
         view={view}
         onView={setView}
         walletAddress={null}
@@ -361,16 +366,9 @@ export function LaunchSections({
 }
 
 /**
- * One phase's section: a heading, its controls, and one page of launches.
- *
- * The page is a query, not a slice. Changing the sort or the page number asks
- * the API for that page of that ordering and swaps in what comes back, so the
- * count beside the heading, the rows below it and the pager under those are
- * three views of one answer. They used to be three readings of different
- * things — the count came from /v2/stats, the rows from a fixed prefetch, the
- * pager from dividing that prefetch — which is how the section could print
- * "Minting 30" above a list of 24 with no page two, and why a launch that had
- * not been minted yet was unreachable from every control on the page.
+ * One phase's homepage preview: a heading, its controls, and the first page.
+ * Sorting and filtering query the whole phase before taking that preview.
+ * The bottom link opens the full phase with the same presentation choices.
  *
  * `paged` false keeps the old behaviour for the one case that still needs it:
  * the API being down, where the page hands over every launch it derived live
@@ -412,11 +410,9 @@ function Section({
 }) {
   const num = useNumbers();
   const t = useT();
-  const { code } = useFxRate();
   const options = SORTS[phase] ?? SORTS.scheduled!;
   const defaultSort = options[0]!.id;
   const [sortId, setSortId] = useState(defaultSort);
-  const [page, setPage] = useState(0);
   // Store the address that enabled the filter rather than a bare boolean. If
   // the user switches wallets, the new wallet does not inherit the old one's
   // checked preference or personalised query.
@@ -434,30 +430,13 @@ function Section({
     return [...initial.rows].sort((a, b) => by(a, b, height));
   }, [paged, initial.rows, options, sortId, height]);
 
-  const atDefault = sortId === defaultSort && page === 0 && !unmintedBy;
+  const atDefault = sortId === defaultSort && !unmintedBy;
 
-  /**
-   * How long the phase was, as of the last answer that arrived.
-   *
-   * State rather than something read off the response below, because it is an
-   * INPUT to that request: the cursor has to be clamped against a length
-   * before the offset can be worked out, and a hook's result does not exist
-   * before the hook. The version this replaced derived the same bound from
-   * its own `fetched` state for the same reason.
-   *
-   * Polling is what makes it matter. A phase can shrink WHILE someone sits on
-   * its last page — a launch graduates and Minting is a page shorter than it
-   * was — and clamping only what is drawn would leave the section asking for
-   * an offset that no longer exists, forever, since nothing else would move
-   * the cursor back.
-   */
-  const [knownTotal, setKnownTotal] = useState(initial.total);
+  // View all keeps the last known full phase count during a wallet filter.
+  // The preview's own count is read alongside its rows from the SWR answer.
+  const [unfilteredTotal, setUnfilteredTotal] = useState(initial.total);
 
-  const total = local ? local.length : knownTotal;
-  const pages = Math.max(1, Math.ceil(total / perPage));
-  // Clamped on read, never in an effect: an effect would render the stale
-  // cursor once before correcting it, and would ask for that page on the way.
-  const current = Math.min(page, pages - 1);
+  const fullTotal = local ? local.length : unfilteredTotal;
 
   /**
    * The page this section is showing, kept current rather than fetched once.
@@ -475,7 +454,7 @@ function Section({
           "launch-page",
           phase,
           sortId,
-          current,
+          0,
           perPage,
           unmintedBy ?? null,
           // Part of the key only where it is part of the answer. Pace is
@@ -489,14 +468,14 @@ function Section({
         phase,
         sortId,
         perPage,
-        current * perPage,
+        0,
         unmintedBy,
         sortId === "pace" ? height : undefined,
       );
       // Thrown, not returned as null: an error leaves SWR holding the last
       // page that loaded, which is what belongs on screen, and it schedules
       // its own retry. Returning null would CACHE the failure as the answer.
-      if (!res) throw new Error(`no ${phase} page ${current}`);
+      if (!res) throw new Error(`no ${phase} preview`);
       return {
         rows: res.rows.map(toSectionRow),
         total: res.total,
@@ -507,17 +486,17 @@ function Section({
       // Page one of the default ordering is what the document was rendered
       // with, so it is never re-asked on arrival — that would be a round trip
       // to land back where we started. `revalidateOnMount` suppresses only
-      // the mount: a sort or page change is a new key and still fetches, and
+      // the mount: a sort or filter change is a new key and still fetches, and
       // the interval below still runs.
       fallbackData: atDefault ? initial : undefined,
       revalidateOnMount: false,
       refreshInterval: INDEX_REFRESH_MS,
       keepPreviousData: true,
       revalidateOnFocus: true,
-      // Every page carries the length of the phase it came from, so each
-      // answer re-bounds the next cursor. Unchanged on a quiet refresh, which
-      // React bails out of rather than re-rendering.
-      onSuccess: (p) => setKnownTotal(p.total),
+      // The heading follows the query; View all always counts the full phase.
+      onSuccess: (p) => {
+        if (!unmintedBy) setUnfilteredTotal(p.total);
+      },
     },
   );
 
@@ -529,8 +508,11 @@ function Section({
   const failed = Boolean(error);
 
   const shown = local
-    ? local.slice(current * perPage, current * perPage + perPage)
+    ? local.slice(0, perPage)
     : (data ?? initial).rows;
+  // Cached answers can become active without onSuccess running, including
+  // when a wallet disconnects and its personalised query is no longer used.
+  const total = local ? local.length : (data ?? initial).total;
 
   // The launch index knows who minted; ownership can change afterward. Ask
   // Counterparty only for the graduated page on screen, and retain that
@@ -661,39 +643,10 @@ function Section({
                 it changes the numbers on the cards rather than leading
                 somewhere else. */}
             {onDenomination && (
-              <div
-                role="group"
-                aria-label={t("Quote returns and prices in")}
-                className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 text-xs font-medium dark:border-gray-800 dark:bg-gray-900"
-              >
-                {DENOMINATIONS.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    aria-pressed={denomination === d}
-                    onClick={() => onDenomination(d)}
-                    className={`rounded-full px-2.5 py-1 transition-colors ${
-                      denomination === d
-                        ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
-                        : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
-                    }`}
-                  >
-                    {d === "usd" ? code : "XCP"}
-                  </button>
-                ))}
-              </div>
+              <DenominationToggle value={denomination} onChange={onDenomination} />
             )}
             {phase === "graduated" && (
-              <a
-                href="https://opreturn.art/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hidden items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 sm:inline-flex"
-              >
-                <span aria-hidden="true">🐐</span>
-                <span>{t("Trading Data")}</span>
-                <span aria-hidden="true">↗</span>
-              </a>
+              <TradingDataLink />
             )}
 
             {walletAddress && phase === "minting" && (
@@ -704,11 +657,6 @@ function Section({
                   onChange={(event) => {
                     const checked = event.target.checked;
                     setHideMintedBy(checked ? walletAddress : null);
-                    setPage(0);
-                    // The unfiltered total is already known from the initial
-                    // server render. Restore it immediately on uncheck rather
-                    // than leaving the filtered count beside unfiltered rows.
-                    if (!checked) setKnownTotal(initial.total);
                   }}
                   className="size-3.5 accent-purple-600"
                 />
@@ -720,32 +668,11 @@ function Section({
               label={t("Sort {section}", { section: title })}
               options={options}
               value={sortId}
-              onChange={(id) => {
-                setSortId(id);
-                setPage(0);
-              }}
+              onChange={setSortId}
             />
 
             {canTabulate && (
-              <div className="flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-0.5">
-                {(["grid", "table"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={view === v}
-                    aria-label={v === "grid" ? t("Grid view") : t("Table view")}
-                    // No page reset: a page is the same launches either way
-                    // now that the two views share one page size, so toggling
-                    // keeps your place instead of throwing you back to the top.
-                    onClick={() => onView(v)}
-                    className={`rounded-full p-1.5 transition-colors ${
-                      view === v ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300"
-                    }`}
-                  >
-                    <ViewIcon view={v} />
-                  </button>
-                ))}
-              </div>
+              <ViewToggle value={view} onChange={onView} />
             )}
           </div>
         )}
@@ -767,7 +694,7 @@ function Section({
             <LaunchTable
               rows={displayed}
               phase={phase}
-              offset={current * perPage}
+              offset={0}
               height={height}
               xcpUsd={xcpUsd}
               xcpUsdDayAgo={xcpUsdDayAgo}
@@ -792,17 +719,94 @@ function Section({
         </div>
       )}
 
-      {/* Said plainly, because the alternative is the pager claiming to be on
-          a page whose rows never arrived — the same class of quiet lie this
-          whole change was about. */}
       {failed && (
         <p role="status" className="mt-3 text-center text-xs text-gray-500 dark:text-gray-400">
-          {t("Couldn't load page {n}. Showing the last page that loaded.", { n: current + 1 })}
+          {t("Couldn't refresh this page. Showing the last version that loaded.")}
         </p>
       )}
 
-      {pages > 1 && <Pager page={current} pages={pages} onGo={setPage} />}
+      <div className="mt-4 flex justify-center">
+        <LazyLink
+          href={directoryHref(phase, { sort: sortId, view, denomination })}
+          className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-purple-600 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 dark:text-purple-400"
+        >
+          <span>{t("View all")}</span>
+          <span className="tabular-nums">({num.commas(fullTotal)})</span>
+          <span aria-hidden="true">→</span>
+        </LazyLink>
+      </div>
     </section>
+  );
+}
+
+/** Controlled presentation shared by the homepage and the launch directory.
+ * Changing the view keeps the caller's page and sort in place. */
+export function ViewToggle({ value, onChange }: { value: View; onChange: (view: View) => void }) {
+  const t = useT();
+  return (
+    <div className="flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-0.5">
+      {(["grid", "table"] as const).map((v) => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={value === v}
+          aria-label={v === "grid" ? t("Grid view") : t("Table view")}
+          onClick={() => onChange(v)}
+          className={`rounded-full p-1.5 transition-colors ${
+            value === v ? "bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900" : "text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300"
+          }`}
+        >
+          <ViewIcon view={v} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function DenominationToggle({ value, onChange }: {
+  value: Denomination;
+  onChange: (denomination: Denomination) => void;
+}) {
+  const t = useT();
+  const { code } = useFxRate();
+  return (
+    <div
+      role="group"
+      aria-label={t("Quote returns and prices in")}
+      className="inline-flex rounded-full border border-gray-200 bg-white p-0.5 text-xs font-medium dark:border-gray-800 dark:bg-gray-900"
+    >
+      {DENOMINATIONS.map((d) => (
+        <button
+          key={d}
+          type="button"
+          aria-pressed={value === d}
+          onClick={() => onChange(d)}
+          className={`rounded-full px-2.5 py-1 transition-colors ${
+            value === d
+              ? "bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900"
+              : "text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100"
+          }`}
+        >
+          {d === "usd" ? code : "XCP"}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export function TradingDataLink() {
+  const t = useT();
+  return (
+    <a
+      href="https://opreturn.art/"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="hidden items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:border-gray-300 hover:text-gray-900 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:text-gray-100 sm:inline-flex"
+    >
+      <span aria-hidden="true">🐐</span>
+      <span>{t("Trading Data")}</span>
+      <span aria-hidden="true">↗</span>
+    </a>
   );
 }
 
@@ -817,7 +821,7 @@ function Section({
  * answers the "did that do anything?" question the popup would otherwise
  * invite, without keeping every choice on screen to do it.
  */
-function SortMenu({
+export function SortMenu({
   label,
   options,
   value,
@@ -896,7 +900,7 @@ function SortMenu({
  * Numbered pages rather than infinite scroll: these sections are ranked, so
  * "page 3 of market cap" is a place someone can mean to be and come back to.
  */
-function Pager({
+export function Pager({
   page,
   pages,
   onGo,
@@ -1054,17 +1058,18 @@ function launchReturns(
   xcpUsd: number | null,
   xcpUsdDayAgo: number | null,
   denomination: Denomination,
-): { sinceMint: number | null; recent: number | null; window: string } {
+): { sinceMint: number | null; recent: number | null; window: string | null } {
   const launchPriceXcp = ratio(row.fm.price, row.fm.quantity_by_price);
+  const hasHeight = height > 0;
   const marketAgeBlocks = height - (row.lastMintBlock ?? row.announceBlock);
-  const youngMarket = marketAgeBlocks > 0 && marketAgeBlocks < 144;
-  const window = youngMarket ? `${Math.max(1, Math.round(marketAgeBlocks / 6))}h` : "24h";
+  const youngMarket = hasHeight && marketAgeBlocks > 0 && marketAgeBlocks < 144;
+  const window = !hasHeight ? null : youngMarket ? `${Math.max(1, Math.round(marketAgeBlocks / 6))}h` : "24h";
   const finite = (n: number | null) => (n !== null && Number.isFinite(n) ? n : null);
   if (denomination === "xcp") {
     return {
       sinceMint: finite(priceChangePercent(row.priceXcp, launchPriceXcp)),
       recent:
-        row.priceDayAgoXcp !== null
+        hasHeight && row.priceDayAgoXcp !== null
           ? finite(priceChangePercent(row.priceXcp, row.priceDayAgoXcp))
           : null,
       window,
@@ -1076,7 +1081,7 @@ function launchReturns(
       usdPriceChangePercent(row.priceXcp, xcpUsd, launchPriceXcp, row.launchXcpUsd),
     ),
     recent:
-      row.priceDayAgoXcp !== null
+      hasHeight && row.priceDayAgoXcp !== null
         ? finite(
             usdPriceChangePercent(row.priceXcp, xcpUsd, row.priceDayAgoXcp, recentUsdBaseline),
           )
@@ -1086,14 +1091,17 @@ function launchReturns(
 }
 
 const age = (announceBlock: number, height: number, t: T) =>
-  announceBlock > 0 ? blocksDuration(height - announceBlock, t) : "—";
+  height > 0 && announceBlock > 0 ? blocksDuration(height - announceBlock, t) : "—";
+
+const eta = (block: number, height: number, t: T) =>
+  height > 0 && block > 0 ? blocksEta(block - height, t) : "—";
 
 /**
  * The comparison view. Columns differ by phase because the phases are not
  * comparable on the same axes — a minting launch has no price and a graduated
  * one has no progress left to make.
  */
-function LaunchTable({
+export function LaunchTable({
   rows,
   phase,
   offset,
@@ -1101,6 +1109,7 @@ function LaunchTable({
   xcpUsd,
   xcpUsdDayAgo = null,
   denomination = "usd",
+  countMode = "holders",
 }: {
   rows: SectionRow[];
   phase: LaunchPhase;
@@ -1109,6 +1118,8 @@ function LaunchTable({
   xcpUsd: number | null;
   xcpUsdDayAgo?: number | null;
   denomination?: Denomination;
+  /** Directory pages can show indexed minters without querying every asset's holders. */
+  countMode?: "holders" | "minters";
 }) {
   const num = useNumbers();
   const t = useT();
@@ -1160,7 +1171,7 @@ function LaunchTable({
         { label: msg("All-time") },
         { label: msg("24h") },
         { label: msg("Graduated") },
-        { label: msg("Holders") },
+        { label: countMode === "minters" ? msg("Minters") : msg("Holders") },
       ]
     : scheduled
       ? [{ label: msg("Opens") }, { label: msg("Closes") }, { label: msg("Announced") }]
@@ -1235,16 +1246,16 @@ function LaunchTable({
                     <Cell>
                       {returnCell(
                         returns?.recent ?? null,
-                        returns && returns.window !== "24h" ? returns.window : undefined,
+                        returns?.window && returns.window !== "24h" ? returns.window : undefined,
                       )}
                     </Cell>
                     <Cell>{age(r.lastMintBlock ?? r.announceBlock, height, t)}</Cell>
-                    <Cell>{holderText(r.holders, num)}</Cell>
+                    <Cell>{countMode === "minters" ? minterText(r.minters, num) : holderText(r.holders, num)}</Cell>
                   </>
                 ) : scheduled ? (
                   <>
-                    <Cell>{blocksEta(r.fm.start_block - height, t)}</Cell>
-                    <Cell>{deadline > 0 ? blocksEta(deadline - height, t) : "—"}</Cell>
+                    <Cell>{eta(r.fm.start_block, height, t)}</Cell>
+                    <Cell>{eta(deadline, height, t)}</Cell>
                     <Cell>{age(r.announceBlock, height, t)}</Cell>
                   </>
                 ) : (
@@ -1253,7 +1264,7 @@ function LaunchTable({
                     <Cell>{paceCell(r, height, num)}</Cell>
                     <Cell>{num.compact(fromSats(r.fm.paid_quantity ?? 0))} XCP</Cell>
                     <Cell>{minterText(r.minters, num)}</Cell>
-                    <Cell>{deadline > 0 ? blocksEta(deadline - height, t) : "—"}</Cell>
+                    <Cell>{eta(deadline, height, t)}</Cell>
                   </>
                 )}
               </tr>
@@ -1268,7 +1279,7 @@ function LaunchTable({
 /** Grid and table, drawn rather than shipped as an icon dependency — the same
  *  approach the header's burger takes. The labels live in aria-label, so the
  *  control stays named for a screen reader. */
-function ViewIcon({ view }: { view: View }) {
+export function ViewIcon({ view }: { view: View }) {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden fill="none">
       {view === "grid" ? (
@@ -1317,7 +1328,7 @@ function Cell({ children }: { children: React.ReactNode }) {
  * nothing restates it in words; the creator's address is the same shape on
  * every card and told a browser nothing, so it is gone.
  */
-function Card({
+export function Card({
   row,
   height,
   xcpUsd,
@@ -1347,7 +1358,7 @@ function Card({
   const performanceLabel = performance !== null ? signedPercent(performance, num) : null;
   const dayChange = returns?.recent ?? null;
   const dayChangeLabel = dayChange !== null ? signedPercent(dayChange, num) : null;
-  const windowLabel = returns?.window ?? "24h";
+  const windowLabel = returns?.window ?? "—";
 
   const chip =
     phase === "scheduled" ? (
@@ -1401,7 +1412,7 @@ function Card({
   // Bottom-right, always a time — the one axis every phase shares, pointing
   // backwards for the finished and forwards for the rest.
   const when =
-    phase === "graduated"
+    !(height > 0) ? "—" : phase === "graduated"
       ? (row.lastMintBlock ?? row.announceBlock) > 0
         ? t("{age} ago", { age: age(row.lastMintBlock ?? row.announceBlock, height, t) })
         : ""
@@ -1557,7 +1568,7 @@ function Card({
       <div className="space-y-1 px-3 py-2.5 text-[11px] text-gray-500 dark:text-gray-400">
         <div className="flex items-center justify-between gap-2">
           <span
-            className="min-w-0 truncate tabular-nums"
+            className={`min-w-0 truncate tabular-nums ${phase === "graduated" && row.displayDescription ? "font-medium" : ""}`}
             title={phase === "graduated" && row.displayDescription ? row.displayDescription : undefined}
           >
             {fact}
@@ -1642,7 +1653,7 @@ function Card({
               value={dayChangeLabel}
               up={dayChange !== null && dayChange >= 0}
               title={
-                windowLabel === "24h"
+                !returns?.window ? "" : windowLabel === "24h"
                   ? t("Change in {currency} over the last 24 hours", { currency: denomination === "usd" ? "USD" : "XCP" })
                   : t("Change in {currency} over the last {window}, since the pool opened", { currency: denomination === "usd" ? "USD" : "XCP", window: windowLabel })
               }

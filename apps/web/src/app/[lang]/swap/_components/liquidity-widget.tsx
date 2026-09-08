@@ -401,7 +401,7 @@ export function LiquidityWidget({
         {btcUsd != null && (
           <span className="text-gray-400 dark:text-gray-500">
             {" "}
-            (~{usdFmt(((feeRate * POOL_VBYTES) / SATS) * btcUsd)})
+            ({usdFmt(((feeRate * POOL_VBYTES) / SATS) * btcUsd)})
           </span>
         )}
       </dd>
