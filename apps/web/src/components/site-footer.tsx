@@ -4,12 +4,13 @@ import { usePathname, useRouter } from "next/navigation";
 import { Globe, rememberLocale } from "@/components/language-switch";
 import { NumberPreference } from "@/components/number-preference";
 import { LazyLink } from "@/components/lazy-link";
+import { TELEGRAM_URL } from "@/components/telegram-chip";
 import { CURRENCIES, type Currency, setCurrency, useCurrency } from "@/lib/currency";
 import { useLocale, useMachineDrafted, useT } from "@/lib/i18n/client";
 import { LOCALE_INFO, LOCALES, type Locale, localePath, splitLocale } from "@/lib/i18n/locales";
 
 /**
- * The bottom line of every page: the site's name, the rate its fiat figures
+ * The homepage footer: the site's name, the rate its fiat figures
  * are quoted at, and — on a locale that is still mostly the model's draft —
  * an honest note with the English one click away.
  *
@@ -24,29 +25,39 @@ export function SiteFooter() {
   const pathname = usePathname();
   const machine = useMachineDrafted();
   const { code, date } = useCurrency();
+  if (splitLocale(pathname).path !== "/") return null;
+
   return (
     <footer className="mx-auto max-w-5xl px-4 pb-24 pt-4">
       <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
         <FooterSettings />
-        <NumberPreference />
-        {/* The reference pages, a second time. They are in the header too,
-            but the header is the one row that every language competes for,
-            and on a phone they live behind a burger. A footer link costs
-            nothing and is where a reader looks for documentation. */}
-        <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
-          <LazyLink href="/faq" className="hover:text-gray-600 dark:hover:text-gray-300">
-            {t("FAQ")}
-          </LazyLink>
-          <LazyLink href="/docs" className="hover:text-gray-600 dark:hover:text-gray-300">
-            {t("Docs")}
-          </LazyLink>
-          <LazyLink href="/stats" className="hover:text-gray-600 dark:hover:text-gray-300">
-            {t("Stats")}
-          </LazyLink>
-          <LazyLink href="/activity" className="hover:text-gray-600 dark:hover:text-gray-300">
-            {t("Activity")}
-          </LazyLink>
-        </nav>
+        <div className="flex flex-col gap-3 nav:flex-row-reverse nav:items-center nav:justify-between">
+          <NumberPreference />
+          {/* Reference links remain easy to find after browsing the launches. */}
+          <nav className="flex flex-wrap items-center gap-x-4 gap-y-1">
+            <LazyLink href="/faq" className="hover:text-gray-600 dark:hover:text-gray-300">
+              {t("FAQ")}
+            </LazyLink>
+            <LazyLink href="/docs" className="hover:text-gray-600 dark:hover:text-gray-300">
+              {t("Docs")}
+            </LazyLink>
+            <LazyLink href="/stats" className="hover:text-gray-600 dark:hover:text-gray-300">
+              {t("Stats")}
+            </LazyLink>
+            <LazyLink href="/activity" className="hover:text-gray-600 dark:hover:text-gray-300">
+              {t("Activity")}
+            </LazyLink>
+            <a
+              href={TELEGRAM_URL}
+              target="_blank"
+              rel="noreferrer"
+              aria-label={t("XCP.FUN on Telegram")}
+              className="hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              {t("Telegram")}
+            </a>
+          </nav>
+        </div>
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <span>
             xcp.fun · {t("XCP-69 launches on Counterparty")}

@@ -6,35 +6,19 @@ import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
 import { CurrencySubmenu, LanguageSubmenu, LanguageSwitch } from "@/components/language-switch";
 import { usePathname } from "next/navigation";
-import { useT } from "@/lib/i18n/client";
-import { splitLocale } from "@/lib/i18n/locales";
+import { useLocale, useT } from "@/lib/i18n/client";
+import { splitLocale, type Locale } from "@/lib/i18n/locales";
 import { MempoolChip, useMempoolCount } from "@/components/mempool-chip";
 import { RewardsChip } from "@/components/rewards-chip";
-import { TelegramChip } from "@/components/telegram-chip";
+import { TELEGRAM_URL, TelegramChip } from "@/components/telegram-chip";
 
 /**
  * The site header.
  *
- * Mobile is the constraint that shapes it. Everything shown at once needed
- * roughly 460px of content in the ~358px a 390px phone actually offers — the
- * logo, three section links, a Launch button and a 152px address pill — so it
- * simply overflowed. Two things give way rather than being shrunk:
- *
- *  - Launch has left the header entirely. It is the homepage's call to action,
- *    not a permanent fixture, and it competed with the section links on every
- *    other page for space none of them had.
- *  - Below `nav` (1024px, defined in globals.css) the links collapse into one
- *    menu button, which is the only honest way to fit six destinations on a
- *    narrow screen.
- *
- * The threshold includes translated labels and the wider connected-wallet
- * pill. Spanish needs roughly 966px with the rewards chip; measuring only
- * English let the two navigation groups overlap at the old 880px threshold.
- *
- * The wallet is desktop-only, and that is a statement of fact rather than a
- * layout compromise: the XCP Wallet is a browser extension, and no mobile
- * browser can run it. Offering Connect on a phone would be offering something
- * that cannot work.
+ * Desktop badges stay at the viewport's center, independently of the two
+ * navigation groups. Locale-specific spacing and Telegram visibility keep
+ * that center clear while a connected wallet and queued transactions show.
+ * Below `nav` (1024px), links move into the menu and status chips take turns.
  */
 
 const LINKS = [
@@ -70,13 +54,28 @@ const MENU_EXTRA = [
   { href: "/docs", label: msg("Docs") },
 ];
 
+// Measured with a connected wallet and three-digit mempool count. The inline
+// language control leaves the row at 1340px; all locales fit all badges there.
+// Every locale has an explicit policy so new translations require a fit check.
+const DESKTOP_LAYOUT: Record<Locale, "all" | "defer-telegram" | "tight-nav"> = {
+  en: "defer-telegram",
+  es: "tight-nav",
+  pt: "tight-nav",
+  fr: "defer-telegram",
+  ja: "defer-telegram",
+  ko: "all",
+  ru: "tight-nav",
+  uk: "tight-nav",
+  zh: "all",
+  "zh-tw": "all",
+  "zh-hk": "all",
+};
+
 export function SiteHeader() {
   const t = useT();
-  // Below `xl` the chips sit inline, in the row's remaining space — and there
-  // is only ever enough of it for one. Two at once pushed the wordmark until
-  // 🎉 XCP.FUN began to truncate, which is the one thing in the row that can't
-  // give way. So the pair becomes a priority: queued work outranks a standing
-  // offer, and rewards steps aside for the minute or two mempool is up.
+  const layout = DESKTOP_LAYOUT[useLocale()];
+  // Phones prioritize queued work. Desktop keeps both status badges and lets
+  // Telegram yield first when the centered group would crowd navigation.
   const queued = useMempoolCount() > 0;
 
   return (
@@ -92,9 +91,9 @@ export function SiteHeader() {
       <div className="absolute end-4 top-1/2 hidden -translate-y-1/2 min-[1340px]:block">
         <LanguageSwitch />
       </div>
-      {/* Status chips stay in the flex flow between the navigation groups. */}
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-2 py-3 min-[360px]:px-4">
-        <div className="flex min-w-0 items-center gap-5">
+      {/* Navigation stays anchored to the sides; badges have their own center. */}
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-1 px-2 py-3 min-[360px]:gap-3 min-[360px]:px-4">
+        <div className="flex shrink-0 items-center gap-5">
           <LazyLink
             href="/"
             className="flex shrink-0 items-center gap-1.5 text-lg font-bold tracking-tight"
@@ -119,32 +118,20 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        {/* The row is capped at 1024px even on a wide monitor. Translated
-            headers compact the chips to leave room for navigation and a
-            connected wallet; English retains its original chip labels. */}
-        <div className="hidden shrink-0 items-center gap-2 xl:flex">
-          {/* Rewards is always on; mempool joins it only when something is
-              queued, so the group grows and shrinks as one unit. Telegram sits
-              last — the two before it are about this site's own state, and it
-              is the one that leaves. That also makes it the only chip whose
-              position is fixed: second normally, third when the mempool has
-              something to say. */}
+        <div className="absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 items-center gap-2 nav:flex">
           <RewardsChip />
           <MempoolChip />
-          <TelegramChip />
+          <TelegramChip className={queued && layout !== "all" ? "hidden min-[1340px]:flex" : ""} />
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 min-[360px]:gap-4">
-          {/* Beside the burger on a phone, and beside the links in the band
-              between — the same chips, just not pretending to be centred, and
-              never both at once. */}
+        <div className={`flex shrink-0 items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 min-[360px]:gap-4 ${layout === "tight-nav" ? "nav:gap-3 min-[1340px]:gap-4" : ""}`}>
           {/* Telegram uses its icon on phones and in translated headers.
               Status chips take turns here to leave room for the menu. */}
-          <span className="flex items-center gap-1 min-[360px]:gap-2 xl:hidden">
-            {queued ? <MempoolChip /> : <RewardsChip />}
+          <span className="flex items-center gap-1 min-[360px]:gap-2 nav:hidden">
+            {queued ? <MempoolChip className="max-[360px]:gap-1 max-[360px]:px-2" /> : <RewardsChip />}
             <TelegramChip />
           </span>
-          <nav className="hidden items-center gap-4 nav:flex">
+          <nav className={`hidden items-center nav:flex ${layout === "tight-nav" ? "gap-2 min-[1340px]:gap-4" : "gap-4"}`}>
             {SECONDARY.map((l) => (
               <LazyLink key={l.href} href={l.href} className="whitespace-nowrap hover:text-gray-900 dark:hover:text-gray-100">
                 {t(l.label)}
@@ -220,6 +207,11 @@ function MobileMenu() {
               </LazyLink>
             </DM.Item>
           ))}
+          <DM.Item asChild>
+            <a href={TELEGRAM_URL} target="_blank" rel="noreferrer" className={item}>
+              {t("Telegram")}
+            </a>
+          </DM.Item>
           <DM.Separator className="my-1.5 h-px bg-gray-100 dark:bg-gray-800" />
           {/* Language and currency, each a submenu. Listed inline they were
               eleven rows and thirty-one, and this menu is the one place with
@@ -228,12 +220,7 @@ function MobileMenu() {
               without opening either. */}
           <LanguageSubmenu path={path} />
           <CurrencySubmenu overlap />
-          {/* Telegram and Create used to end this menu and no longer do. Both
-              were duplicates of something already on the phone's screen: the
-              paper plane is a chip in this very header, and Create is the
-              button beside the search on the front page. A menu that has to
-              fit on one screen spends its rows on the pages with no other
-              way in. */}
+          {/* Create is available beside the homepage search. */}
         </DM.Content>
       </DM.Portal>
     </DM.Root>
