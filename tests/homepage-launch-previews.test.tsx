@@ -115,7 +115,7 @@ describe("homepage launch previews", () => {
     expect(sections().map((section) => assets(section).length)).toEqual([12, 36, 12]);
     expect(links().map((link) => link.textContent)).toEqual(["View all(1,234)→", "View all(5,678)→", "View all(9,012)→"]);
     expect(links().map((link) => link.getAttribute("href"))).toEqual([
-      "/graduated?sort=mcap", "/minting?sort=pace", "/scheduled?sort=soonest",
+      "/graduated", "/minting", "/scheduled",
     ]);
     for (const section of sections()) {
       expect(section.firstElementChild!.querySelector('a[href^="/graduated"], a[href^="/minting"], a[href^="/scheduled"]')).toBeNull();
@@ -128,10 +128,10 @@ describe("homepage launch previews", () => {
     setNumberLocale("fr");
     await render(initial(), true, "es", { "View all": "Ver todo" });
     expect(links()[0]!.textContent).toBe(`Ver todo(${new Intl.NumberFormat("fr").format(1234)})→`);
-    expect(links()[0]!.getAttribute("href")).toBe("/es/graduated?sort=mcap");
+    expect(links()[0]!.getAttribute("href")).toBe("/es/graduated");
   });
 
-  it("carries the shared view and denomination plus each sort into the full phase, only querying offset zero", async () => {
+  it("keeps phase links plain after changing preview controls, only querying offset zero", async () => {
     await render();
     await click(container.querySelector<HTMLElement>('button[aria-label="Table view"]')!);
     const xcp = [...container.querySelectorAll<HTMLButtonElement>('div[role="group"] button')].find((button) => button.textContent === "XCP")!;
@@ -140,9 +140,9 @@ describe("homepage launch previews", () => {
     await settle(() => expect(boundary.pages).toHaveBeenCalledTimes(1));
     expect(boundary.pages.mock.calls).toEqual([["scheduled", "newest", 12, 0, undefined, undefined]]);
     expect(links().map((link) => link.getAttribute("href"))).toEqual([
-      "/graduated?sort=mcap&view=table&denomination=xcp",
-      "/minting?sort=pace&view=table&denomination=xcp",
-      "/scheduled?sort=newest&view=table&denomination=xcp",
+      "/graduated",
+      "/minting",
+      "/scheduled",
     ]);
     expect(sections().every((section) => section.querySelector("table"))).toBe(true);
   });
@@ -157,7 +157,7 @@ describe("homepage launch previews", () => {
     await click(checkbox);
     await settle(() => expect(sections()[1]!.textContent).toContain("You’ve already minted every live launch."));
     expect(links()[1]!.textContent).toBe("View all(90)→");
-    expect(links()[1]!.getAttribute("href")).toBe("/minting?sort=progress");
+    expect(links()[1]!.getAttribute("href")).toBe("/minting");
     expect(boundary.pages.mock.calls).toEqual([
       ["minting", "progress", 36, 0, undefined, undefined],
       ["minting", "progress", 36, 0, "wallet-address", undefined],

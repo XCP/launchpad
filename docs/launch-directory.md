@@ -6,7 +6,7 @@ The homepage shows first-page previews. Each section ends in a View all link wit
 
 - /graduated, /minting, /scheduled, and /graveyard share one directory view. Non-English routes use the normal locale prefix.
 - /all permanently redirects to /graduated. Older phase query links redirect to the corresponding path; valid display preferences survive.
-- Homepage links carry sort, table/grid, and fiat/XCP denomination. Tabs retain display choices and reset to the new phase's default sort. Directory sort and view controls update the URL; language changes preserve those query values.
+- Homepage links use plain phase paths with no query parameters, opening the directory defaults. Within the directory, tabs retain display choices and reset to the new phase's default sort. Directory sort and view controls update the URL; language changes preserve those query values.
 - The directory reuses HomeToolbar (search, market prices, Create). Every phase has the same sort and grid/table controls. Its desktop sort and first card positions match the homepage.
 - Asset status badges link to their phase. The classic non-pool Minted out fallback remains a status label.
 - Each phase has its own canonical/hreflang metadata. The sitemap lists the four phase routes, not the redirect. Graveyard is part of the public directory.

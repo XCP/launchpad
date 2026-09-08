@@ -27,7 +27,7 @@ import { ratio } from "@/lib/numeric";
 import { priceChangePercent, usdPriceChangePercent } from "@/lib/market";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { mapWithLimit } from "@/lib/net";
-import { directoryHref } from "@/lib/launch-directory";
+import { PHASE_PATHS } from "@/lib/launch-directory";
 
 export type View = "grid" | "table";
 
@@ -368,7 +368,7 @@ export function LaunchSections({
 /**
  * One phase's homepage preview: a heading, its controls, and the first page.
  * Sorting and filtering query the whole phase before taking that preview.
- * The bottom link opens the full phase with the same presentation choices.
+ * The bottom link opens the full phase with its default presentation.
  *
  * `paged` false keeps the old behaviour for the one case that still needs it:
  * the API being down, where the page hands over every launch it derived live
@@ -727,7 +727,7 @@ function Section({
 
       <div className="mt-4 flex justify-center">
         <LazyLink
-          href={directoryHref(phase, { sort: sortId, view, denomination })}
+          href={PHASE_PATHS[phase]}
           className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium text-purple-600 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-500 dark:text-purple-400"
         >
           <span>{t("View all")}</span>
