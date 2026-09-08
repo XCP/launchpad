@@ -93,7 +93,7 @@ export interface CurrencyState {
   code: Currency;
   /** No explicit choice stored; `code` came from the browser's locale. */
   auto: boolean;
-  /** What the locale says, whatever was chosen. The footer shows it. */
+  /** Initial browser suggestion, independent of any explicit choice. */
   detected: Currency;
   /** Units of `code` per dollar. Null until the table has loaded, in which
    *  case figures stay in dollars rather than in a currency at rate 1. */
@@ -124,7 +124,7 @@ function isCurrency(value: unknown): value is Currency {
  * Auto uses the browser's language and timezone, with dollars as the
  * fallback. Opening a translated URL does not change an existing choice.
  * Choosing a language in the UI explicitly sets its suggested currency;
- * selecting Auto returns to browser detection. `maximize()` gives a bare
+ * an internal preference reset returns to browser detection. `maximize()` gives a bare
  * browser tag such as "ja" its region.
  */
 const REGION_CURRENCY: Record<string, Currency> = { JP: "JPY", HK: "HKD", MO: "HKD", KR: "KRW", BR: "BRL", FR: "EUR", BE: "EUR", LU: "EUR", MC: "EUR" };

@@ -75,7 +75,7 @@ function metric(
   if (shown === "minting") {
     return num.percent(row.progress, { minDigits: 1 });
   }
-  if (shown === "scheduled") return t("opens {eta}", { eta: blocksEta(row.startBlock - height, t) });
+  if (shown === "scheduled") return height > 0 ? t("opens {eta}", { eta: blocksEta(row.startBlock - height, t) }) : "—";
   return row.minters === 1
     ? t("{n} minter", { n: num.commas(row.minters) })
     : t("{n} minters", { n: num.commas(row.minters) });
@@ -309,7 +309,7 @@ export function LaunchSearch({
                         {t("by {address}", { address: shortAddress(r.source) })}
                         {phase === "all"
                           ? ` · ${phaseWord(t, r.phase)}`
-                          : r.announceBlock > 0
+                          : r.announceBlock > 0 && height > 0
                             ? ` · ${t("{age} old", { age: blocksDuration(height - r.announceBlock, t) })}`
                             : ""}
                       </span>

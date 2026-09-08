@@ -27,8 +27,8 @@ import { type Raw, ratio } from "@/lib/numeric";
  * works on either. If that ever changes, this comment is the place that was
  * checked.
  *
- * workers.dev stays enabled regardless: the LaunchRoom and SitePresence
- * sockets still connect there, and a WebSocket has nothing to cache.
+ * LaunchRoom and SitePresence use wss://api.xcp.fun. The workers.dev host
+ * stays enabled for older clients that still connect to its original URLs.
  */
 const API_BASE = process.env.NEXT_PUBLIC_LAUNCHPAD_API_BASE ?? "https://api.xcp.fun";
 

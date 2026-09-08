@@ -11,6 +11,9 @@ import { FOCUS } from "@/components/ui/tokens";
 import { timeAgo, monthYear } from "@/lib/chain-time";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { msg } from "@/lib/i18n/t";
+import { LazyLink } from "@/components/lazy-link";
+import { PHASE_PATHS } from "@/lib/launch-directory";
+import type { LaunchPhase } from "@/lib/xcp69";
 
 export function ShareButton({
   asset,
@@ -133,7 +136,7 @@ export function StatusPill({
   phase,
   hasPool,
 }: {
-  phase: string;
+  phase: LaunchPhase;
   hasPool: boolean;
 }) {
   const t = useT();
@@ -142,10 +145,9 @@ export function StatusPill({
   const style =
     (phase === "graduated" && !hasPool ? null : STATUS_STYLES[phase]) ??
     MINTED_OUT;
-  return (
-    <span
-      className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.className}`}
-    >
+  const className = `rounded-full border px-2 py-0.5 text-[11px] font-medium ${style.className}`;
+  const content = (
+    <>
       {t(style.label)}
       {/* A sale in progress should look like it's in progress. */}
       {phase === "minting" && (
@@ -161,8 +163,11 @@ export function StatusPill({
           ))}
         </span>
       )}
-    </span>
+    </>
   );
+  return style === MINTED_OUT
+    ? <span className={className}>{content}</span>
+    : <LazyLink href={PHASE_PATHS[phase]} className={`${className} transition-opacity hover:opacity-75 ${FOCUS}`}>{content}</LazyLink>;
 }
 
 /** How long ago the launch itself was announced, linked to the fairminter

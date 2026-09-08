@@ -172,10 +172,17 @@ export async function fetchXcpUsdHistory(): Promise<DailyXcpUsd[]> {
  * block is a worse answer than the ticker.
  */
 export async function fetchXcpUsd(): Promise<number | null> {
+  return (await fetchMarketPrices()).xcp;
+}
+
+/** One aggregate read supplies both toolbar prices and their reference dates.
+ * Client callers share this snapshot instead of fetching the ticker again
+ * for each price/change displayed beside it. */
+export async function fetchMarketPrices(): Promise<Ticker> {
   const [ticker, dispensers, pending] = await Promise.all([
     fetchTicker(),
     fetchXcpDispensers().catch(() => []),
     fetchPendingXcpDispenses().catch(() => []),
   ]);
-  return bestAskUsd(dispensers, ticker.btc, pending) ?? ticker.xcp;
+  return { ...ticker, xcp: bestAskUsd(dispensers, ticker.btc, pending) ?? ticker.xcp };
 }

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Hint } from "@/components/ui/tooltip";
 import { useT } from "@/lib/i18n/client";
 
-const WS_BASE = "wss://launchpad-api.me-bbe.workers.dev";
+const WS_BASE = "wss://api.xcp.fun";
 const MAX_BACKOFF_MS = 30_000;
 const VISITOR_KEY = "xcpfun:visitor:v1";
 

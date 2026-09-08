@@ -397,7 +397,7 @@ export function useDispenseRouter(btcUsd?: number | null) {
       const totalHave = utxos.reduce((s, u) => s + u.value, 0);
       if (totalHave < totalNeeded) {
         throw new Error(
-          `Not enough BTC: this load needs ~${(totalNeeded / 1e8).toFixed(8)} BTC including fees`,
+          `Not enough BTC: this load needs ${(totalNeeded / 1e8).toFixed(8)} BTC including fees`,
         );
       }
 

@@ -131,11 +131,11 @@ export function RewardsContent({ stats, earners, graduates, mintsPool, xcpUsd, b
           />
           <Stat
             label={t("Your fee")}
-            value={`~${num.commas(typicalMintFeeSats)} sats`}
+            value={`${num.commas(typicalMintFeeSats)} sats`}
             hint={
               measuredFee > 0
-                ? t("~{xcp} XCP · {n}-mint median", { xcp: num.fixed(feeXcp, 2), n: num.commas(feeSamples) })
-                : t("~{xcp} XCP · estimate", { xcp: num.fixed(feeXcp, 2) })
+                ? t("{xcp} XCP · {n}-mint median", { xcp: num.fixed(feeXcp, 2), n: num.commas(feeSamples) })
+                : t("{xcp} XCP · estimate", { xcp: num.fixed(feeXcp, 2) })
             }
           />
           <Stat

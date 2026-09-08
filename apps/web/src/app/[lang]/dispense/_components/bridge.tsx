@@ -705,7 +705,7 @@ function LoadCard({
             <div className="flex justify-between">
               <dt>{plan.length > 1 ? t("TX fees · {n} txs", { n: plan.length }) : t("TX fees")}</dt>
               <dd>
-                ~{num.commas(plan.length * legFeeSats)} sats
+                {num.commas(plan.length * legFeeSats)} sats
                 {btcUsd
                   ? ` (≈${usdFmt(((plan.length * legFeeSats) / SATS) * btcUsd)})`
                   : ""}
@@ -945,7 +945,7 @@ function UnloadCard({
           {rich(t, "It can still sell until {when}, then the remaining {amount} returns automatically.", {
             when: existing.close_block_index
               ? t("block {n}", { n: num.commas(existing.close_block_index) })
-              : t("the close settles (~5 blocks)"),
+              : t("the close settles (5 blocks)"),
             amount: (
               <span className="font-semibold">
                 {num.commas(existing.give_remaining / SATS)} XCP
@@ -961,7 +961,7 @@ function UnloadCard({
     return (
       <div className="rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 text-sm text-gray-700 dark:text-gray-300">
         <p>
-          {rich(t, "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles ~5 blocks after it confirms and returns the rest.", {
+          {rich(t, "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles 5 blocks after it confirms and returns the rest.", {
             lead: <span className="font-semibold">{t("Currently unloading:")}</span>,
             n: num.commas(existing.give_remaining / SATS),
             // Divided in the numeric layer rather than in doubles: both
@@ -1207,7 +1207,7 @@ function UnloadCard({
                   {btcUsd !== null && (
                     <span className="text-gray-400 dark:text-gray-500">
                       {" "}
-                      (~{usdFmt(((sellFeeRate * 250) / SATS) * btcUsd)})
+                      ({usdFmt(((sellFeeRate * 250) / SATS) * btcUsd)})
                     </span>
                   )}
                 </dd>

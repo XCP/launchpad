@@ -1,6 +1,7 @@
 "use client";
 
-import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
+import { usePathname, useRouter, useSearchParams, useSelectedLayoutSegment } from "next/navigation";
+import { Suspense } from "react";
 import { Globe, rememberLocale } from "@/components/language-switch";
 import { NumberPreference } from "@/components/number-preference";
 import { LazyLink } from "@/components/lazy-link";
@@ -8,9 +9,10 @@ import { TELEGRAM_URL } from "@/components/telegram-chip";
 import { CURRENCIES, type Currency, setCurrency, useCurrency } from "@/lib/currency";
 import { useLocale, useMachineDrafted, useT } from "@/lib/i18n/client";
 import { LOCALE_INFO, LOCALES, type Locale, localePath, splitLocale } from "@/lib/i18n/locales";
+import { phaseForPath } from "@/lib/launch-directory";
 
 /**
- * The homepage footer: the site's name, the rate its fiat figures
+ * The browsing footer: the site's name, the rate its fiat figures
  * are quoted at, and — on a locale that is still mostly the model's draft —
  * an honest note with the English one click away.
  *
@@ -22,18 +24,17 @@ import { LOCALE_INFO, LOCALES, type Locale, localePath, splitLocale } from "@/li
  */
 export function SiteFooter() {
   const t = useT();
-  const pathname = usePathname();
   const page = useSelectedLayoutSegment();
   const machine = useMachineDrafted();
   const { code, date } = useCurrency();
-  // This sits in [lang]/layout: its homepage has no child segment. The route
-  // tree is stable across English's server-side /en rewrite and browser /.
-  if (page !== null) return null;
+  // Browse pages share the footer; forms and individual assets stay compact.
+  // Layout segments are stable across English's /en rewrite and browser /.
+  if (page !== null && !phaseForPath(`/${page}`)) return null;
 
   return (
     <footer className="mx-auto max-w-5xl px-4 pb-24 pt-4">
       <div className="flex flex-col gap-3 border-t border-gray-200 pt-4 text-xs text-gray-400 dark:border-gray-800 dark:text-gray-500">
-        <FooterSettings />
+        <Suspense fallback={null}><FooterSettings /></Suspense>
         <div className="flex flex-col gap-3 nav:flex-row-reverse nav:items-center nav:justify-between">
           <NumberPreference />
           {/* Reference links remain easy to find after browsing the launches. */}
@@ -69,16 +70,7 @@ export function SiteFooter() {
                 {" · "}
                 {t("Translated automatically")}
                 {" · "}
-                <LazyLink
-                  href={splitLocale(pathname).path}
-                  locale="en"
-                  lang="en"
-                  hrefLang="en"
-                  onClick={() => rememberLocale("en")}
-                  className="underline underline-offset-2"
-                >
-                  English
-                </LazyLink>
+                <Suspense fallback={null}><FooterEnglishLink /></Suspense>
               </>
             )}
           </span>
@@ -91,6 +83,22 @@ export function SiteFooter() {
   );
 }
 
+function useFooterPath() {
+  const { path } = splitLocale(usePathname());
+  const query = useSearchParams().toString();
+  return phaseForPath(path) && query ? `${path}?${query}` : path;
+}
+
+function FooterEnglishLink() {
+  const path = useFooterPath();
+  return (
+    <LazyLink href={path} locale="en" lang="en" hrefLang="en"
+      onClick={() => rememberLocale("en")} className="underline underline-offset-2">
+      English
+    </LazyLink>
+  );
+}
+
 /** Native selects, because on a phone the platform's own picker beats any
  *  menu the page could draw. Hidden at the width where the header has the
  *  globe menu, so the same choice is never offered twice on one screen. */
@@ -98,8 +106,8 @@ function FooterSettings() {
   const t = useT();
   const locale = useLocale();
   const router = useRouter();
-  const pathname = usePathname();
-  const { code, auto, detected } = useCurrency();
+  const path = useFooterPath();
+  const { code } = useCurrency();
   const select =
     "rounded-md border border-gray-200 bg-white px-2 py-1 text-xs text-gray-600 dark:border-gray-800 dark:bg-gray-900 dark:text-gray-300";
   return (
@@ -113,7 +121,7 @@ function FooterSettings() {
           onChange={(e) => {
             const next = e.target.value as Locale;
             rememberLocale(next);
-            router.push(localePath(next, splitLocale(pathname).path));
+            router.push(localePath(next, path));
           }}
         >
           {LOCALES.map((l) => (
@@ -127,10 +135,9 @@ function FooterSettings() {
         <span className="sr-only">{t("Currency")}</span>
         <select
           className={select}
-          value={auto ? "auto" : code}
-          onChange={(e) => setCurrency(e.target.value as Currency | "auto")}
+          value={code}
+          onChange={(e) => setCurrency(e.target.value as Currency)}
         >
-          <option value="auto">{t("Auto ({code})", { code: detected })}</option>
           {CURRENCIES.map((c) => (
             <option key={c} value={c}>
               {c}
