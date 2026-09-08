@@ -3,9 +3,8 @@ import { isLocale } from "@/lib/i18n/locales";
 import { localeAlternates } from "@/lib/i18n/seo";
 import { getMessages } from "@/lib/i18n/server";
 import { makeT, msg } from "@/lib/i18n/t";
-import { fetchXcpDispensers } from "@/lib/api/counterparty";
-import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
-import { XcpBridge } from "@/app/[lang]/dispense/_components/bridge";
+import { loadXcpBridge } from "@/app/[lang]/dispense/_lib/load-bridge";
+import { BridgeRecovery } from "@/app/[lang]/dispense/_components/bridge-recovery";
 
 export const revalidate = 60;
 
@@ -34,15 +33,11 @@ export async function generateMetadata({
 }
 
 export default async function GetXcpPage() {
-  const [dispensers, btcUsd, xcpUsd] = await Promise.all([
-    fetchXcpDispensers(),
-    fetchBtcUsd(),
-    fetchXcpUsd(),
-  ]);
+  const snapshot = await loadXcpBridge();
 
   return (
     <div className="mx-auto max-w-lg space-y-6 lg:max-w-3xl">
-      <XcpBridge dispensers={dispensers} btcUsd={btcUsd} xcpUsd={xcpUsd} />
+      <BridgeRecovery {...snapshot} />
 
     </div>
   );

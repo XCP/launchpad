@@ -2201,6 +2201,7 @@
     "components/address-hover-card.tsx"
   ],
   "Loading…": [
+    "app/[lang]/dispense/_components/bridge-recovery.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/profile/_components/profile-xcp-balance.tsx",
     "components/chat-panel.tsx"
@@ -3131,6 +3132,7 @@
   ],
   "Refresh": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/dispense/_components/bridge-recovery.tsx",
     "app/[lang]/profile/_components/orders-tab.tsx",
     "components/ui/refresh-button.tsx"
   ],
@@ -3183,6 +3185,7 @@
     "app/[lang]/docs/page.tsx"
   ],
   "Retry": [
+    "app/[lang]/dispense/_components/bridge-recovery.tsx",
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "Retry verification": [
@@ -3595,6 +3598,7 @@
   ],
   "The service is busy or unavailable. Try again shortly.": [
     "app/[lang]/all/_components/all-launches-view.tsx",
+    "app/[lang]/dispense/_components/bridge-recovery.tsx",
     "components/compose-error.tsx"
   ],
   "The standard removes the rug pull and the premine. It does not remove risk, and we won't pretend otherwise:": [
@@ -3877,6 +3881,7 @@
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
   "Wait {n}s": [
+    "app/[lang]/dispense/_components/bridge-recovery.tsx",
     "components/chat-panel.tsx"
   ],
   "Wait {n}s before sending again.": [
