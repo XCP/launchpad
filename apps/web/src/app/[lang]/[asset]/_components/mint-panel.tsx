@@ -249,7 +249,9 @@ export function MintPanel({
           max={maxLots * TOKENS_PER_LOT}
           value={tokens}
           onChange={setTokens}
-          error={adjusted ? t("Enter a multiple of {n}.", { n: num.commas(TOKENS_PER_LOT) }) : undefined}
+          // The limit message already explains why this address cannot mint.
+          // Suppress the redundant range warning without changing validation.
+          error={addressCapped ? "" : adjusted ? t("Enter a multiple of {n}.", { n: num.commas(TOKENS_PER_LOT) }) : undefined}
           placeholder="0"
           ariaLabel={t("{asset} to mint", { asset })}
           className="w-full min-w-0 bg-transparent text-[2rem] font-semibold leading-tight text-gray-900 dark:text-gray-100 outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"

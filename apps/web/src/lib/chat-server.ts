@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { CHAT_MAX_RAW_BYTES } from "@launchpad/chat";
+import { readBoundedBody } from "@/lib/bounded-body";
 
 /** Exact, server-configured addresses. A connected-wallet claim is not proof. */
 export function isChatAdmin(address: string, configured: unknown): boolean {
@@ -18,29 +19,7 @@ export function chatReply(body: unknown, status: number, retryAfter?: number) {
 
 /** Bound actual bytes, not just Content-Length (which can be absent). */
 export async function readChatBody(request: Request): Promise<unknown> {
-  const reader = request.body?.getReader();
-  if (!reader) throw new Error("Missing body");
-  const chunks: Uint8Array[] = [];
-  let length = 0;
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      length += value.byteLength;
-      if (length > CHAT_MAX_RAW_BYTES) {
-        await reader.cancel();
-        throw new Error("Body too large");
-      }
-      chunks.push(value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-  const body = new Uint8Array(length);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.length;
-  }
+  const body = await readBoundedBody(request, CHAT_MAX_RAW_BYTES);
+  // Keep chat's strict UTF-8 validation instead of replacing malformed bytes.
   return JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(body));
 }

@@ -13,7 +13,7 @@ import { fetchBlockHeight } from "@/lib/api/counterparty";
 import { fetchLaunchStats } from "@/lib/api/launchpad-api";
 import { fetchMarketPrices } from "@/lib/api/price";
 import { priceChangePercent } from "@/lib/market";
-import { blocksDuration, fromSats } from "@/lib/format";
+import { blocksDuration, fromSats, shortAddress } from "@/lib/format";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { localePath } from "@/lib/i18n/locales";
 import { useNumbers } from "@/lib/i18n/numbers";
@@ -189,6 +189,17 @@ function LaunchPhasePanel({
   }, [visibleTotal, onTotal, phase]);
   const waiting = isLoading || (!ready && heightPending);
   const failed = Boolean(error) || (!ready && heightFailed);
+  const displayedSort = failed && data ? data.sort : sort;
+  // Older API workers do not know every graveyard sort yet. A complete phase
+  // can be ordered safely here while web/API releases catch up; a partial page
+  // must retain the API's global order, never masquerade as a sorted universe.
+  const rows = useMemo(() => {
+    if (!data) return [];
+    if (phase !== "refunded" || data.page !== 0 || data.total !== data.rows.length) return data.rows;
+    const by = (REFUNDED_SORTS.find((option) => option.id === displayedSort) ?? REFUNDED_SORTS[0]!).by;
+    return [...data.rows].sort((a, b) => by(a, b, height)
+      || b.fm.tx_index - a.fm.tx_index || a.fm.tx_hash.localeCompare(b.fm.tx_hash));
+  }, [data, phase, displayedSort, height]);
   const displayedPage = data?.page ?? current;
   const pages = Math.max(1, Math.ceil((data?.total ?? 0) / ALL_LAUNCHES_PAGE_SIZE));
   const label = t(PHASES.find((item) => item.id === phase)!.label);
@@ -200,7 +211,7 @@ function LaunchPhasePanel({
         <div className="ms-auto flex min-w-0 max-w-full items-center gap-2">
         <SortMenu
           label={t("Sort {section}", { section: label })} options={options}
-          value={failed && data ? data.sort : sort}
+          value={displayedSort}
           onChange={onSort}
         />
         <ViewToggle value={view} onChange={onView} />
@@ -217,11 +228,11 @@ function LaunchPhasePanel({
         <div aria-busy={waiting} className={waiting ? "opacity-50 transition-opacity" : undefined}>
           {view === "table" ? (
             phase === "refunded"
-              ? <RefundedTable rows={data.rows} offset={displayedPage * ALL_LAUNCHES_PAGE_SIZE} height={height} />
-              : <LaunchTable rows={data.rows} phase={phase} offset={displayedPage * ALL_LAUNCHES_PAGE_SIZE} height={height} xcpUsd={xcpUsd} xcpUsdDayAgo={xcpUsdDayAgo} denomination={denomination} countMode="minters" />
+              ? <RefundedTable rows={rows} offset={displayedPage * ALL_LAUNCHES_PAGE_SIZE} height={height} />
+              : <LaunchTable rows={rows} phase={phase} offset={displayedPage * ALL_LAUNCHES_PAGE_SIZE} height={height} xcpUsd={xcpUsd} xcpUsdDayAgo={xcpUsdDayAgo} denomination={denomination} countMode="minters" />
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
-              {data.rows.map((row) => phase === "refunded"
+              {rows.map((row) => phase === "refunded"
                 ? <GraveyardCard key={row.fm.tx_hash} row={row} height={height} />
                 : <Card key={row.fm.tx_hash} row={row} height={height} xcpUsd={xcpUsd} xcpUsdDayAgo={xcpUsdDayAgo} denomination={denomination} pending={pendingMints.get(row.fm.asset) ?? 0} fresh={false} />)}
             </div>
@@ -253,10 +264,13 @@ function RefundedTable({ rows, offset, height }: { rows: SectionRow[]; offset: n
         </tr></thead>
         <tbody>{rows.map((row, index) => (
           <tr key={row.fm.tx_hash} className="border-b border-gray-50 last:border-0 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-gray-800/60">
-            <td className="px-3 py-2.5"><LazyLink href={`/${row.fm.asset}`} className="flex items-center gap-2.5">
+            <td className="px-3 py-2.5"><LazyLink href={`/${row.fm.asset}`} className="flex min-w-0 items-center gap-2.5">
               <span className="w-5 shrink-0 text-xs tabular-nums text-gray-400">{num.commas(offset + index + 1)}</span>
               <TokenImage asset={row.fm.asset} className="size-7 shrink-0 rounded-lg bg-gray-100 object-cover grayscale dark:bg-gray-800" />
-              <span className="font-semibold">{row.fm.asset_longname ?? row.fm.asset}</span>
+              <span className="min-w-0">
+                <span className="block truncate font-semibold text-gray-900 dark:text-gray-100">{row.fm.asset_longname ?? row.fm.asset}</span>
+                <span className="block truncate text-[11px] text-gray-400 dark:text-gray-500">{t("by {address}", { address: shortAddress(row.fm.source) })}</span>
+              </span>
             </LazyLink></td>
             <td className={cell}>{num.percent(row.progress, { minDigits: 1 })}</td>
             <td className={cell}>{num.compact(fromSats(row.fm.paid_quantity ?? 0))} XCP</td>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { BodyTooLarge, boundedJson } from "@/lib/bounded-body";
 import {
   validateProof,
   verifyDeclaredConnectionSignature,
@@ -14,6 +15,8 @@ import {
 } from "@/lib/session";
 
 const PRIVATE_HEADERS = { "cache-control": "private, no-store", vary: "Cookie" };
+// A connection proof is small; allow 64 KiB for supported wallet formats.
+const MAX_PROOF_BODY_BYTES = 64 * 1024;
 
 /** Restore only the identity attested by a currently valid HttpOnly cookie. */
 export async function GET(request: Request) {
@@ -51,8 +54,11 @@ export async function POST(request: Request) {
       | { method: "BIP-137"; format: "legacy_recoverable" };
   };
   try {
-    proof = ((await request.json()) as { proof?: typeof proof }).proof ?? {};
-  } catch {
+    proof = ((await boundedJson(request, MAX_PROOF_BODY_BYTES)) as { proof?: typeof proof }).proof ?? {};
+  } catch (error) {
+    if (error instanceof BodyTooLarge) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
     return NextResponse.json({ error: "Malformed body" }, { status: 400 });
   }
 
