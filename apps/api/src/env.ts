@@ -1,6 +1,7 @@
 import type { Announcer } from "#api/durable/announcer";
 import type { LaunchRoom } from "#api/durable/launch-room";
 import type { SitePresence } from "#api/durable/site-presence";
+import type { ChatRoom } from "#api/durable/chat-room";
 
 export interface Env {
   DB: D1Database;
@@ -9,6 +10,11 @@ export interface Env {
   METADATA: R2Bucket;
   LAUNCH_ROOM: DurableObjectNamespace<LaunchRoom>;
   SITE_PRESENCE: DurableObjectNamespace<SitePresence>;
+  CHAT_ROOM: DurableObjectNamespace<ChatRoom>;
+  /** Explicit opt-in; unset/other values disable both reading and posting. */
+  CHAT_ENABLED?: string;
+  /** Comma-separated opaque author IDs; never wallet addresses. */
+  CHAT_MUTED_AUTHORS?: string;
   /** One instance, site-wide — the rate limit being managed belongs to the
    *  channel, so several queues would just race into the same ceiling. */
   ANNOUNCER: DurableObjectNamespace<Announcer>;

@@ -23,6 +23,7 @@
     "wrangler": "4.125.0"
   },
   "dependencies": {
+    "@launchpad/chat": "*",
     "hono": "^4.13.3"
   }
 }

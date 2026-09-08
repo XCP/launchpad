@@ -32,6 +32,7 @@ import { claimFastSync, recordMempoolSnapshot } from "#api/scheduler/mempool-tra
 
 export { LaunchRoom } from "#api/durable/launch-room";
 export { SitePresence } from "#api/durable/site-presence";
+export { ChatRoom } from "#api/durable/chat-room";
 
 const app = new Hono<{ Bindings: Env }>();
 
@@ -217,6 +218,14 @@ app.get("/ws/presence", (c) => {
   const id = c.env.SITE_PRESENCE.idFromName("global");
   const stub = c.env.SITE_PRESENCE.get(id);
   return stub.fetch(c.req.raw);
+});
+
+// Read-only public subscriptions. publish() is available only through the
+// same-account DO binding used by the web worker's authenticated POST route.
+app.get("/ws/chat", (c) => {
+  if (c.env.CHAT_ENABLED !== "true") return c.text("chat disabled", 503);
+  if (c.req.header("Upgrade") !== "websocket") return c.text("expected a websocket upgrade", 426);
+  return c.env.CHAT_ROOM.get(c.env.CHAT_ROOM.idFromName("global")).fetch(c.req.raw);
 });
 
 export default {

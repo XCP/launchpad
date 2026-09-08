@@ -10,6 +10,7 @@ const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 export default defineConfig({
   resolve: {
     alias: {
+      "@launchpad/chat": here("./packages/chat/src/protocol.ts"),
       // Mirrors apps/web/tsconfig.json's paths and the @launchpad/xcp69
       // subpath exports, so tests import modules exactly as the app does
       // rather than through relative paths that could drift.

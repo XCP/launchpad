@@ -1,0 +1,10 @@
+{
+  "name": "@launchpad/chat",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/protocol.ts",
+    "./protocol": "./src/protocol.ts"
+  }
+}

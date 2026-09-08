@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
   // in open-next.config.ts. It was tried here first, and it is inert.
   // The XCP-69 predicate is shared with apps/api so the two never derive
   // different verdicts; Next doesn't transpile workspace packages by default.
-  transpilePackages: ["@launchpad/xcp69"],
+  transpilePackages: ["@launchpad/xcp69", "@launchpad/chat"],
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "cdn.xcp.io" },

@@ -5,6 +5,9 @@ out/
 *.tsbuildinfo
 next-env.d.ts
 .env*
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 .wrangler/
 .DS_Store
 
