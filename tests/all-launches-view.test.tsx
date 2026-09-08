@@ -91,7 +91,8 @@ function page(phase: LaunchPhase, index = 0, total = 450, prefix: string = phase
   return {
     rows: Array.from({ length: Math.min(200, Math.max(0, total - offset)) }, (_, n): SectionRow => ({
       fm: {
-        tx_hash: `${prefix}-${offset + n}`, asset: `${prefix}-${offset + n}`, asset_longname: null,
+        tx_hash: `${prefix}-${offset + n}`, tx_index: offset + n, asset: `${prefix}-${offset + n}`, asset_longname: null,
+        source: "bc1qcreatoraddress0000000000000000000000000",
         paid_quantity: "100000000", soft_cap_deadline_block: 99900, end_block: 0,
       } as Fairminter,
       phase, conforming: true, marketCapXcp: 10, priceXcp: 1, minters: 2, holders: null,
@@ -172,6 +173,43 @@ async function sort(value: string) {
 }
 
 describe("all-launches view coordination", () => {
+  it("orders a complete graveyard phase locally while an older API still returns opening order", async () => {
+    boundary.phase = "refunded";
+    const complete = page("refunded", 0, 4);
+    complete.rows.forEach((row, index) => {
+      row.progress = [0.02, 0.7, 0.7, 0.4][index]!;
+      row.minters = [2, 9, 3, 12][index]!;
+      row.fm.soft_cap_deadline_block = 99900 - index * 100;
+    });
+    boundary.pages.mockResolvedValue(complete);
+    await render(); await settle(() => expect(assets()).toEqual(["refunded-0", "refunded-1", "refunded-2", "refunded-3"]));
+    await sort("progress"); await settle(() => expect(assets()).toEqual(["refunded-2", "refunded-1", "refunded-3", "refunded-0"]));
+    await sort("minters"); await settle(() => expect(assets()).toEqual(["refunded-3", "refunded-1", "refunded-2", "refunded-0"]));
+    expect(complete.rows.map((row) => row.fm.asset)).toEqual(["refunded-0", "refunded-1", "refunded-2", "refunded-3"]);
+  });
+
+  it("keeps server order on a partial graveyard page rather than pretending it is a global sort", async () => {
+    boundary.phase = "refunded"; boundary.query = "sort=progress";
+    const partial = page("refunded", 0, 201);
+    partial.rows.forEach((row, index) => { row.progress = index / 1000; });
+    boundary.pages.mockResolvedValue(partial);
+    await render(); await settle(() => expect(assets()).toHaveLength(200));
+    expect(assets()[0]).toBe("refunded-0"); expect(assets()[199]).toBe("refunded-199");
+    expect(currentPage()).toBe("1/2");
+  });
+
+  it("shows the creator address beneath each graveyard table asset without another lookup", async () => {
+    boundary.phase = "refunded"; boundary.query = "view=table";
+    boundary.pages.mockResolvedValue(page("refunded", 0, 1));
+    await render(); await settle(() => expect(container.querySelector("tbody tr")).toBeTruthy());
+    const link = container.querySelector<HTMLAnchorElement>("tbody td a")!;
+    expect(link.getAttribute("href")).toBe("/refunded-0");
+    expect(link.textContent).toContain("refunded-0");
+    expect(link.textContent).toContain("by bc1qcr…000000");
+    expect(link.querySelector(".text-\\[11px\\]")?.className).toContain("block truncate");
+    expect(boundary.pages).toHaveBeenCalledTimes(1);
+  });
+
   it("fetches only the selected phase and does not enrich individual assets", async () => {
     await render();
     await settle(() => expect(assets()).toHaveLength(200));

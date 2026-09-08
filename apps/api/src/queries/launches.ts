@@ -377,7 +377,16 @@ export async function listLaunchPage(
   // tx_index breaks every tie, so two launches that compare equal cannot swap
   // places between two renders — which across pages is worse than untidy: a
   // row can appear twice, or not at all.
-  const sql = SORT_SQL[key];
+  // rank_key is funding progress only while minting; refunded rows use their
+  // start block there. Rank those by the retained mint total instead, matching
+  // the graveyard's displayed earned_quantity / soft_cap. Refund settlement
+  // destroys escrowed supply, but does not erase these historical mint totals.
+  // Keep the indexed rank_key path for the frequently read minting list.
+  const sql = key === "progress" && phase === "refunded"
+    ? `CASE WHEN CAST(soft_cap AS REAL) > 0
+         THEN COALESCE(CAST(earned_quantity AS REAL), 0) / CAST(soft_cap AS REAL)
+         ELSE 0 END DESC`
+    : SORT_SQL[key];
   const order = `${typeof sql === "function" ? sql(tip) : sql}, tx_index DESC`;
 
   /**
