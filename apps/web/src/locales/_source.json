@@ -3382,7 +3382,9 @@
     "components/compose-error.tsx"
   ],
   "Telegram": [
-    "app/[lang]/create/page.tsx"
+    "app/[lang]/create/page.tsx",
+    "components/site-footer.tsx",
+    "components/site-header.tsx"
   ],
   "Ten percent above the cheapest open dispenser": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -3858,6 +3860,7 @@
     "app/[lang]/layout.tsx"
   ],
   "XCP.FUN on Telegram": [
+    "components/site-footer.tsx",
     "components/telegram-chip.tsx"
   ],
   "xcp.fun profile": [
