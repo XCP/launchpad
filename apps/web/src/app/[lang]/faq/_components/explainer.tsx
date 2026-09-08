@@ -388,7 +388,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         </summary>
         <p className="mt-2">
           {t(
-            "This is the protocol's own swap math: constant product with a 50 bps fee that stays in the pool. Price is the ratio of the two reserves — one drains as the other fills, which is why the tick marks sit at center: both sides open worth {xcp} XCP each. The reserve approaches zero without ever arriving, and the LP is burned, so this liquidity can be traded against forever and withdrawn by no one — whatever XCP sits in the pool is out of circulation for good.",
+            "This simulator uses the protocol's constant-product swap formula, including the 50 bps fee that stays in the pool. Price follows the reserve ratio: at opening, each side is valued at {xcp} XCP. Sellers can receive XCP from the pool through swaps. The initial LP tokens are held at an unspendable address, which prevents withdrawing that initial liquidity with LP tokens; it does not prevent swaps from changing the reserves.",
             { xcp: num.commas(RAISE) },
           )}
         </p>

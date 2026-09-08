@@ -891,6 +891,9 @@
   "at least ~1 hour out": [
     "app/[lang]/create/page.tsx"
   ],
+  "At the deadline, consensus destroys the escrowed launch tokens, returns each minter's contributed XCP, and closes the asset at zero supply with issuance locked. Bitcoin transaction fees are not refunded. The name stays registered and cannot be minted again. If you launch with a name you already own, a failed launch permanently closes minting for that name.": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "at the floor": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
@@ -1162,6 +1165,9 @@
   "checking…": [
     "app/[lang]/create/page.tsx"
   ],
+  "Choose a graduated launch from the home page to validate your integration. Its fairminter row should pass the predicate above, its mint history should show at least {n} distinct participating addresses, and its initial LP tokens should be credited to the unspendable address. Verify the corresponding pool and transaction records on your Counterparty node.": [
+    "app/[lang]/docs/page.tsx"
+  ],
   "Choose a wallet": [
     "components/connect-button.tsx"
   ],
@@ -1296,7 +1302,7 @@
   "Connect your wallet to see your positions and launches.": [
     "app/[lang]/profile/_components/profile-view.tsx"
   ],
-  "Connecting needs a wallet browser extension, and no mobile browser can run one yet. Everything here is readable on a phone — launches, prices, holders — but minting and trading need a desktop.": [
+  "Connecting requires a supported wallet browser extension. You can browse launches, prices, and holders on your phone; use a desktop browser to mint or trade.": [
     "components/connect-button.tsx"
   ],
   "Consensus enforces the standard's coherence at parse time: {softCap} must equal {formula} whenever {poolQuantity} > 0 — all-or-nothing is a protocol rule, not site policy. The issuer's address must hold the 0.5 XCP name-registration fee plus the pooldeposit gas fee on-ledger; both debit at confirmation, so settlement later costs nothing. Pick {lpAsset} with real randomness: numeric issuance is free, and a predictable name lets anyone pre-register it between broadcast and confirmation, invalidating the launch.": [
@@ -1378,7 +1384,7 @@
   "Counterparty's canonical unspendable burn address": [
     "app/[lang]/[asset]/_components/address-badges.tsx"
   ],
-  "Counterparty's DEX order is the single trading primitive: matching routes through the pool whenever the pool's price beats the order book. A {market} is an order at the router's quoted output — it fills from pool and book at best price immediately. A {limit} rests on the book, and the pool fills it automatically if its price ever crosses yours.": [
+  "Counterparty's DEX order is the trading primitive: matching can use the pool when it offers a better price than the order book. A {market} uses the router's quote to set its limit price. It can fill from the pool and book when confirmed; any unfilled amount stays open until it fills, expires, or is cancelled. A {limit} sets your chosen price: it can use pool liquidity when confirmed, and any unfilled remainder rests on the order book awaiting a matching order.": [
     "app/[lang]/docs/page.tsx"
   ],
   "Counts use unique addresses. Held, moved, and sold are exclusive outcomes for minters of each graduated launch. Held means no sale and a meaningful current balance; moved means no sale and no meaningful current balance; sold means at least one pool or order-book sale captured by xcp.fun.": [
@@ -1532,6 +1538,9 @@
   "Dumping now": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
+  "Each eligible mint transaction earns {n} MINTS, regardless of its token quantity. Splitting a mint can earn additional rewards, but each transaction also incurs a Bitcoin fee. Rewards do not guarantee that your fees or other costs are covered.": [
+    "app/[lang]/rewards/_components/rewards-content.tsx"
+  ],
   "Each number counts unique addresses. A sale is a pool or order-book sale captured by xcp.fun. Dump means the address sold within {blocks} blocks of graduation. A meaningful balance is more than one token and more than 1% of the address's acquired amount.": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
   ],
@@ -1663,9 +1672,6 @@
   "fairmint pools": [
     "app/[lang]/docs/page.tsx"
   ],
-  "Fairmint pools activated on 2026-08-05 and no XCP-69 launch exists yet. The first launch will be linked here as the reference token — the canonical record to validate your integration against: its fairminter row should pass the predicate above, its mint tape should show ≥{n} distinct addresses, and its pool row should show the burned LP at the unspendable address.": [
-    "app/[lang]/docs/page.tsx"
-  ],
   "Fairmint pools are live.": [
     "app/[lang]/page.tsx"
   ],
@@ -1762,7 +1768,7 @@
   "graduated coins": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
-  "Graduated tokens trade against a constant-product TOKEN/XCP pool. The price is simply the ratio of the pool's reserves; every swap moves it. A fixed {fee} fee on each swap is paid to the pool itself — and since the LP is burned, fees deepen the locked liquidity rather than paying anyone out.": [
+  "Graduated tokens trade against a constant-product TOKEN/XCP pool. The reserve ratio determines its price, and each swap changes that ratio. A fixed {fee} fee on each swap stays in the pool, increasing its reserves. The initial LP tokens are held at an unspendable address; providers who add liquidity later can withdraw the share represented by their own LP tokens.": [
     "app/[lang]/docs/page.tsx"
   ],
   "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses. The pool is created and its initial LP tokens go to an unspendable address, permanently locking that liquidity. A launch that misses its target returns the contributed XCP by consensus and does not count. {link}": [
@@ -1886,9 +1892,6 @@
   "in pools": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
-  "In the mempool — matching runs the moment the block lands.": [
-    "components/order-tracker.tsx"
-  ],
   "in the mempool — waiting for a block": [
     "components/pending-dock.tsx"
   ],
@@ -1941,9 +1944,6 @@
   ],
   "It can still sell until {when}, then the remaining {amount} returns automatically.": [
     "app/[lang]/dispense/_components/bridge.tsx"
-  ],
-  "It ceases to exist — permanently. At the deadline, consensus destroys every minted token out of protocol escrow (they never touched anyone's wallet), refunds every minter's XCP, and closes the asset locked at zero supply. Nothing lingers in any wallet: no frozen tokens, no dust — minters end bit-identical to never having participated, minus one miner fee. The name itself becomes a tombstone: registered forever, mintable never. Worth weighing if you launch with a name you already own — a failed launch buries the name with the launch.": [
-    "app/[lang]/faq/page.tsx"
   ],
   "it has circulating supply — every unit must be destroyed first": [
     "app/[lang]/create/page.tsx"
@@ -2401,9 +2401,6 @@
     "app/[lang]/rewards/_components/earners-table.tsx"
   ],
   "No — and that's the point. The fairminter protocol allows enormous variation: no soft cap, no refunds, creator commissions up to 99%, premines, no pool at all. XCP-69 pins one configuration of it, and this site lists only launches that match the standard exactly, checked field-by-field against the on-chain record. Here, every launch behaves identically and you never audit the parameters yourself. A fairminter you encounter anywhere else carries no such guarantee — read its fields before you mint.": [
-    "app/[lang]/faq/page.tsx"
-  ],
-  "No — it's structural, not promised. The pool must open at 69/31 of mint price because those are the only quantities that exist, but the floor decays as people sell into it. Nothing stops a token trading below mint. What the pool guarantees is a bid that never reaches zero, not a bid you'll like.": [
     "app/[lang]/faq/page.tsx"
   ],
   "No active {give}/{get} pool liquidity. A resting order can still fill through the order book.": [
@@ -3390,9 +3387,6 @@
   "The activity feed is unavailable right now. It will come back on its own.": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
-  "The Bitcoin fee you pay is per transaction, so the reward is too. Minting one lot and minting the full 1% cost you the same fee and earn the same {n} MINTS — there is nothing to gain by splitting a mint into smaller pieces.": [
-    "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
   "The Bitcoin miner fee. Default tracks the next-block median.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
@@ -3447,10 +3441,13 @@
   "The on-chain asset name — universally unique, can never change.": [
     "app/[lang]/create/page.tsx"
   ],
+  "The opening reserve ratio sets a price above the mint price, but it does not guarantee a profitable sale. Selling changes the pool price; swap fees, Bitcoin fees, and other trades affect what you receive. A token can trade below its mint price.": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "The per-address cap is sybil-resistant in cost only, not in principle.": [
     "app/[lang]/docs/page.tsx"
   ],
-  "The pool opens with 690 XCP against 31M tokens: 69/31 ≈ {mult}× the mint price. Every minter is structurally in profit at open, and the pool — not later buyers — absorbs early exits.": [
+  "The pool opens with 690 XCP against 31M tokens, setting an initial reserve price of 69/31 ≈ {mult}× the mint price. Your actual sale proceeds depend on price impact, fees, and other trades. The opening ratio does not guarantee a profit.": [
     "app/[lang]/docs/page.tsx"
   ],
   "The sale line sits at 69M of the 100M supply; the other 31M is reserved for the pool and only ever exists if the line is crossed — 69 + 31 = 100, locked, nowhere else for supply to be. Below the line, every escrowed satoshi refunds at the deadline: there is no partial launch to be bag-held. The {perAddress} XCP per-address cap means crossing takes at least {n} distinct addresses — more if people mint below the cap. A floor on the crowd, not a count.": [
@@ -3480,7 +3477,7 @@
   "This image is {kb} KB — inscribing caps at 385 KB. Use a smaller file or uncheck to host it instead.": [
     "app/[lang]/create/page.tsx"
   ],
-  "This is the protocol's own swap math: constant product with a 50 bps fee that stays in the pool. Price is the ratio of the two reserves — one drains as the other fills, which is why the tick marks sit at center: both sides open worth {xcp} XCP each. The reserve approaches zero without ever arriving, and the LP is burned, so this liquidity can be traded against forever and withdrawn by no one — whatever XCP sits in the pool is out of circulation for good.": [
+  "This simulator uses the protocol's constant-product swap formula, including the 50 bps fee that stays in the pool. Price follows the reserve ratio: at opening, each side is valued at {xcp} XCP. Sellers can receive XCP from the pool through swaps. The initial LP tokens are held at an unspendable address, which prevents withdrawing that initial liquidity with LP tokens; it does not prevent swaps from changing the reserves.": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "This wallet hasn't launched anything yet.": [
@@ -3715,6 +3712,9 @@
   "Waiting for the network…": [
     "app/[lang]/create/page.tsx"
   ],
+  "Waiting for transaction status…": [
+    "components/order-tracker.tsx"
+  ],
   "Wearing the crown: minted more recently than anything else still minting": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
@@ -3863,7 +3863,7 @@
   "xcp.fun talks to Counterparty through a wallet browser extension. Install one, then come back and connect.": [
     "components/connect-button.tsx"
   ],
-  "Yes — and a name with history is a feature. But only the name comes along: consensus requires {zero} at launch (the all-or-nothing equation only balances at zero), so even a decade-old name starts with a clean cap table — the 69M + 31M minted at launch is all the supply that has ever existed. You must be the asset's current issuer, it must be unlocked, and it must already be divisible. If it carries supply, destroy every unit first — and supply in other people's hands can't be destroyed, which permanently disqualifies the name. There is no grandfathering old holders; that would be a premine with extra steps.": [
+  "Yes. You must be the current issuer of an unlocked, divisible asset with {zero} before the launch. If supply remains, its holders must destroy all of it first; you cannot destroy units held by other addresses. A successful XCP-69 launch creates 69M sale tokens and 31M pool tokens. Earlier issuance and destruction remain in the asset's history.": [
     "app/[lang]/faq/page.tsx"
   ],
   "you": [

@@ -54,7 +54,7 @@ export function OrderTracker({
     return (
       <p className="mt-2 flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
         <span className="size-2 animate-pulse rounded-full bg-green-500" />
-        {t("In the mempool — matching runs the moment the block lands.")}
+        {t("Waiting for transaction status…")}
       </p>
     );
   }

@@ -160,7 +160,7 @@ export default async function StandardPage() {
               {t("What happens to the token itself if a launch fails?")}
             </summary>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {t("It ceases to exist — permanently. At the deadline, consensus destroys every minted token out of protocol escrow (they never touched anyone's wallet), refunds every minter's XCP, and closes the asset locked at zero supply. Nothing lingers in any wallet: no frozen tokens, no dust — minters end bit-identical to never having participated, minus one miner fee. The name itself becomes a tombstone: registered forever, mintable never. Worth weighing if you launch with a name you already own — a failed launch buries the name with the launch.")}
+              {t("At the deadline, consensus destroys the escrowed launch tokens, returns each minter's contributed XCP, and closes the asset at zero supply with issuance locked. Bitcoin transaction fees are not refunded. The name stays registered and cannot be minted again. If you launch with a name you already own, a failed launch permanently closes minting for that name.")}
             </p>
           </details>
           <details className="p-4">
@@ -170,7 +170,7 @@ export default async function StandardPage() {
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
               {rich(
                 t,
-                "Yes — and a name with history is a feature. But only the name comes along: consensus requires {zero} at launch (the all-or-nothing equation only balances at zero), so even a decade-old name starts with a clean cap table — the 69M + 31M minted at launch is all the supply that has ever existed. You must be the asset's current issuer, it must be unlocked, and it must already be divisible. If it carries supply, destroy every unit first — and supply in other people's hands can't be destroyed, which permanently disqualifies the name. There is no grandfathering old holders; that would be a premine with extra steps.",
+                "Yes. You must be the current issuer of an unlocked, divisible asset with {zero} before the launch. If supply remains, its holders must destroy all of it first; you cannot destroy units held by other addresses. A successful XCP-69 launch creates 69M sale tokens and 31M pool tokens. Earlier issuance and destruction remain in the asset's history.",
                 { zero: <em>{t("zero existing supply")}</em> },
               )}
             </p>
@@ -204,7 +204,7 @@ export default async function StandardPage() {
               {t("Is the {mult}× opening premium a price guarantee?", { mult })}
             </summary>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-              {t("No — it's structural, not promised. The pool must open at 69/31 of mint price because those are the only quantities that exist, but the floor decays as people sell into it. Nothing stops a token trading below mint. What the pool guarantees is a bid that never reaches zero, not a bid you'll like.")}
+              {t("The opening reserve ratio sets a price above the mint price, but it does not guarantee a profitable sale. Selling changes the pool price; swap fees, Bitcoin fees, and other trades affect what you receive. A token can trade below its mint price.")}
             </p>
           </details>
           <details className="p-4">

@@ -252,7 +252,7 @@ export function RewardsContent({ stats, earners, graduates, mintsPool, xcpUsd, b
           </Faq>
           <Faq q={t("Why per transaction, not per token?")}>
             {t(
-              "The Bitcoin fee you pay is per transaction, so the reward is too. Minting one lot and minting the full 1% cost you the same fee and earn the same {n} MINTS — there is nothing to gain by splitting a mint into smaller pieces.",
+              "Each eligible mint transaction earns {n} MINTS, regardless of its token quantity. Splitting a mint can earn additional rewards, but each transaction also incurs a Bitcoin fee. Rewards do not guarantee that your fees or other costs are covered.",
               { n: num.commas(MINTS_PER_MINT) },
             )}
           </Faq>
