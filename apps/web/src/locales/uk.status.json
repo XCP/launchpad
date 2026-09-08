@@ -1226,6 +1226,10 @@
     "Your wallet could not complete this request. Check the details.",
     "Trade history is unavailable. Please try again shortly.",
     "Units unavailable",
-    "{earned} / {target} to launch"
+    "{earned} / {target} to launch",
+    "Already deducted from available XCP",
+    "Available XCP",
+    "Escrowed in open mints",
+    "{amount} XCP pending outgoing"
   ]
 }

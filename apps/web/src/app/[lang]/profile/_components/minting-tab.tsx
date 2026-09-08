@@ -5,8 +5,8 @@ import useSWR from "swr";
 import { TokenImage } from "@/components/token-image";
 import {
   fetchMempoolSnapshot,
-  fetchMintsBySource,
 } from "@/lib/api/launchpad-api";
+import { useOpenMints } from "@/app/[lang]/profile/_lib/use-open-mints";
 import { big } from "@/lib/numeric";
 import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
@@ -25,11 +25,7 @@ interface OpenMint {
 export function MintingTab({ address }: { address: string }) {
   const num = useNumbers();
   const t = useT();
-  const { data: mints, isLoading } = useSWR(
-    ["open-mints", address],
-    () => fetchMintsBySource(address),
-    { refreshInterval: 30_000 },
-  );
+  const { data: mints, isLoading } = useOpenMints(address);
   const { data: mempool } = useSWR(
     ["open-mints-mempool", address],
     async () => {

@@ -68,6 +68,9 @@
   "{amount} sell vol": [
     "app/[lang]/[asset]/_components/pressure-panel.tsx"
   ],
+  "{amount} XCP pending outgoing": [
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
+  ],
   "{amount} XCP repaid": [
     "app/[lang]/graveyard/_components/graveyard-list.tsx"
   ],
@@ -813,6 +816,9 @@
   "All@@window": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
+  "Already deducted from available XCP": [
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
+  ],
   "already registered": [
     "app/[lang]/create/page.tsx"
   ],
@@ -913,6 +919,9 @@
   "available": [
     "app/[lang]/create/page.tsx"
   ],
+  "Available XCP": [
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
+  ],
   "Available: {n}": [
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
@@ -921,6 +930,7 @@
   ],
   "Balance unavailable": [
     "app/[lang]/dispense/_components/bridge.tsx",
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx",
     "app/[lang]/swap/_components/liquidity-widget.tsx"
   ],
   "Balance:": [
@@ -1575,6 +1585,9 @@
   "escrowed": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
+  "Escrowed in open mints": [
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
+  ],
   "escrowed until launch": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
   ],
@@ -2126,7 +2139,8 @@
     "components/address-hover-card.tsx"
   ],
   "Loading…": [
-    "app/[lang]/profile/_components/launches-tab.tsx"
+    "app/[lang]/profile/_components/launches-tab.tsx",
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
   ],
   "locked forever": [
     "app/[lang]/activity/_components/activity-view.tsx"
@@ -3802,7 +3816,8 @@
     "components/address-hover-card.tsx"
   ],
   "XCP committed": [
-    "app/[lang]/profile/_components/minting-tab.tsx"
+    "app/[lang]/profile/_components/minting-tab.tsx",
+    "app/[lang]/profile/_components/profile-xcp-balance.tsx"
   ],
   "XCP exchange rate": [
     "app/[lang]/_components/market-pulse.tsx"

@@ -1223,6 +1223,10 @@
     "Graduating means selling out: {xcp} XCP raised from at least {n} different addresses. The pool is created and its initial LP tokens go to an unspendable address, permanently locking that liquidity. A launch that misses its target returns the contributed XCP by consensus and does not count. {link}",
     "Everything about XCP-69, in one place: how launches work, how pricing works, what graduation means, fees, and how to integrate.",
     "Pool price is XCP reserve ÷ token reserve. Swaps change this ratio. Limit orders can also trade on Counterparty's order book.",
-    "{earned} / {target} to launch"
+    "{earned} / {target} to launch",
+    "Already deducted from available XCP",
+    "Available XCP",
+    "Escrowed in open mints",
+    "{amount} XCP pending outgoing"
   ]
 }
