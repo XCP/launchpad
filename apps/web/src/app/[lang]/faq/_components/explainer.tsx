@@ -4,12 +4,12 @@ import { useState } from "react";
 import { useFiat } from "@/lib/currency";
 import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
-import { XCP69, XCP69_MIN_PARTICIPANTS, XCP69_RAISE_SATS } from "@/lib/xcp69";
+import { XCP69, XCP69_RAISE_SATS } from "@/lib/xcp69";
 
 /**
- * The standard as something you can drag. Two gestures, numbers doing the
- * talking: a supply meter with the all-or-nothing line, and the pool under
- * trade pressure via the protocol's own constant-product math.
+ * One illustrative trade from the opening pool, using the protocol's
+ * constant-product model. The launch story and its terms are separate,
+ * always-readable content; this simulation never gates them.
  *
  * Color system: XCP is purple (brand), tokens are cyan, amber = short of
  * the line, green = crossed it, red = under mint price. Prose lives in
@@ -23,8 +23,6 @@ const SUPPLY = FLOAT + POOL_TOKENS; // 100,000,000
 const MINT_PRICE = XCP69.PRICE / XCP69.QUANTITY_BY_PRICE; // 0.00001 XCP
 const OPEN_PRICE = RAISE / POOL_TOKENS; // ≈ 2.23× mint
 const FEE = 0.005; // 50 bps XCP-pair pool fee
-const MAX_ADDR = XCP69_MIN_PARTICIPANTS; // 69
-const XCP_PER_ADDR = 10;
 /** counterparty-core lib/ledger/markets.py::compute_pool_output */
 function poolOutput(reserveIn: number, reserveOut: number, input: number): number {
   if (input <= 0) return 0;
@@ -61,156 +59,11 @@ const MAX_BUY_XCP = (() => {
   return (lo + hi) / 2;
 })();
 
-export function StandardPlayground({
-  xcpUsd,
-  children,
-}: {
-  xcpUsd: number | null;
-  children?: React.ReactNode;
-}) {
-  const t = useT();
-  // Steps 2 and 3 don't exist until the launch has sold out once — the page
-  // structure teaching the mechanism. Latched: crossing the line reveals
-  // them for good; dragging back down doesn't unmake the pool.
-  const [unlocked, setUnlocked] = useState(false);
-  return (
-    <div className="space-y-4">
-      <LaunchMeter xcpUsd={xcpUsd} onSoldOut={() => setUnlocked(true)} />
-      {unlocked ? (
-        <>
-          <PoolStress xcpUsd={xcpUsd} />
-          {children}
-        </>
-      ) : (
-        <div className="rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-800 p-6 text-center text-sm text-gray-400 dark:text-gray-500">
-          {t("Sell out the launch above — the pool only exists on the other side of the line.")}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function withUsd(xcp: number, xcpUsd: number | null, usdFmt: (n: number) => string): string {
   return xcpUsd ? ` (≈${usdFmt(xcp * xcpUsd)})` : "";
 }
 
-function LaunchMeter({
-  xcpUsd,
-  onSoldOut,
-}: {
-  xcpUsd: number | null;
-  onSoldOut: () => void;
-}) {
-  const num = useNumbers();
-  const t = useT();
-  const usdFmt = useFiat();
-  // Slider travel maps 1:1 onto the supply bar below it: the track spans the
-  // full 100M, but the thumb CLAMPS at the 69% finish line — you can feel
-  // the edge of what can be minted; the last 31% belongs to the pool.
-  const salePct = (FLOAT / SUPPLY) * 100; // the 69% finish line
-  const [pos, setPos] = useState(0);
-  const soldOut = pos >= salePct;
-  const mintedPct = Math.min(pos, salePct);
-  const minted = (mintedPct / 100) * SUPPLY;
-  const committed = minted * MINT_PRICE; // XCP escrowed so far
-
-  return (
-    <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-      <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-        <h3 className="font-semibold">{t("1 · The launch is binary")}</h3>
-        <div className="text-right">
-          <span className={`text-3xl font-bold ${soldOut ? "text-green-600 dark:text-green-400" : "text-gray-900 dark:text-gray-100"}`}>
-            {num.compact(minted)}
-          </span>
-          <span className="text-sm text-gray-400 dark:text-gray-500">
-            {" "}
-            {t("of {supply} supply minted", { supply: num.compact(SUPPLY) })}
-          </span>
-        </div>
-      </div>
-
-      <input
-        type="range"
-        min={0}
-        max={100}
-        step={0.5}
-        value={pos}
-        onChange={(e) => {
-          const next = Math.min(Number(e.target.value), salePct);
-          setPos(next);
-          if (next >= salePct) onSoldOut();
-        }}
-        className="ui-slider mt-3 w-full"
-        aria-label={t("Tokens minted")}
-        aria-valuemax={salePct}
-      />
-
-      {/* The whole 100M supply as one bar: the sale fills toward the 69%
-          line; the pool's 31% only exists if the line is crossed. */}
-      <div className="relative mt-2 h-7 overflow-hidden rounded-lg bg-gray-100 dark:bg-gray-800">
-        <div
-          className={`h-full transition-all duration-300 ${
-            soldOut ? "bg-green-500" : "bg-amber-400"
-          }`}
-          style={{ width: `${mintedPct}%` }}
-        />
-        {/* Pool allocation: colorless until the line is crossed — it doesn't
-            exist yet — then the token cyan from card 2 (bluer than the green
-            sale fill, so the two segments read apart). */}
-        <div
-          className={`absolute inset-y-0 transition-colors duration-300 ${
-            soldOut ? "bg-cyan-500" : "bg-gray-200 dark:bg-gray-700"
-          }`}
-          style={{ left: `${salePct}%`, right: 0 }}
-        />
-        <div
-          className="absolute inset-y-0 w-0.5 bg-gray-800 dark:bg-gray-200"
-          style={{ left: `${salePct}%` }}
-        />
-      </div>
-      <div className="mt-1 flex text-xs text-gray-400 dark:text-gray-500">
-        <span style={{ width: `${salePct}%` }}>{t("public sale · 69M")}</span>
-        <span>{t("pool · 31M")}</span>
-      </div>
-
-      <p className="mt-2 text-sm">
-        {soldOut ? (
-          <span className="font-medium text-green-700 dark:text-green-400">
-            {t("✓ Graduated — pool created with {xcp} XCP{usd} + 31M tokens, LP burned.", {
-              xcp: num.commas(RAISE),
-              usd: withUsd(RAISE, xcpUsd, usdFmt),
-            })}
-          </span>
-        ) : pos === 0 ? (
-          <span className="font-medium text-blue-700 dark:text-blue-300">
-            {t("⏳ Scheduled — announced on-chain, nothing minted yet.")}
-          </span>
-        ) : (
-          <span className="font-medium text-amber-700 dark:text-amber-400">
-            {t(
-              "↩ Minting — {xcp} XCP{usd} raised so far, all of it returned automatically if the launch doesn't sell out.",
-              { xcp: num.commas(Math.round(committed)), usd: withUsd(committed, xcpUsd, usdFmt) },
-            )}
-          </span>
-        )}
-      </p>
-
-      <details className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-        <summary className="cursor-pointer text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400">
-          {t("how it works")}
-        </summary>
-        <p className="mt-2">
-          {t(
-            "The sale line sits at 69M of the 100M supply; the other 31M is reserved for the pool and only ever exists if the line is crossed — 69 + 31 = 100, locked, nowhere else for supply to be. Below the line, every escrowed satoshi refunds at the deadline: there is no partial launch to be bag-held. The {perAddress} XCP per-address cap means crossing takes at least {n} distinct addresses — more if people mint below the cap. A floor on the crowd, not a count.",
-            { perAddress: XCP_PER_ADDR, n: MAX_ADDR },
-          )}
-        </p>
-      </details>
-    </div>
-  );
-}
-
-function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
+export function PoolPlayground({ xcpUsd }: { xcpUsd: number | null }) {
   const num = useNumbers();
   const t = useT();
   const usdFmt = useFiat();
@@ -246,7 +99,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
     line =
       pressure === -100
         ? t(
-            "Every minted token dumped in one trade — the pool still quotes a bid with {left} XCP left, and sellers exit at {mult}× mint ({paid}% of what they paid). Those {left} XCP can never be withdrawn: every launch is a permanent sink for XCP itself.",
+            "Selling the entire public allocation in this example leaves {left} XCP in the pool. Sellers receive {mult}× their mint cost ({paid}% of what they paid). The initial LP position cannot be withdrawn.",
             vars,
           )
         : exitMultiple >= 1
@@ -268,10 +121,10 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
     line =
       pressure === 100
         ? t(
-            "It took {xcp} XCP{usd} of buying — and every satoshi of it is locked liquidity now, backing the new price.",
+            "Buying with {xcp} XCP{usd} adds that XCP to the pool and takes tokens out. Later trades can move the reserves again.",
             vars,
           )
-        : t("{xcp} XCP{usd} of net buying — and all of it joins the locked reserve.", vars);
+        : t("{xcp} XCP{usd} of buying joins the pool reserve in exchange for tokens.", vars);
   }
 
   const multiple = price / MINT_PRICE;
@@ -298,7 +151,7 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
   return (
     <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
       <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-        <h3 className="font-semibold">{t("2 · The liquidity is locked")}</h3>
+        <h3 className="font-semibold">{t("Trade through the launch pool")}</h3>
         <div className="text-right">
           <span className={`text-3xl font-bold ${multipleColor}`}>
             {multiple >= 99.5 ? Math.round(multiple) : multiple.toFixed(2)}×
@@ -388,13 +241,13 @@ function PoolStress({ xcpUsd }: { xcpUsd: number | null }) {
         </summary>
         <p className="mt-2">
           {t(
-            "This is the protocol's own swap math: constant product with a 50 bps fee that stays in the pool. Price is the ratio of the two reserves — one drains as the other fills, which is why the tick marks sit at center: both sides open worth {xcp} XCP each. The reserve approaches zero without ever arriving, and the LP is burned, so this liquidity can be traded against forever and withdrawn by no one — whatever XCP sits in the pool is out of circulation for good.",
+            "The pool uses constant-product pricing with a 0.5% swap fee that stays in its reserves. Both sides start worth {xcp} XCP each. The initial LP tokens are held at an unspendable address, so nobody can withdraw that position. Swaps keep working; later liquidity providers can withdraw their own positions.",
             { xcp: num.commas(RAISE) },
           )}
         </p>
         <p className="mt-2">
           {t(
-            "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.",
+            "This example models one buy or sell from the opening reserves. It includes the pool fee and excludes Bitcoin transaction fees. Mixed trades and later liquidity deposits follow different paths. Market cap is the displayed price multiplied by circulating supply.",
           )}
         </p>
       </details>
