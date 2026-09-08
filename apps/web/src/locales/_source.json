@@ -122,6 +122,9 @@
   "{currency} return from the mint price at launch": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
+  "{earned} / {target} to launch": [
+    "app/[lang]/[asset]/_components/live-progress.tsx"
+  ],
   "{eta} left": [
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx"

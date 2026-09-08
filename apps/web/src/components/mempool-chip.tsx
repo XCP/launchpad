@@ -48,21 +48,19 @@ export function MempoolChip({ className = "" }: { className?: string }) {
   // Nothing queued, or nothing known yet: render nothing at all rather than a
   // placeholder that would pop into a number a moment later.
   if (count === 0) return null;
+  const label = `${t("Mempool", "chip")} (${count})`;
 
   return (
     <LazyLink
       href="/mempool"
+      aria-label={label}
+      title={label}
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300 transition-colors hover:border-amber-300 dark:hover:border-amber-700 ${FOCUS} ${className}`}
     >
       <PendingDot />
-      {/* Same count grammar as the tabs on /mempool — "Mints (3)" — so the
-          chip and the page it opens read as one system. */}
-      {/* The chip has its own key: in English it says Mempool, but a reader
-          who has never met the word needs what it MEANS here — unconfirmed
-          transactions waiting — and a Japanese reviewer read メンプール as
-          "main pool". */}
-      <span>{t("Mempool", "chip")}</span>
-      <span className="tabular-nums">({count})</span>
+      {/* Keep the header compact across locales; the full translated name
+          remains available to screen readers and on hover. */}
+      <span className="tabular-nums">{count}</span>
     </LazyLink>
   );
 }

@@ -115,7 +115,7 @@ export default async function DocsPage() {
   const linkClass = "text-purple-600 dark:text-purple-400 underline";
   return (
     <article className="mx-auto max-w-2xl space-y-10">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div>
           <h1 className="text-3xl font-bold">{t("Docs")}</h1>
           <p className="mt-2 text-gray-600 dark:text-gray-400">
