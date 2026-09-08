@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSelectedLayoutSegment } from "next/navigation";
 import { Globe, rememberLocale } from "@/components/language-switch";
 import { NumberPreference } from "@/components/number-preference";
 import { LazyLink } from "@/components/lazy-link";
@@ -23,9 +23,12 @@ import { LOCALE_INFO, LOCALES, type Locale, localePath, splitLocale } from "@/li
 export function SiteFooter() {
   const t = useT();
   const pathname = usePathname();
+  const page = useSelectedLayoutSegment();
   const machine = useMachineDrafted();
   const { code, date } = useCurrency();
-  if (splitLocale(pathname).path !== "/") return null;
+  // This sits in [lang]/layout: its homepage has no child segment. The route
+  // tree is stable across English's server-side /en rewrite and browser /.
+  if (page !== null) return null;
 
   return (
     <footer className="mx-auto max-w-5xl px-4 pb-24 pt-4">
