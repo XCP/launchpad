@@ -386,9 +386,6 @@
   "{n} XCP lands on your Counterparty balance as each payment confirms — ready to mint with.": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
-  "{n}+ addresses to sell out": [
-    "app/[lang]/faq/page.tsx"
-  ],
   "{n}+ launches": [
     "components/address-hover-card.tsx"
   ],
@@ -479,6 +476,9 @@
   "{period} {kind} from every fill on the pair — pool and order book. Volume beneath in XCP; {volume} XCP is the busiest {bucket} shown. Trend {trend} over this range.": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
   ],
+  "{raised} of {target} XCP": [
+    "components/launch-story.tsx"
+  ],
   "{recipe} Success and failure both end at fairminter status {closed}, so the pool row is the disambiguator:": [
     "app/[lang]/docs/page.tsx"
   ],
@@ -524,7 +524,7 @@
   "{xcp} XCP or refund": [
     "app/[lang]/create/page.tsx"
   ],
-  "{xcp} XCP{usd} of net buying — and all of it joins the locked reserve.": [
+  "{xcp} XCP{usd} of buying joins the pool reserve in exchange for tokens.": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "← Prev": [
@@ -543,9 +543,6 @@
   ],
   "↘ Sell": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
-  ],
-  "↩ Minting — {xcp} XCP{usd} raised so far, all of it returned automatically if the launch doesn't sell out.": [
-    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "+ {amount} XCP waiting to confirm": [
     "app/[lang]/profile/_components/minting-tab.tsx"
@@ -641,17 +638,11 @@
   "≈ {usd} if fully sold": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
-  "⏳ Scheduled — announced on-chain, nothing minted yet.": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "◆ Pool": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "✓ broadcast": [
     "app/[lang]/dispense/_components/bridge.tsx"
-  ],
-  "✓ Graduated — pool created with {xcp} XCP{usd} + 31M tokens, LP burned.": [
-    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "💀 RIP": [
     "app/[lang]/[asset]/_components/launch-chrome.tsx"
@@ -665,17 +656,11 @@
   "0% — rests until a counter-order takes it": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
-  "1 · The launch is binary": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "1,000,000 tokens (10 XCP)": [
     "app/[lang]/faq/page.tsx"
   ],
   "100,000,000 — locked at close": [
     "app/[lang]/faq/page.tsx"
-  ],
-  "2 · The liquidity is locked": [
-    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "24h": [
     "app/[lang]/[asset]/_components/pressure-panel.tsx",
@@ -683,9 +668,6 @@
   ],
   "24h volume": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
-  ],
-  "3 · All coins are the same": [
-    "app/[lang]/faq/page.tsx"
   ],
   "30-day change": [
     "app/[lang]/_components/market-pulse.tsx"
@@ -713,9 +695,6 @@
   ],
   "A mint locks your XCP until the launch resolves. If it graduates, your XCP funds the pool and you receive tokens, which can lose value. If it refunds, your XCP is returned. The Bitcoin network fee is paid in either case; rewards do not guarantee that every cost is covered.": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
-  "A new way to launch a coin on Counterparty — every launch identical, enforced by consensus.": [
-    "app/[lang]/faq/page.tsx"
   ],
   "A pool never runs out, it only gets worse. This is what it can absorb before its price moves 1%.": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -786,6 +765,9 @@
   ],
   "adjusts to {n}": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "After a successful launch, nobody can withdraw the initial LP position. Trading still moves XCP and tokens through the pool. Try buying or selling below.": [
+    "app/[lang]/faq/page.tsx"
   ],
   "After graduation": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
@@ -858,7 +840,10 @@
   "Announced": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
-  "Announced before minting opens": [
+  "Announced before anyone can mint": [
+    "components/launch-story.tsx"
+  ],
+  "Announced before minting. The same price for everyone. Fill the mint to open a trading pool, or get your XCP back.": [
     "app/[lang]/faq/page.tsx"
   ],
   "announced, not open": [
@@ -916,6 +901,9 @@
   "Available: {n}": [
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
+  "Back at your address": [
+    "components/launch-story.tsx"
+  ],
   "Balance": [
     "components/address-hover-card.tsx"
   ],
@@ -934,6 +922,9 @@
   ],
   "before": [
     "app/[lang]/docs/page.tsx"
+  ],
+  "Before mint": [
+    "components/launch-story.tsx"
   ],
   "Below 0.5% the order may not fill.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -1024,6 +1015,9 @@
   "BTC to send": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
+  "BTC transaction fees are not refunded.": [
+    "components/launch-story.tsx"
+  ],
   "burn": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
@@ -1091,6 +1085,9 @@
   ],
   "Buying {n} XCP · {routes} routes": [
     "app/[lang]/dispense/_components/bridge.tsx"
+  ],
+  "Buying with {xcp} XCP{usd} adds that XCP to the pool and takes tokens out. Later trades can move the reserves again.": [
+    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "by {address}": [
     "app/[lang]/_components/launch-search.tsx",
@@ -1523,6 +1520,9 @@
   "down": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
   ],
+  "Drag to fill the mint": [
+    "components/launch-story.tsx"
+  ],
   "dropped — nothing was spent": [
     "components/pending-dock.tsx"
   ],
@@ -1587,6 +1587,9 @@
   "Event": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
+  "Every launch follows these terms, checked against its on-chain record.": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "Every launch that conforms to XCP-69, and what has actually been minted.": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
@@ -1595,9 +1598,6 @@
   ],
   "Every mint on a conforming launch, counted. Ranked by mints, because that is the unit the reward is paid in.": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
-  "Every minted token dumped in one trade — the pool still quotes a bid with {left} XCP left, and sellers exit at {mult}× mint ({paid}% of what they paid). Those {left} XCP can never be withdrawn: every launch is a permanent sink for XCP itself.": [
-    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "Every route has a purchase pending in the mempool — check back in a few minutes.": [
     "app/[lang]/dispense/_components/bridge.tsx"
@@ -1625,6 +1625,9 @@
   ],
   "exactly 1,000 blocks (~7 days) from start": [
     "app/[lang]/faq/page.tsx"
+  ],
+  "Example launch funding": [
+    "components/launch-story.tsx"
   ],
   "Expiration": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -1684,15 +1687,15 @@
     "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
-  "Feel the mechanism": [
-    "app/[lang]/faq/page.tsx"
-  ],
   "Fees": [
     "app/[lang]/docs/page.tsx"
   ],
   "Fetching quote…": [
     "app/[lang]/swap/_components/liquidity-widget.tsx",
     "app/[lang]/swap/_components/swap-widget.tsx"
+  ],
+  "Fill it by the deadline to open the pool.": [
+    "components/launch-story.tsx"
   ],
   "filled": [
     "components/pending-dock.tsx"
@@ -1728,6 +1731,9 @@
   "Follow language": [
     "components/number-preference.tsx"
   ],
+  "From fair mint to open market.": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "Full 1M bags sold before yours": [
     "app/[lang]/research/_components/exit-race-simulator.tsx"
   ],
@@ -1746,9 +1752,6 @@
   "Get XCP before it opens": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
-  "gotchas": [
-    "app/[lang]/faq/page.tsx"
-  ],
   "graduated": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
     "app/[lang]/_components/launch-search.tsx",
@@ -1760,7 +1763,8 @@
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/stats/_components/stats-content.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx",
+    "components/launch-story.tsx"
   ],
   "graduated coins": [
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -1834,6 +1838,9 @@
   "Hourly": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
   ],
+  "How far ahead is a launch announced?": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "how it works": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
@@ -1871,6 +1878,9 @@
   "If these limits cannot be met at confirmation, the liquidity operation is invalid. Pool assets are not debited; the Bitcoin network fee is still paid.": [
     "app/[lang]/swap/_components/swap-settings.tsx"
   ],
+  "Illustrative launch · no transaction": [
+    "components/launch-story.tsx"
+  ],
   "Image": [
     "app/[lang]/create/page.tsx"
   ],
@@ -1894,6 +1904,9 @@
   ],
   "in the mempool — waiting for a block": [
     "components/pending-dock.tsx"
+  ],
+  "In this example, you commit {amount} XCP for {tokens} tokens if the mint fills. Your XCP waits in escrow. No creator allocation.": [
+    "components/launch-story.tsx"
   ],
   "In XCP terms, exactly. In fiat terms, only if XCP's price held during the ~week-long window. Refunds return quantity, not value.": [
     "app/[lang]/faq/page.tsx"
@@ -1954,9 +1967,6 @@
   "it is indivisible; XCP-69 assets are divisible": [
     "app/[lang]/create/page.tsx"
   ],
-  "It took {xcp} XCP{usd} of buying — and every satoshi of it is locked liquidity now, backing the new price.": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "its issuance is locked, which can never be undone": [
     "app/[lang]/create/page.tsx"
   ],
@@ -2003,6 +2013,9 @@
   "Launch mechanism": [
     "app/[lang]/docs/page.tsx"
   ],
+  "Launch stages": [
+    "components/launch-story.tsx"
+  ],
   "Launch the first": [
     "app/[lang]/page.tsx"
   ],
@@ -2022,6 +2035,9 @@
   ],
   "Launches use the {fairminter} message (ID 90) with the pool fields {poolQuantity} and {lpAsset} set. Mints are ordinary fairmint messages in whole-lot multiples of {quantityByPrice}.": [
     "app/[lang]/docs/page.tsx"
+  ],
+  "Let the deadline pass": [
+    "components/launch-story.tsx"
   ],
   "Lifecycle detection recipe.": [
     "app/[lang]/docs/page.tsx"
@@ -2061,9 +2077,6 @@
   "Liquidity": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
     "app/[lang]/create/page.tsx"
-  ],
-  "Liquidity locked forever": [
-    "app/[lang]/faq/page.tsx"
   ],
   "Liquidity settings": [
     "app/[lang]/swap/_components/swap-settings.tsx"
@@ -2231,7 +2244,8 @@
   ],
   "Mint": [
     "app/[lang]/activity/_components/activity-view.tsx",
-    "components/address-hover-card.tsx"
+    "components/address-hover-card.tsx",
+    "components/launch-story.tsx"
   ],
   "Mint {amount} {asset}": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
@@ -2300,7 +2314,8 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/profile/_components/profile-view.tsx",
-    "app/[lang]/stats/_components/stats-content.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx",
+    "components/launch-story.tsx"
   ],
   "Minting activity": [
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -2345,12 +2360,6 @@
   ],
   "Mints must be whole-lot multiples of {quantityByPrice}, within the per-transaction cap, and within the address's remaining allowance — a partially used cap can be topped up across multiple transactions. The minter needs the XCP {onBalance}; a funded BTC wallet with no XCP will compose-fail with {error}.": [
     "app/[lang]/docs/page.tsx"
-  ],
-  "Mints out, or full refund": [
-    "app/[lang]/faq/page.tsx"
-  ],
-  "Mints out, or your XCP back.": [
-    "app/[lang]/faq/page.tsx"
   ],
   "Mints so far": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
@@ -2485,9 +2494,6 @@
   "No orders queued — every order so far has confirmed.": [
     "app/[lang]/mempool/_components/mempool-view.tsx"
   ],
-  "No platform, no creator fees": [
-    "app/[lang]/faq/page.tsx"
-  ],
   "No pools yet. A launch has to graduate before its liquidity exists.": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
@@ -2496,9 +2502,6 @@
   ],
   "No sells waiting in the mempool.": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
-  ],
-  "No slider on this one — there is nothing to configure. Every launch is identical, checked field-by-field against the on-chain record.": [
-    "app/[lang]/faq/page.tsx"
   ],
   "No trades in this range.": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
@@ -2605,9 +2608,6 @@
   "of {n} minters, {pct}%": [
     "app/[lang]/stats/_components/communities.tsx"
   ],
-  "of {supply} supply minted": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "Of minters": [
     "app/[lang]/stats/_components/communities.tsx"
   ],
@@ -2680,6 +2680,9 @@
   "open right now": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
+  "Open the mint": [
+    "components/launch-story.tsx"
+  ],
   "Open XCP price": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
@@ -2703,9 +2706,6 @@
   ],
   "opens {eta}": [
     "app/[lang]/_components/launch-search.tsx"
-  ],
-  "Opens at {mult}× mint price": [
-    "app/[lang]/faq/page.tsx"
   ],
   "Opens at Block {block}": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -2733,6 +2733,9 @@
   ],
   "Other out": [
     "app/[lang]/profile/_components/activity-tab.tsx"
+  ],
+  "Outcome": [
+    "components/launch-story.tsx"
   ],
   "Overview": [
     "app/[lang]/docs/page.tsx"
@@ -2835,9 +2838,6 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
-  "pool · 31M": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "Pool + order book": [
     "app/[lang]/swap/_components/swap-widget.tsx"
   ],
@@ -2936,9 +2936,6 @@
   "Public sale": [
     "app/[lang]/faq/page.tsx"
   ],
-  "public sale · 69M": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "Queue": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
@@ -3028,7 +3025,8 @@
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/activity-tab.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/stats/_components/stats-content.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx",
+    "components/launch-story.tsx"
   ],
   "Refunds are not a support process. They are automatic protocol behavior: at the deadline, every minter's XCP is returned and the escrowed supply is destroyed in the same block. Failed launches move to the graveyard, where their history is preserved — the mint tape, the participant count, and the on-chain proof: a destruction record tagged {tag}.": [
     "app/[lang]/docs/page.tsx"
@@ -3124,7 +3122,8 @@
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
-    "app/[lang]/stats/_components/stats-content.tsx"
+    "app/[lang]/stats/_components/stats-content.tsx",
+    "components/launch-story.tsx"
   ],
   "Search asset name": [
     "app/[lang]/_components/launch-search.tsx"
@@ -3179,9 +3178,6 @@
   "Sell {n} XCP": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
-  "Sell out the launch above — the pool only exists on the other side of the line.": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
   "Sell pending": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
@@ -3193,6 +3189,9 @@
   ],
   "Seller inventory cleared": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
+  ],
+  "Selling the entire public allocation in this example leaves {left} XCP in the pool. Sellers receive {mult}× their mint cost ({paid}% of what they paid). The initial LP position cannot be withdrawn.": [
+    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "Send": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
@@ -3419,6 +3418,9 @@
   "The compose API returns an {unsigned} raw Bitcoin transaction — the node never sees a key. Sign with your own wallet, broadcast, done. Add {verbose} for a PSBT and echoed params; every quantity is a raw integer.": [
     "app/[lang]/docs/page.tsx"
   ],
+  "The deadline passes. Your XCP returns.": [
+    "components/launch-story.tsx"
+  ],
   "The difference between the quoted price and what executes, if the pool moves between your quote and your confirmation.": [
     "app/[lang]/docs/page.tsx"
   ],
@@ -3449,6 +3451,15 @@
   "The inversion:": [
     "app/[lang]/docs/page.tsx"
   ],
+  "The launch confirms on-chain with a future opening block. Everyone can see the terms; nobody, including the creator, can mint yet.": [
+    "components/launch-story.tsx"
+  ],
+  "The mint did not fill, so your XCP is refunded automatically. No trading pool opens. You can use that XCP for another launch.": [
+    "components/launch-story.tsx"
+  ],
+  "The mint fills. The pool opens.": [
+    "components/launch-story.tsx"
+  ],
   "The on-chain asset name — universally unique, can never change.": [
     "app/[lang]/create/page.tsx"
   ],
@@ -3458,8 +3469,14 @@
   "The pool opens with 690 XCP against 31M tokens: 69/31 ≈ {mult}× the mint price. Every minter is structurally in profit at open, and the pool — not later buyers — absorbs early exits.": [
     "app/[lang]/docs/page.tsx"
   ],
-  "The sale line sits at 69M of the 100M supply; the other 31M is reserved for the pool and only ever exists if the line is crossed — 69 + 31 = 100, locked, nowhere else for supply to be. Below the line, every escrowed satoshi refunds at the deadline: there is no partial launch to be bag-held. The {perAddress} XCP per-address cap means crossing takes at least {n} distinct addresses — more if people mint below the cap. A floor on the crowd, not a count.": [
+  "The pool uses constant-product pricing with a 0.5% swap fee that stays in its reserves. Both sides start worth {xcp} XCP each. The initial LP tokens are held at an unspendable address, so nobody can withdraw that position. Swaps keep working; later liquidity providers can withdraw their own positions.": [
     "app/[lang]/faq/_components/explainer.tsx"
+  ],
+  "The protocol releases your tokens and creates a pool with {target} XCP and {poolTokens} tokens. Nobody can withdraw the initial LP position; buying and selling stay open.": [
+    "components/launch-story.tsx"
+  ],
+  "The same mint price for everyone": [
+    "components/launch-story.tsx"
   ],
   "The service is busy or unavailable. Try again shortly.": [
     "components/compose-error.tsx"
@@ -3473,20 +3490,17 @@
   "The transaction did not match the verified request. It was blocked.": [
     "components/compose-error.tsx"
   ],
-  "The whole standard, hands-on — starting, like every launch, with the mint.": [
-    "app/[lang]/faq/page.tsx"
-  ],
   "The XCP-69 standard": [
     "app/[lang]/faq/page.tsx"
   ],
   "There is no fee-split table because there are no fees to split. Every satoshi of XCP paid by minters goes into the pool. The only costs anywhere in the system are Bitcoin transaction fees, the 0.5 XCP asset-name registration fee for named assets, and the protocol's pooldeposit gas fee debited at creation — costs paid to the network, not to us or to the creator.": [
     "app/[lang]/docs/page.tsx"
   ],
+  "This example models one buy or sell from the opening reserves. It includes the pool fee and excludes Bitcoin transaction fees. Mixed trades and later liquidity deposits follow different paths. Market cap is the displayed price multiplied by circulating supply.": [
+    "app/[lang]/faq/_components/explainer.tsx"
+  ],
   "This image is {kb} KB — inscribing caps at 385 KB. Use a smaller file or uncheck to host it instead.": [
     "app/[lang]/create/page.tsx"
-  ],
-  "This is the protocol's own swap math: constant product with a 50 bps fee that stays in the pool. Price is the ratio of the two reserves — one drains as the other fills, which is why the tick marks sit at center: both sides open worth {xcp} XCP each. The reserve approaches zero without ever arriving, and the LP is burned, so this liquidity can be traded against forever and withdrawn by no one — whatever XCP sits in the pool is out of circulation for good.": [
-    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "This wallet hasn't launched anything yet.": [
     "app/[lang]/profile/_components/launches-tab.tsx"
@@ -3499,6 +3513,9 @@
   ],
   "This XCP is escrowed by consensus. It returns automatically if a launch misses its soft cap; if the launch graduates, you receive the tokens shown below instead.": [
     "app/[lang]/profile/_components/minting-tab.tsx"
+  ],
+  "Time to discover the launch, read its terms and decide.": [
+    "components/launch-story.tsx"
   ],
   "today": [
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -3522,9 +3539,6 @@
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
   "Tokens in the pool": [
-    "app/[lang]/faq/_components/explainer.tsx"
-  ],
-  "Tokens minted": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "Too soon — needs to be block {n} or later (~1 hour out). The launch has to confirm before it opens.": [
@@ -3561,6 +3575,9 @@
   "Trade pressure through the pool": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
+  "Trade through the launch pool": [
+    "app/[lang]/faq/_components/explainer.tsx"
+  ],
   "Trade volume": [
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
@@ -3595,14 +3612,20 @@
   "Trustless token launches on Counterparty. All-or-nothing mints, liquidity locked by consensus, no platform custody.": [
     "app/[lang]/layout.tsx"
   ],
+  "Try a launch": [
+    "components/launch-story.tsx"
+  ],
   "Try again": [
     "app/[lang]/_components/market-pulse.tsx"
   ],
+  "Try the mint again": [
+    "components/launch-story.tsx"
+  ],
+  "Try trading through the pool": [
+    "components/launch-story.tsx"
+  ],
   "Two bounties are claimed — one is still open for the next launch to graduate.": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
-  ],
-  "Two honesty notes. The slider is a bounding envelope — pure one-way flow, all sellers or all buyers, nothing interleaved. Real markets mix both directions, and every swap leaves 50 bps behind in the pool, so the real path lives strictly inside these extremes. And market cap = price × circulating supply — issued supply minus burned tokens. It is a convention, not a promise.": [
-    "app/[lang]/faq/_components/explainer.tsx"
   ],
   "TX fee": [
     "app/[lang]/[asset]/_components/mint-panel.tsx",
@@ -3732,11 +3755,17 @@
   "What happens to the token itself if a launch fails?": [
     "app/[lang]/faq/page.tsx"
   ],
+  "What if it doesn't fill?": [
+    "components/launch-story.tsx"
+  ],
   "What is MINTS?": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
   "What is this?": [
     "app/[lang]/create/page.tsx"
+  ],
+  "What locked liquidity means": [
+    "app/[lang]/faq/page.tsx"
   ],
   "What sellers did next": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
@@ -3853,6 +3882,9 @@
   "XCP-69 market": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
+  "XCP-69 requires the announcement to confirm on-chain before the opening block. Nobody can mint during that interval, including the creator. There is no fixed six-hour notice period in the standard. This site's default schedules the start 36 blocks ahead (about six hours); custom starts can be as close as six blocks (about one hour), or much further away. These are estimates from creation, and confirmation takes some of that time.": [
+    "app/[lang]/faq/page.tsx"
+  ],
   "XCP.FUN - Bitcoin Memecoins on Counterparty": [
     "app/[lang]/page.tsx"
   ],
@@ -3932,6 +3964,9 @@
   ],
   "Your profile": [
     "components/header-wallet.tsx"
+  ],
+  "Your tokens": [
+    "components/launch-story.tsx"
   ],
   "Your wallet could not complete this request. Check the details.": [
     "components/compose-error.tsx"

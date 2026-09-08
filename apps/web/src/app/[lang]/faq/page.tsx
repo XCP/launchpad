@@ -5,12 +5,10 @@ import { localeAlternates } from "@/lib/i18n/seo";
 import { getMessages, getT } from "@/lib/i18n/server";
 import { makeT, msg } from "@/lib/i18n/t";
 import { LazyLink } from "@/components/lazy-link";
+import { LaunchStory } from "@/components/launch-story";
 import { fetchXcpUsd } from "@/lib/api/price";
-import {
-  XCP69_MIN_PARTICIPANTS,
-  XCP69_OPENING_MULTIPLE,
-} from "@/lib/xcp69";
-import { StandardPlayground } from "@/app/[lang]/faq/_components/explainer";
+import { XCP69_OPENING_MULTIPLE } from "@/lib/xcp69";
+import { PoolPlayground } from "@/app/[lang]/faq/_components/explainer";
 
 const PAGE_METADATA = {
   title: msg("How it works — xcp.fun"),
@@ -58,69 +56,40 @@ export default async function StandardPage() {
   return (
     <article className="mx-auto max-w-2xl space-y-8">
       <div>
-        <h1 className="text-3xl font-bold">{t("Mints out, or your XCP back.")}</h1>
+        <h1 className="text-3xl font-bold">{t("From fair mint to open market.")}</h1>
         <p className="mt-2 text-gray-600 dark:text-gray-400">
-          {t("A new way to launch a coin on Counterparty — every launch identical, enforced by consensus.")}
+          {t("Announced before minting. The same price for everyone. Fill the mint to open a trading pool, or get your XCP back.")}
         </p>
       </div>
 
-      <section className="holo-border rounded-xl p-6">
+      <LaunchStory />
+
+      <section id="launch-terms" className="scroll-mt-24 rounded-xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-gray-900">
         <div className="flex flex-wrap items-baseline justify-between gap-x-3">
           <h2 className="font-bold">{t("The XCP-69 standard")}</h2>
           <span className="text-xs text-gray-400 dark:text-gray-500">
             {t("guaranteed by consensus, not this website")}
           </span>
         </div>
-        <ul className="mt-4 grid gap-x-6 gap-y-3 text-sm font-medium text-gray-800 dark:text-gray-200 sm:grid-cols-2">
-          <li className="flex items-center gap-2.5">
-            <span aria-hidden>⚖️</span>{t("Mints out, or full refund")}
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span aria-hidden>🔒</span>{t("Liquidity locked forever")}
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span aria-hidden>🚫</span>{t("No platform, no creator fees")}
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span aria-hidden>👥</span>
-            {t("{n}+ addresses to sell out", { n: XCP69_MIN_PARTICIPANTS })}
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span aria-hidden>📢</span>{t("Announced before minting opens")}
-          </li>
-          <li className="flex items-center gap-2.5">
-            <span aria-hidden>📈</span>{t("Opens at {mult}× mint price", { mult })}
-          </li>
-        </ul>
+        <dl className="mt-3 divide-y divide-gray-100 text-sm dark:divide-gray-800">
+          {PARAMS.map(([k, v]) => (
+            <div key={k} className="grid gap-1 py-2.5 sm:grid-cols-[1fr_1.6fr] sm:gap-4">
+              <dt className="text-gray-500 dark:text-gray-400">{t(k)}</dt>
+              <dd className="font-medium sm:text-right">{t(v)}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          {t("Every launch follows these terms, checked against its on-chain record.")}
+        </p>
       </section>
 
-      <section>
-        <h2 className="mb-3 font-bold">{t("Feel the mechanism")}</h2>
+      <section id="launch-pool" className="scroll-mt-24">
+        <h2 className="mb-3 font-bold">{t("What locked liquidity means")}</h2>
         <p className="mb-3 text-sm text-gray-600 dark:text-gray-400">
-          {t("The whole standard, hands-on — starting, like every launch, with the mint.")}
+          {t("After a successful launch, nobody can withdraw the initial LP position. Trading still moves XCP and tokens through the pool. Try buying or selling below.")}
         </p>
-        <StandardPlayground xcpUsd={xcpUsd}>
-          <div className="rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5">
-            <div className="flex flex-wrap items-end justify-between gap-x-3 gap-y-1">
-              <h3 className="font-semibold">{t("3 · All coins are the same")}</h3>
-              <div className="text-right">
-                <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">0</span>
-                <span className="text-sm text-gray-400 dark:text-gray-500"> {t("gotchas")}</span>
-              </div>
-            </div>
-            <dl className="mt-3 divide-y divide-gray-100 dark:divide-gray-800 text-sm">
-              {PARAMS.map(([k, v]) => (
-                <div key={k} className="flex justify-between gap-4 py-2.5">
-                  <dt className="text-gray-500 dark:text-gray-400">{t(k)}</dt>
-                  <dd className="text-right font-medium">{t(v)}</dd>
-                </div>
-              ))}
-            </dl>
-            <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
-              {t("No slider on this one — there is nothing to configure. Every launch is identical, checked field-by-field against the on-chain record.")}
-            </p>
-          </div>
-        </StandardPlayground>
+        <PoolPlayground xcpUsd={xcpUsd} />
       </section>
 
       <section>
@@ -129,6 +98,14 @@ export default async function StandardPage() {
           {t("The honest questions — including the ones that don't flatter us.")}
         </p>
         <div className="divide-y divide-gray-100 dark:divide-gray-800 rounded-lg border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+          <details className="p-4">
+            <summary className="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">
+              {t("How far ahead is a launch announced?")}
+            </summary>
+            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              {t("XCP-69 requires the announcement to confirm on-chain before the opening block. Nobody can mint during that interval, including the creator. There is no fixed six-hour notice period in the standard. This site's default schedules the start 36 blocks ahead (about six hours); custom starts can be as close as six blocks (about one hour), or much further away. These are estimates from creation, and confirmation takes some of that time.")}
+            </p>
+          </details>
           <details className="group p-4" open>
             <summary className="cursor-pointer text-sm font-medium text-gray-900 dark:text-gray-100">
               {t("What do I actually lose if a launch fails?")}
