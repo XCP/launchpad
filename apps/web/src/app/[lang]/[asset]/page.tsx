@@ -24,7 +24,7 @@ import {
 } from "@/lib/api/launchpad-api";
 import { foldPointsToCandles, type ChartResolution } from "@/lib/candles";
 import { proseDescription } from "@launchpad/xcp69/description";
-import { fetchBtcUsd, fetchXcpUsd } from "@/lib/api/price";
+import { fetchMarketPrices } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import { isLocale, localePath } from "@/lib/i18n/locales";
 import { localeAlternates, openGraphLocale } from "@/lib/i18n/seo";
@@ -203,7 +203,7 @@ export default async function LaunchPage({
     isPendingConfirmation = true;
   }
 
-  const [mints, pool, original, xcpUsd, btcUsd, feeSats, indexed] = await Promise.all([
+  const [mints, pool, original, prices, feeSats, indexed] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask. Same for
     // anything still unconfirmed — the tx_hash isn't indexed yet either.
     fm.status === "pending" || isPendingConfirmation
@@ -218,11 +218,9 @@ export default async function LaunchPage({
     fm.status !== "pending" && !isPendingConfirmation && xcp69Params(fm)
       ? fetchOriginalRecord(fm.tx_hash)
       : Promise.resolve({ deadline: null, announceBlock: null }),
-    fetchXcpUsd(),
-    // Same upstream feed as fetchXcpUsd (Next dedupes by URL) — only the
-    // TX fees stat needs it, and only to convert its sats into a dollar
-    // figure when the site-wide denomination toggle is on.
-    fetchBtcUsd(),
+    // Both currencies come from the same parsed ticker. Independent readers
+    // carry AbortSignals, so Next does not deduplicate their fetches.
+    fetchMarketPrices(),
     // Bitcoin-side fee data only apps/api has; only the minting stat strip
     // reads it, so don't ask outside that phase.
     fm.status === "open" && !isPendingConfirmation
@@ -230,6 +228,7 @@ export default async function LaunchPage({
       : Promise.resolve(null),
     indexedLaunch(asset),
   ]);
+  const { xcp: xcpUsd, btc: btcUsd } = prices;
   const burnedQuantity = indexed?.burnedQuantity ?? "0";
   const circulatingRaw = circulatingSupplyRaw(fm.hard_cap, burnedQuantity);
   // The creator's own trades on this asset, for the chart's markers. Indexed

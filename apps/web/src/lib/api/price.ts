@@ -21,8 +21,9 @@ export interface DailyXcpUsd {
 
 /**
  * The explorer's aggregate feed (daily CMC aggregate; carries both legs).
- * One fetch for both — Next dedupes by URL, so the two exported readers below
- * cost a single request per render.
+ * Use fetchMarketPrices when several fields are needed together. The deadline
+ * signal bypasses Next's request memoization, so independent readers each
+ * fetch and parse a ticker even when their URLs match.
  */
 async function fetchTicker(): Promise<Ticker> {
   try {
