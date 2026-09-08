@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { authed } from "#api/admin-auth";
 import type { Env } from "#api/env";
 import { MIRRORS, refreshMirrors } from "#api/indexer/mirrors";
 import { syncOrders } from "#api/indexer/orders";
@@ -18,14 +19,6 @@ import { fetchBlockHeight, fetchMempoolFairmints } from "#api/integrations/count
 
 export { Announcer } from "#api/durable/announcer";
 
-/** Length-then-value, so a wrong token does not leak its length by failing
- *  faster on a short one. Not constant time, but this guards a channel post,
- *  not a key. */
-function authed(supplied: string | undefined, expected: string | undefined): boolean {
-  const a = supplied ?? "";
-  const b = expected ?? "";
-  return b.length > 0 && a.length === b.length && a === b;
-}
 import { runScheduledJob } from "#api/scheduler/job";
 import { withLock } from "#api/scheduler/lock";
 import { claimFastSync, recordMempoolSnapshot } from "#api/scheduler/mempool-transition";
@@ -84,8 +77,8 @@ app.route("/", activityRoute);
 /**
  * Post one sample announcement, to prove the bot is wired up.
  *
- * Guarded by ADMIN_TOKEN and compared with a constant-time-ish equality that
- * at least does not leak length on the first character — this endpoint writes
+ * Guarded by ADMIN_TOKEN and compared with native timing-safe equality over
+ * fixed-size hashes — this endpoint writes
  * to a public channel, so an open one is a graffiti button. Returns what it
  * would send when `dry` is set, which is how the wording gets reviewed without
  * posting.
