@@ -268,6 +268,29 @@ describe("deliberate language selection", () => {
 });
 
 describe("explicit currency controls", () => {
+  it.each(["graduated", "minting", "scheduled", "graveyard"])("shows the footer on %s and preserves its view during language changes", async (phase) => {
+    navigation.segment = phase; navigation.pathname = `/fr/${phase}`; navigation.query = "view=table";
+    await render(<SiteFooter />, "fr");
+    expect(container.querySelector("footer")).not.toBeNull();
+    const language = container.querySelector<HTMLSelectElement>("footer select")!;
+    await select(language, "ja");
+    expect(navigation.push).toHaveBeenLastCalledWith(`/ja/${phase}?view=table`);
+    expect(value("currency")).toBe("JPY");
+  });
+
+  it("keeps listing controls in the footer's English recovery link", async () => {
+    navigation.segment = "minting"; navigation.pathname = "/ja/minting"; navigation.query = "sort=progress&view=table";
+    await render(<SiteFooter />, "ja");
+    const english = [...container.querySelectorAll<HTMLAnchorElement>("footer a")].find(node => node.textContent === "English")!;
+    expect(english.getAttribute("href")).toBe("/minting?sort=progress&view=table");
+  });
+
+  it.each(["create", "swap", "limit", "dispense", "mempool", "PEPEMEMECOIN"])("keeps the footer hidden on %s", async (page) => {
+    navigation.segment = page; navigation.pathname = `/${page}`;
+    await render(<SiteFooter />);
+    expect(container.querySelector("footer")).toBeNull();
+  });
+
   it.each([["en-US", "USD"], ["ja-JP", "JPY"]] as const)(
     "shows and checks the detected %s currency %s without offering Auto",
     async (browserLanguage, expected) => {
