@@ -12,12 +12,13 @@ import {
   LaunchDescription,
   isOurMetadata,
 } from "@/app/[lang]/[asset]/_components/launch-metadata";
-import { DenomToggle, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[lang]/[asset]/_components/launch-stats";
+import { DenomToggle, MintTargetStat, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[lang]/[asset]/_components/launch-stats";
 import { classifyDescription, proseDescription } from "@launchpad/xcp69/description";
 import { ScheduledPulse } from "@/app/[lang]/[asset]/_components/scheduled-pulse";
 import { AddressHoverCard, IssuerChips, IssuerLine } from "@/components/address-hover-card";
 import type { Fairmint, PairActivity, Pool } from "@/lib/api/counterparty";
 import type { ChartCandle, FeeSummary } from "@/lib/api/launchpad-api";
+import type { AssetOrigin } from "@/lib/api/asset-origin";
 import type { ChartResolution } from "@/lib/candles";
 import { LABEL } from "@/components/ui/tokens";
 import { LaunchRoomProvider } from "@/app/[lang]/[asset]/_components/launch-room";
@@ -42,6 +43,7 @@ import { AssetTradeSurface } from "@/app/[lang]/[asset]/_components/asset-trade-
 import { EditPanel } from "@/app/[lang]/[asset]/_components/edit-panel";
 import { LiveProgress } from "@/app/[lang]/[asset]/_components/live-progress";
 import { MintPanel } from "@/app/[lang]/[asset]/_components/mint-panel";
+import { MintDeadline } from "@/app/[lang]/[asset]/_components/mint-deadline";
 import { PressurePanel } from "@/app/[lang]/[asset]/_components/pressure-panel";
 import { PriceChart, type DevTrade } from "@/app/[lang]/[asset]/_components/price-chart";
 
@@ -73,6 +75,7 @@ export function LaunchView({
   concentration,
   displayDescription,
   burnedQuantity,
+  assetOrigin = null,
 }: {
   asset: string;
   fm: Fairminter;
@@ -92,6 +95,7 @@ export function LaunchView({
   concentration?: { top10Pct: number; devPct: number };
   displayDescription: string | null;
   burnedQuantity: string;
+  assetOrigin?: AssetOrigin | null;
 }) {
   const num = useNumbers();
   const t = useT();
@@ -328,43 +332,40 @@ export function LaunchView({
                   />
                 </div>
               </div>
-              <IssuerChips
-                source={fm.source}
-                currentAsset={asset}
-                trailing={
-                  isOurMetadata(fm.description) ? (
-                    <>
-                      <HostedSocials url={fm.description} asset={asset} />
-                      <HostedInscriptionChip url={fm.description} />
-                    </>
-                  ) : isInscribed ? (
-                    <InscriptionChip txHash={fm.tx_hash} />
-                  ) : null
-                }
-              />
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {assetOrigin && (
+                  <span
+                    title={assetOrigin.kind === "new"
+                      ? t("Created by this fairminter.")
+                      : t("Asset name first registered in {year}.", { year: assetOrigin.year })}
+                    className="rounded-full border border-gray-200 bg-gray-50 px-2 py-0.5 text-[11px] text-gray-600 tabular-nums dark:border-gray-800 dark:bg-gray-800/60 dark:text-gray-400"
+                  >
+                    {assetOrigin.kind === "new"
+                      ? t("New asset")
+                      : t("{year} asset", { year: assetOrigin.year })}
+                  </span>
+                )}
+                {isOurMetadata(fm.description) ? (
+                  <>
+                    <HostedSocials url={fm.description} asset={asset} />
+                    <HostedInscriptionChip url={fm.description} />
+                  </>
+                ) : isInscribed ? (
+                  <InscriptionChip txHash={fm.tx_hash} />
+                ) : null}
+              </div>
             </div>
           </div>
 
-          {/* The fixed facts (scheduled) or the live number (minting)
-              belong with identity — nothing below this card is a "fact
-              about the launch" anymore, just the countdown or the form.
-
-              Desktop only. Every value in this strip is fixed by the
-              standard, so it is character-for-character identical on every
-              XCP-69 launch: price, per-address cap, target, supply. On a
-              phone — where a shared link gets opened, and where space is
-              scarcest — four numbers that say nothing about THIS launch are
-              exactly what should give way. What's left is what differs: the
-              art, the name, who's launching it, and when it opens. The terms
-              are still a tap away in the countdown's own copy and in the
-              docs. */}
+          {/* Scheduled terms stay on desktop; live progress belongs with
+              the asset, and its deadline sits beside the mint form. */}
           {!minting && standardTerms && (
             <div className="hidden sm:block">
               <TermsStrip xcpUsd={xcpUsd} />
             </div>
           )}
-          {minting && mints.length > 0 && (
-            <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pb-2 pt-2">
+          {minting && (
+            <div className="mt-5 border-t border-gray-100 dark:border-gray-800 pb-2 pt-4">
               <LiveProgress
                 initialEarned={fm.earned_quantity ?? 0}
                 target={saleTarget(fm)}
@@ -378,11 +379,44 @@ export function LaunchView({
         </div>
 
         {minting ? (
-          /* MintPanel brings its own card chrome — the same shape the
-             swap/limit/dispense forms use — so it isn't nested inside a
-             second one here. */
-          <div className="mt-4">
-            {standardTerms && <MintPanel asset={asset} xcpUsd={xcpUsd} />}
+          <div className={`mt-4 grid gap-4 ${standardTerms ? "sm:grid-cols-[minmax(0,1fr)_15rem] sm:items-start sm:gap-6" : ""}`}>
+            {/* The clock precedes the form on phones and sits in the same
+                right-hand rail as the graduated page's market facts. */}
+            <aside className={`min-w-0 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white dark:divide-gray-800 dark:border-gray-800 dark:bg-gray-900 ${standardTerms ? "sm:col-start-2 sm:row-start-1" : ""}`}>
+              <div className="px-4 py-4">
+                <MintDeadline
+                  deadlineBlock={big(fm.pool_quantity) > 0n ? fm.soft_cap_deadline_block : fm.end_block}
+                  initialHeight={blockHeight}
+                  initialEarned={fm.earned_quantity ?? 0}
+                  target={big(fm.pool_quantity) > 0n ? saleTarget(fm) : fm.hard_cap}
+                  allOrNothing={big(fm.pool_quantity) > 0n}
+                />
+              </div>
+                <div className="grid grid-cols-2 gap-px overflow-hidden rounded-b-2xl bg-gray-100 dark:bg-gray-800 sm:block sm:space-y-px">
+                  <div className="flex items-start justify-between gap-2 bg-white px-3 py-2.5 dark:bg-gray-900 sm:px-4">
+                    <RaisedStat paidQuantity={fm.paid_quantity} xcpUsd={xcpUsd} progress={progress} />
+                    {xcpUsd !== null && <DenomToggle visibleOn="desktop" />}
+                  </div>
+                  {standardTerms && (
+                    <div className="bg-white px-3 py-2.5 dark:bg-gray-900 sm:px-4">
+                      <MintTargetStat xcpUsd={xcpUsd} />
+                    </div>
+                  )}
+                  <div className="bg-white px-3 py-2.5 dark:bg-gray-900 sm:px-4">
+                    <ParticipantsStat participants={participants} />
+                  </div>
+                  {feeSats && feeSats.mints > 0 && (
+                    <div className="bg-white px-3 py-2.5 dark:bg-gray-900 sm:px-4">
+                      <TxFeesStat totalFeeSats={feeSats.totalFeeSats} btcUsd={btcUsd} />
+                    </div>
+                  )}
+                </div>
+            </aside>
+            {standardTerms && (
+              <div className="min-w-0 sm:col-start-1 sm:row-start-1">
+                <MintPanel asset={asset} xcpUsd={xcpUsd} />
+              </div>
+            )}
           </div>
         ) : (
           <div className="mt-4 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 sm:p-7">
@@ -407,33 +441,6 @@ export function LaunchView({
                 ) : undefined
               }
             />
-          </div>
-        )}
-
-        {/* How the sale is actually going — the live progress number now
-            sits above, where the description used to be. These facts are
-            the rest of it: still live, still not a repeat of the fixed
-            terms that ran once on the scheduled poster. */}
-        {minting && mints.length > 0 && (
-          <div className="mt-4 grid grid-cols-2 gap-3 rounded-3xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-5 sm:grid-cols-4">
-            <RaisedStat paidQuantity={fm.paid_quantity} xcpUsd={xcpUsd} progress={progress} />
-            {feeSats && feeSats.mints > 0 && (
-              <TxFeesStat totalFeeSats={feeSats.totalFeeSats} btcUsd={btcUsd} />
-            )}
-            <ParticipantsStat participants={participants} />
-            <div>
-              <div className="flex items-start justify-between gap-2">
-                <div className={LABEL}>
-                  {t("Deadline")}
-                </div>
-                {xcpUsd !== null && <DenomToggle visibleOn="desktop" />}
-              </div>
-              <div className="mt-0.5 text-sm font-semibold tabular-nums text-gray-900 dark:text-gray-100">
-                {fm.soft_cap_deadline_block - blockHeight > 0
-                  ? t("Block {n}", { n: num.commas(fm.soft_cap_deadline_block) })
-                  : t("closing")}
-              </div>
-            </div>
           </div>
         )}
 
@@ -627,12 +634,7 @@ export function LaunchView({
                 />
               </div>
             </div>
-            {/* Issuer-history chips ("first launch", "3rd launch") answer
-                "should I trust this creator" — the question before minting.
-                Once an asset has graduated it has its own track record;
-                "first launch" here reads as "first launch on the site",
-                not "this issuer's first launch". Facts about the ASSET
-                replace them; the issuer stays named in the line above. */}
+            {/* Asset facts stay with the asset name. */}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {pool && (
                 <span className="rounded-full border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/40 px-2 py-0.5 text-[11px] font-medium text-green-700 dark:text-green-400 tabular-nums">

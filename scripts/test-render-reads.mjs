@@ -108,6 +108,11 @@ function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false, indexed =
       return Response.json({ result: [{ block_index: fairminter.block_index,
         params: { soft_cap_deadline_block: fairminter.soft_cap_deadline_block } }] });
     }
+    if (path === `/v2/assets/${asset}/issuances`) return Response.json({ result_count: 1, result: [{
+      asset, tx_hash: fairminter.tx_hash, tx_index: fairminter.tx_index,
+      msg_index: 0, block_index: fairminter.block_index, block_time: 1749798000,
+      asset_events: "open_fairminter", status: "valid",
+    }] });
     if (path === "/v2/assets/XCP/dispensers") return Response.json({ result: dispenser ? [{ tx_hash: "dispense", give_remaining: 100000000, give_quantity: 100000000, satoshirate: 1000 }] : [] });
     if (path === "/v2/mempool/events/DISPENSE") return Response.json({ result: [] });
     return null;

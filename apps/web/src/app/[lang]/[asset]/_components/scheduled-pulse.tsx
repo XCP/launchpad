@@ -1,46 +1,16 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import useSWR from "swr";
 import { fetchJson } from "@/lib/client";
 import { blocksEta } from "@/lib/format";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
-import { fetchBlockHeight } from "@/lib/api/counterparty";
+import { useChainHeight } from "@/hooks/use-chain-height";
 
 import { LABEL } from "@/components/ui/tokens";
 import { blockAge } from "@/lib/chain-time";
 import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
-
-/** Chain height, polled lazily: every 2 minutes far out, tightening to 30s
- *  inside the final 12 blocks so the last stretch reads like a countdown. */
-function useChainHeight(startBlock: number, initialHeight: number) {
-  const latestHeight = useRef(initialHeight);
-  const { data } = useSWR(
-    "cp-height",
-    async () => {
-      // Distant countdowns need indexed height. Near opening, ask the live
-      // parser so a lagging mirror cannot delay the mint form.
-      const height = startBlock - latestHeight.current > 3
-        ? await fetchBlockHeight()
-        : (await fetchJson(`${COUNTERPARTY_API_BASE}/`)).result.counterparty_height;
-      if (!Number.isSafeInteger(height) || height <= 0) throw new Error("Invalid chain height");
-      latestHeight.current = height;
-      return height as number;
-    },
-    {
-      // Blocks land every ~10 minutes; poll like it. Half-minute polling
-      // only earns its keep in the last few blocks — a dozen blocks out it
-      // was two hours of 30-second requests to learn nothing.
-      refreshInterval: (latest) =>
-        startBlock - (latest ?? initialHeight) <= 3 ? 30_000 : 180_000,
-      revalidateOnFocus: true,
-      fallbackData: initialHeight,
-    },
-  );
-  return data ?? initialHeight;
-}
 
 /**
  * The scheduled page's living center: countdown and block train.

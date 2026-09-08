@@ -368,7 +368,6 @@
     "Closed",
     "Closes",
     "closes@@chart",
-    "closing",
     "Closing soonest",
     "Collapse",
     "collections with a minter in them",
@@ -439,7 +438,6 @@
     "Daily",
     "Data",
     "day",
-    "Deadline",
     "Deposit",
     "Deposit broadcast — {tx}",
     "Description",
@@ -1274,6 +1272,13 @@
     "Could not load banned users.",
     "Could not update this ban.",
     "You are banned from chat.",
-    "Banned ({n})"
+    "Banned ({n})",
+    "Time remaining",
+    "Closes at block {n}, or earlier if sold out.",
+    "New asset",
+    "{year} asset",
+    "Created by this fairminter.",
+    "Asset name first registered in {year}.",
+    "If it fails, every minter’s XCP is automatically refunded."
   ]
 }

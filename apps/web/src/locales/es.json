@@ -376,7 +376,6 @@
   "Closed": "Cerrado",
   "Closes": "Cierra",
   "closes@@chart": "cierres",
-  "closing": "por cerrar",
   "Closing soonest": "Cierra más pronto",
   "Collapse": "Contraer",
   "collections with a minter in them": "colecciones con al menos un acuñador",
@@ -451,7 +450,6 @@
   "Daily": "diario",
   "Data": "Datos",
   "day": "día",
-  "Deadline": "Bloque límite",
   "Deposit": "Depósito",
   "Deposit broadcast — {tx}": "Depósito transmitido — {tx}",
   "Description": "Descripción",
@@ -1285,5 +1283,12 @@
   "Could not load banned users.": "No se pudieron cargar los usuarios bloqueados.",
   "Could not update this ban.": "No se pudo actualizar este bloqueo.",
   "You are banned from chat.": "No puedes enviar mensajes porque se te bloqueó en el chat.",
-  "Banned ({n})": "Bloqueados ({n})"
+  "Banned ({n})": "Bloqueados ({n})",
+  "Time remaining": "Tiempo restante",
+  "Closes at block {n}, or earlier if sold out.": "Cierra en el bloque {n}, o antes si se agota.",
+  "New asset": "Activo nuevo",
+  "{year} asset": "Activo de {year}",
+  "Created by this fairminter.": "Creado por este fairminter.",
+  "Asset name first registered in {year}.": "Nombre del activo registrado por primera vez en {year}.",
+  "If it fails, every minter’s XCP is automatically refunded.": "Si no se completa, se devuelve automáticamente todo el XCP de cada participante."
 }

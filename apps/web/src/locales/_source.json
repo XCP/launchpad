@@ -129,6 +129,7 @@
     "app/[lang]/[asset]/_components/live-progress.tsx"
   ],
   "{eta} left": [
+    "app/[lang]/[asset]/_components/mint-deadline.tsx",
     "app/[lang]/_components/launch-sections.tsx",
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
@@ -182,13 +183,15 @@
     "components/address-hover-card.tsx"
   ],
   "{n} block": [
-    "app/[lang]/[asset]/_components/launch-view.tsx"
+    "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/[asset]/_components/mint-deadline.tsx"
   ],
   "{n} block · {asset}": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
   ],
   "{n} blocks": [
     "app/[lang]/[asset]/_components/launch-view.tsx",
+    "app/[lang]/[asset]/_components/mint-deadline.tsx",
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx",
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
@@ -553,6 +556,9 @@
   "{xcp} XCP{usd} of net buying — and all of it joins the locked reserve.": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
+  "{year} asset": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
   "@you": [
     "components/chat-panel.tsx"
   ],
@@ -899,6 +905,9 @@
     "app/[lang]/faq/page.tsx",
     "app/[lang]/mempool/_components/mempool-view.tsx"
   ],
+  "Asset name first registered in {year}.": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
   "at ATH": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
@@ -993,7 +1002,7 @@
   ],
   "Block {n}": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
-    "app/[lang]/[asset]/_components/launch-view.tsx"
+    "app/[lang]/[asset]/_components/mint-deadline.tsx"
   ],
   "block height": [
     "app/[lang]/create/page.tsx"
@@ -1238,11 +1247,11 @@
   "Closes": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
+  "Closes at block {n}, or earlier if sold out.": [
+    "app/[lang]/[asset]/_components/mint-deadline.tsx"
+  ],
   "closes@@chart": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
-  ],
-  "closing": [
-    "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "Closing soonest": [
     "app/[lang]/_components/launch-sections.tsx"
@@ -1460,6 +1469,9 @@
   "Created": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
+  "Created by this fairminter.": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
+  ],
   "Creator": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
@@ -1506,9 +1518,6 @@
   ],
   "day": [
     "app/[lang]/[asset]/_components/price-chart.tsx"
-  ],
-  "Deadline": [
-    "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "Deposit": [
     "app/[lang]/activity/_components/activity-view.tsx",
@@ -1931,6 +1940,9 @@
   ],
   "If it fails to launch": [
     "app/[lang]/[asset]/_components/mint-panel.tsx"
+  ],
+  "If it fails, every minter’s XCP is automatically refunded.": [
+    "app/[lang]/[asset]/_components/mint-deadline.tsx"
   ],
   "If it's yours, connect that wallet to launch with it.": [
     "app/[lang]/create/page.tsx"
@@ -2492,6 +2504,9 @@
   ],
   "new address": [
     "components/address-hover-card.tsx"
+  ],
+  "New asset": [
+    "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
   "New buyers": [
     "app/[lang]/research/_components/live-behavior-dashboard.tsx"
@@ -3234,6 +3249,7 @@
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "Sale closing": [
+    "app/[lang]/[asset]/_components/mint-deadline.tsx",
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
   "Save failed": [
@@ -3638,6 +3654,9 @@
   ],
   "This XCP is escrowed by consensus. It returns automatically if a launch misses its soft cap; if the launch graduates, you receive the tokens shown below instead.": [
     "app/[lang]/profile/_components/minting-tab.tsx"
+  ],
+  "Time remaining": [
+    "app/[lang]/[asset]/_components/mint-deadline.tsx"
   ],
   "today": [
     "app/[lang]/stats/_components/stats-content.tsx"

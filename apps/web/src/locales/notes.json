@@ -23,11 +23,9 @@
   "Max": "Button: fill the amount field with the most the wallet can spend or mint.",
   "Total": "Column header: total XCP for the row.",
   "Expires": "Column header: when a resting limit order expires.",
-  "Deadline": "Stat label: the block by which a minting launch must reach its target.",
   "Failed on": "Stat label on a refunded launch: the date it failed.",
   "Sold out in": "Stat label on a graduated launch: how long the sale took to sell out.",
   "Closed": "Launch status: the sale is over, one way or the other.",
-  "closing": "Sort option: launches whose minting window ends soonest.",
   "Opens": "Table header: when minting opens.",
   "Announced": "Table header: when the launch was announced on-chain.",
   "All": "Filter chip in search: every phase. Also the chart range meaning the whole history.",
@@ -106,5 +104,12 @@
   "Already deducted from available XCP": "Tooltip for the pending-outgoing amount. The available balance already excludes this amount; do not suggest subtracting it again.",
   "Escrowed in open mints": "Profile balance detail: confirmed XCP commitments held by the protocol in ongoing mint sales. Tokens become available after successful settlement; an unfilled sale returns the committed XCP. Open describes the sale, not an unlocked balance.",
   "View all": "Homepage section action: open the full launch browser for that section’s phase. This refers to more launch records, not transaction history. Keep the action short.",
-  "Browse XCP-69 launches by phase: graduated, minting, scheduled, and refunded.": "SEO description of the public launch phase directories. The four categories are launch phases: graduated means the sale filled and its pool opened; minting means the sale is open; scheduled means announced before minting opens; refunded means the sale missed its target and contributed XCP was returned. Use the locale’s established phase terms, not transaction categories."
+  "Browse XCP-69 launches by phase: graduated, minting, scheduled, and refunded.": "SEO description of the public launch phase directories. The four categories are launch phases: graduated means the sale filled and its pool opened; minting means the sale is open; scheduled means announced before minting opens; refunded means the sale missed its target and contributed XCP was returned. Use the locale’s established phase terms, not transaction categories.",
+  "Time remaining": "Minting-page label for the estimated time until the launch's deadline block. This is time left in the current mint, not time since announcement or time until minting opens.",
+  "Closes at block {n}, or earlier if sold out.": "Current mint ends at the exact deadline block shown as {n}, unless the entire public sale sells out earlier. Keep {n} unchanged; it is a formatted block height, not a block count or a wall-clock deadline.",
+  "New asset": "Asset-origin chip: this fairminter created the asset name. Describes the asset, not the issuing address or the age of newly minted tokens.",
+  "{year} asset": "Asset-origin chip: the asset name was first registered in the calendar year {year}, before this fairminter. Preserve {year}; it does not date the issuer address or newly minted tokens.",
+  "Created by this fairminter.": "Tooltip for New asset: the current fairminter registered the asset name as part of this launch.",
+  "Asset name first registered in {year}.": "Tooltip for an existing asset: {year} is the calendar year when its name was first registered, not when this launch minted tokens. Preserve {year}.",
+  "If it fails, every minter’s XCP is automatically refunded.": "All-or-nothing pool launch deadline explanation: if the sale misses its target, consensus automatically returns every participant’s full XCP contribution without a manual claim. Explicitly preserve automatic and full refund; this does not include Bitcoin transaction fees or describe other mint types."
 }

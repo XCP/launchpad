@@ -33,6 +33,7 @@ import {
   windowIsExact,
 } from "@/lib/xcp69";
 import { LaunchView } from "@/app/[lang]/[asset]/_components/launch-view";
+import { fetchAssetOrigin } from "@/lib/api/asset-origin";
 
 export const revalidate = 30;
 
@@ -196,7 +197,7 @@ export default async function LaunchPage({
     isPendingConfirmation = true;
   }
 
-  const [mints, pool, original, prices, feeSats] = await Promise.all([
+  const [mints, pool, original, prices, feeSats, assetOrigin] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask. Same for
     // anything still unconfirmed — the tx_hash isn't indexed yet either.
     fm.status === "pending" || isPendingConfirmation
@@ -214,6 +215,9 @@ export default async function LaunchPage({
     // reads it, so don't ask outside that phase.
     fm.status === "open" && !isPendingConfirmation
       ? fetchLaunchFees(asset)
+      : Promise.resolve(null),
+    fm.status !== "closed"
+      ? fetchAssetOrigin(asset, fm.tx_hash)
       : Promise.resolve(null),
   ]);
   const { xcp: xcpUsd, btc: btcUsd } = prices;
@@ -303,6 +307,7 @@ export default async function LaunchPage({
       poolVolume={poolVolume}
       displayDescription={indexed?.displayDescription ?? null}
       burnedQuantity={burnedQuantity}
+      assetOrigin={assetOrigin}
     />
   );
 }

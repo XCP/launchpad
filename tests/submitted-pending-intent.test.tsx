@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { act, cloneElement, type ReactElement, type ReactNode } from "react";
+import { act, cloneElement, type ComponentProps, type ReactElement, type ReactNode } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invalidatePending, pendingSpentRaw, readPending } from "@xcp/wallet-sdk";
@@ -65,6 +65,7 @@ vi.mock("@/components/token-select-modal", () => ({ TokenSelectModal: () => null
 vi.mock("@/components/order-tracker", () => ({ OrderTracker: () => null }));
 vi.mock("@/components/connect-button", () => ({ ConnectButton: () => null }));
 vi.mock("@/components/quote-ring", () => ({ QuoteRing: () => null }));
+vi.mock("@/components/lazy-link", () => ({ LazyLink: (props: ComponentProps<"a">) => <a {...props} /> }));
 
 let root: Root;
 let container: HTMLDivElement;
@@ -107,6 +108,7 @@ function expectReservation(asset: string, raw: bigint) {
 describe("confirmed pending spends use the submitted form, through edits while signing", () => {
   it("keeps a mint's original XCP cost, asset and account after an invalid edit", async () => {
     await render(<MintPanel asset="TOKEN" xcpUsd={2} />);
+    expect(container.querySelector('a[href="/dispense"]')?.textContent).toBe("Buy some with BTC");
     await enter("TOKEN to mint", "1000"); await click();
     expect(boundary.mint).toHaveBeenCalledWith({ asset: "TOKEN", quantity: 100000000000 });
     await phase("signing"); await enter("TOKEN to mint", "-1000000");
