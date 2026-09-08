@@ -35,7 +35,7 @@ import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchJson } from "@/lib/client";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { LIMIT_EXPIRATIONS, useSwapSettings } from "@/app/[lang]/swap/_components/swap-settings";
 
 /**
@@ -114,7 +114,7 @@ export function TradePanel({
   );
 
   const { data: pool } = useSWR<PoolInfo | null>(
-    `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP`,
+    `${COUNTERPARTY_READ_API_BASE}/pools/${asset}/XCP`,
     (url: string) => fetchJson(url).then((d) => d.result ?? null),
     { refreshInterval: 60_000 },
   );
@@ -140,7 +140,7 @@ export function TradePanel({
   // The resting book: best counter-order beats the pool with no fee. One
   // page covers today's books; revisit pagination if depth ever grows.
   const { data: bookOrders } = useSWR<BookOrder[]>(
-    `${COUNTERPARTY_API_BASE}/orders/${asset}/XCP?status=open&limit=1000`,
+    `${COUNTERPARTY_READ_API_BASE}/orders/${asset}/XCP?status=open&limit=1000`,
     (url: string) => fetchJson(url).then((d) => d.result ?? []),
     { refreshInterval: 60_000 },
   );

@@ -1,4 +1,4 @@
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { discard } from "@/lib/net";
 import { parseJsonLossless } from "@/lib/numeric";
 
@@ -34,7 +34,7 @@ export async function fetchAssetOrigin(
 ): Promise<AssetOrigin | null> {
   try {
     const response = await fetch(
-      `${COUNTERPARTY_API_BASE}/assets/${encodeURIComponent(asset)}/issuances?limit=${PAGE_SIZE}&verbose=true&sort=block_index:asc`,
+      `${COUNTERPARTY_READ_API_BASE}/assets/${encodeURIComponent(asset)}/issuances?limit=${PAGE_SIZE}&verbose=true&sort=block_index:asc`,
       { signal: AbortSignal.timeout(5_000), next: { revalidate: 300 } },
     );
     if (!response.ok) {

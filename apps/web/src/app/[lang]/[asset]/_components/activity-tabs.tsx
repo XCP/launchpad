@@ -19,7 +19,7 @@ import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchJson } from "@/lib/client";
 import { timeAgo } from "@/lib/chain-time";
 import { useLaunchRoom } from "@/app/[lang]/[asset]/_components/launch-room";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { Identicon } from "@/app/[lang]/[asset]/_components/launch-view";
 import { useAddressFreshness } from "@/app/[lang]/[asset]/_components/launch-stats";
 import { AddressBadges, DevBadge } from "@/app/[lang]/[asset]/_components/address-badges";
@@ -266,7 +266,7 @@ export function ActivityTabs({
    */
   const { data: orders, mutate: refreshOrders } = useSWR<OpenOrder[]>(
     !minting
-      ? `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(asset)}/XCP?status=open&verbose=true&limit=200`
+      ? `${COUNTERPARTY_READ_API_BASE}/orders/${encodeURIComponent(asset)}/XCP?status=open&verbose=true&limit=200`
       : null,
     async (url: string) => (await fetchJson(url)).result as OpenOrder[],
     // Thirty seconds: an order's fate is decided per block, and the tape

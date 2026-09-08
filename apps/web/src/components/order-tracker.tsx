@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { parseJsonLossless, type Raw, ratio } from "@/lib/numeric";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
 import { orderAssetDecimals } from "@/lib/order-legs";
@@ -36,7 +36,7 @@ export function OrderTracker({
 }) {
   const num = useNumbers();
   const { data: order } = useSWR<OrderRow | null>(
-    `${COUNTERPARTY_API_BASE}/orders/${encodeURIComponent(txHash)}?verbose=true`,
+    `${COUNTERPARTY_READ_API_BASE}/orders/${encodeURIComponent(txHash)}?verbose=true`,
     async (url: string) => {
       const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
       if (!res.ok) return null;

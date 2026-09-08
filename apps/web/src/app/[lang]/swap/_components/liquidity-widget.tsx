@@ -41,7 +41,7 @@ import { isBusy } from "@/hooks/use-busy";
 import { useCompose } from "@/lib/wallet/useCompose";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { fetchJson } from "@/lib/client";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_API_BASE, COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { useSwapSettings } from "@/app/[lang]/swap/_components/swap-settings";
 import { defaultTradeAsset } from "@/lib/trade-selection";
 
@@ -104,7 +104,7 @@ export function LiquidityWidget({
   );
 
   const { data: pool } = useSWR<PoolInfo | null>(
-    asset ? `${COUNTERPARTY_API_BASE}/pools/${asset}/XCP` : null,
+    asset ? `${COUNTERPARTY_READ_API_BASE}/pools/${asset}/XCP` : null,
     (url: string) => fetchJson(url).then((d) => d.result ?? null),
     { refreshInterval: 30_000 },
   );

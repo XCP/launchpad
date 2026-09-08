@@ -2,7 +2,7 @@
 
 import { fetchAssetTradesPage, type AssetTradePage, type ActivityTrade } from "@/lib/api/launchpad-api";
 import { fetchJson } from "@/lib/client";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { mergePairTrades, type MatchRow, type PairTrade } from "@launchpad/xcp69/trades";
 
 type KnownTrade = Pick<PairTrade, "txHash" | "address" | "buy" | "tokenQuantity" | "xcpQuantity">;
@@ -55,7 +55,7 @@ async function readCoreHistory(asset: string, divisible: boolean): Promise<Activ
     let cursor: number | null = null;
     const seen = new Set<number>();
     for (let page = 0; page < 200; page++) {
-      const data = await fetchJson(`${COUNTERPARTY_API_BASE}${path}&limit=500${cursor === null ? "" : `&cursor=${cursor}`}`);
+      const data = await fetchJson(`${COUNTERPARTY_READ_API_BASE}${path}&limit=500${cursor === null ? "" : `&cursor=${cursor}`}`);
       if (!Array.isArray(data.result)) throw new Error("trade_history_invalid");
       rows.push(...data.result);
       if (data.next_cursor === null) return rows;
@@ -70,7 +70,7 @@ async function readCoreHistory(asset: string, divisible: boolean): Promise<Activ
     walk(`/orders/${pair}/matches?verbose=true&status=completed`),
   ]);
   const trades = await mergePairTrades(asset, pool, book,
-    async txHash => (await fetchJson(`${COUNTERPARTY_API_BASE}/transactions/${encodeURIComponent(txHash)}/events?limit=1000`)).result);
+    async txHash => (await fetchJson(`${COUNTERPARTY_READ_API_BASE}/transactions/${encodeURIComponent(txHash)}/events?limit=1000`)).result);
   return trades.map(trade => ({
       key: trade.key, txHash: trade.txHash, asset,
       address: trade.address, counterpartyAddress: trade.counterpartyAddress || null,

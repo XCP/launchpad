@@ -9,7 +9,7 @@ import { useCoarsePointer } from "@/hooks/use-coarse-pointer";
 import { shortAddress, tokenQty } from "@/lib/format";
 import { big, type RawLike } from "@/lib/numeric";
 import { fetchLaunchpadAddressSummary } from "@/lib/api/launchpad-api";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { fetchBlockTimestamp } from "@/lib/api/explorer";
 import {
   type Fairminter,
@@ -43,7 +43,7 @@ export function IssuerChips({
     ["issuer-history", source, currentAsset],
     async () => {
       const d = (await fetchJson(
-        `${COUNTERPARTY_API_BASE}/addresses/${source}/fairminters?limit=100&verbose=true`,
+        `${COUNTERPARTY_READ_API_BASE}/addresses/${source}/fairminters?limit=100&verbose=true`,
       )) as { result: (Fairminter & { block_time?: number })[] };
       // Only launches held to this standard count, so "2nd launch" means the
       // second XCP-69 one. Parameters are readable from the row; the timing
@@ -81,7 +81,7 @@ export function IssuerChips({
           if (r.status === "pending")
             return isXcp69(r, undefined) ? r : null;
           const event = (await fetchJson(
-            `${COUNTERPARTY_API_BASE}/transactions/${r.tx_hash}/events/NEW_FAIRMINTER`,
+            `${COUNTERPARTY_READ_API_BASE}/transactions/${r.tx_hash}/events/NEW_FAIRMINTER`,
           ).catch(() => null)) as {
             result?: {
               block_index: number;
@@ -108,7 +108,7 @@ export function IssuerChips({
       const pools = await Promise.all(
         closed.slice(0, 4).map((r) =>
           fetchJson(
-            `${COUNTERPARTY_API_BASE}/pools/${encodeURIComponent(r.asset)}/XCP`,
+            `${COUNTERPARTY_READ_API_BASE}/pools/${encodeURIComponent(r.asset)}/XCP`,
           )
             .then((p: { result: unknown }) => (p.result ? "graduated" : "refunded"))
             .catch(() => "unknown"),

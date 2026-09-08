@@ -73,10 +73,9 @@ export default async function RootLayout({
             before its first byte. Only origins reached from the root layout
             belong here; a preconnect a page does not use holds a socket open
             for ten seconds for nothing. cdn.xcp.io is the art fallback behind
-            every TokenImage, and Counterparty backs the wallet's balance
-            reads. */}
+            every TokenImage, and our APIs serve the page's indexed data. */}
         <link rel="preconnect" href="https://api.xcp.fun" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://api.counterparty.io:4000" crossOrigin="anonymous" />
+        <link rel="preconnect" href="https://api.xcp.io" crossOrigin="anonymous" />
         <link rel="preconnect" href="https://cdn.xcp.io" />
       </head>
       <body className="min-h-dvh bg-gray-50 text-gray-900 antialiased dark:bg-gray-950 dark:text-gray-100">

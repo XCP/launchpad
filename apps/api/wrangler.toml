@@ -3,9 +3,9 @@
 # It does NOT replace the Counterparty API: it mirrors the small slice of it
 # this site actually needs answered fast and cheap (the launch index, and the
 # per-launch conformance verdict, which otherwise costs a subrequest per
-# launch per render). Everything else — balances, fee rates, live mint
-# progress, wallet composes — still goes straight from the browser to
-# Counterparty, same as today. That traffic is free and not this worker's job.
+# launch per render). Read-only /node/v2 compatibility routes cover fields
+# the indexes do not expose. Wallet quotes, spend checks, composition and
+# broadcasts retain direct Counterparty access for authoritative live state.
 name = "launchpad-api"
 main = "src/index.ts"
 compatibility_date = "2025-01-01"

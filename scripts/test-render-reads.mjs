@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createRequire } from "node:module";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import test from "node:test";
@@ -17,11 +17,17 @@ const require = createRequire(import.meta.url);
 const baselineRef = process.argv.find((arg) => arg.startsWith("--baseline-ref="))?.slice("--baseline-ref=".length);
 const expectedAssetReads = Number(process.argv.find((arg) => arg.startsWith("--expected-asset-reads="))?.split("=")[1] ?? 1);
 const expectedHomeReads = Number(process.argv.find((arg) => arg.startsWith("--expected-home-reads="))?.split("=")[1] ?? 1);
+const expectedFairminterReads = Number(process.argv.find((arg) => arg.startsWith("--expected-fairminter-reads="))?.split("=")[1] ?? 0);
+const protocolLatencyMs = Number(process.argv.find((arg) => arg.startsWith("--protocol-latency-ms="))?.split("=")[1] ?? 0);
+const evidencePath = process.argv.find((arg) => arg.startsWith("--evidence="))?.slice("--evidence=".length);
+let indexedAssetMeasurement;
 
 // These are the actual page and metadata functions rendered through Next's
 // production React Flight renderer, using its request-scoped fetch deduper.
 // Only the service-binding context, locale context, and final client views are
 // fixtures. Price calculation, API reads, parsing and page orchestration run.
+// --baseline-ref replaces only page.tsx modules; their API helpers and transport
+// remain current. This isolates page orchestration, not an entire old release.
 async function loadPage(name, relativePath) {
   const output = path.join(root, ".test-dist/render-reads", `${name}.mjs`);
   await mkdir(path.dirname(output), { recursive: true });
@@ -42,7 +48,7 @@ async function loadPage(name, relativePath) {
         if (name === "next/navigation") return { contents: "export function notFound() { throw new Error('NEXT_HTTP_ERROR_FALLBACK;404'); }", loader: "js" };
         if (name === "@/lib/i18n/server") return { contents: "export const getMessages = async () => ({}); export const getT = async () => (message) => message;", loader: "js" };
         const exportName = name.endsWith("launch-view") ? "LaunchView" : name.endsWith("home-toolbar") ? "HomeToolbar" : name.endsWith("launch-sections") ? "LaunchSections" : "LazyLink";
-        return { contents: `import React from 'react'; export function ${exportName}(props) { return React.createElement('div', {'data-view': '${exportName}', 'data-xcp': props.xcpUsd, 'data-btc': props.btcUsd, 'data-day-ago': props.xcpUsdDayAgo, 'data-btc-change': props.btcChange30d, 'data-xcp-change': props.xcpChange30d, 'data-phase': props.phase}, props.children); }`, loader: "js" };
+        return { contents: `import React from 'react'; export function ${exportName}(props) { return React.createElement('div', {'data-view': '${exportName}', 'data-xcp': props.xcpUsd, 'data-btc': props.btcUsd, 'data-day-ago': props.xcpUsdDayAgo, 'data-btc-change': props.btcChange30d, 'data-xcp-change': props.xcpChange30d, 'data-phase': props.phase, 'data-conforming': props.conforming}, props.children); }`, loader: "js" };
       });
     } }],
   });
@@ -63,13 +69,66 @@ const fairminter = {
   divisible: true, lp_asset: "A69000000000000069", status: "pending", earned_quantity: null, paid_quantity: null,
 };
 
-function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false } = {}) {
-  const current = { tickerReads: 0, bindingReads: 0, unexpected: [], cancelled: 0 };
+function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false, indexed = false, asset = "TESTCOIN", status = "pending" } = {}) {
+  const current = { tickerReads: 0, bindingReads: 0, indexedLaunchReads: 0, protocolFairminterReads: 0, protocolCreationReads: 0, protocolPoolReads: 0, protocolMintsReads: 0, unexpected: [], cancelled: 0 };
+  const height = status === "closed" ? 901001 : 899970;
+  const indexedRow = {
+    ...fairminter, asset, status,
+    burn_payment: 0, lock_description: 1, lock_quantity: 1, divisible: 1,
+    current_deadline_block: fairminter.soft_cap_deadline_block,
+    announce_block: fairminter.block_index, original_deadline: fairminter.soft_cap_deadline_block,
+    conforming: 1, phase: status === "closed" ? "refunded" : "scheduled", minters: 0,
+    pool_xcp_sats: 0, pool_xcp_reserve: null, pool_token_reserve: null,
+    // Exercise metadata's on-chain prose path too, not an early return from
+    // an already mirrored description. The old page still needs its node row.
+    display_description: null,
+  };
+  const protocol = (url) => {
+    const path = url.pathname.replace(/^\/node/, "");
+    if (path === "/v2/") return Response.json({ result: { counterparty_height: height } });
+    if (path === `/v2/assets/${asset}/fairminters`) {
+      current.protocolFairminterReads++;
+      const response = Response.json({ result: [{ ...fairminter, asset, status }] });
+      // A bounded delay also exercises the pre-existing in-flight coalescer.
+      // Immediate replies can finish before metadata asks for the same row.
+      return protocolLatencyMs > 0
+        ? new Promise((resolve) => setTimeout(() => resolve(response), protocolLatencyMs))
+        : response;
+    }
+    if (path === `/v2/fairminters/${fairminter.tx_hash}/fairmints`) {
+      current.protocolMintsReads++;
+      return Response.json({ result: [], next_cursor: null });
+    }
+    if (path === `/v2/pools/${asset}/XCP`) {
+      current.protocolPoolReads++;
+      return Response.json({ result: null });
+    }
+    if (path === `/v2/transactions/${fairminter.tx_hash}/events/NEW_FAIRMINTER`) {
+      current.protocolCreationReads++;
+      return Response.json({ result: [{ block_index: fairminter.block_index,
+        params: { soft_cap_deadline_block: fairminter.soft_cap_deadline_block } }] });
+    }
+    if (path === `/v2/assets/${asset}/issuances`) return Response.json({ result_count: 1, result: [{
+      asset, tx_hash: fairminter.tx_hash, tx_index: fairminter.tx_index,
+      msg_index: 0, block_index: fairminter.block_index, block_time: 1749798000,
+      asset_events: "open_fairminter", status: "valid",
+    }] });
+    if (path === "/v2/assets/XCP/dispensers") return Response.json({ result: dispenser ? [{ tx_hash: "dispense", give_remaining: 100000000, give_quantity: 100000000, satoshirate: 1000 }] : [] });
+    if (path === "/v2/mempool/events/DISPENSE") return Response.json({ result: [] });
+    return null;
+  };
   globalThis.__renderReadFixture = { context: { cf: {}, env: { LAUNCHPAD_API: { async fetch(request) {
     const url = new URL(request.url);
+    if (url.pathname.startsWith("/node/v2/")) {
+      const response = protocol(url);
+      if (response) return response;
+    }
     current.bindingReads++;
     if (url.pathname === "/v2/launches") return Response.json({ result: [], total: 0 });
-    if (url.pathname === "/v2/launches/TESTCOIN") return Response.json({ result: null });
+    if (url.pathname === `/v2/launches/${asset}`) {
+      current.indexedLaunchReads++;
+      return Response.json({ result: indexed ? indexedRow : null });
+    }
     current.unexpected.push(url.href);
     return new Response(null, { status: 404 });
   } } } } };
@@ -84,16 +143,14 @@ function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false } = {}) {
         { day: "2026-08-09", usd: 1, btc: 40000 }, { day: "2026-09-07", usd: 1.5, btc: 70000 },
       ] } });
     }
-    if (url.hostname === "api.counterparty.io") {
-      if (url.pathname === "/v2/") return Response.json({ result: { counterparty_height: 899970 } });
-      if (url.pathname === "/v2/assets/TESTCOIN/fairminters") return Response.json({ result: [fairminter] });
-      if (url.pathname === "/v2/assets/TESTCOIN/issuances") return Response.json({ result_count: 1, result: [{
-        asset: fairminter.asset, tx_hash: fairminter.tx_hash, tx_index: fairminter.tx_index,
-        msg_index: 0, block_index: fairminter.block_index, block_time: 1749798000,
-        asset_events: "open_fairminter", status: "valid",
-      }] });
-      if (url.pathname === "/v2/assets/XCP/dispensers") return Response.json({ result: dispenser ? [{ tx_hash: "dispense", give_remaining: 100000000, give_quantity: 100000000, satoshirate: 1000 }] : [] });
-      if (url.pathname === "/v2/mempool/events/DISPENSE") return Response.json({ result: [] });
+    if (url.hostname === "api.xcp.io" && url.pathname === "/v2/status") {
+      return Response.json({ result: { tip: height, indexed_block: height } });
+    }
+    if (url.hostname === "api.counterparty.io" ||
+        (url.hostname === "api.xcp.fun" && url.pathname.startsWith("/node/v2/"))) {
+      // Retain the old boundary for --baseline-ref comparisons.
+      const response = protocol(url);
+      if (response) return response;
     }
     current.unexpected.push(url.href);
     return new Response(null, { status: 404 });
@@ -101,8 +158,8 @@ function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false } = {}) {
   return current;
 }
 
-async function render(module) {
-  const params = Promise.resolve({ lang: "en", asset: "TESTCOIN" });
+async function render(module, asset = "TESTCOIN") {
+  const params = Promise.resolve({ lang: "en", asset });
   async function Metadata() {
     const metadata = await module.generateMetadata({ params });
     return React.createElement("meta", { name: "description", content: metadata.description });
@@ -118,6 +175,28 @@ async function render(module) {
 }
 
 try {
+  await test("closed indexed asset metadata and page reuse one launch row without redundant protocol fairminter reads", async () => {
+    const current = setup({ indexed: true, asset: "EVOLVEDPEPE", status: "closed" });
+    const flight = await render(assetPage, "EVOLVEDPEPE");
+    indexedAssetMeasurement = {
+      asset: "EVOLVEDPEPE",
+      fixture: "conforming closed/refunded launch with complete creation evidence; current live EVOLVEDPEPE is graduated and lacks indexed original_deadline",
+      protocolFixtureLatencyMs: protocolLatencyMs,
+      indexedLaunchReads: current.indexedLaunchReads,
+      protocolFairminterReads: current.protocolFairminterReads,
+      protocolCreationReads: current.protocolCreationReads,
+      protocolPoolReads: current.protocolPoolReads,
+      protocolMintsReads: current.protocolMintsReads,
+      tickerReads: current.tickerReads,
+      unexpectedRequests: current.unexpected.length,
+    };
+    assert.equal(current.indexedLaunchReads, 1, "metadata and body share the indexed row in one Flight render");
+    assert.equal(current.protocolFairminterReads, expectedFairminterReads);
+    assert.deepEqual(current.unexpected, []);
+    assert.match(flight, /"data-phase":"refunded"/);
+    assert.match(flight, /"data-conforming":true/);
+    assert.match(flight, /A launch description/);
+  });
   for (const [name, module, expectedReads] of [["asset", assetPage, expectedAssetReads], ["home", homePage, expectedHomeReads]]) {
     await test(`${name} renders identical prices from one ticker read`, async () => {
       const current = setup();
@@ -162,7 +241,19 @@ try {
       });
     }
   }
-  console.log(JSON.stringify({ assetTickerReads: expectedAssetReads, homeTickerReads: expectedHomeReads, subsequentRequestFresh: true, nullAndFailureRecovery: true }));
+  const evidence = {
+    observedAt: new Date().toISOString(),
+    pageSource: baselineRef ?? "working-tree",
+    comparisonScope: "page.tsx orchestration only; API helpers and transport are current in both runs",
+    indexedAsset: indexedAssetMeasurement,
+    assetTickerReads: expectedAssetReads, homeTickerReads: expectedHomeReads,
+    subsequentRequestFresh: true, nullAndFailureRecovery: true,
+  };
+  if (evidencePath) {
+    await mkdir(path.dirname(evidencePath), { recursive: true });
+    await writeFile(evidencePath, JSON.stringify(evidence, null, 2));
+  }
+  console.log(JSON.stringify(evidence));
 } finally {
   globalThis.fetch = originalFetch;
   delete globalThis.__renderReadFixture;

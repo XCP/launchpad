@@ -4,9 +4,7 @@ import { cache } from "react";
 import {
   fetchBlockHeight,
   fetchFairmints,
-  fetchFairmintersByAsset,
   fetchMempoolFairminter,
-  fetchOriginalRecord,
   fetchPool,
   fetchPriceSeries,
   fetchHolderCount,
@@ -18,10 +16,10 @@ import {
 import {
   fetchCandles,
   fetchEventsBySource,
-  fetchIndexedLaunch,
   fetchLaunchFees,
   type ChartCandle,
 } from "@/lib/api/launchpad-api";
+import { fetchAssetLaunch, fetchLaunchOriginal } from "@/lib/api/asset-launch";
 import { foldPointsToCandles, type ChartResolution } from "@/lib/candles";
 import { proseDescription } from "@launchpad/xcp69/description";
 import { fetchMarketPrices } from "@/lib/api/price";
@@ -33,7 +31,6 @@ import {
   isXcp69,
   launchPhase,
   windowIsExact,
-  xcp69Params,
 } from "@/lib/xcp69";
 import { LaunchView } from "@/app/[lang]/[asset]/_components/launch-view";
 import { fetchAssetOrigin } from "@/lib/api/asset-origin";
@@ -41,21 +38,20 @@ import { fetchAssetOrigin } from "@/lib/api/asset-origin";
 export const revalidate = 30;
 
 /**
- * The indexed row, read once per render.
+ * The indexed launch and any fallback, resolved once per render.
  *
  * generateMetadata needs it for the unfurled description and the page body
  * needs it for burned supply and the rest, and Next's fetch memoization does
  * not see either call: in production the API module goes over a service
  * binding, not global fetch, so both callers were paying for the same row.
  * React's cache() shares the promise for the lifetime of one server request
- * only — a null, whether the launch is absent or the call timed out, is
- * shared within the render and forgotten with it, so nothing here outlives
- * the request or delays a later one from seeing the update.
+ * only. Missing rows and failures are forgotten with the request, so this
+ * adds no persistent cache and a later render can see a recovered index.
  *
  * Kept in this server-only module rather than the API module, which Client
  * Components import too.
  */
-const indexedLaunch = cache(fetchIndexedLaunch);
+const assetLaunch = cache((asset: string) => fetchAssetLaunch(asset, { freshStatus: true }));
 
 /** Long enough to say something, short enough that no platform truncates
  *  it mid-word. */
@@ -73,14 +69,14 @@ const SHARE_DESCRIPTION_MAX = 200;
  */
 async function shareDescription(asset: string): Promise<string | null> {
   try {
-    const indexed = await indexedLaunch(asset);
+    const launch = await assetLaunch(asset);
+    const { indexed } = launch;
     if (indexed?.displayDescription) {
       return clamp(indexed.displayDescription, SHARE_DESCRIPTION_MAX);
     }
-    const fairminters = await fetchFairmintersByAsset(asset);
     const fm =
-      fairminters.find((f) => xcp69Params(f)) ??
-      (await fetchMempoolFairminter(asset));
+      launch.fm ??
+      (!launch.hasConfirmedFairminters ? await fetchMempoolFairminter(asset) : null);
     if (!fm) return null;
 
     const onChain = typeof fm.description === "string" ? fm.description.trim() : "";
@@ -173,12 +169,9 @@ export default async function LaunchPage({
   // /pepe uppercases — while real routes stay lowercase and take precedence.
   if (!/^[B-Z][A-Z]{3,11}$/.test(asset)) notFound();
 
-  const fairminters = await fetchFairmintersByAsset(asset);
-  let fm =
-    // Selection is by parameters only: the timing clauses need the creation
-    // event, fetched below. (Also, `find(isXcp69)` would hand the array index
-    // in as announceBlock.)
-    fairminters.find((f) => xcp69Params(f));
+  const launch = await assetLaunch(asset);
+  const { indexed } = launch;
+  let fm = launch.fm;
 
   // blockHeight is needed up front now: a mempool-sourced fm needs it to
   // compute a real status (mempool-time status is computed against
@@ -194,7 +187,7 @@ export default async function LaunchPage({
     // check the mempool before giving up. Shaped as an ordinary Fairminter
     // so it flows through the same Scheduled/Minting view as everything
     // else — no separate "pending" page to keep in sync.
-    const pending = fairminters.length === 0 ? await fetchMempoolFairminter(asset) : null;
+    const pending = !launch.hasConfirmedFairminters ? await fetchMempoolFairminter(asset) : null;
     if (!pending) notFound();
     fm = {
       ...pending,
@@ -204,21 +197,17 @@ export default async function LaunchPage({
     isPendingConfirmation = true;
   }
 
-  const [mints, pool, original, prices, feeSats, indexed, assetOrigin] = await Promise.all([
+  const [mints, pool, original, prices, feeSats, assetOrigin] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask. Same for
     // anything still unconfirmed — the tx_hash isn't indexed yet either.
     fm.status === "pending" || isPendingConfirmation
       ? Promise.resolve([])
       : fetchFairmints(fm.tx_hash),
     fm.status === "closed" ? fetchPool(asset) : Promise.resolve(null),
-    // The row mutates once a launch leaves "pending" — its block_index
-    // becomes the opening block and a closed window becomes the settlement
-    // block — so both timing clauses are judged on the creation event.
-    // An unconfirmed launch skips this too: isXcp69's own confirmed-false
-    // path already treats the pre-announcement clause as satisfied.
-    fm.status !== "pending" && !isPendingConfirmation && xcp69Params(fm)
-      ? fetchOriginalRecord(fm.tx_hash)
-      : Promise.resolve({ deadline: null, announceBlock: null }),
+    // The indexed immutable creation evidence avoids another protocol read.
+    // Missing evidence still falls back to the original event, never the
+    // mutable opening or settlement block on the fairminter row.
+    fetchLaunchOriginal({ ...launch, fm }),
     // Both currencies come from the same parsed ticker. Independent readers
     // carry AbortSignals, so Next does not deduplicate their fetches.
     fetchMarketPrices(),
@@ -227,7 +216,6 @@ export default async function LaunchPage({
     fm.status === "open" && !isPendingConfirmation
       ? fetchLaunchFees(asset)
       : Promise.resolve(null),
-    indexedLaunch(asset),
     fm.status !== "closed"
       ? fetchAssetOrigin(asset, fm.tx_hash)
       : Promise.resolve(null),

@@ -183,6 +183,8 @@ interface ApiLaunchRow {
   pool_xcp_reserve: string | null;
   pool_token_reserve: string | null;
   announce_block: number | null;
+  original_deadline?: number | null;
+  conforming?: number | null;
   minters: number;
   /** Optional because a worker older than migration 0012 does not send it. */
   last_mint_block?: number | null;
@@ -200,7 +202,9 @@ interface ApiLaunchRow {
 export interface IndexedLaunch {
   fm: Fairminter;
   phase: LaunchPhase;
-  conforming: true; // the API only ever stores rows that passed the verdict
+  /** True only for a verified verdict; detail reads can include rejected or
+   *  not-yet-verified rows even though the listings filter those out. */
+  conforming: boolean;
   xcpDepth: bigint;
   /** Live pool reserves. Their ratio is XCP sats per raw token unit, which
    *  prices a holding without a per-asset pool lookup. */
@@ -209,6 +213,8 @@ export interface IndexedLaunch {
   /** The block the launch was ANNOUNCED in — its real age. `fm.block_index`
    *  is a stand-in for start_block on this path and can't answer that. */
   announceBlock: number | null;
+  /** Immutable creation deadline, before an early settlement rewrites it. */
+  originalDeadline: number | null;
   /** Distinct addresses that have minted. The one participation number every
    *  phase has, which is what makes it the cross-phase column in search. */
   minters: number;
@@ -832,11 +838,12 @@ function toIndexedLaunch(row: ApiLaunchRow): IndexedLaunch {
   return {
     fm: toFairminter(row),
     phase: row.phase,
-    conforming: true as const,
+    conforming: row.conforming === 1,
     xcpDepth: BigInt(Math.trunc(row.pool_xcp_sats) || 0),
     poolXcpReserve: row.pool_xcp_reserve,
     poolTokenReserve: row.pool_token_reserve,
-    announceBlock: row.announce_block,
+    announceBlock: row.announce_block ?? null,
+    originalDeadline: row.original_deadline ?? null,
     minters: row.minters,
     lastMintBlock: row.last_mint_block ?? null,
     launchTime: row.launch_time ?? null,
@@ -869,11 +876,12 @@ export async function fetchFxRates(): Promise<FxRates | null> {
 }
 
 /** One indexed launch, including its full mirrored creator description. */
-export async function fetchIndexedLaunch(asset: string): Promise<IndexedLaunch | null> {
+export async function fetchIndexedLaunch(asset: string, revalidate = 60): Promise<IndexedLaunch | null> {
   try {
     const res = await launchpadApiFetch(`/v2/launches/${encodeURIComponent(asset)}`, {
       signal: AbortSignal.timeout(3_000),
-      next: { revalidate: 60 },
+      cache: "no-store",
+      next: { revalidate },
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { result?: ApiLaunchRow | null };

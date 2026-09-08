@@ -12,7 +12,7 @@ import {
 } from "@xcp/wallet-sdk";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { big, parseJsonLossless, type Raw } from "@/lib/numeric";
-import { COUNTERPARTY_API_BASE } from "@/lib/constants";
+import { COUNTERPARTY_READ_API_BASE } from "@/lib/constants";
 import { useT } from "@/lib/i18n/client";
 
 const POLL_MS = 30_000;
@@ -87,7 +87,7 @@ export function PendingDock() {
           try {
             if (item.kind === "order") {
               const res = await fetch(
-                `${COUNTERPARTY_API_BASE}/orders/${item.txid}`,
+                `${COUNTERPARTY_READ_API_BASE}/orders/${item.txid}`,
                 { signal: AbortSignal.timeout(10_000), cache: "no-store" },
               );
               if (!res.ok) return;
@@ -115,7 +115,7 @@ export function PendingDock() {
             // count as misses (network errors never do), only after a 60s
             // propagation grace, and only 3 CONSECUTIVE misses mark a drop.
             const res = await fetch(
-              `${COUNTERPARTY_API_BASE}/transactions/${item.txid}`,
+              `${COUNTERPARTY_READ_API_BASE}/transactions/${item.txid}`,
               {
                 signal: AbortSignal.timeout(10_000),
                 // A polling request must reach the source. Reusing a cached

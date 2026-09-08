@@ -1,6 +1,5 @@
 import type { MempoolMint } from "@launchpad/xcp69/mempool";
 import {
-  COUNTERPARTY_API_BASE,
   COUNTERPARTY_BURN_ADDRESS,
   XCP_API_BASE,
 } from "@/lib/constants";
@@ -12,6 +11,7 @@ import {
 } from "@/lib/api/explorer";
 import type { LpBalance } from "@/lib/holders";
 import { discard } from "@/lib/net";
+import { nodeApiFetch } from "@/lib/api/node";
 import { big, parseJsonLossless, ratio, type Raw } from "@/lib/numeric";
 import type { Fairminter } from "@/lib/xcp69";
 
@@ -233,11 +233,9 @@ async function get<T>(path: string, revalidate = 60): Promise<T> {
 function attemptFetch(path: string, revalidate: number, deadline: number): Promise<Response> {
   const remaining = deadline - Date.now();
   if (remaining <= 0) throw new CounterpartyReadDeadline();
-  return fetch(`${COUNTERPARTY_API_BASE}${path}`, {
-    // Counterparty is a third party we do not run, and this is the shared
-    // client behind every server-rendered read. Without a deadline a stalled
-    // node holds the Worker invocation open and delays the HTML for everyone
-    // on that route; the throw is what callers already handle.
+  return nodeApiFetch(path, {
+    // The gateway preserves the protocol response and upstream refusal. Keep
+    // the existing deadline and freshness budget for its callers.
     signal: AbortSignal.timeout(Math.min(8_000, remaining)),
     next: { revalidate },
   });
@@ -1240,29 +1238,29 @@ export function fetchBlockTime(blockIndex: number): Promise<number | null> {
 
 export async function fetchBlockHeight(): Promise<number> {
   try {
-    const data = await get<{ result: { counterparty_height: number } }>("/", 30);
-    return data.result.counterparty_height;
-  } catch {
-    // Static generation runs pages in parallel, so several otherwise harmless
-    // tip reads can reach Counterparty together and trip its 429 limit. The
-    // xcp.io API is already a dependency throughout this app and exposes the
-    // same indexed tip. Falling back here keeps a transient throttle from
-    // failing the whole build (or every page that needs a countdown) without
-    // retrying the throttled origin in a loop.
-    const res = await fetch(`${XCP_API_BASE}/`, {
+    // The status heartbeat is cached for 15s; the home summary can be an
+    // hour old. Use parsed/indexed height, never an ahead-of-parser tip.
+    const res = await fetch(`${XCP_API_BASE}/status`, {
       signal: AbortSignal.timeout(8_000),
       next: { revalidate: 30 },
     });
     if (!res.ok) {
       await discard(res);
-      throw new Error(`XCP API ${res.status}: /`);
+      throw new Error(`XCP API ${res.status}: /status`);
     }
     const data = parseJsonLossless<{
-      result?: { tip?: number | string; indexed_block?: number | string };
+      result?: { indexed_block?: number | string; synced?: boolean };
     }>(await res.text());
-    const height = Number(data.result?.tip ?? data.result?.indexed_block);
-    if (!Number.isSafeInteger(height) || height <= 0) {
+    const height = Number(data.result?.indexed_block);
+    if (data.result?.synced === false || !Number.isSafeInteger(height) || height <= 0) {
       throw new Error("XCP API returned an invalid block height");
+    }
+    return height;
+  } catch {
+    const data = await get<{ result: { counterparty_height?: unknown } }>("/", 30);
+    const height = Number(data.result?.counterparty_height);
+    if (!Number.isSafeInteger(height) || height <= 0) {
+      throw new Error("Protocol API returned an invalid block height");
     }
     return height;
   }
