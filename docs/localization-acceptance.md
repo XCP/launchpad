@@ -43,3 +43,20 @@ Browser component fixtures use deterministic wallet, balance and quote data. The
 ## Remaining boundaries
 
 Review is model-assisted, without native-speaker certification. A fluent user's task walkthrough remains stronger evidence of regional naturalness. The separate English explanation draft is not part of this release's acceptance. Changing the language URL still clears an unsaved form; changing number or fiat preferences preserves it. Extension localization remains a separate release.
+
+## Context follow-up — 8 September 2026
+
+The later FAQ and meme prototypes remain separate in [draft PR30](https://github.com/XCP/launchpad/pull/30). This follow-up starts from main `24bddfb`, including the profile's available-XCP and open-mint summary. It changes translations and translator context only; the English keys, FAQ, transaction logic and preference behavior are unchanged.
+
+Review against the actual callers identified 47 value corrections across 13 keys in all ten translated catalogs:
+
+- Count minting and payout addresses without implying independently identified people. Classic-fairminter summaries use count labels where necessary to accommodate one address as well as many.
+- Identify cumulative MINTS programme rewards explicitly in profile labels and their explanation, rather than leaving them open to interpretation as investment profit. These totals are neither a current wallet balance nor necessarily already paid.
+- Correct Japanese Activity's ordinary-pool LP label, which previously meant LP currently held; clarify Chinese LP redemption as removing liquidity to receive underlying assets.
+- Correct a Japanese deadline clause, a Korean ongoing-mint modifier, and a Chinese Research explanation where a residual-balance threshold had been described as a considerable balance.
+
+Fifteen context notes record the measured counts, reward-ledger meaning, LP operation and available/pending/escrowed XCP distinctions. The four new profile translations already express those balance distinctions correctly and require no value changes. Existing regional glossary choices, including shared Spanish and separate Chinese variants, remain appropriate for this bounded review.
+
+All 1,242 keys remain present in every catalog. Placeholder parity and key order pass, status files are unchanged, and every changed entry retains machine provenance. The existing web type/lint/numeric checks and 71 focused localization, profile and compose-safety tests pass. This remains model-assisted contextual review, not native-speaker certification.
+
+Some inherited English FAQ/Docs explanations describe pool XCP as permanently immobile. The initial LP restriction does not prevent swaps from paying assets out of the pool. Those source-copy concerns remain recorded with the parked explanation work; translations must not silently introduce a different claim in only one language. This follow-up does not certify or rewrite those paragraphs.
