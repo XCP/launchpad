@@ -51,12 +51,16 @@ Four phases:
 ## Trading and pricing
 
 Graduated tokens trade against a constant-product TOKEN/XCP pool with a
-fixed 50 bps swap fee paid to the pool itself — the LP is burned, so fees
-deepen the locked liquidity. Counterparty's DEX order is the single trading
-primitive: matching routes through the pool whenever the pool's marginal
-price beats the order book, so a "market order" is an order at the router's
-quoted output, and a "limit order" rests on the book until counter-orders —
-or the pool's own price crossing yours — fill it. Price = XCP reserve ÷
+fixed 50 bps swap fee retained in its reserves. Initial LP tokens are held
+at an unspendable address; providers who add liquidity later can withdraw
+the share represented by their own LP tokens. Swaps can pay XCP out of the
+pool. Counterparty orders can use pool and book liquidity when confirmed,
+subject to their limit price. A market order sets that limit from the
+router's quote; a limit order uses your chosen price. Any unfilled remainder
+rests on the book awaiting a matching order, until filled, expired or
+cancelled. The opening reserve ratio does not guarantee a profitable sale:
+price impact, swap fees, Bitcoin fees and other trades affect proceeds.
+Price = XCP reserve ÷
 token reserve. "Market cap" = price × circulating supply (issued supply minus
 burned tokens) — a convention, not a
 promise.

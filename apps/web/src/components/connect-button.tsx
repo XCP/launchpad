@@ -49,7 +49,7 @@ export function useConnectAction(): {
           <div className="px-2 pb-2">
             <p className="text-sm leading-relaxed text-gray-600 dark:text-gray-400">
               {t(
-                "Connecting needs a wallet browser extension, and no mobile browser can run one yet. Everything here is readable on a phone — launches, prices, holders — but minting and trading need a desktop.",
+                "Connecting requires a supported wallet browser extension. You can browse launches, prices, and holders on your phone; use a desktop browser to mint or trade.",
               )}
             </p>
           </div>

@@ -131,10 +131,12 @@ therefore holds the **settlement block**, not the composed deadline. Consequence
   months ~98% of the time; 1–4 buyers, 0%.) The cap is per address, not per person —
   it raises the cost of faking a crowd, it cannot prevent one.
 - **Pool opening price:** 690 XCP against 31M tokens =
-  **69/31 ≈ 2.23× the mint price**. Every minter is structurally in profit at open;
-  the pool, not later buyers, absorbs early exits.
-- **Depth at open:** ~690 XCP of real, permanently locked liquidity; constant
-  50 bps swap fee (XCP pair).
+  **69/31 ≈ 2.23× the mint price**. This reserve ratio does not guarantee a
+  profitable sale: price impact, swap fees, Bitcoin fees and intervening trades
+  affect actual proceeds.
+- **Depth at open:** 690 XCP paired with 31M tokens; the initial LP tokens are
+  held at an unspendable address. Swaps change these reserves and can pay XCP
+  out to sellers. The swap fee is 50 bps (XCP pair).
 - **Allocation:** 69% of supply publicly minted, 31% in the pool. They sum to 100% —
   there is nowhere else for supply to be.
 

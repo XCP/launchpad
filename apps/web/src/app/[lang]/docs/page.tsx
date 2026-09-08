@@ -225,17 +225,17 @@ export default async function DocsPage() {
         <p className="text-sm text-gray-700 dark:text-gray-300">
           {rich(
             t,
-            "Graduated tokens trade against a constant-product TOKEN/XCP pool. The price is simply the ratio of the pool's reserves; every swap moves it. A fixed {fee} fee on each swap is paid to the pool itself — and since the LP is burned, fees deepen the locked liquidity rather than paying anyone out.",
+            "Graduated tokens trade against a constant-product TOKEN/XCP pool. The reserve ratio determines its price, and each swap changes that ratio. A fixed {fee} fee on each swap stays in the pool, increasing its reserves. The initial LP tokens are held at an unspendable address; providers who add liquidity later can withdraw the share represented by their own LP tokens.",
             { fee: <strong>{t("50 bps")}</strong> },
           )}
         </p>
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          {t("The pool opens with 690 XCP against 31M tokens: 69/31 ≈ {mult}× the mint price. Every minter is structurally in profit at open, and the pool — not later buyers — absorbs early exits.", { mult })}
+          {t("The pool opens with 690 XCP against 31M tokens, setting an initial reserve price of 69/31 ≈ {mult}× the mint price. Your actual sale proceeds depend on price impact, fees, and other trades. The opening ratio does not guarantee a profit.", { mult })}
         </p>
         <p className="text-sm text-gray-700 dark:text-gray-300">
           {rich(
             t,
-            "Counterparty's DEX order is the single trading primitive: matching routes through the pool whenever the pool's price beats the order book. A {market} is an order at the router's quoted output — it fills from pool and book at best price immediately. A {limit} rests on the book, and the pool fills it automatically if its price ever crosses yours.",
+            "Counterparty's DEX order is the trading primitive: matching can use the pool when it offers a better price than the order book. A {market} uses the router's quote to set its limit price. It can fill from the pool and book when confirmed; any unfilled amount stays open until it fills, expires, or is cancelled. A {limit} sets your chosen price: it can use pool liquidity when confirmed, and any unfilled remainder rests on the order book awaiting a matching order.",
             { market: <em>{t("market order")}</em>, limit: <em>{t("limit order")}</em> },
           )}
         </p>
@@ -525,7 +525,7 @@ export default async function DocsPage() {
       <section id="reference-launch" className="space-y-3">
         <h2 className="text-xl font-bold">{t("Reference launch")}</h2>
         <div className="rounded-lg border border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-5 text-sm text-gray-600 dark:text-gray-400">
-          {t("Fairmint pools activated on 2026-08-05 and no XCP-69 launch exists yet. The first launch will be linked here as the reference token — the canonical record to validate your integration against: its fairminter row should pass the predicate above, its mint tape should show ≥{n} distinct addresses, and its pool row should show the burned LP at the unspendable address.", { n: min })}
+          {t("Choose a graduated launch from the home page to validate your integration. Its fairminter row should pass the predicate above, its mint history should show at least {n} distinct participating addresses, and its initial LP tokens should be credited to the unspendable address. Verify the corresponding pool and transaction records on your Counterparty node.", { n: min })}
         </div>
       </section>
 
