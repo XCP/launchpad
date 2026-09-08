@@ -1625,7 +1625,7 @@ function Card({
         <div className="grid grid-cols-2 divide-x divide-gray-100 border-t border-gray-100 dark:divide-gray-800 dark:border-gray-800">
           <div className="px-2 py-2 sm:px-3">
             <div className={STAT_CAPTION}>{t("Market cap")}</div>
-            <div className="text-[13px] font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-base">
+            <div className="whitespace-nowrap text-xs font-bold tabular-nums text-gray-900 dark:text-gray-100 sm:text-base">
               {capLabel}
             </div>
           </div>

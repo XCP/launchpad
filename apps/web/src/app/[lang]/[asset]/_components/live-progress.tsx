@@ -2,6 +2,7 @@
 
 import { tokenQty } from "@/lib/format";
 import { useNumbers } from "@/lib/i18n/numbers";
+import { useT } from "@/lib/i18n/client";
 import { useLaunchRoom, useStatusTransition } from "@/app/[lang]/[asset]/_components/launch-room";
 import { big, type Raw, ratio, sumRaw } from "@/lib/numeric";
 
@@ -39,6 +40,7 @@ export function LiveProgress({
   serverStatus: string;
 }) {
   const num = useNumbers();
+  const t = useT();
   const { state } = useLaunchRoom();
   // Sells out or refunds while you're watching: the page follows.
   useStatusTransition(serverStatus);
@@ -52,12 +54,15 @@ export function LiveProgress({
 
   return (
     <>
-      <div className="mb-2 flex items-baseline justify-between">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3">
         <span className="text-lg font-bold">{num.percent(confirmedPct / 100)}</span>
         <span className="text-sm text-gray-500 dark:text-gray-400">
-          {num.compact(tokenQty(earned, divisible))} /{" "}
-          {big(target) > 0n ? num.compact(tokenQty(target, divisible)) : "∞"}
-          {allOrNothing ? " · to launch" : ""}
+          {allOrNothing
+            ? t("{earned} / {target} to launch", {
+                earned: num.compact(tokenQty(earned, divisible)),
+                target: big(target) > 0n ? num.compact(tokenQty(target, divisible)) : "∞",
+              })
+            : <>{num.compact(tokenQty(earned, divisible))} / {big(target) > 0n ? num.compact(tokenQty(target, divisible)) : "∞"}</>}
         </span>
       </div>
       <div className="h-3 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">

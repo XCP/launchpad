@@ -676,7 +676,7 @@ export function SwapWidget({
           guarantee row, digit-for-digit what the wallet will show. */}
       {rateText && (
       <div className="px-2 pt-2">
-        <div className="flex h-6 items-center justify-between text-xs">
+        <div className="flex min-h-6 flex-wrap items-center justify-between gap-x-2 gap-y-1 text-xs">
           <button
             type="button"
             onClick={() => setRateInverted((v) => !v)}

@@ -83,5 +83,7 @@
   "escrowed until launch": "Escrow lasts until the token sale resolves (graduation or refund), not merely until minting begins.",
   "Of XCP minted": "Share of XCP contributed to token mints. XCP is spent/committed here, not newly issued or minted.",
   "No LP in this pool": "The connected wallet has zero LP tokens for this pool. Does not mean that the pool has no liquidity or no LP supply.",
-  "XCP Rewards — xcp.fun": "Localized page title follows the same short Rewards label as navigation; retain the xcp.fun site name."
+  "XCP Rewards — xcp.fun": "Localized page title follows the same short Rewards label as navigation; retain the xcp.fun site name.",
+  "{earned} / {target} to launch": "Sale progress: confirmed token amount minted out of the full target required to open the pool. Both values are already formatted for the chosen number locale. Keep the complete phrase natural; no person or transaction classifier.",
+  "{period} {kind} from every fill on the pair — pool and order book. Volume beneath in XCP; {volume} XCP is the busiest {bucket} shown. Trend {trend} over this range.": "Chart caption. period, kind, bucket and trend are independently translated labels. Restructure as short labeled clauses where joining them would require different grammatical cases or genders. volume is the largest XCP volume in one displayed interval, not an interval itself."
 }

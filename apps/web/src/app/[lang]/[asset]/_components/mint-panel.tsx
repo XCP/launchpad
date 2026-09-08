@@ -298,7 +298,7 @@ export function MintPanel({
                 : "text-gray-300 dark:text-gray-600"
             }`}
           >
-            {costXcp > 0 ? costXcp.toFixed(2) : "0"}
+            {costXcp > 0 ? num.fixed(costXcp, 2) : "0"}
           </div>
         </Well>
       </div>

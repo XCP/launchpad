@@ -105,6 +105,7 @@ export function TradePanel({
   const [editField, setEditField] = useState<"amount" | "total">("amount");
 
   const { customFee, medianFeeRate, limitExpiration, limitSettingsValid } = useSwapSettings();
+  const expirationPreset = LIMIT_EXPIRATIONS.find((x) => x.blocks === limitExpiration);
   const feeRate = customFee ?? medianFeeRate ?? null;
   const { data: btcUsd } = useSWR(
     "btc-usd",
@@ -615,8 +616,7 @@ export function TradePanel({
             <div className="flex justify-between">
               <dt>{t("Expires")}</dt>
               <dd>
-                {LIMIT_EXPIRATIONS.find((x) => x.blocks === limitExpiration)
-                  ?.label ?? t("{n} blocks", { n: limitExpiration })}
+                {expirationPreset ? t(expirationPreset.label) : t("{n} blocks", { n: limitExpiration })}
               </dd>
             </div>
             {feeRate !== null && (

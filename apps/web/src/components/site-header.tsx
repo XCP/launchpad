@@ -23,22 +23,13 @@ import { TelegramChip } from "@/components/telegram-chip";
  *  - Launch has left the header entirely. It is the homepage's call to action,
  *    not a permanent fixture, and it competed with the section links on every
  *    other page for space none of them had.
- *  - Below `nav` (880px, defined in globals.css) the links collapse into one
+ *  - Below `nav` (1024px, defined in globals.css) the links collapse into one
  *    menu button, which is the only honest way to fit six destinations on a
  *    narrow screen.
  *
- * That threshold is measured, not chosen, and it is not one of Tailwind's own
- * stops because none of them fits. In the band between the burger and `lg` the
- * row carries both nav groups, the inline status chips and the wallet, and it
- * needs 761px with a Connect button — but 822px once a wallet is connected and
- * that button becomes a 137px address pill. The connected state is the one a
- * desktop visitor is usually in, so it is the one the breakpoint has to clear.
- *
- * `sm` (640px) was therefore wrong by ~180px and had been since before Activity
- * joined the secondary links; `md` (768px) is still 54px short. The row does not
- * break when it overruns — it squeezes the one group allowed to shrink — so the
- * failure was quiet rather than visible, which is exactly why it survived.
- * `lg` (1024px) would fit but hides the links on every tablet, so 880px it is.
+ * The threshold includes translated labels and the wider connected-wallet
+ * pill. Spanish needs roughly 966px with the rewards chip; measuring only
+ * English let the two navigation groups overlap at the old 880px threshold.
  *
  * The wallet is desktop-only, and that is a statement of fact rather than a
  * layout compromise: the XCP Wallet is a browser extension, and no mobile
@@ -81,7 +72,7 @@ const MENU_EXTRA = [
 
 export function SiteHeader() {
   const t = useT();
-  // Below `lg` the chips sit inline, in the row's remaining space — and there
+  // Below `xl` the chips sit inline, in the row's remaining space — and there
   // is only ever enough of it for one. Two at once pushed the wordmark until
   // 🎉 XCP.FUN began to truncate, which is the one thing in the row that can't
   // give way. So the pair becomes a priority: queued work outranks a standing
@@ -101,11 +92,8 @@ export function SiteHeader() {
       <div className="absolute end-4 top-1/2 hidden -translate-y-1/2 min-[1340px]:block">
         <LanguageSwitch />
       </div>
-      {/* `relative` so the mempool chip can be centred on the HEADER rather
-          than on whatever gap the two nav groups happen to leave — those
-          change width with the wallet's state, and a "centre" that drifts
-          when you connect isn't one. */}
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+      {/* Status chips stay in the flex flow between the navigation groups. */}
+      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-2 py-3 min-[360px]:px-4">
         <div className="flex min-w-0 items-center gap-5">
           <LazyLink
             href="/"
@@ -131,22 +119,9 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        {/* In the flow between the two nav groups, NOT absolutely centred.
-            It used to be absolute — dead centre of the header, so it could not
-            drift when the wallet changed width — and that is precisely how it
-            broke: absolute centring places the cluster by the row's midpoint
-            while ignoring that the groups either side are different widths. On
-            a connected wallet with all three chips up, its right edge landed on
-            top of the secondary nav and "Telegram" sat over "Activity".
-
-            Widening the window could never fix that. This row is capped at
-            `max-w-5xl`, so it is 1024px on a 1440px monitor exactly as it is on
-            a 1024px one, and the collision was identical at every size above
-            lg. The content genuinely fits — 274 + ~317 + 342 plus padding is
-            965 of 1024 — so flexbox was the right tool all along: as a normal
-            child the cluster simply cannot overlap its siblings, and the worst
-            case is that it sits a little off true centre when the wallet
-            changes width. Drifting beats colliding. */}
+        {/* The row is capped at 1024px even on a wide monitor. Keeping Telegram
+            icon-only and mempool count-only leaves room for both status chips,
+            translated navigation and a connected wallet. */}
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
           {/* Rewards is always on; mempool joins it only when something is
               queued, so the group grows and shrinks as one unit. Telegram sits
@@ -159,16 +134,13 @@ export function SiteHeader() {
           <TelegramChip />
         </div>
 
-        <div className="flex shrink-0 items-center gap-4 text-sm font-medium text-gray-600 dark:text-gray-400">
+        <div className="flex shrink-0 items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 min-[360px]:gap-4">
           {/* Beside the burger on a phone, and beside the links in the band
               between — the same chips, just not pretending to be centred, and
               never both at once. */}
-          {/* Telegram survives the one-chip rule because it costs almost
-              nothing to keep: below `lg` it is the logo alone, no label, so it
-              adds an icon's width rather than a word's. The status chip still
-              takes turns beside it — that constraint was about text, and this
-              does not spend any. */}
-          <span className="flex items-center gap-2 xl:hidden">
+          {/* Telegram remains an icon at every width. The status chips still
+              take turns here so the compact row has room for the menu. */}
+          <span className="flex items-center gap-1 min-[360px]:gap-2 xl:hidden">
             {queued ? <MempoolChip /> : <RewardsChip />}
             <TelegramChip />
           </span>
