@@ -12,6 +12,7 @@ import { ActivityTab } from "@/app/[lang]/profile/_components/activity-tab";
 import { HistoryTab } from "@/app/[lang]/profile/_components/history-tab";
 import { LaunchesTab } from "@/app/[lang]/profile/_components/launches-tab";
 import { MintingTab } from "@/app/[lang]/profile/_components/minting-tab";
+import { ProfileXcpBalance } from "@/app/[lang]/profile/_components/profile-xcp-balance";
 import { OrdersTab } from "@/app/[lang]/profile/_components/orders-tab";
 import { PositionsTab } from "@/app/[lang]/profile/_components/positions-tab";
 import { PoolsTab } from "@/app/[lang]/profile/_components/pools-tab";
@@ -165,6 +166,7 @@ export function ProfileView({ viewing }: { viewing?: string }) {
             )}
           </div>
         </div>
+        <ProfileXcpBalance address={address} onOpenMints={() => setTab("minting")} />
       </div>
 
       {isSelf && proofStatus === "failed" && (
