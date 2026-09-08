@@ -175,8 +175,9 @@ const compareRecent = (a: SectionRow, b: SectionRow): number => {
 /**
  * Each phase is judged by its own measure, so each gets its own sort menu
  * rather than one shared list where two thirds of the options are inert.
- * The first entry is the default, and matches the order apps/api already
- * returns the section in.
+ * The first entry is the homepage default and matches the initial request
+ * in page.tsx. Minting explicitly requests pace; other phases use the API's
+ * defaults.
  *
  * Every `id` here is a key of SORT_SQL in apps/api/src/queries/launches.ts —
  * that is the contract, and it is why these are terse strings rather than
@@ -197,10 +198,8 @@ const SORTS: Record<string, SortOption[]> = {
     { id: "newest", label: msg("Newest"), by: (a, b) => announced(b) - announced(a) },
   ],
   minting: [
-    // First, so it is the default — and it must stay in step with
-    // DEFAULT_SORT.minting in apps/api/src/queries/launches.ts, which is what
-    // the server renders page one with.
-    { id: "progress", label: msg("Progress"), by: (a, b) => b.progress - a.progress },
+    // First, so it is the homepage default. page.tsx renders the same first
+    // page with an explicit pace request and the height passed to this view.
     // Not a column the API can index — it is a rate against the live tip — so
     // the request carries the tip and the worker orders on it. See SORT_SQL's
     // `pace` in apps/api/src/queries/launches.ts, which computes the same
@@ -210,6 +209,7 @@ const SORTS: Record<string, SortOption[]> = {
       label: msg("Mint Pace"),
       by: (a, b, height) => paceRank(b, height) - paceRank(a, height),
     },
+    { id: "progress", label: msg("Progress"), by: (a, b) => b.progress - a.progress },
     // The window is fixed by the standard at start_block + 1,000, so the
     // deadline is exact and closing order never contradicts opening order.
     // end_block is NOT the field for this: it is 0 on every conforming

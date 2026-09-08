@@ -579,6 +579,7 @@ export function ActivityTabs({
                             address={r.source}
                             issuerSource={issuerSource}
                             collections={collections?.get(r.source)}
+                            maxChips={minting ? 4 : undefined}
                           />
                           {freshness?.noHistory.has(r.source) && (
                             <span

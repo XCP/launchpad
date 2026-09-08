@@ -4,7 +4,7 @@ import { msg } from "@/lib/i18n/t";
 import { LazyLink } from "@/components/lazy-link";
 import { DropdownMenu as DM } from "radix-ui";
 import { HeaderWallet } from "@/components/header-wallet";
-import { CurrencySubmenu, LanguageSubmenu, LanguageSwitch } from "@/components/language-switch";
+import { CurrencySubmenu, CurrencySwitch, LanguageSubmenu, LanguageSwitch } from "@/components/language-switch";
 import { usePathname } from "next/navigation";
 import { useLocale, useT } from "@/lib/i18n/client";
 import { splitLocale, type Locale } from "@/lib/i18n/locales";
@@ -86,10 +86,17 @@ export function SiteHeader() {
           Wide enough for a margin beyond the 1024px row, it sits in the
           corner where a reader who cannot read the page will look for a
           globe. Narrower, it joins the row beside the wallet. On phones it
-          is a section of the menu. 1340px is where the corner has room for
-          the widest language name without touching the row. */}
-      <div className="absolute end-4 top-1/2 hidden -translate-y-1/2 min-[1340px]:block">
-        <LanguageSwitch />
+          is a section of the menu. The corner has room for separate globe
+          and currency controls at 1340px; the language name joins them at
+          1536px without touching the centered navigation row. */}
+      <div className="absolute end-4 top-1/2 hidden -translate-y-1/2 items-center gap-2 min-[1340px]:flex">
+        <div className="min-[1536px]:hidden">
+          <LanguageSwitch compact includeCurrency={false} />
+        </div>
+        <div className="hidden min-[1536px]:block">
+          <LanguageSwitch includeCurrency={false} />
+        </div>
+        <CurrencySwitch />
       </div>
       {/* Navigation stays anchored to the sides; badges have their own center. */}
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-1 px-2 py-3 min-[360px]:gap-3 min-[360px]:px-4">

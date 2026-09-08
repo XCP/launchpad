@@ -36,7 +36,7 @@ beforeEach(() => {
 });
 afterEach(async () => { await act(() => root.unmount()); container.remove(); });
 
-it("keeps exact intent and USD while language and display format change independently", async () => {
+it("keeps exact intent and USD during passive locale rendering and display-format changes", async () => {
   await render("ja");
   expect(container.querySelector("#number")!.textContent).toBe("100,000,000.00000001");
   await act(() => setNumberLocale("fr"));

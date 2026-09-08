@@ -20,10 +20,13 @@ export function AddressBadges({
   address,
   issuerSource,
   collections,
+  maxChips = 6,
 }: {
   address: string;
   issuerSource?: string;
   collections?: string[];
+  /** Collection flair slots, including the overflow count; identity badges remain separate. */
+  maxChips?: number;
 }) {
   const t = useT();
   return (
@@ -38,20 +41,17 @@ export function AddressBadges({
           <span className="sr-only">{t("burn address")}</span>
         </span>
       )}
-      {collections && <CollectionChips tags={collections} />}
+      {collections && <CollectionChips tags={collections} maxChips={maxChips} />}
     </>
   );
 }
 
-/** Six chips fit a row; past that, five and a count, so a prolific creator
- *  never pushes the balance off the screen. The count's tooltip names the rest. */
-const SHOW_ALL_UP_TO = 6;
-const SHOW_WHEN_MORE = 5;
-
-function CollectionChips({ tags }: { tags: string[] }) {
+/** Reserve the final slot for a count when the row exceeds its limit.
+ *  The count's tooltip names every remaining collection. */
+function CollectionChips({ tags, maxChips }: { tags: string[]; maxChips: number }) {
   const t = useT();
   const matched = COLLECTIONS.filter((c) => tags.includes(c.tag));
-  const shown = matched.length <= SHOW_ALL_UP_TO ? matched : matched.slice(0, SHOW_WHEN_MORE);
+  const shown = matched.length <= maxChips ? matched : matched.slice(0, maxChips - 1);
   const rest = matched.slice(shown.length);
   return (
     <>
