@@ -18,13 +18,7 @@ import {
   fetchOriginalRecord,
   fetchPool,
 } from "@/lib/api/counterparty";
-import {
-  fetchBtcUsd,
-  fetchBtcUsd30dAgo,
-  fetchXcpUsd,
-  fetchXcpUsd30dAgo,
-  fetchXcpUsdDayAgo,
-} from "@/lib/api/price";
+import { fetchMarketPrices } from "@/lib/api/price";
 import { priceChangePercent } from "@/lib/market";
 import { big } from "@/lib/numeric";
 import {
@@ -88,19 +82,13 @@ export default async function HomePage() {
   const heightPromise = fetchBlockHeight();
   const [
     blockHeight,
-    xcpUsd,
-    btcUsd,
-    btcUsd30dAgo,
-    xcpUsd30dAgo,
-    xcpUsdDayAgo,
+    prices,
     ...first
   ] = await Promise.all([
     heightPromise,
-    fetchXcpUsd(),
-    fetchBtcUsd(),
-    fetchBtcUsd30dAgo(),
-    fetchXcpUsd30dAgo(),
-    fetchXcpUsdDayAgo(),
+    // One parsed ticker supplies both prices and all three reference values.
+    // Each independent reader has a deadline and bypasses Next memoization.
+    fetchMarketPrices(),
     // Minting uses the homepage's explicit pace default. The public API's
     // defaults, used by the other phases, remain unchanged.
     ...SECTIONS.map((phase) =>
@@ -111,6 +99,7 @@ export default async function HomePage() {
         : fetchLaunchPage(phase, undefined, PER_PAGE[phase], 0),
     ),
   ]);
+  const { xcp: xcpUsd, btc: btcUsd, btcUsd30dAgo, xcpUsd30dAgo, xcpUsdDayAgo } = prices;
   const btcChange30d =
     btcUsd !== null && btcUsd30dAgo !== null
       ? priceChangePercent(btcUsd, btcUsd30dAgo)

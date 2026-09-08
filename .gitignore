@@ -1,6 +1,7 @@
 node_modules/
 .next/
 .open-next/
+.test-dist/
 out/
 *.tsbuildinfo
 next-env.d.ts
