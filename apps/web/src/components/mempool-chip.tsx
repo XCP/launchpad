@@ -4,7 +4,7 @@ import { LazyLink } from "@/components/lazy-link";
 import { useMempool } from "@/hooks/use-mempool";
 import { PendingDot } from "@/components/pending-dot";
 import { FOCUS } from "@/components/ui/tokens";
-import { useT } from "@/lib/i18n/client";
+import { useLocale, useT } from "@/lib/i18n/client";
 
 /**
  * Ambient, not watched: this sits on every page, so it polls at a third of
@@ -43,6 +43,7 @@ export function useMempoolCount() {
  */
 export function MempoolChip({ className = "" }: { className?: string }) {
   const t = useT();
+  const english = useLocale() === "en";
   const count = useMempoolCount();
 
   // Nothing queued, or nothing known yet: render nothing at all rather than a
@@ -58,9 +59,10 @@ export function MempoolChip({ className = "" }: { className?: string }) {
       className={`flex shrink-0 items-center gap-1.5 rounded-full border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-xs font-medium text-amber-800 dark:text-amber-300 transition-colors hover:border-amber-300 dark:hover:border-amber-700 ${FOCUS} ${className}`}
     >
       <PendingDot />
-      {/* Keep the header compact across locales; the full translated name
-          remains available to screen readers and on hover. */}
-      <span className="tabular-nums">{count}</span>
+      {/* English retains its original label; translated headers use the
+          count with the full name available to screen readers and on hover. */}
+      {english && <span>{t("Mempool", "chip")}</span>}
+      <span className="tabular-nums">{english ? `(${count})` : count}</span>
     </LazyLink>
   );
 }
