@@ -10,6 +10,7 @@ import { listMarketAssets } from "#api/queries/activity";
 import { launchesRoute } from "#api/read/launches";
 import { fxRoute } from "#api/read/fx";
 import { communitiesRoute } from "#api/read/communities";
+import { nodeRoute } from "#api/read/node";
 import { syncCommunities } from "#api/indexer/communities";
 import { mintClosed } from "#api/telegram/format";
 import { announceLive, queueAnnouncements } from "#api/telegram/live";
@@ -73,6 +74,7 @@ app.route("/", launchesRoute);
 app.route("/", fxRoute);
 app.route("/", communitiesRoute);
 app.route("/", activityRoute);
+app.route("/", nodeRoute);
 
 /**
  * Post one sample announcement, to prove the bot is wired up.
