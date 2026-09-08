@@ -119,9 +119,9 @@ export function SiteHeader() {
           </nav>
         </div>
 
-        {/* The row is capped at 1024px even on a wide monitor. Keeping Telegram
-            icon-only and mempool count-only leaves room for both status chips,
-            translated navigation and a connected wallet. */}
+        {/* The row is capped at 1024px even on a wide monitor. Translated
+            headers compact the chips to leave room for navigation and a
+            connected wallet; English retains its original chip labels. */}
         <div className="hidden shrink-0 items-center gap-2 xl:flex">
           {/* Rewards is always on; mempool joins it only when something is
               queued, so the group grows and shrinks as one unit. Telegram sits
@@ -138,8 +138,8 @@ export function SiteHeader() {
           {/* Beside the burger on a phone, and beside the links in the band
               between — the same chips, just not pretending to be centred, and
               never both at once. */}
-          {/* Telegram remains an icon at every width. The status chips still
-              take turns here so the compact row has room for the menu. */}
+          {/* Telegram uses its icon on phones and in translated headers.
+              Status chips take turns here to leave room for the menu. */}
           <span className="flex items-center gap-1 min-[360px]:gap-2 xl:hidden">
             {queued ? <MempoolChip /> : <RewardsChip />}
             <TelegramChip />
