@@ -3149,7 +3149,6 @@
   ],
   "Refresh": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
-    "app/[lang]/dispense/_components/bridge-recovery.tsx",
     "app/[lang]/profile/_components/orders-tab.tsx",
     "components/ui/refresh-button.tsx"
   ],

@@ -12,9 +12,12 @@ import { LocaleProvider } from "@/lib/i18n/client";
 vi.mock("@/lib/api/counterparty", () => ({ fetchXcpDispensers: vi.fn() }));
 vi.mock("@/lib/api/price", () => ({ fetchMarketPrices: vi.fn() }));
 vi.mock("@/app/[lang]/dispense/_components/bridge", () => ({
-  XcpBridge: ({ dispensers, btcUsd, xcpUsd }: { dispensers: Dispenser[]; btcUsd: number | null; xcpUsd: number | null }) => <div data-bridge>
+  // Stands in for the ladder's own heading crank, which is the real
+  // component's only refresh affordance once a book is on screen.
+  XcpBridge: ({ dispensers, btcUsd, xcpUsd, onRefresh }: { dispensers: Dispenser[]; btcUsd: number | null; xcpUsd: number | null; onRefresh: () => void }) => <div data-bridge>
     <p>{dispensers.length ? "Available book" : "No open dispensers"}</p>
-    <output>{btcUsd}:{xcpUsd}</output><input aria-label="Amount" defaultValue="draft" /><button type="button">Buy XCP</button>
+    <output>{btcUsd}:{xcpUsd}</output><input aria-label="Amount" defaultValue="draft" />
+    <button type="button" data-refresh onClick={onRefresh}>Re-read book</button><button type="button">Buy XCP</button>
   </div>,
 }));
 const rows: Dispenser[] = [{ tx_hash: "a".repeat(64), source: "dispenser-address", give_quantity: 100_000_000, give_remaining: 1_000_000_000, satoshirate: 1000, price: 1000 }];
@@ -85,10 +88,23 @@ describe("dispenser recovery interaction", () => {
     await render(null); await click();
     expect(container.textContent).toContain("No open dispensers"); expect(container.querySelector('[role="alert"]')).toBeNull();
   });
+  it("shows no banner or retry over a healthy book, and never reads on its own", async () => {
+    vi.useFakeTimers(); await render(rows);
+    expect(container.textContent).toContain("Available book"); expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).not.toContain("Retry");
+    expect(container.querySelector("fieldset")?.disabled).toBe(false);
+    await act(() => vi.advanceTimersByTimeAsync(60_000)); expect(read).not.toHaveBeenCalled();
+  });
+  it("retires its recovery chrome once a retry succeeds, leaving the form live", async () => {
+    await render(null); await click();
+    expect(container.textContent).toContain("Available book"); expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(container.textContent).not.toContain("Retry");
+    expect(container.querySelector("fieldset")?.disabled).toBe(false);
+  });
   it("retains known rows and the draft after a failed refresh, blocking stale-book actions", async () => {
     await render(rows); const input = container.querySelector("input")!; input.value = "my exact draft";
     read.mockResolvedValue(Response.json({ error: "unavailable" }, { status: 503 }));
-    await click();
+    await act(async () => { (container.querySelector("[data-refresh]") as HTMLButtonElement).click(); });
     expect(container.textContent).toContain("Available book"); expect(container.querySelector("input")).toBe(input);
     expect(input.value).toBe("my exact draft"); expect(container.querySelector("fieldset")?.disabled).toBe(true);
     expect(container.querySelector('[role="alert"]')).toBeTruthy();

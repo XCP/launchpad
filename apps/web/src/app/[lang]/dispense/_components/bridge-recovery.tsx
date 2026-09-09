@@ -77,17 +77,26 @@ export function BridgeRecovery({ dispensers, btcUsd, xcpUsd }: {
   };
 
   return <div className="space-y-3">
-    {unavailable && <ErrorBanner>{t("The service is busy or unavailable. Try again shortly.")}</ErrorBanner>}
-    <div className="flex justify-end">
-      <button type="button" onClick={() => void retry()} disabled={pending || wait > 0}
-        className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:underline disabled:opacity-50 dark:text-purple-400">
-        {pending ? t("Loading…") : wait > 0 ? t("Wait {n}s", { n: num.commas(wait) }) : unavailable ? t("Retry") : t("Refresh")}
-      </button>
-    </div>
+    {/* The loud half of recovery, for the only case that has nothing else to
+        show: no book at all. The page is cached for one revalidate, so an
+        unavailable book is served from cache until it expires and a reload
+        cannot clear it. In the quiet case the same retry rides the ladder's
+        own heading instead (see BookHeading) — but that button sits inside
+        the fieldset a failure disables, so the banner keeps its own copy and
+        stays the way out of both. */}
+    {unavailable && <>
+      <ErrorBanner>{t("The service is busy or unavailable. Try again shortly.")}</ErrorBanner>
+      <div className="flex justify-end">
+        <button type="button" onClick={() => void retry()} disabled={pending || wait > 0}
+          className="rounded px-2 py-1 text-xs font-medium text-purple-600 hover:underline disabled:opacity-50 dark:text-purple-400">
+          {pending ? t("Loading…") : wait > 0 ? t("Wait {n}s", { n: num.commas(wait) }) : t("Retry")}
+        </button>
+      </div>
+    </>}
     {/* Preserve known rows and the mounted form after a failed refresh, while
         preventing a new action against a book we could not revalidate. */}
     {book !== null && <fieldset disabled={unavailable || pending} className="min-w-0" aria-busy={pending}>
-      <XcpBridge dispensers={book} btcUsd={btcUsd} xcpUsd={xcpUsd} />
+      <XcpBridge dispensers={book} btcUsd={btcUsd} xcpUsd={xcpUsd} onRefresh={() => void retry()} />
     </fieldset>}
   </div>;
 }
