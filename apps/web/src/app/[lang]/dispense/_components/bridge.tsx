@@ -17,6 +17,7 @@ import { ConnectButton } from "@/components/connect-button";
 import { CTA } from "@/components/ui/button";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { FlipNotch } from "@/components/ui/flip-notch";
+import { RefreshButton } from "@/components/ui/refresh-button";
 import { Well } from "@/components/ui/well";
 import { ConfirmCard, TxLink } from "@/components/ui/confirm-card";
 import { SegmentedList, SegmentedTrigger, Tabs } from "@/components/ui/tabs";
@@ -68,10 +69,13 @@ export function XcpBridge({
   dispensers,
   btcUsd,
   xcpUsd,
+  onRefresh,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
   xcpUsd: number | null;
+  /** Re-read the book behind the ladder — see BookHeading. */
+  onRefresh: () => void;
 }) {
   const t = useT();
   const [direction, setDirection] = useState<"load" | "unload">("load");
@@ -141,6 +145,7 @@ export function XcpBridge({
             flips={flips}
             customFee={customFee}
             feeValid={feeDraft.valid}
+            onRefresh={onRefresh}
           />
         ) : (
           <UnloadCard
@@ -151,6 +156,7 @@ export function XcpBridge({
             flips={flips}
             customFee={customFee}
             feeValid={feeDraft.valid}
+            onRefresh={onRefresh}
           />
         )}
       </div>
@@ -241,6 +247,7 @@ function LoadCard({
   customFee,
   feeValid,
   hiddenCount,
+  onRefresh,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
@@ -250,6 +257,7 @@ function LoadCard({
   customFee: number | null;
   feeValid: boolean;
   hiddenCount: number;
+  onRefresh: () => void;
 }) {
   const num = useNumbers();
   const t = useT();
@@ -769,7 +777,7 @@ function LoadCard({
       </div>
 
     </div>
-    <RouteBook open={open} plan={plan} hiddenCount={hiddenCount} />
+    <RouteBook open={open} plan={plan} hiddenCount={hiddenCount} onRefresh={onRefresh} />
     </div>
   );
 }
@@ -794,6 +802,7 @@ function UnloadCard({
   flips,
   customFee,
   feeValid,
+  onRefresh,
 }: {
   dispensers: Dispenser[];
   btcUsd: number | null;
@@ -802,6 +811,7 @@ function UnloadCard({
   flips: number;
   customFee: number | null;
   feeValid: boolean;
+  onRefresh: () => void;
 }) {
   const num = useNumbers();
   const t = useT();
@@ -1238,6 +1248,7 @@ function UnloadCard({
       yourEscrowXcp={escrowRaw / SATS}
       active={escrowRaw > 0 || (parseAmountRaw(price, 0) ?? 0n) > 0n}
       onPick={(sats) => setPrice(String(sats))}
+      onRefresh={onRefresh}
     />
     </div>
   );
@@ -1247,14 +1258,39 @@ function UnloadCard({
 /* The route book: the dispenser ladder, cheapest first                */
 /* ------------------------------------------------------------------ */
 
+/**
+ * The book's eyebrow, and the one place the ladder can be re-read from.
+ *
+ * The page is statically rendered and revalidates on a minute, so the book
+ * behind this panel is the only thing here a user might want newer than the
+ * cache will give them. It wears the gear's clothes in the gear's corner —
+ * the same quiet icon /mempool and /activity use — because a hand crank on a
+ * self-refreshing page should read as chrome, not as a call to action.
+ *
+ * The slot is occupied whether or not the button can act, so the ladder
+ * underneath never moves.
+ */
+function BookHeading({ children, onRefresh }: { children: React.ReactNode; onRefresh: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-1 pb-2">
+      <span className="text-xs font-medium text-gray-500 dark:text-gray-400">{children}</span>
+      <span className="-my-1 -mr-1 shrink-0">
+        <RefreshButton onRefresh={onRefresh} />
+      </span>
+    </div>
+  );
+}
+
 function RouteBook({
   open,
   plan,
   hiddenCount,
+  onRefresh,
 }: {
   open: Dispenser[];
   plan: PlannedLeg[];
   hiddenCount: number;
+  onRefresh: () => void;
 }) {
   const num = useNumbers();
   const t = useT();
@@ -1263,9 +1299,7 @@ function RouteBook({
   const taken = new Map(plan.map((l) => [l.dispenser.source, l.units]));
   return (
     <aside className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
-      <div className="px-1 pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-        {t("Dispensers · cheapest first")}
-      </div>
+      <BookHeading onRefresh={onRefresh}>{t("Dispensers · cheapest first")}</BookHeading>
       <ul className="space-y-1">
         {rows.map((r) => {
           const units = taken.get(r.source);
@@ -1333,12 +1367,14 @@ function SellBook({
   yourEscrowXcp,
   active,
   onPick,
+  onRefresh,
 }: {
   open: Dispenser[];
   yourPriceSats: number;
   yourEscrowXcp: number;
   active: boolean;
   onPick: (sats: number) => void;
+  onRefresh: () => void;
 }) {
   const num = useNumbers();
   const t = useT();
@@ -1366,9 +1402,7 @@ function SellBook({
   );
   return (
     <aside className="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-3">
-      <div className="px-1 pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">
-        {t("The competition · cheapest first")}
-      </div>
+      <BookHeading onRefresh={onRefresh}>{t("The competition · cheapest first")}</BookHeading>
       <ul className="space-y-1">
         {rows.slice(0, markerAt).map((r) => (
           <SellRow key={r.source} r={r} maxDepth={maxDepth} onPick={onPick} />

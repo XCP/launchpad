@@ -346,7 +346,8 @@
       "pt": "atividade",
       "fr": "activité",
       "ru": "активность",
-      "uk": "активність"
+      "uk": "активність",
+      "note": "The sitewide feed of on-chain events, and one address's own tab on its profile. JA: MetaMask's Japanese UI names the tab アクティビティ beside アセット, and Japanese explainers gloss it as 活動履歴 — 活動 is the explanation, never the label. ZH: 动态 is the feed word. 活动 is what the exchanges call a promotion: OKX's 活动中心 lives at /campaign-center/campaigns and holds 新手任务, airdrops and fee vouchers, so 活动 in a launch site's nav reads as 'promotions'. QA 2026-09-09: all four renderings re-derived from source and unchanged."
     },
     "stats": {
       "ja": "統計",
@@ -374,8 +375,8 @@
       "uk": "документація"
     },
     "rewards": {
-      "note": "The minter reward programme. User preference 2026-09-07: use the local Rewards word without an XCP prefix in non-English labels and page titles. Identify currencies beside actual amounts.",
-      "ja": "リワード",
+      "note": "The minter reward programme. User preference 2026-09-07: use the local Rewards word without an XCP prefix in non-English labels and page titles. Identify currencies beside actual amounts. JA 2026-09-09: 報酬, not リワード — Coincheck and bitFlyer both write ステーキング報酬 for a staking return, and this site's own explainer prose already said 報酬 while the labels said リワード. The loanword had no source behind it; the catalogue contradicted itself for as long as it stood.",
+      "ja": "報酬",
       "zh": "奖励",
       "zh-tw": "獎勵",
       "zh-hk": "獎勵",
@@ -391,7 +392,7 @@
       "zh": "内存池",
       "zh-tw": "記憶體池",
       "zh-hk": "記憶池",
-      "note": "Taiwan says 記憶體池 (CoinGlass zh-TW); Hong Kong says 記憶池 (OSL HK academy) — 內存 is the mainland computing word; the mainland says 内存池 (Foresight). MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it. JA REVIEW 2026-09-07: a Japanese reader took the header chip メンプール for main pool, so the chip alone says 未承認 (and pending/待确认 elsewhere) while the page and nav keep the jargon. UniSat ru keeps mempool in Latin; мемпул is how the Russian Bitcoin community writes it.",
+      "note": "Taiwan says 記憶體池 (CoinGlass zh-TW); Hong Kong says 記憶池 (OSL HK academy) — 內存 is the mainland computing word; the mainland says 内存池 (Foresight). MONAPARTY writes mempool in Latin; the wiki says mempool上にある未承認トランザクション. Katakana kept. ES: la mempool (feminine), as CriptoNoticias and Binance es-LA write it. JA REVIEW 2026-09-07: a Japanese reader took the header chip メンプール for main pool, so the chip alone says 未承認 (and pending/待确认 elsewhere) while the page and nav keep the jargon. UniSat ru keeps mempool in Latin; мемпул is how the Russian Bitcoin community writes it. QA 2026-09-09: re-derived independently — DMM Bitcoin and Monex Crypto Bank's glossaries both write メンプール, and Xverse SC / Foresight News write 内存池. The nav label is the proper noun; only the chip is the pending state. An edit that put 未確認 in the nav also broke the JA stem (this catalogue says 未承認 and 承認待ち everywhere else) and collided with the chip in ZH.",
       "es": "mempool",
       "ko": "멤풀",
       "pt": "mempool",

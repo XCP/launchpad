@@ -168,7 +168,7 @@ function MobileMenu() {
   const t = useT();
   const { path } = splitLocale(usePathname() ?? "/");
   const item =
-    "block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 outline-none data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-800 data-[highlighted]:text-gray-900 dark:data-[highlighted]:text-gray-100";
+    "block max-w-full truncate rounded-lg px-3 py-2.5 text-sm font-medium text-gray-700 dark:text-gray-300 outline-none data-[highlighted]:bg-gray-100 dark:data-[highlighted]:bg-gray-800 data-[highlighted]:text-gray-900 dark:data-[highlighted]:text-gray-100";
 
   return (
     <DM.Root>
