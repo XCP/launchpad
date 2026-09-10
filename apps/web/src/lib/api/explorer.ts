@@ -1,8 +1,32 @@
 import { COUNTERPARTY_READ_API_BASE, XCP_API_BASE } from "@/lib/constants";
-import { fetchJson } from "@/lib/client";
 import { discard } from "@/lib/net";
 import { coalesceHolderBalances, type HolderRow, type LpBalance } from "@/lib/holders";
-import type { Raw } from "@/lib/numeric";
+import { parseJsonLossless, type Raw } from "@/lib/numeric";
+
+/**
+ * One explorer read, from a server render as well as from the browser.
+ *
+ * Deliberately NOT `fetchJson` from `@/lib/client`: that module is
+ * `"use client"`, so on the server every call through it throws "Attempted
+ * to call fetchJson() from the server". This file is imported from both
+ * sides, and its two server-side callers — the holder count and the
+ * concentration stat — both swallow their errors, so the boundary failure
+ * surfaced only as every graduated launch page reporting a 0% top ten and a
+ * creator who holds "nothing".
+ *
+ * Nothing is lost by reading directly: the relay the client helper adds
+ * applies only to COUNTERPARTY_API_BASE URLs, which no explorer URL is.
+ */
+async function explorerJson(url: string, timeoutMs = 10_000): Promise<unknown> {
+  const res = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) {
+    await discard(res);
+    throw new Error(`HTTP ${res.status}`);
+  }
+  // Not res.json(): JSON.parse rounds integers above 2^53-1, and a full
+  // XCP-69 balance is 10^16 raw. Oversized integers arrive as strings.
+  return parseJsonLossless(await res.text());
+}
 
 interface ExplorerLedgerRow {
   direction: "in" | "out";
@@ -109,7 +133,7 @@ export async function fetchAddressCollections(addresses: string[]): Promise<Map<
   const unique = [...new Set(addresses)].sort().slice(0, 50);
   const out = new Map<string, string[]>();
   if (unique.length === 0) return out;
-  const d = (await fetchJson(
+  const d = (await explorerJson(
     `${XCP_API_BASE}/addresses/collections?addresses=${unique.map(encodeURIComponent).join(",")}`,
   )) as { result?: AddressCollectionCreator[] };
   for (const row of d.result ?? []) {
@@ -137,7 +161,7 @@ const HOLDER_PAGE = 100;
  * holders was ten requests and three megabytes per view.
  */
 export async function fetchTopHolders(asset: string, limit = HOLDER_PAGE): Promise<HolderRow[]> {
-  const d = (await fetchJson(
+  const d = (await explorerJson(
     `${XCP_API_BASE}/assets/${encodeURIComponent(asset)}/balances?limit=${Math.min(limit, HOLDER_PAGE)}`,
   )) as { result?: ExplorerHolderRow[] };
   return coalesceHolderBalances(
@@ -151,7 +175,7 @@ export async function fetchTopHolders(asset: string, limit = HOLDER_PAGE): Promi
 
 /** Every balance location of a small-supply token such as an LP token, one page. */
 export async function fetchTopLpBalances(lpAsset: string): Promise<LpBalance[]> {
-  const d = (await fetchJson(
+  const d = (await explorerJson(
     `${XCP_API_BASE}/assets/${encodeURIComponent(lpAsset)}/balances?limit=${HOLDER_PAGE}`,
   )) as { result?: ExplorerHolderRow[] };
   return (d.result ?? []).map((row) => ({
@@ -163,7 +187,7 @@ export async function fetchTopLpBalances(lpAsset: string): Promise<LpBalance[]> 
 /** The explorer's rolled-up holder count; null when it has no row for the asset yet. */
 export async function fetchAssetHolderCount(asset: string): Promise<number | null> {
   try {
-    const d = (await fetchJson(`${XCP_API_BASE}/assets/${encodeURIComponent(asset)}`)) as {
+    const d = (await explorerJson(`${XCP_API_BASE}/assets/${encodeURIComponent(asset)}`)) as {
       result?: { holder_count?: unknown };
       holder_count?: unknown;
     };
@@ -185,7 +209,7 @@ async function explorerFirst<Body, T>(
 ): Promise<T | null> {
   for (const base of [XCP_API_BASE, COUNTERPARTY_READ_API_BASE]) {
     try {
-      const value = pick((await fetchJson(`${base}${path}`)) as Body);
+      const value = pick((await explorerJson(`${base}${path}`)) as Body);
       if (value !== null && value !== undefined) return value;
     } catch {}
   }

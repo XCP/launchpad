@@ -501,14 +501,19 @@ export function fetchHolderCount(asset: string): Promise<number | null> {
  *
  * Percentages go through ratio(), which divides in BigInt before narrowing:
  * supply here is 1e16 raw, well past what a double holds exactly.
+ *
+ * Null, never zeroes, when the holder list cannot be read. A zero here
+ * prints as a 0% top ten and a creator who holds "nothing" — the strongest
+ * claim this page can make about a launch, asserted from no evidence at
+ * all. The caller renders null as "—".
  */
 export async function fetchHolderConcentration(
   asset: string,
   creator: string,
   supplyRaw: Raw,
-): Promise<HolderConcentration> {
+): Promise<HolderConcentration | null> {
   const supply = big(supplyRaw);
-  if (supply <= 0n) return { top10Pct: 0, devPct: 0 };
+  if (supply <= 0n) return null;
   try {
     const held = (await fetchTopHolders(asset)).filter(
       (row) => row.quantity > 0n && row.address !== COUNTERPARTY_BURN_ADDRESS,
@@ -522,7 +527,7 @@ export async function fetchHolderConcentration(
     const pct = (part: bigint) => ratio(part, supply) * 100;
     return { top10Pct: pct(top10), devPct: pct(dev) };
   } catch {
-    return { top10Pct: 0, devPct: 0 };
+    return null;
   }
 }
 

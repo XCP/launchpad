@@ -230,7 +230,7 @@ export default async function LaunchPage({
   // list is the same one the Holders tab reads.
   const concentration = pool
     ? await fetchHolderConcentration(asset, fm.source, String(circulatingRaw))
-    : { top10Pct: 0, devPct: 0 };
+    : null;
 
   const devTrades =
     pool !== null

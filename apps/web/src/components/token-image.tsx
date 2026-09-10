@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CDN_BASE } from "@/lib/constants";
+import { pixelArtClass } from "@/lib/pixel-art";
 
 const ART_UPDATED_EVENT = "xcpfun:art-updated";
 
@@ -148,7 +149,7 @@ export function TokenImage({
       ref={ref}
       src={sources[index]}
       alt=""
-      className={className}
+      className={`${className}${pixelArtClass(asset)}`}
       // Fetched when it nears the viewport, not when the page does. The homepage
       // renders 56 of these; without this a visitor who never scrolls still
       // costs 56 image requests, each a Worker invocation.
@@ -190,7 +191,7 @@ export function HeroTokenImage({ asset, className = "" }: { asset: string; class
       ref={ref}
       src={`/art/${asset}${version ? `?v=${encodeURIComponent(version)}` : ""}`}
       alt=""
-      className={className}
+      className={`${className}${pixelArtClass(asset)}`}
       onError={() => setFailed(true)}
     />
   );

@@ -92,7 +92,7 @@ export function LaunchView({
   holderCount: number | null;
   poolVolume: PairActivity;
   devTrades?: DevTrade[];
-  concentration?: { top10Pct: number; devPct: number };
+  concentration?: { top10Pct: number; devPct: number } | null;
   displayDescription: string | null;
   burnedQuantity: string;
   assetOrigin?: AssetOrigin | null;
