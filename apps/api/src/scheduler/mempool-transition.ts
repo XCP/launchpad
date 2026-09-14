@@ -82,3 +82,16 @@ export async function claimFastSync(
     .run();
   return (claim.meta.rows_written ?? 0) > 0;
 }
+
+/**
+ * Hand a claim back when the run it paid for never happened — the indexer
+ * lock was already held by the five-minute tick. Without this the claim
+ * still counted, and the next confirmation had to wait out the full interval
+ * for a fast sync that never ran.
+ */
+export async function releaseFastSync(db: D1Database): Promise<void> {
+  await db
+    .prepare(`UPDATE chain_state SET value = '0' WHERE key = ?1`)
+    .bind(FAST_SYNC_KEY)
+    .run();
+}
