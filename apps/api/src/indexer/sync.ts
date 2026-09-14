@@ -26,6 +26,7 @@ import {
   rewardAccountsAreStale,
 } from "#api/indexer/reward-rollup";
 import { fetchTxFee } from "#api/integrations/mempool";
+import { recordBlockHeight } from "#api/indexer/height";
 import {
   isXcp69,
   launchPhase,
@@ -131,6 +132,10 @@ export async function syncLaunches(
   metadata: R2Bucket,
 ): Promise<SyncResult> {
   const [all, height] = await Promise.all([fetchAllFairminters(), fetchBlockHeight()]);
+  // Remembered so what runs after this pass can judge "now" without a node
+  // read of its own. The feed announces straight after this, which is exactly
+  // when the node is likeliest to be refusing us; see currentHeight.
+  await recordBlockHeight(db, height);
   const candidates = all.filter((fm) => fm.asset && xcp69Params(fm));
   const storedByTxHash = await fetchStoredByTxHash(
     db,
@@ -187,7 +192,19 @@ export async function syncLaunches(
     // -- SEISMONSTER had graduated with 529 XCP in its pool and was demoted to refunded, losing
     // its reserves from the site's market cap and pool totals along with it.
     let poolUnknown = false;
-    if (fm.status === "closed" && truthy(fm.pool_quantity)) {
+    const priorLaunch = storedByTxHash.get(fm.tx_hash) ?? null;
+    // A closed launch already on record as refunded is never asked again. The
+    // pool is created in the block that closes the fairminter, and `refunded`
+    // is only ever written from a definitive "no such pool" (an unanswered
+    // lookup keeps the prior phase, below), so asking again can only return
+    // the same answer. It was the bulk of this tick's node traffic — every
+    // refunded launch with a pool parameter, some 45 requests every five
+    // minutes — and the reason the node's rate limit tripped mid-tick.
+    if (
+      fm.status === "closed" &&
+      truthy(fm.pool_quantity) &&
+      priorLaunch?.phase !== "refunded"
+    ) {
       const lookup = await fetchPool(fm.asset);
       poolUnknown = !lookup.known;
       if (!lookup.known) {
@@ -212,7 +229,6 @@ export async function syncLaunches(
         poolXcpSats = Number(big(xcpReserve));
       }
     }
-    const priorLaunch = storedByTxHash.get(fm.tx_hash) ?? null;
     // An unanswered pool question keeps whatever was already believed. With nothing stored there
     // is nothing to keep, so the launch is skipped for this tick rather than recorded as a
     // failure it may not be -- the next tick will ask again.

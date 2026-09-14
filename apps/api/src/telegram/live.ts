@@ -24,7 +24,7 @@ import {
   type Announcement,
 } from "#api/telegram/format";
 import { buildBacklog } from "#api/telegram/replay";
-import { advanceBurnCursor, scanBurnReceives } from "#api/telegram/burns";
+import { advanceBurnCursor, scanBurnReceives, type BurnScan } from "#api/telegram/burns";
 
 /** How close to the deadline the countdown fires. */
 const CLOSING_BLOCKS = 5;
@@ -165,7 +165,17 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
   if (!(await isLive(env.DB))) return { announced: 0, queued: 0 };
 
   const items: AnnouncementItem[] = [];
-  const burnScan = await scanBurnReceives(env.DB);
+  // The one node read left on this path, made at the moment the node is
+  // likeliest to be refusing us: straight after the indexer's own pass. A
+  // refused scan must not hold back the chain facts D1 already holds, and
+  // skipping it loses nothing — the cursor only advances on a scan that ran.
+  const burnScan = await scanBurnReceives(env.DB).catch((error: unknown): BurnScan => {
+    console.warn({
+      event: "burn_scan_skipped",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return { announcements: [], nextCursor: null, nextDestructionCursor: null, seeded: false };
+  });
   for (const burn of burnScan.announcements) {
     items.push({ key: burn.key, a: burn.a, mintOf: null, earned: "0", paid: "0" });
   }

@@ -5,6 +5,7 @@ import { MIRRORS, refreshMirrors } from "#api/indexer/mirrors";
 import { syncOrders } from "#api/indexer/orders";
 import { syncBehaviorBalances } from "#api/indexer/behavior-balances";
 import { syncLaunches } from "#api/indexer/sync";
+import { currentHeight } from "#api/indexer/height";
 import { activityRoute } from "#api/read/activity";
 import { listMarketAssets } from "#api/queries/activity";
 import { launchesRoute } from "#api/read/launches";
@@ -16,13 +17,17 @@ import { mintClosed } from "#api/telegram/format";
 import { announceLive, queueAnnouncements } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
-import { fetchBlockHeight, fetchMempoolFairmints } from "#api/integrations/counterparty";
+import { fetchMempoolFairmints } from "#api/integrations/counterparty";
 
 export { Announcer } from "#api/durable/announcer";
 
 import { runScheduledJob } from "#api/scheduler/job";
 import { withLock } from "#api/scheduler/lock";
-import { claimFastSync, recordMempoolSnapshot } from "#api/scheduler/mempool-transition";
+import {
+  claimFastSync,
+  recordMempoolSnapshot,
+  releaseFastSync,
+} from "#api/scheduler/mempool-transition";
 
 export { LaunchRoom } from "#api/durable/launch-room";
 export { SitePresence } from "#api/durable/site-presence";
@@ -101,8 +106,7 @@ app.post("/admin/replay", async (c) => {
   if (!authed(c.req.header("x-admin-token"), c.env.ADMIN_TOKEN)) {
     return c.json({ error: "unauthorized" }, 401);
   }
-  const height = await fetchBlockHeight();
-  const backlog = await buildBacklog(c.env.DB, height);
+  const backlog = await buildBacklog(c.env.DB, await currentHeight(c.env.DB));
 
   if (c.req.query("dry")) {
     return c.json({
@@ -270,11 +274,14 @@ export default {
               await runScheduledJob("sync_after_mempool", () =>
                 syncLaunches(env.DB, env.METADATA),
               );
-              await runScheduledJob("announce_after_mempool", async () => {
-                const height = await fetchBlockHeight();
-                return announceLive(env, height);
-              });
+              await runScheduledJob("announce_after_mempool", async () =>
+                announceLive(env, await currentHeight(env.DB)),
+              );
             });
+            // The claim rate-limits runs, not attempts. When the five-minute
+            // tick already held the lock nothing ran here, and the next
+            // disappearance should not wait out a claim that bought nothing.
+            if (!fastSyncRan) await releaseFastSync(env.DB);
           }
 
           return {
@@ -292,6 +299,21 @@ export default {
     ctx.waitUntil(
       withLock(env.DB, 110, async () => {
         await runScheduledJob("sync_launches", () => syncLaunches(env.DB, env.METADATA));
+        // After the indexer, never inside it. The feed reads committed state
+        // rather than the tick's own deltas, so an announcement can only
+        // describe something D1 already believes — and a tick that dies
+        // half-done leaves nothing announced that did not happen.
+        //
+        // Directly after it, ahead of the order book and the rollups: they
+        // write nothing the feed reads, and every second they take is a
+        // second a mint that just confirmed sits in the outbox unsaid.
+        //
+        // Inside the same lock so the index and feed normally advance as one
+        // ordered pass. The Durable Object's accepted-key markers still make
+        // an overlapping admin replay or retry harmless.
+        await runScheduledJob("announce", async () =>
+          announceLive(env, await currentHeight(env.DB)),
+        );
         // The order book, mirrored so /v2/activity/orders can answer from D1
         // instead of fanning out to Counterparty per edge-cache miss. AFTER
         // syncLaunches, because its worklist is the set of graduated launches
@@ -311,24 +333,12 @@ export default {
         );
         // Skips itself until six hours have passed; see src/indexer/communities.ts.
         await runScheduledJob("sync_communities", () => syncCommunities(env.DB));
-        // After the indexer, never inside it. The feed reads committed state
-        // rather than the tick's own deltas, so an announcement can only
-        // describe something D1 already believes — and a tick that dies
-        // half-done leaves nothing announced that did not happen.
-        //
-        // Inside the same lock so the index and feed normally advance as one
-        // ordered pass. The Durable Object's accepted-key markers still make
-        // an overlapping admin replay or retry harmless.
-        await runScheduledJob("announce", async () => {
-          const height = await fetchBlockHeight();
-          return announceLive(env, height);
-        });
       }),
     );
 
     /**
-     * Outside the lock, and deliberately so. This touches no D1 row and
-     * nothing the indexer reads, so serializing it against the index buys
+     * Outside the lock, and deliberately so. This writes no D1 row and reads
+     * only the stored height, so serializing it against the index buys
      * nothing — while the two foreign hops it makes are the one part of this
      * tick whose latency belongs to somebody else's web server. Inside the
      * lock, a slow issuer host would spend the indexer's 110-second budget.
@@ -338,10 +348,9 @@ export default {
      */
     if (MIRRORS.length > 0) {
       ctx.waitUntil(
-        runScheduledJob("refresh_mirrors", async () => {
-          const height = await fetchBlockHeight();
-          return refreshMirrors(env.METADATA, height);
-        }).then(() => undefined),
+        runScheduledJob("refresh_mirrors", async () =>
+          refreshMirrors(env.METADATA, await currentHeight(env.DB)),
+        ).then(() => undefined),
       );
     }
   },
