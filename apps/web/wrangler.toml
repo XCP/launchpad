@@ -4,7 +4,7 @@
 # https://xcp.fun/j/<ASSET>.json (write-once), so those URLs must resolve the
 # moment the first real launch confirms — LAUNCHCOIN's 404 was this gap.
 name = "launchpad"
-main = ".open-next/worker.js"
+main = "worker.mjs"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
