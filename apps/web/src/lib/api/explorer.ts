@@ -120,10 +120,16 @@ export interface AddressCollectionCreator {
   collections: { tag: string; cards: number }[];
 }
 
+// Arvik's display alias, approved by Dan on 2026-09-21. Inherit the art
+// address's live creator badges only; balances and wallet identity stay separate.
+const COLLECTION_CREATOR_ALIASES: ReadonlyMap<string, string> = new Map([
+  ["15dx2KbwKxppVjJYvXrK6pCwnQeqat71ZA", "17LV3y5KhExPdVcqS81zXuVUfNV9pmaGA"],
+]);
+
 /**
  * Which curated collections each address created cards in, by the
- * explorer's collection tag ("rare-pepe", "bitcorn", …). One call for a
- * whole page of rows; addresses that created nothing are simply absent. The
+ * explorer's collection tag ("rare-pepe", "bitcorn", …). Usually one call
+ * for a page, with approved display aliases included in the lookup. The
  * explorer projects this from every member asset's first issuance and
  * refreshes it with its daily collections crawl, so the answer follows the
  * collections as they grow. The list is sorted so the same page hits the
@@ -133,14 +139,27 @@ export async function fetchAddressCollections(addresses: string[]): Promise<Map<
   const unique = [...new Set(addresses)].sort().slice(0, 50);
   const out = new Map<string, string[]>();
   if (unique.length === 0) return out;
-  const d = (await explorerJson(
-    `${XCP_API_BASE}/addresses/collections?addresses=${unique.map(encodeURIComponent).join(",")}`,
-  )) as { result?: AddressCollectionCreator[] };
-  for (const row of d.result ?? []) {
-    out.set(
-      row.address,
-      row.collections.map((c) => c.tag),
-    );
+  const lookup = [...new Set(unique.flatMap((address) => {
+    const alias = COLLECTION_CREATOR_ALIASES.get(address);
+    return alias ? [address, alias] : [address];
+  }))].sort();
+  // Adding an alias must not exceed the explorer's fifty-address limit or
+  // drop a visible address from a full page.
+  const requests: Promise<{ result?: AddressCollectionCreator[] }>[] = [];
+  for (let i = 0; i < lookup.length; i += 50) {
+    const batch = lookup.slice(i, i + 50);
+    requests.push(explorerJson(
+      `${XCP_API_BASE}/addresses/collections?addresses=${batch.map(encodeURIComponent).join(",")}`,
+    ) as Promise<{ result?: AddressCollectionCreator[] }>);
+  }
+  const rows = new Map((await Promise.all(requests)).flatMap((page) =>
+    (page.result ?? []).map((row) => [row.address, row.collections.map((c) => c.tag)] as const),
+  ));
+  for (const address of unique) {
+    const own = rows.get(address) ?? [];
+    const alias = COLLECTION_CREATOR_ALIASES.get(address);
+    const tags = alias ? [...new Set([...own, ...(rows.get(alias) ?? [])])] : own;
+    if (tags.length > 0) out.set(address, tags);
   }
   return out;
 }
