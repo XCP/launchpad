@@ -18,7 +18,7 @@ describe("enhanced asset descriptions", () => {
     expect(await read()).toBe("In the beginning...");
     expect(network).toHaveBeenCalledExactlyOnceWith(
       "https://api.xcp.io/v2/assets/FAKEBANG/enhanced",
-      expect.objectContaining({ next: { revalidate: 300 }, signal: expect.any(AbortSignal), redirect: "error" }),
+      expect.objectContaining({ next: { revalidate: 300 }, signal: expect.any(AbortSignal), redirect: "manual" }),
     );
   });
 
@@ -28,7 +28,7 @@ describe("enhanced asset descriptions", () => {
       .toBe("Small <b>beginning</b>.");
   });
 
-  it.each([404, 500])("keeps fallback and releases the response for HTTP %s", async (status) => {
+  it.each([302, 307, 404, 500])("keeps fallback and releases the response for HTTP %s", async (status) => {
     const cancel = vi.fn();
     network.mockResolvedValue(new Response(new ReadableStream({ cancel }), { status }));
     expect(await read()).toBeNull();

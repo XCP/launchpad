@@ -34,7 +34,9 @@ export async function fetchAssetDescription(
     const hosted = url.origin === METADATA_ORIGIN;
     const response = await fetch(
       hosted ? url.href : `${XCP_API_BASE}/assets/${encodeURIComponent(asset)}/enhanced`,
-      { signal: AbortSignal.timeout(5_000), next: { revalidate: 300 }, redirect: "error" },
+      // Workers supports manual/follow, but rejects redirect: "error".
+      // Manual leaves redirects non-OK so they take the link fallback below.
+      { signal: AbortSignal.timeout(5_000), next: { revalidate: 300 }, redirect: "manual" },
     );
     if (!response.ok) {
       await discard(response);
