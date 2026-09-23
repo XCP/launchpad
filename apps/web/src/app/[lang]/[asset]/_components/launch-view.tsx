@@ -5,15 +5,14 @@ import { ChatPanel } from "@/components/chat-panel";
 import { useChatRoute } from "@/providers/chat-context";
 import { AnnouncedAgo, ArtLightbox, BlockAgo, BlockMonthYear, ShareButton, StatusPill } from "@/app/[lang]/[asset]/_components/launch-chrome";
 import {
-  HostedDescription,
   HostedInscriptionChip,
   HostedSocials,
   InscriptionChip,
-  LaunchDescription,
+  LaunchDescriptionContent,
   isOurMetadata,
 } from "@/app/[lang]/[asset]/_components/launch-metadata";
 import { DenomToggle, MintTargetStat, ParticipantsStat, RaisedStat, TermsStrip, TxFeesStat } from "@/app/[lang]/[asset]/_components/launch-stats";
-import { classifyDescription, proseDescription } from "@launchpad/xcp69/description";
+import { classifyDescription } from "@launchpad/xcp69/description";
 import { ScheduledPulse } from "@/app/[lang]/[asset]/_components/scheduled-pulse";
 import { AddressHoverCard, IssuerChips, IssuerLine } from "@/components/address-hover-card";
 import type { Fairmint, PairActivity, Pool } from "@/lib/api/counterparty";
@@ -235,7 +234,6 @@ export function LaunchView({
       rawEquals(fm.hard_cap, XCP69_EXACT.HARD_CAP) &&
       rawEquals(fm.soft_cap, XCP69_EXACT.SOFT_CAP) &&
       rawEquals(fm.pool_quantity, XCP69_EXACT.POOL_QUANTITY);
-    const descriptionKind = classifyDescription(fm.description, fm.mime_type);
     const blocksLeft = fm.start_block - blockHeight;
     // "opens in now" is what blocksEta returns at the boundary, where the
     // record is still pending but the chain has caught up.
@@ -249,45 +247,6 @@ export function LaunchView({
     const shareSubline = conforming
       ? t("0.01 XCP / 1,000 · sells out or refunds")
       : t("an XCP fairminter on xcp.fun");
-    const prose = proseDescription(fm.description, fm.mime_type, asset);
-    // Only real prose earns the space: a URL is machine metadata, a
-    // one-word "description" is noise the poster reads better without, and
-    // an inscription's description is its content — 33 KB of HTML that used
-    // to render here as `<!doctype html><html lang="en">…` under a "Show
-    // more" link.
-    //
-    // `curated` comes first because it is the only copy that exists for a
-    // launch composed outside this site: the owner's words, written through
-    // the editor into our own storage, where the on-chain field is an
-    // inscription or a stranger's URL and can never hold them. It is also
-    // already on the server, so a hosted-metadata launch skips the client
-    // fetch and paints its description with the rest of the page.
-    //
-    // Shared between phases since it renders in two different spots —
-    // before the countdown on scheduled, below the live bar on minting —
-    // each needing its own top margin to land in the same visual place.
-    const curated = displayDescription?.trim() ?? "";
-    const renderDescription = (marginClassName: string) =>
-      curated ? (
-        <LaunchDescription text={curated} marginClassName={marginClassName} />
-      ) : isOurMetadata(fm.description) ? (
-        <HostedDescription url={fm.description} marginClassName={marginClassName} />
-      ) : descriptionKind === "url" ? (
-        // Someone else's host: link it rather than fetch it, so viewing a
-        // launch never reports the visitor to the issuer's server.
-        <p className={`${marginClassName} text-sm text-gray-500 dark:text-gray-400`}>
-          <a
-            href={fm.description}
-            target="_blank"
-            rel="noreferrer nofollow"
-            className="break-all text-purple-600 dark:text-purple-400 hover:underline"
-          >
-            {fm.description}
-          </a>
-        </p>
-      ) : prose ? (
-        <LaunchDescription text={prose} marginClassName={marginClassName} />
-      ) : null;
     return (
       <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled={minting}>
       <div data-launch-chat className="chat-launch-layout">
@@ -375,7 +334,12 @@ export function LaunchView({
               />
             </div>
           )}
-          {renderDescription("mt-5")}
+          <LaunchDescriptionContent
+            text={displayDescription}
+            description={fm.description}
+            mimeType={fm.mime_type}
+            asset={asset}
+          />
         </div>
 
         {minting ? (
@@ -731,9 +695,13 @@ export function LaunchView({
           </div>
         )}
 
-        {displayDescription && (
-          <LaunchDescription text={displayDescription} marginClassName="mt-4" />
-        )}
+        <LaunchDescriptionContent
+          text={displayDescription}
+          description={fm.description}
+          mimeType={fm.mime_type}
+          asset={asset}
+          marginClassName="mt-4"
+        />
       </div>
 
       <EditPanel asset={asset} />

@@ -21,7 +21,7 @@ import {
 } from "@/lib/api/launchpad-api";
 import { fetchAssetLaunch, fetchLaunchOriginal } from "@/lib/api/asset-launch";
 import { foldPointsToCandles, type ChartResolution } from "@/lib/candles";
-import { proseDescription } from "@launchpad/xcp69/description";
+import { fetchAssetDescription } from "@/lib/api/asset-description";
 import { fetchMarketPrices } from "@/lib/api/price";
 import { METADATA_ORIGIN, metadataImageUrl } from "@/lib/metadata";
 import { isLocale, localePath } from "@/lib/i18n/locales";
@@ -52,6 +52,9 @@ export const revalidate = 30;
  * Components import too.
  */
 const assetLaunch = cache((asset: string) => fetchAssetLaunch(asset, { freshStatus: true }));
+// Page and link-preview metadata share one bounded enhanced-info read per
+// render. The fetch itself uses the existing five-minute Next data cache.
+const assetDescription = cache(fetchAssetDescription);
 
 /** Long enough to say something, short enough that no platform truncates
  *  it mid-word. */
@@ -79,29 +82,8 @@ async function shareDescription(asset: string): Promise<string | null> {
       (!launch.hasConfirmedFairminters ? await fetchMempoolFairminter(asset) : null);
     if (!fm) return null;
 
-    const onChain = typeof fm.description === "string" ? fm.description.trim() : "";
-
-    // Our own hosted JSON holds the words; the on-chain field is just the
-    // pointer. Only ever OUR origin — the description is chosen by the
-    // issuer, so following it anywhere else would have our server fetch a
-    // URL a stranger controls. Same rule the browser-side reader applies
-    // (isOurMetadata), inlined so this server path doesn't pull in a client
-    // module for one string comparison.
-    if (onChain.startsWith(`${METADATA_ORIGIN}/`)) {
-      const meta = (await fetch(onChain, { next: { revalidate: 300 } })
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null)) as { description?: unknown } | null;
-      const words = typeof meta?.description === "string" ? meta.description.trim() : "";
-      if (words) return clamp(words, SHARE_DESCRIPTION_MAX);
-    } else {
-      // A launch composed elsewhere can put real text on-chain — or its
-      // content, which is not text at all. An inscribed launch's description
-      // is an image, an SVG, or a whole HTML page; unfurling
-      // `<!doctype html><html lang="en">…` as the creator's pitch is worse
-      // than falling through to the issuer line below.
-      const words = proseDescription(onChain, fm.mime_type, asset);
-      if (words) return clamp(words, SHARE_DESCRIPTION_MAX);
-    }
+    const words = await assetDescription(asset, fm.description, fm.mime_type, indexed?.displayDescription ?? null);
+    if (words) return clamp(words, SHARE_DESCRIPTION_MAX);
 
     return fm.source ? `Launched by ${fm.source}` : null;
   } catch {
@@ -197,7 +179,7 @@ export default async function LaunchPage({
     isPendingConfirmation = true;
   }
 
-  const [mints, pool, original, prices, feeSats, assetOrigin] = await Promise.all([
+  const [mints, pool, original, prices, feeSats, assetOrigin, displayDescription] = await Promise.all([
     // A pending fairminter cannot have mints yet; don't ask. Same for
     // anything still unconfirmed — the tx_hash isn't indexed yet either.
     fm.status === "pending" || isPendingConfirmation
@@ -219,6 +201,7 @@ export default async function LaunchPage({
     fm.status !== "closed"
       ? fetchAssetOrigin(asset, fm.tx_hash)
       : Promise.resolve(null),
+    assetDescription(asset, fm.description, fm.mime_type, indexed?.displayDescription ?? null),
   ]);
   const { xcp: xcpUsd, btc: btcUsd } = prices;
   const burnedQuantity = indexed?.burnedQuantity ?? "0";
@@ -305,7 +288,7 @@ export default async function LaunchPage({
       concentration={concentration}
       holderCount={holderCount}
       poolVolume={poolVolume}
-      displayDescription={indexed?.displayDescription ?? null}
+      displayDescription={displayDescription}
       burnedQuantity={burnedQuantity}
       assetOrigin={assetOrigin}
     />

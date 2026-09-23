@@ -48,7 +48,7 @@ async function loadPage(name, relativePath) {
         if (name === "next/navigation") return { contents: "export function notFound() { throw new Error('NEXT_HTTP_ERROR_FALLBACK;404'); }", loader: "js" };
         if (name === "@/lib/i18n/server") return { contents: "export const getMessages = async () => ({}); export const getT = async () => (message) => message;", loader: "js" };
         const exportName = name.endsWith("launch-view") ? "LaunchView" : name.endsWith("home-toolbar") ? "HomeToolbar" : name.endsWith("launch-sections") ? "LaunchSections" : "LazyLink";
-        return { contents: `import React from 'react'; export function ${exportName}(props) { return React.createElement('div', {'data-view': '${exportName}', 'data-xcp': props.xcpUsd, 'data-btc': props.btcUsd, 'data-day-ago': props.xcpUsdDayAgo, 'data-btc-change': props.btcChange30d, 'data-xcp-change': props.xcpChange30d, 'data-phase': props.phase, 'data-conforming': props.conforming}, props.children); }`, loader: "js" };
+        return { contents: `import React from 'react'; export function ${exportName}(props) { return React.createElement('div', {'data-view': '${exportName}', 'data-description': props.displayDescription, 'data-xcp': props.xcpUsd, 'data-btc': props.btcUsd, 'data-day-ago': props.xcpUsdDayAgo, 'data-btc-change': props.btcChange30d, 'data-xcp-change': props.xcpChange30d, 'data-phase': props.phase, 'data-conforming': props.conforming}, props.children); }`, loader: "js" };
       });
     } }],
   });
@@ -69,8 +69,8 @@ const fairminter = {
   divisible: true, lp_asset: "A69000000000000069", status: "pending", earned_quantity: null, paid_quantity: null,
 };
 
-function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false, indexed = false, asset = "TESTCOIN", status = "pending" } = {}) {
-  const current = { tickerReads: 0, bindingReads: 0, indexedLaunchReads: 0, protocolFairminterReads: 0, protocolCreationReads: 0, protocolPoolReads: 0, protocolMintsReads: 0, unexpected: [], cancelled: 0 };
+function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false, indexed = false, asset = "TESTCOIN", status = "pending", enhanced = false } = {}) {
+  const current = { tickerReads: 0, bindingReads: 0, indexedLaunchReads: 0, protocolFairminterReads: 0, protocolCreationReads: 0, protocolPoolReads: 0, protocolMintsReads: 0, enhancedReads: 0, unexpected: [], cancelled: 0 };
   const height = status === "closed" ? 901001 : 899970;
   const indexedRow = {
     ...fairminter, asset, status,
@@ -81,6 +81,7 @@ function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false, indexed =
     pool_xcp_sats: 0, pool_xcp_reserve: null, pool_token_reserve: null,
     // Exercise metadata's on-chain prose path too, not an early return from
     // an already mirrored description. The old page still needs its node row.
+    description: enhanced ? "https://artist.example/metadata.json" : fairminter.description,
     display_description: null,
   };
   const protocol = (url) => {
@@ -134,6 +135,13 @@ function setup({ mode = "ok", xcp = 2, btc = 80000, dispenser = false, indexed =
   } } } } };
   globalThis.fetch = createDedupeFetch(async (input) => {
     const url = new URL(typeof input === "string" ? input : input.url);
+    if (url.hostname === "api.xcp.io" && url.pathname === `/v2/assets/${asset}/enhanced`) {
+      current.enhancedReads++;
+      if (enhanced === "404") return new Response(null, { status: 404 });
+      if (enhanced === "malformed") return new Response("<html>Not JSON</html>");
+      if (enhanced === "missing-description") return Response.json({ result: { url: indexedRow.description, json: { asset } } });
+      return Response.json({ result: { url: indexedRow.description, json: { asset, description: "In the beginning..." } } });
+    }
     if (url.hostname === "api.xcp.io" && url.pathname === "/v2/price") {
       current.tickerReads++;
       if (mode === "throw") throw new Error("ticker unavailable");
@@ -175,6 +183,25 @@ async function render(module, asset = "TESTCOIN") {
 }
 
 try {
+  await test("page and link preview share one enhanced JSON read and description", async () => {
+    const current = setup({ indexed: true, asset: "FAKEBANG", status: "closed", enhanced: true });
+    const flight = await render(assetPage, "FAKEBANG");
+    assert.equal(current.enhancedReads, 1);
+    assert.equal(current.indexedLaunchReads, 1);
+    assert.deepEqual(current.unexpected, []);
+    assert.match(flight, /"data-description":"In the beginning\.\.\."/);
+    assert.match(flight, /"name":"description","content":"In the beginning\.\.\."/);
+  });
+  for (const enhanced of ["404", "malformed", "missing-description"]) {
+    await test(`enhanced JSON ${enhanced} preserves page and link-preview fallback`, async () => {
+      const current = setup({ indexed: true, asset: "FAKEBANG", status: "closed", enhanced });
+      const flight = await render(assetPage, "FAKEBANG");
+      assert.equal(current.enhancedReads, 1);
+      assert.deepEqual(current.unexpected, []);
+      assert.match(flight, /"data-description":null/);
+      assert.match(flight, /"name":"description","content":"Launched by 1SomeCreatorAddress"/);
+    });
+  }
   await test("closed indexed asset metadata and page reuse one launch row without redundant protocol fairminter reads", async () => {
     const current = setup({ indexed: true, asset: "EVOLVEDPEPE", status: "closed" });
     const flight = await render(assetPage, "EVOLVEDPEPE");

@@ -15,7 +15,7 @@ vi.mock("@/components/chat-panel", () => ({ ChatPanel: () => <aside data-chat-fi
 vi.mock("@/components/lazy-link", () => ({ LazyLink: ({ children }: { children: ReactNode }) => <span>{children}</span> }));
 vi.mock("@/lib/currency", () => ({ useFiat: () => (value: number) => `$${value}` }));
 vi.mock("@/app/[lang]/[asset]/_components/launch-chrome", () => ({ AnnouncedAgo: () => null, ArtLightbox: () => null, BlockAgo: () => null, BlockMonthYear: () => null, ShareButton: () => null, StatusPill: () => null }));
-vi.mock("@/app/[lang]/[asset]/_components/launch-metadata", () => ({ HostedDescription: () => null, HostedInscriptionChip: () => null, HostedSocials: () => null, InscriptionChip: () => null, LaunchDescription: () => null, isOurMetadata: () => false }));
+vi.mock("@/app/[lang]/[asset]/_components/launch-metadata", () => ({ HostedInscriptionChip: () => null, HostedSocials: () => null, InscriptionChip: () => null, LaunchDescriptionContent: () => null, isOurMetadata: () => false }));
 vi.mock("@/app/[lang]/[asset]/_components/launch-stats", () => ({ DenomToggle: () => null, MintTargetStat: () => null, ParticipantsStat: () => null, RaisedStat: () => null, TermsStrip: () => null, TxFeesStat: () => null }));
 vi.mock("@/app/[lang]/[asset]/_components/scheduled-pulse", () => ({ ScheduledPulse: ({ mintForm }: { mintForm: ReactNode }) => <div data-scheduled-fixture>{mintForm}</div> }));
 vi.mock("@/components/address-hover-card", () => ({ AddressHoverCard: () => null, IssuerChips: () => null, IssuerLine: () => null }));

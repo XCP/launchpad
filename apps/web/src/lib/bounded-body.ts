@@ -7,7 +7,7 @@ export class BodyTooLarge extends Error {
 }
 
 /** Content-Length is an early refusal only; streamed bytes enforce the limit. */
-export async function readBoundedBody(request: Request, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
+export async function readBoundedBody(request: Pick<Request, "headers" | "body">, maxBytes: number): Promise<Uint8Array<ArrayBuffer>> {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < 0) throw new RangeError("Invalid body limit");
   const declared = request.headers.get("content-length");
   if (declared && /^\d+$/.test(declared) && Number(declared) > maxBytes) {
@@ -48,6 +48,6 @@ export async function boundedFormData(request: Request, maxBytes: number): Promi
   return new Response(bytes, { headers: { "content-type": request.headers.get("content-type") ?? "" } }).formData();
 }
 
-export async function boundedJson(request: Request, maxBytes: number): Promise<unknown> {
+export async function boundedJson(request: Pick<Request, "headers" | "body">, maxBytes: number): Promise<unknown> {
   return new Response(await readBoundedBody(request, maxBytes)).json();
 }

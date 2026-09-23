@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
+import { classifyDescription, proseDescription } from "@launchpad/xcp69/description";
 import { fetchJson } from "@/lib/client";
 import { useT } from "@/lib/i18n/client";
 import { METADATA_ORIGIN } from "@/lib/metadata";
@@ -10,7 +11,6 @@ import { inscriptionPageUrl } from "@/lib/constants";
 import { FOCUS } from "@/components/ui/tokens";
 
 interface HostedMeta {
-  description?: unknown;
   social?: { type?: string; data?: string }[];
   /** Written by the create flow for an inscription launch; `id` is `<reveal txid>i0`. */
   inscription?: { id?: unknown };
@@ -19,7 +19,7 @@ interface HostedMeta {
 /** True only for metadata we publish ourselves. Third-party JSON is never
  *  fetched from the visitor's browser: the description URL is chosen by the
  *  issuer, so fetching it would hand every viewer's IP to whoever they
- *  pointed it at. Those launches show the link instead. */
+ *  pointed it at. External descriptions are resolved server-side. */
 export function isOurMetadata(url: string | null | undefined) {
   return typeof url === "string" && url.startsWith(`${METADATA_ORIGIN}/`);
 }
@@ -77,22 +77,36 @@ export function LaunchDescription({
   );
 }
 
-/** Description for launches whose on-chain description is our hosted
- *  metadata JSON — fetch it and show the human words inside. */
-export function HostedDescription({
-  url,
-  marginClassName,
+/** Render server-resolved words as text, or retain the original metadata
+ * link when its document could not supply a valid description. */
+export function LaunchDescriptionContent({
+  text,
+  description,
+  mimeType,
+  asset,
+  marginClassName = "mt-5",
 }: {
-  url: string;
+  text: string | null;
+  description: string;
+  mimeType?: string | null;
+  asset: string;
   marginClassName?: string;
 }) {
-  const { data } = useHostedMeta(url);
-  const text =
-    data && typeof data.description === "string" && data.description.trim()
-      ? data.description.trim()
-      : null;
-  if (!text) return null;
-  return <LaunchDescription text={text} marginClassName={marginClassName} />;
+  const words = text?.trim() || proseDescription(description, mimeType, asset);
+  if (words) return <LaunchDescription text={words} marginClassName={marginClassName} />;
+  if (classifyDescription(description, mimeType) !== "url") return null;
+  return (
+    <p className={`${marginClassName} text-sm text-gray-500 dark:text-gray-400`}>
+      <a
+        href={description.trim()}
+        target="_blank"
+        rel="noreferrer nofollow"
+        className="break-all text-purple-600 dark:text-purple-400 hover:underline"
+      >
+        {description.trim()}
+      </a>
+    </p>
+  );
 }
 
 export const SOCIAL_ICONS: Record<string, { label: string; path: string }> = {
