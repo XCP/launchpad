@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { fetchAssetDescription } from "@/lib/api/asset-description";
 
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: vi.fn() }));
+
+const stored = new Map<string, string>();
+const bucketGet = vi.fn(async (key: string) => {
+  const text = stored.get(key);
+  return text === undefined ? null : { body: new Response(text).body };
+});
 
 const pointer = "https://ordinals.com/content/354f99d595b3c801b3744a57900470fe8a62e5aebc0b34ebc06c26d5d60ac72di0?.json";
 const metadata = { asset: "FAKEBANG", description: "In the beginning..." };
@@ -9,7 +16,12 @@ const network = vi.fn();
 const read = () => fetchAssetDescription("FAKEBANG", pointer, "text/plain", null);
 const envelope = (json: unknown = metadata, url = pointer) => ({ result: { url, json, verified: false } });
 
-beforeEach(() => vi.stubGlobal("fetch", network.mockReset()));
+beforeEach(() => {
+  vi.stubGlobal("fetch", network.mockReset());
+  stored.clear();
+  bucketGet.mockClear();
+  vi.mocked(getCloudflareContext).mockResolvedValue({ env: { METADATA: { get: bucketGet } }, ctx: {} } as never);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe("enhanced asset descriptions", () => {
@@ -70,10 +82,35 @@ describe("enhanced asset descriptions", () => {
     expect(cancel).toHaveBeenCalledOnce();
   });
 
+  it("reads our hosted metadata from the bucket, never over HTTP to our own zone", async () => {
+    stored.set("j/FAKEBANG", JSON.stringify({ asset: "FAKEBANG", description: " Crystallized bitcoin. " }));
+    expect(await fetchAssetDescription("FAKEBANG", "https://xcp.fun/FAKEBANG.json", "text/plain", null))
+      .toBe("Crystallized bitcoin.");
+    expect(await fetchAssetDescription("FAKEBANG", "https://xcp.fun/j/FAKEBANG.json", undefined, null))
+      .toBe("Crystallized bitcoin.");
+    expect(bucketGet).toHaveBeenCalledWith("j/FAKEBANG");
+    expect(network).not.toHaveBeenCalled();
+  });
+
   it("retains hosted legacy metadata support and caps the displayed text", async () => {
-    network.mockResolvedValue(Response.json({ description: "x".repeat(2_001) }));
+    stored.set("j/FAKEBANG", JSON.stringify({ description: "x".repeat(2_001) }));
     expect(await fetchAssetDescription("FAKEBANG", "https://xcp.fun/FAKEBANG.json", undefined, null))
       .toHaveLength(2_000);
+  });
+
+  it.each([
+    ["another asset's document", "https://xcp.fun/OTHERCOIN.json"],
+    ["a non-metadata path", "https://xcp.fun/FAKEBANG"],
+    ["a missing document", "https://xcp.fun/FAKEBANG.json"],
+  ])("keeps the link fallback for %s", async (_, url) => {
+    stored.set("j/OTHERCOIN", JSON.stringify({ asset: "OTHERCOIN", description: "Someone else's words" }));
+    expect(await fetchAssetDescription("FAKEBANG", url, undefined, null)).toBeNull();
+    expect(network).not.toHaveBeenCalled();
+  });
+
+  it("rejects a hosted document that names a different asset", async () => {
+    stored.set("j/FAKEBANG", JSON.stringify({ asset: "OTHERCOIN", description: "Someone else's words" }));
+    expect(await fetchAssetDescription("FAKEBANG", "https://xcp.fun/FAKEBANG.json", undefined, null)).toBeNull();
   });
 
   it("needs no metadata request for curated prose, on-chain prose, or inscription content", async () => {

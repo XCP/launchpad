@@ -1,14 +1,26 @@
 // @vitest-environment happy-dom
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { fetchAssetDescription } from "@/lib/api/asset-description";
 import { LaunchDescriptionContent } from "@/app/[lang]/[asset]/_components/launch-metadata";
 
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: vi.fn() }));
 vi.mock("@/lib/client", () => ({ fetchJson: vi.fn() }));
 
+// External pointers go over fetch; our own are read from the bucket. Both
+// draw from `network` so one set of cases covers either path.
 const network = vi.fn();
-beforeEach(() => vi.stubGlobal("fetch", network.mockReset()));
+const bucket = {
+  async get() {
+    const response: Response = await network();
+    return response.status === 404 ? null : { body: response.body };
+  },
+};
+beforeEach(() => {
+  vi.stubGlobal("fetch", network.mockReset());
+  vi.mocked(getCloudflareContext).mockResolvedValue({ env: { METADATA: bucket }, ctx: {} } as never);
+});
 afterEach(() => vi.unstubAllGlobals());
 
 describe.each([
