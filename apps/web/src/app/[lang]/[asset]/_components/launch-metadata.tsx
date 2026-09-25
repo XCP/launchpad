@@ -78,7 +78,9 @@ export function LaunchDescription({
 }
 
 /** Render server-resolved words as text, or retain the original metadata
- * link when its document could not supply a valid description. */
+ * link when its document could not supply a valid description. Our own
+ * hosted JSON is never shown as a link: a creator who left the description
+ * blank said nothing, and the document's art and socials render elsewhere. */
 export function LaunchDescriptionContent({
   text,
   description,
@@ -94,7 +96,7 @@ export function LaunchDescriptionContent({
 }) {
   const words = text?.trim() || proseDescription(description, mimeType, asset);
   if (words) return <LaunchDescription text={words} marginClassName={marginClassName} />;
-  if (classifyDescription(description, mimeType) !== "url") return null;
+  if (classifyDescription(description, mimeType) !== "url" || isOurMetadata(description)) return null;
   return (
     <p className={`${marginClassName} text-sm text-gray-500 dark:text-gray-400`}>
       <a

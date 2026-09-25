@@ -42,7 +42,7 @@ describe.each([
     return container;
   }
 
-  it.each(["404", "missing", "empty", "wrong-type", "malformed"])("shows the original link for %s metadata", async (failure) => {
+  it.each(["404", "missing", "empty", "wrong-type", "malformed"])("falls back without words for %s metadata", async (failure) => {
     const response = failure === "404" ? new Response(null, { status: 404 })
       : failure === "malformed" ? new Response("<html>Not JSON</html>")
       : Response.json(documentBody({
@@ -53,6 +53,12 @@ describe.each([
 
     const container = await renderDescription();
     const link = container.querySelector("a");
+    if (pointer.startsWith("https://xcp.fun/")) {
+      // Our own document with no usable words: say nothing, never the bare JSON link.
+      expect(container.innerHTML).toBe("");
+      expect(network).toHaveBeenCalledOnce();
+      return;
+    }
     expect(link?.getAttribute("href")).toBe(pointer);
     expect(link?.textContent).toBe(pointer);
     expect(link?.getAttribute("rel")).toBe("noreferrer nofollow");
