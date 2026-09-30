@@ -17,8 +17,8 @@ describe("mpmaCapable", () => {
     expect(MPMA_TAPROOT_SUPPORT_BLOCK).toBe(971_700);
   });
 
-  it.each([MPMA_TAPROOT_SUPPORT_BLOCK - 1, 969_320])(
-    "below the activation (tip %i) keeps 32-byte programs out, as Core's compose does",
+  it.each([MPMA_TAPROOT_SUPPORT_BLOCK - 2, 969_320])(
+    "while the next block is below the activation (tip %i) keeps 32-byte programs out, as Core's compose does",
     (tip) => {
       expect(mpmaCapable(ADDRESSES.p2pkh, tip)).toBe(true);
       expect(mpmaCapable(ADDRESSES.p2sh, tip)).toBe(true);
@@ -28,8 +28,8 @@ describe("mpmaCapable", () => {
     },
   );
 
-  it.each([MPMA_TAPROOT_SUPPORT_BLOCK, MPMA_TAPROOT_SUPPORT_BLOCK + 1])(
-    "from the activation (tip %i) takes P2TR and P2WSH recipients too",
+  it.each([MPMA_TAPROOT_SUPPORT_BLOCK - 1, MPMA_TAPROOT_SUPPORT_BLOCK, MPMA_TAPROOT_SUPPORT_BLOCK + 1])(
+    "once the next block is the activation or later (tip %i) takes P2TR and P2WSH recipients too",
     (tip) => {
       for (const address of Object.values(ADDRESSES)) expect(mpmaCapable(address, tip)).toBe(true);
     },

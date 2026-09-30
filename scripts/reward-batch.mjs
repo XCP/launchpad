@@ -17,10 +17,10 @@
  *
  * Before Core 11.4's `mpma_taproot_support` (block 971,700), Counterparty
  * refuses an MPMA send to a P2TR or P2WSH address; those recipients go to
- * manual.csv for individual sends. From that block on, everyone fits in the
- * MPMA and manual.csv is empty. See scripts/lib/mpma.mjs. The chain tip is
- * read from the Counterparty API (COUNTERPARTY_API_BASE, or the public node)
- * unless --height gives it.
+ * manual.csv for individual sends. Once the next block is that one (a tip of
+ * 971,699 or later), everyone fits in the MPMA and manual.csv is empty. See
+ * scripts/lib/mpma.mjs. The chain tip is read from the Counterparty API
+ * (COUNTERPARTY_API_BASE, or the public node) unless --height gives it.
  *
  * SIX CONFIRMATIONS
  *
