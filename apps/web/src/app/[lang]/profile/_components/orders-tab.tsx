@@ -94,7 +94,7 @@ export function OrdersTab({
                 )}
                 <span className="ml-2 text-xs text-gray-500 dark:text-gray-400">
                   {t("{pct}% filled", { pct: (filled * 100).toFixed(0) })} ·{" "}
-                  {o.expire_index === null ? "GTC" : t("expires block {n}", { n: num.commas(o.expire_index) })}
+                  {o.expire_index === null ? t("No expiry") : t("expires block {n}", { n: num.commas(o.expire_index) })}
                 </span>
               </div>
               {canCancel && (

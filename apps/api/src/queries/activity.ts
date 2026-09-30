@@ -210,7 +210,8 @@ export interface OrderRow {
   token_remaining: string;
   xcp_remaining: string;
   status: string;
-  expire_index: number;
+  /** Null for an order that never expires. */
+  expire_index: number | null;
   divisible: number;
 }
 

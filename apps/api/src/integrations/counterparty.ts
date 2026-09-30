@@ -284,7 +284,10 @@ export interface CpOrder {
   get_asset: string;
   get_quantity: number | string;
   get_remaining: number | string;
-  expire_index: number;
+  /** Blocks the order stays open for; 0 means it never expires. */
+  expiration: number;
+  /** The block it expires at, or null for an order that never expires. */
+  expire_index: number | null;
   /** `open`, `filled`, `cancelled` or `expired`. Counterparty has no
    *  "partially filled" status — that is an open order whose remaining is
    *  below its original, and the tape derives it. */

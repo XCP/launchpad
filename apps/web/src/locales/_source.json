@@ -2537,6 +2537,11 @@
   "No closed positions yet.": [
     "app/[lang]/profile/_components/history-tab.tsx"
   ],
+  "No expiry": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/activity/_components/activity-view.tsx",
+    "app/[lang]/profile/_components/orders-tab.tsx"
+  ],
   "no history": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],

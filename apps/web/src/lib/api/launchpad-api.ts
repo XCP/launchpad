@@ -1511,7 +1511,8 @@ export interface ActivityOrder {
   side: "buy" | "sell";
   state: OrderState;
   block: number;
-  expireBlock: number;
+  /** Null for an order that never expires. */
+  expireBlock: number | null;
   /** Original size; the order's price is a statement about these. */
   tokenQuantity: Raw;
   xcpQuantity: Raw;
@@ -1705,7 +1706,7 @@ interface ApiActivityOrder {
   side: string;
   state: string;
   block_index: number;
-  expire_index: number;
+  expire_index: number | null;
   token_quantity: Raw;
   xcp_quantity: Raw;
   token_remaining: Raw;
@@ -1777,7 +1778,7 @@ export async function fetchActivityOrders(
       // undefined.
       state: ORDER_STATES.find((s) => s === r.state) ?? "open",
       block: r.block_index,
-      expireBlock: r.expire_index,
+      expireBlock: typeof r.expire_index === "number" ? r.expire_index : null,
       tokenQuantity: r.token_quantity,
       xcpQuantity: r.xcp_quantity,
       tokenRemaining: r.token_remaining,
