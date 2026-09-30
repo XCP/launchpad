@@ -32,6 +32,8 @@ enabled = true
 TELEGRAM_CHAT_ID = "-1004326432550"
 CHAT_ENABLED = "true"
 # Optional CHAT_MUTED_AUTHORS contains comma-separated opaque author IDs.
+# Optional COUNTERPARTY_API_BASE is the Counterparty API's /v2 root; unset
+# reads https://api.counterparty.io:4000/v2.
 
 # Blocks land every ~10 minutes, and Counterparty's /fairminters list has no
 # server-side filter beyond status — every tick re-lists the chain's ENTIRE

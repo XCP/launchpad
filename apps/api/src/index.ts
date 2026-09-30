@@ -17,7 +17,7 @@ import { mintClosed } from "#api/telegram/format";
 import { announceLive, queueAnnouncements } from "#api/telegram/live";
 import { buildBacklog } from "#api/telegram/replay";
 import { send } from "#api/telegram/send";
-import { fetchMempoolFairmints } from "#api/integrations/counterparty";
+import { configureCounterpartyApi, fetchMempoolFairmints } from "#api/integrations/counterparty";
 
 export { Announcer } from "#api/durable/announcer";
 
@@ -228,8 +228,12 @@ app.get("/ws/chat", (c) => {
 });
 
 export default {
-  fetch: app.fetch,
+  fetch(request, env, ctx) {
+    configureCounterpartyApi(env);
+    return app.fetch(request, env, ctx);
+  },
   async scheduled(event, env, ctx) {
+    configureCounterpartyApi(env);
     /**
      * The one-minute sweep: wake the rooms that have something to say.
      *
@@ -271,9 +275,10 @@ export default {
           let fastSyncRan = false;
           if (fastSyncClaimed) {
             fastSyncRan = await withLock(env.DB, 110, async () => {
-              await runScheduledJob("sync_after_mempool", () =>
+              const sync = await runScheduledJob("sync_after_mempool", () =>
                 syncLaunches(env.DB, env.METADATA),
               );
+              if (sync?.paused) return;
               await runScheduledJob("announce_after_mempool", async () =>
                 announceLive(env, await currentHeight(env.DB)),
               );
@@ -298,7 +303,11 @@ export default {
 
     ctx.waitUntil(
       withLock(env.DB, 110, async () => {
-        await runScheduledJob("sync_launches", () => syncLaunches(env.DB, env.METADATA));
+        const sync = await runScheduledJob("sync_launches", () => syncLaunches(env.DB, env.METADATA));
+        // A node too old for its height (see src/indexer/core-version.ts) is
+        // not read for anything else this tick either: the order book and the
+        // balances below come from the same ledger the index refused.
+        if (sync?.paused) return;
         // After the indexer, never inside it. The feed reads committed state
         // rather than the tick's own deltas, so an announcement can only
         // describe something D1 already believes — and a tick that dies
