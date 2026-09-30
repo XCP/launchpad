@@ -1,4 +1,4 @@
-import { Address, SigHash } from "@scure/btc-signer";
+import { Address, SigHash, type Transaction } from "@scure/btc-signer";
 import {
   addressToScriptPubKey,
   buildCommitFundingPsbt,
@@ -283,17 +283,28 @@ async function signAndBroadcastReveal(opts: {
 }
 
 /**
+ * What resuming came to: the launch's reveal is out, or the commit can never
+ * confirm and the kept record was dropped.
+ */
+export type ResumeResult =
+  | { outcome: "launched"; commitTxid: string; revealTxid: string }
+  | { outcome: "abandoned"; commitTxid: string; spentBy: string };
+
+/**
  * Finish a launch whose commit went out and whose reveal did not: rebuild the
  * reveal from the kept envelope and ask the wallet to sign it (or send the
  * one it already signed), then broadcast. A commit output already spent means
  * the reveal made it after all: the record is cleared and nothing is asked.
+ * A commit the node does not know whose funding was since spent by another
+ * confirmed transaction can never confirm: the record is cleared, nothing is
+ * broadcast, and the result says so.
  */
 export async function resumeInscribeLaunch(opts: {
   record: PendingReveal;
   signPsbt: SignPsbt;
   broadcast: (hex: string) => Promise<string>;
   onStep: (step: InscribeStep) => void;
-}): Promise<{ commitTxid: string; revealTxid: string }> {
+}): Promise<ResumeResult> {
   const { record, onStep } = opts;
   onStep("preparing");
   if (record.recipient !== BURN_ADDRESS) {
@@ -326,9 +337,17 @@ export async function resumeInscribeLaunch(opts: {
   if (outspend.spent) {
     clearPendingReveal(record.address);
     onStep("done");
-    return { commitTxid: record.commitTxid, revealTxid: outspend.txid };
+    return { outcome: "launched", commitTxid: record.commitTxid, revealTxid: outspend.txid };
   }
   if (!outspend.known) {
+    // Neither confirmed nor in the mempool. If a coin the commit spends has
+    // since confirmed in another transaction, the commit can never confirm,
+    // no BTC waits behind it, and the record would only block this address.
+    const spentBy = await fundingSpentElsewhere(commit, record.commitTxid);
+    if (spentBy !== null) {
+      clearPendingReveal(record.address);
+      return { outcome: "abandoned", commitTxid: record.commitTxid, spentBy };
+    }
     // The page died before the commit reached the network. Its funding input
     // is still unspent or the broadcast fails, so sending it now is the same
     // launch, just later.
@@ -351,7 +370,39 @@ export async function resumeInscribeLaunch(opts: {
   }
   clearPendingReveal(record.address);
   onStep("done");
-  return { commitTxid: record.commitTxid, revealTxid };
+  return { outcome: "launched", commitTxid: record.commitTxid, revealTxid };
+}
+
+/**
+ * The confirmed transaction that spent one of the commit's inputs instead of
+ * the commit, or null. Only a confirmed spend counts: a conflict still in the
+ * mempool can be evicted or replaced, and then the kept commit is good again.
+ * An input whose status cannot be read is not evidence either way.
+ */
+async function fundingSpentElsewhere(commit: Transaction, commitTxid: string): Promise<string | null> {
+  for (let i = 0; i < commit.inputsLength; i++) {
+    const input = commit.getInput(i);
+    if (!input.txid || input.index === undefined) continue;
+    try {
+      const res = await fetch(`${ELECTRS_API_BASE}/tx/${hexCodec.encode(input.txid)}/outspend/${input.index}`);
+      if (!res.ok) {
+        await res.body?.cancel().catch(() => undefined);
+        continue;
+      }
+      const data = (await res.json()) as { spent?: unknown; txid?: unknown; status?: { confirmed?: unknown } };
+      if (
+        data.spent === true &&
+        typeof data.txid === "string" && /^[0-9a-f]{64}$/.test(data.txid) &&
+        data.txid !== commitTxid &&
+        data.status?.confirmed === true
+      ) {
+        return data.txid;
+      }
+    } catch {
+      // Unreadable: keep the record.
+    }
+  }
+  return null;
 }
 
 /** Whether the node knows the commit, and whether its output is spent (and by what). */

@@ -236,6 +236,8 @@ export default function CreatePage() {
   // (lib/pending-reveal), for the connected address.
   const pendingReveal = usePendingReveal(address);
   const [resuming, setResuming] = useState(false);
+  // A kept launch that resuming found could never confirm, and dropped.
+  const [abandoned, setAbandoned] = useState<{ address: string; asset: string } | null>(null);
 
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<NameCheck>("idle");
@@ -475,12 +477,18 @@ export default function CreatePage() {
     setResuming(true);
     setUploadError(null);
     try {
-      const { revealTxid } = await resumeInscribeLaunch({
+      const result = await resumeInscribeLaunch({
         record,
         signPsbt,
         broadcast: broadcastTransaction,
         onStep: setInscribeStep,
       });
+      if (result.outcome === "abandoned") {
+        setAbandoned({ address: record.address, asset: record.asset });
+        setInscribeStep(null);
+        return;
+      }
+      const { revealTxid } = result;
       setName(record.asset);
       setScheduledStart(record.startBlock);
       setScheduledLabel(blockHeight === undefined ? null : estimateFromBlocks(record.startBlock - blockHeight, t));
@@ -602,6 +610,17 @@ export default function CreatePage() {
                   ? t(INSCRIBE_STEP_LABELS[inscribeStep])
                   : t("Finish launching {asset}", { asset: pendingReveal.asset })}
               </CTA>
+            </div>
+          )}
+
+          {abandoned && abandoned.address === address && !pendingReveal && (
+            <div className="mt-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4 text-sm text-gray-700 dark:text-gray-300">
+              <p>
+                {t(
+                  "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.",
+                  { asset: abandoned.asset },
+                )}
+              </p>
             </div>
           )}
 
