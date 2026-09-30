@@ -117,7 +117,7 @@ async function fetchRealFairminter(
  * resolves from the first block). Freely (re)writable up until a real
  * fairminter exists for the asset — see assetHasRealFairminter — at which
  * point this route refuses and further edits go through PUT below instead,
- * gated by a BIP-322 signature from the asset's current owner.
+ * gated by a signature from the asset's current owner.
  */
 /** The signature dialect the wallet declared, absent for BIP-322 (the XCP Wallet default), false when malformed. */
 function parseVerification(raw: FormDataEntryValue | null): ConnectionProof["verification"] | false {
@@ -243,7 +243,9 @@ const EDIT_MAX_FUTURE_SKEW_SECONDS = 60;
  * description URL is locked forever; the content behind it is curated by
  * whoever currently owns the asset on-chain.
  *
- * Authentication: a BIP-322 signature (the wallet's native signMessage) over
+ * Authentication: a message signature (the wallet's native signMessage,
+ * verified by the dialect the page declares from the connection proof; on a
+ * P2PKH address both classic BIP-137 and the BIP-322 stack verify) over
  * a challenge that binds the asset, the signing address, a timestamp, and a
  * hash of the exact new content — so a captured signature can neither be
  * replayed later nor spent on different content.

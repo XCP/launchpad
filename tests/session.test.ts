@@ -1,5 +1,5 @@
 import { secp256k1 } from "@noble/curves/secp256k1";
-import { p2pkh } from "@scure/btc-signer";
+import { p2pkh, p2wpkh } from "@scure/btc-signer";
 import { createProofMessage, legacyMessageHash } from "@xcp/wallet-sdk";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DELETE, GET, POST } from "@/app/api/session/route";
@@ -122,11 +122,29 @@ describe("session route", () => {
     const valid = proof();
     for (const invalid of [proof({ issued: NOW - 301 }), proof({ issued: NOW + 31 }),
       proof({ origin: "https://other.example" }), { ...valid, address: "claimed-address" },
-      { ...valid, signature: "not-a-signature" }, { ...valid, verification: { method: "BIP-322", format: "" } }]) {
+      { ...valid, signature: "not-a-signature" }]) {
       const response = await POST(request("POST", { body: { proof: invalid } }));
       expect(response.status).toBe(401);
       expect(response.headers.has("set-cookie")).toBe(false);
     }
+  });
+
+  it("accepts a classic P2PKH proof whatever its label, and keeps SegWit to the declared dialect", async () => {
+    // XCP Wallet 0.14 moves legacy proofs from the BIP-322 stack to classic
+    // BIP-137; for a P2PKH address the address check decides, never the label.
+    for (const verification of [{ method: "BIP-322", format: "p2pkh" }, { method: "BIP-322", format: "" }, undefined]) {
+      const response = await POST(request("POST", { body: { proof: { ...proof(), verification } } }));
+      expect(response.status).toBe(200);
+    }
+    const segwit = p2wpkh(secp256k1.getPublicKey(PRIVATE_KEY, true)).address!;
+    const message = createProofMessage({ origin: ORIGIN, issued: NOW, nonce: "session-test-nonce" });
+    const signature = secp256k1.sign(legacyMessageHash(message), PRIVATE_KEY, { prehash: false, lowS: true });
+    const bip137 = { address: segwit, message,
+      signature: Buffer.from([39 + signature.recovery!, ...signature.toCompactRawBytes()]).toString("base64") };
+    expect((await POST(request("POST", { body: { proof: {
+      ...bip137, verification: { method: "BIP-322", format: "p2wpkh" } } } }))).status).toBe(401);
+    expect((await POST(request("POST", { body: { proof: {
+      ...bip137, verification: { method: "BIP-137", format: "legacy_recoverable" } } } }))).status).toBe(200);
   });
 
   it("refuses cross-origin session writes and clears with the same cookie attributes", async () => {
