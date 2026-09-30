@@ -1290,5 +1290,7 @@
   "{year} asset": "Actif de {year}",
   "Created by this fairminter.": "Créé par ce fairminter.",
   "Asset name first registered in {year}.": "Nom de l’actif enregistré pour la première fois en {year}.",
-  "If it fails, every minter’s XCP is automatically refunded.": "En cas d’échec, la totalité des XCP de chaque participant est automatiquement remboursée."
+  "If it fails, every minter’s XCP is automatically refunded.": "En cas d’échec, la totalité des XCP de chaque participant est automatiquement remboursée.",
+  "Finish launching {asset}": "Terminer le lancement de {asset}",
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "Le commit de l'inscription de {asset} est diffusé, mais pas son reveal. Le lancement n'existe qu'une fois le reveal on-chain ; d'ici là, les BTC du commit attendent dans une sortie que seul ce reveal peut dépenser."
 }

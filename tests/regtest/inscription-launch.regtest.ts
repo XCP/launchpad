@@ -23,6 +23,7 @@ import { secp256k1 } from "@noble/curves/secp256k1";
 import { hex } from "@scure/base";
 import * as btc from "@scure/btc-signer";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils.js";
+import { finalizeCommitAndReveal } from "@xcp/wallet-sdk";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 const REGTEST = { bech32: "bcrt", pubKeyHash: 0x6f, scriptHash: 0xc4, wif: 0xef };
@@ -37,7 +38,7 @@ vi.mock("@/lib/inscriber/constants", async (importOriginal) => {
 });
 
 const { prepareFairminterInscriptionPsbt } = await import("@/lib/inscriber/fairminter");
-const { buildCommitFundingPsbt, buildRevealPsbt, finalizeSignedPsbt, txidFromRawTx } = await import(
+const { buildCommitFundingPsbt, buildRevealPsbt, finalizeSignedPsbt } = await import(
   "@/lib/inscriber/transactions"
 );
 const { XCP69 } = await import("@launchpad/xcp69/xcp69");
@@ -116,8 +117,14 @@ describe("inscription launch on regtest", () => {
     );
   });
 
-  /** Fund the wallet, commit from it, and reveal through a leaf closed by `signer`. */
-  async function launch(asset: string, lpAsset: string, jsonUrl: string, signer: Signer) {
+  /**
+   * Fund the wallet, commit from it, and reveal through a leaf closed by
+   * `signer`. `bundle` is the commit-and-reveal flow: both signed against the
+   * unsigned commit's txid before either is broadcast, and finalized by the
+   * SDK's `finalizeCommitAndReveal`, as the create page does for a wallet
+   * that signs the pair in one approval.
+   */
+  async function launch(asset: string, lpAsset: string, jsonUrl: string, signer: Signer, bundle = false) {
     const fundTxid = walletCli("sendtoaddress", wallet.address!, "0.05");
     await mine(1);
     const fundTx = rpc<{ vout: { n: number; value: number; scriptPubKey: { hex: string } }[] }>(
@@ -160,15 +167,12 @@ describe("inscription launch on regtest", () => {
     const commitTx = btc.Transaction.fromPSBT(hex.decode(commit.psbtHex));
     commitTx.updateInput(0, { tapInternalKey: internalKey });
     commitTx.signIdx(priv, 0, [btc.SigHash.ALL]);
-    const commitRaw = finalizeSignedPsbt(hex.encode(commitTx.toPSBT()));
-    const commitTxid = cli("sendrawtransaction", commitRaw);
-    expect(commitTxid).toBe(txidFromRawTx(commitRaw));
-    await mine(1);
+    const unsignedCommitTxid = btc.Transaction.fromPSBT(hex.decode(commit.psbtHex)).id;
 
     // reveal: the script-path spend carrying the envelope, inscription output burned
     const reveal = buildRevealPsbt({
       pubkey: signer.leafKey,
-      commitTxid,
+      commitTxid: unsignedCommitTxid,
       commitVout: 0,
       commitAmount: prepared.commitAmount,
       revealScript: prepared.revealScript,
@@ -178,9 +182,18 @@ describe("inscription launch on regtest", () => {
     });
     const revealTx = btc.Transaction.fromPSBT(hex.decode(reveal.psbtHex));
     revealTx.signIdx(signer.leafPriv, 0, [btc.SigHash.ALL]);
-    const revealRaw = finalizeSignedPsbt(hex.encode(revealTx.toPSBT()));
 
-    const revealTxid = cli("sendrawtransaction", revealRaw);
+    const raw = bundle
+      ? finalizeCommitAndReveal({ commit: hex.encode(commitTx.toPSBT()), reveal: hex.encode(revealTx.toPSBT()) })
+      : {
+          commit: finalizeSignedPsbt(hex.encode(commitTx.toPSBT())),
+          reveal: finalizeSignedPsbt(hex.encode(revealTx.toPSBT())),
+        };
+    const commitTxid = cli("sendrawtransaction", raw.commit);
+    expect(commitTxid).toBe(unsignedCommitTxid);
+    // The two-step flow confirms the commit before the reveal is even asked for.
+    if (!bundle) await mine(1);
+    const revealTxid = cli("sendrawtransaction", raw.reveal);
     await mine(2);
     // Bitcoin accepted and mined it either way; only Core's reading differs.
     expect(rpc<{ confirmations: number }>("getrawtransaction", revealTxid, "true").confirmations).toBeGreaterThan(0);
@@ -212,6 +225,18 @@ describe("inscription launch on regtest", () => {
     expect(fm.result[0].status).toBe("pending");
     expect(fm.result[0].description).toBe(jsonUrl);
     console.log("reveal", revealTxid, "inscription", `${revealTxid}i0`, "source", fm.result[0].source);
+  });
+
+  it("creates the fairminter from a commit and reveal signed together and finalized by the SDK", async () => {
+    const asset = numericAsset(95_700_000_000_000_000n);
+    const lpAsset = numericAsset(96_200_000_000_000_000n);
+    const jsonUrl = `https://xcp.fun/${asset}.json`;
+    const { revealTxid } = await launch(asset, lpAsset, jsonUrl, walletSigner, true);
+    const fm = await cp<{ result: { tx_hash: string; source: string; description: string }[] }>(
+      `/assets/${asset}/fairminters?verbose=true`,
+    );
+    expect(fm.result).toHaveLength(1);
+    expect(fm.result[0]).toMatchObject({ tx_hash: revealTxid, source: wallet.address, description: jsonUrl });
   });
 
   it("ignores a reveal whose leaf is closed by a key that is not the source's", async () => {
