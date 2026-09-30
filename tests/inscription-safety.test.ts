@@ -1,9 +1,11 @@
+// @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hex } from "@scure/base";
 import { p2tr, SigHash, Transaction, utils } from "@scure/btc-signer";
 import { taprootTweakPrivKey } from "@scure/btc-signer/utils.js";
 import { inscribeLaunch } from "../apps/web/src/lib/inscribe-launch";
 import { addressToScriptPubKey, BURN_ADDRESS } from "../apps/web/src/lib/inscriber";
+import { loadPendingReveal } from "../apps/web/src/lib/pending-reveal";
 import { readPsbt, readTransaction } from "../apps/web/src/lib/transaction-verification";
 
 // Offline transaction fixtures and a throwaway key; nothing reaches a node.
@@ -43,6 +45,7 @@ function options(feeRate = 1) {
   };
 }
 beforeEach(() => {
+  localStorage.clear();
   funds = [funding()];
   balanceResponse = () => Response.json({ result: [], next_cursor: null });
   parentResponse = txid => new Response(hex.encode(funds.find(f => f.tx.id === txid)!.tx.toBytes(true, false)));
@@ -147,5 +150,7 @@ describe("inscription funding and returned commit/reveal transactions", () => {
     });
     await expect(inscribeLaunch(options())).rejects.toMatchObject({ code: "transaction_mismatch" });
     expect(broadcast).toHaveBeenCalledTimes(1);
+    // The commit is out and its envelope kept, so the launch can still be finished.
+    expect(loadPendingReveal(address)).toMatchObject({ commitTxid: readTransaction(broadcast.mock.calls[0]![0]).id });
   });
 });

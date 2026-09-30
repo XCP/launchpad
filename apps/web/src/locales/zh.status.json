@@ -1275,6 +1275,8 @@
     "{year} asset",
     "Created by this fairminter.",
     "Asset name first registered in {year}.",
-    "If it fails, every minter’s XCP is automatically refunded."
+    "If it fails, every minter’s XCP is automatically refunded.",
+    "Finish launching {asset}",
+    "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend."
   ]
 }

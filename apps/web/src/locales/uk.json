@@ -1290,5 +1290,7 @@
   "{year} asset": "Актив {year} року",
   "Created by this fairminter.": "Створений цим fairminter.",
   "Asset name first registered in {year}.": "Назву активу вперше зареєстровано у {year} році.",
-  "If it fails, every minter’s XCP is automatically refunded.": "Якщо запуск не відбудеться, усі внесені XCP автоматично повертаються кожному учаснику."
+  "If it fails, every minter’s XCP is automatically refunded.": "Якщо запуск не відбудеться, усі внесені XCP автоматично повертаються кожному учаснику.",
+  "Finish launching {asset}": "Завершити запуск {asset}",
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "Commit інскрипції {asset} надіслано в мережу, а reveal — ні. Запуск з’являється лише тоді, коли reveal у блокчейні, а доти BTC з commit чекають у виході, який може витратити лише цей reveal."
 }

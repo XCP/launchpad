@@ -1290,5 +1290,7 @@
   "{year} asset": "{year}년 자산",
   "Created by this fairminter.": "이 페어민터가 생성한 자산입니다.",
   "Asset name first registered in {year}.": "자산 이름이 {year}년에 처음 등록되었습니다.",
-  "If it fails, every minter’s XCP is automatically refunded.": "출시가 실패하면 모든 민팅 참여자가 지불한 XCP 전액이 자동으로 환불됩니다."
+  "If it fails, every minter’s XCP is automatically refunded.": "출시가 실패하면 모든 민팅 참여자가 지불한 XCP 전액이 자동으로 환불됩니다.",
+  "Finish launching {asset}": "{asset} 런칭 마치기",
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "{asset} 인스크립션의 커밋은 전송되었지만 리빌은 아직입니다. 런칭은 리빌이 온체인에 올라가야 성립하며, 그때까지 커밋의 BTC는 그 리빌만 사용할 수 있는 출력에 머뭅니다."
 }
