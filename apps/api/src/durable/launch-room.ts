@@ -2,7 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import { compareRawDesc, sumRaw } from "@launchpad/xcp69/numeric";
 import { mergePairTrades } from "@launchpad/xcp69/trades";
 import type { Env } from "#api/env";
-import { fetchFairminter } from "#api/integrations/counterparty";
+import { configureCounterpartyApi, counterpartyApiBase, fetchFairminter } from "#api/integrations/counterparty";
 import { closeWebSocket } from "#api/durable/websocket";
 
 /** Was 8s. A room polls Counterparty on behalf of everyone watching that
@@ -20,7 +20,6 @@ const TRADES_MS = 24_000;
 /** Small live snapshot for room broadcasts and holder restoration. Complete
  * trade-table history is server-paged from D1, never carried over the room. */
 const MAX_TRADES = 50;
-const MEMPOOL_BASE = "https://api.counterparty.io:4000/v2";
 /** Individual pending rows are for the "who's minting right now" list —
  *  capped so a launch with an unusually large mempool queue can't bloat
  *  every broadcast frame; the aggregate count/quantity below stay exact
@@ -292,6 +291,9 @@ export class LaunchRoom extends DurableObject<Env> {
    *  VISITOR every 10s (LiveProgress, and again independently in the
    *  Mempool tab) — now it runs once per launch, however many are watching. */
   private async poll(txHash: string): Promise<RoomState | null> {
+    // Every upstream read of this room starts here, and a Durable Object can
+    // run in an isolate the worker's own handlers never configured.
+    configureCounterpartyApi(this.env);
     const fm = await fetchFairminter(txHash);
     if (!fm) return null;
 
@@ -346,7 +348,7 @@ export class LaunchRoom extends DurableObject<Env> {
     const encoded = encodeURIComponent(asset);
     const grab = async (path: string) => {
       try {
-        const res = await fetch(`${MEMPOOL_BASE}${path}`, {
+        const res = await fetch(`${counterpartyApiBase()}${path}`, {
           signal: AbortSignal.timeout(8_000),
         });
         if (!res.ok) return [];
@@ -386,7 +388,7 @@ export class LaunchRoom extends DurableObject<Env> {
    *  foreshadows. Sorted biggest-first, same as the table it replaces. */
   private async fetchPending(txHash: string): Promise<PendingMint[]> {
     try {
-      const res = await fetch(`${MEMPOOL_BASE}/mempool/events/NEW_FAIRMINT?limit=1000`, {
+      const res = await fetch(`${counterpartyApiBase()}/mempool/events/NEW_FAIRMINT?limit=1000`, {
         signal: AbortSignal.timeout(8_000),
       });
       if (!res.ok) return [];

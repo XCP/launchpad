@@ -5,11 +5,13 @@ import { CounterpartyReadDeferred } from "#api/integrations/cooldown";
 import {
   fetchAllFairminters,
   fetchAnnounceFacts,
-  fetchBlockHeight,
   fetchBlockTime,
   fetchFairmints,
+  fetchNodeStatus,
   fetchPool,
 } from "#api/integrations/counterparty";
+import { coreVersionGate } from "#api/indexer/core-version";
+import { checkLedger, type LedgerCheck } from "#api/indexer/ledger";
 import {
   fetchXcpUsd,
   fetchXcpUsdHistory,
@@ -107,6 +109,14 @@ export interface SyncResult {
    *  is skipped entirely when no mint, trade, graduation, or verdict moved. */
   behavior_written: number;
   reward_accounts_written: number;
+  /** The node's Core release is too old for its height; nothing was indexed. */
+  paused: boolean;
+  /** Recorded blocks compared with the node's ledger hashes this tick. */
+  ledger_blocks_compared: number;
+  /** The block the index was rolled back to after Core re-parsed later ones. */
+  ledger_rolled_back_to: number | null;
+  /** The ledger comparison could not be made this tick; the next one repeats it. */
+  ledger_check_failed: boolean;
   partial: boolean;
   pool_lookups_failed: number;
   pool_lookups_deferred: number;
@@ -131,7 +141,18 @@ export async function syncLaunches(
   db: D1Database,
   metadata: R2Bucket,
 ): Promise<SyncResult> {
-  const [all, height] = await Promise.all([fetchAllFairminters(), fetchBlockHeight()]);
+  const node = await fetchNodeStatus();
+  const height = node.height;
+  // A node parsing past an activation on the release before it has the wrong
+  // ledger from there on; taking nothing is the only correct index of it.
+  const gate = coreVersionGate(node.version, height);
+  if (!gate.ok) {
+    console.warn({ event: "indexer_paused", reason: "core_version", height, ...gate });
+    return pausedResult();
+  }
+  // Before anything is read back from D1: a rollback changes what is stored.
+  const [ledger, all] = await Promise.all([checkLedgerSafely(db), fetchAllFairminters()]);
+  const reindexed = ledger !== null && ledger.rolled_back_to !== null;
   // Remembered so what runs after this pass can judge "now" without a node
   // read of its own. The feed announces straight after this, which is exactly
   // when the node is likeliest to be refusing us; see currentHeight.
@@ -554,9 +575,10 @@ export async function syncLaunches(
   // above could have changed the summary. On a quiet tick this is skipped
   // entirely, which is the whole reason materialising /v2/stats pays for
   // itself rather than just moving the cost from read time to write time.
-  const stale = rollupIsStale({ mintsIngested, feesBackfilled, resolved });
+  // A rollback removed rows every rollup summarises, whatever this pass re-read.
+  const stale = reindexed || rollupIsStale({ mintsIngested, feesBackfilled, resolved });
   const rollup = stale ? await refreshRollup(db) : null;
-  const behaviorStale = behaviorRollupIsStale({
+  const behaviorStale = reindexed || behaviorRollupIsStale({
     mintsIngested,
     eventsIngested,
     resolved,
@@ -569,7 +591,7 @@ export async function syncLaunches(
   // row reader on this database when every asker rebuilt it. Eligibility is
   // joined to `launches.conforming`, so a changed verdict counts as staleness
   // alongside new mints.
-  const rewardsStale = rewardAccountsAreStale({
+  const rewardsStale = reindexed || rewardAccountsAreStale({
     mintsIngested,
     resolved,
     graduations: newGraduations.size,
@@ -577,8 +599,12 @@ export async function syncLaunches(
   const rewardRollup = rewardsStale ? await refreshRewardAccounts(db) : null;
 
   return {
-    partial: poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
+    partial: ledger === null || poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
       + eventProgress.failed + eventProgress.deferred + announceProgress.failed + announceProgress.deferred > 0,
+    paused: false,
+    ledger_blocks_compared: ledger?.compared ?? 0,
+    ledger_rolled_back_to: ledger?.rolled_back_to ?? null,
+    ledger_check_failed: ledger === null,
     pool_lookups_failed: poolLookupsFailed,
     pool_lookups_deferred: poolLookupsDeferred,
     mint_feeds_failed: mintFeedsFailed,
@@ -605,6 +631,51 @@ export async function syncLaunches(
     reward_accounts_written: rewardRollup
       ? rewardRollup.sources_written + rewardRollup.sources_removed
       : 0,
+  };
+}
+
+/** The comparison, or null when it could not be made. A failed check never
+ *  blocks the pass: the recorded hashes stay, so the next tick that can ask
+ *  still finds any re-parse and rolls back past whatever this one wrote. */
+async function checkLedgerSafely(db: D1Database): Promise<LedgerCheck | null> {
+  try {
+    return await checkLedger(db);
+  } catch (error) {
+    console.warn({
+      event: "ledger_check_failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+function pausedResult(): SyncResult {
+  return {
+    candidates: 0,
+    written: 0,
+    resolved: 0,
+    mints_ingested: 0,
+    events_ingested: 0,
+    announce_backfilled: 0,
+    fees_backfilled: 0,
+    descriptions_backfilled: 0,
+    launch_prices_backfilled: 0,
+    rollup_written: 0,
+    behavior_written: 0,
+    reward_accounts_written: 0,
+    paused: true,
+    ledger_blocks_compared: 0,
+    ledger_rolled_back_to: null,
+    ledger_check_failed: false,
+    partial: true,
+    pool_lookups_failed: 0,
+    pool_lookups_deferred: 0,
+    mint_feeds_failed: 0,
+    mint_feeds_deferred: 0,
+    event_assets_failed: 0,
+    event_assets_deferred: 0,
+    announce_reads_failed: 0,
+    announce_reads_deferred: 0,
   };
 }
 

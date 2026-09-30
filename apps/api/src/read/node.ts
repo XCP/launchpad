@@ -4,8 +4,8 @@
 import { Hono } from "hono";
 import type { Env } from "#api/env";
 import { retryAfterDeadline } from "#api/integrations/cooldown";
+import { counterpartyApiBase } from "#api/integrations/counterparty";
 
-const COUNTERPARTY = "https://api.counterparty.io:4000/v2";
 const MAX_PATH = 1_024;
 const MAX_QUERY = 32_768;
 const ADDRESS = /^[A-Za-z0-9]{26,90}$/;
@@ -33,7 +33,7 @@ function targetFor(pathname: string): string | null {
   const path = `/${parts.map(encodeURIComponent).join("/")}`;
   const [kind, id, action, detail, extra] = parts;
   const n = parts.length;
-  const target = `${COUNTERPARTY}${path}`;
+  const target = `${counterpartyApiBase()}${path}`;
   if (n === 0) return target;
   if (kind === "bitcoin" && id === "transactions") {
     return n === 3 && HASH.test(action) ? target : null;

@@ -13,7 +13,35 @@ import {
   recordCounterpartyCooldown,
 } from "#api/integrations/cooldown";
 
-const BASE = "https://api.counterparty.io:4000/v2";
+export const DEFAULT_COUNTERPARTY_API_BASE = "https://api.counterparty.io:4000/v2";
+
+let base = DEFAULT_COUNTERPARTY_API_BASE;
+
+/**
+ * Point every Counterparty read in this worker at `COUNTERPARTY_API_BASE`
+ * (the `/v2` root), or back at the public node when it is unset. Called at
+ * each entry point — the fetch and scheduled handlers and the Durable
+ * Objects' constructors — because a Durable Object can run in an isolate the
+ * handlers never touched. An unusable value throws rather than quietly
+ * reading some other node.
+ */
+export function configureCounterpartyApi(env: { COUNTERPARTY_API_BASE?: string }): void {
+  const raw = env.COUNTERPARTY_API_BASE?.trim();
+  if (!raw) {
+    base = DEFAULT_COUNTERPARTY_API_BASE;
+    return;
+  }
+  const url = new URL(raw);
+  if ((url.protocol !== "https:" && url.protocol !== "http:") || url.search || url.hash) {
+    throw new Error(`COUNTERPARTY_API_BASE must be an http(s) /v2 root: ${raw}`);
+  }
+  base = url.href.replace(/\/+$/, "");
+}
+
+/** The `/v2` root reads go to, without a trailing slash. */
+export function counterpartyApiBase(): string {
+  return base;
+}
 
 async function get<T>(path: string): Promise<T> {
   const signal = AbortSignal.timeout(15_000);
@@ -23,7 +51,7 @@ async function get<T>(path: string): Promise<T> {
     // the queue. Check again immediately before starting its own request.
     assertCounterpartyReadAllowed();
     signal.throwIfAborted();
-    const res = await fetch(`${BASE}${path}`, { signal });
+    const res = await fetch(`${base}${path}`, { signal });
     if (!res.ok) {
       if (res.status === 429) recordCounterpartyCooldown(res.headers.get("retry-after"));
       // A Worker holds six outbound connections, and a Response whose body is
@@ -379,8 +407,42 @@ export async function fetchFairminter(txHash: string): Promise<CpFairminter | nu
 }
 
 export async function fetchBlockHeight(): Promise<number> {
-  const data: { result: { counterparty_height: number } } = await get("/");
-  return data.result.counterparty_height;
+  return (await fetchNodeStatus()).height;
+}
+
+export interface NodeStatus {
+  height: number;
+  /** Core's release, `11.5.0`; null when the node does not say. */
+  version: string | null;
+}
+
+/** The API root: how far the node has parsed and which Core release did it. */
+export async function fetchNodeStatus(): Promise<NodeStatus> {
+  const data: { result: { counterparty_height: number; version?: unknown } } = await get("/");
+  const version = data.result.version;
+  return {
+    height: data.result.counterparty_height,
+    version: typeof version === "string" && version ? version : null,
+  };
+}
+
+export interface CpBlockHashes {
+  block_index: number;
+  ledger_hash: string | null;
+  messages_hash: string | null;
+}
+
+/** Core's consensus hashes for the newest `limit` blocks at or below `cursor`
+ *  (the tip when absent), newest first. One request. */
+export async function fetchBlockHashes(limit: number, cursor?: number): Promise<CpBlockHashes[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (cursor !== undefined) qs.set("cursor", String(cursor));
+  const data: { result: CpBlockHashes[] | null } = await get(`/blocks?${qs.toString()}`);
+  return (data.result ?? []).map((b) => ({
+    block_index: Number(b.block_index),
+    ledger_hash: typeof b.ledger_hash === "string" ? b.ledger_hash : null,
+    messages_hash: typeof b.messages_hash === "string" ? b.messages_hash : null,
+  }));
 }
 
 export interface CpAddressReceive {
