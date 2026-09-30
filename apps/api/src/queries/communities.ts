@@ -287,6 +287,7 @@ export async function writeCommunityRollup(db: D1Database, rollup: CommunityRoll
             OR community_totals.paid_xcp IS NOT excluded.paid_xcp`,
       )
       .bind(rollup.minters, rollup.represented, rollup.creators, rollup.collectors, rollup.paid_xcp),
+    db.prepare(`DELETE FROM chain_state WHERE key = ?1`).bind(COMMUNITY_ROLLUP_STALE_KEY),
   ]);
   return results.reduce((sum, r) => sum + (r.meta.rows_written ?? 0), 0);
 }
@@ -331,8 +332,17 @@ export async function readCommunityRollup(db: D1Database): Promise<CommunityRoll
   };
 }
 
-/** False until a refresh has written every column the current shape carries. */
+/** Set by a ledger rollback: the stored rollup summarises mints that are gone. */
+export const COMMUNITY_ROLLUP_STALE_KEY = "community_rollup_stale";
+
+/** False until a refresh has written every column the current shape carries,
+ *  and again after a rollback until the next one has. */
 export async function hasCommunityRollup(db: D1Database): Promise<boolean> {
-  const row = await one<{ paid_xcp: string }>(db, `SELECT paid_xcp FROM community_totals WHERE id = 1`);
-  return row !== null && row.paid_xcp !== "0";
+  const row = await one<{ paid_xcp: string | null; stale: string | null }>(
+    db,
+    `SELECT (SELECT paid_xcp FROM community_totals WHERE id = 1) AS paid_xcp,
+            (SELECT value FROM chain_state WHERE key = ?1) AS stale`,
+    COMMUNITY_ROLLUP_STALE_KEY,
+  );
+  return row !== null && row.paid_xcp !== null && row.paid_xcp !== "0" && row.stale === null;
 }

@@ -18,6 +18,11 @@ const DESTRUCTION_CURSOR_KEY = "telegram_asset_destruction_event_index";
 // Versioned because v1 incorrectly seeded from this address's live balance,
 // while v2 included SENDs but missed explicit ASSET_DESTRUCTION events.
 const SUPPLY_SEED_KEY = "burned_supply_from_chain_events_seeded";
+/** Set by a ledger rollback (indexer/ledger.ts) to the first block it removed.
+ *  Both cursors are Core indexes that a re-parse hands out again from the
+ *  fork, so the scan cannot trust them past it: it re-reads by block instead,
+ *  and then resets both cursors to what it found. */
+export const BURN_RESCAN_KEY = "telegram_burn_rescan_from_block";
 const PAGE_SIZE = 100;
 const MAX_PAGES = 20;
 
@@ -32,6 +37,36 @@ export interface BurnScan {
   nextCursor: number | null;
   nextDestructionCursor: number | null;
   seeded: boolean;
+  /** The block a rollback asked this scan to re-read from, or null on a
+   *  normal scan. Passed back to advanceBurnCursor, which clears it. */
+  rescanFrom: number | null;
+}
+
+/**
+ * Newest-first pages until `reached` says a row is already covered. Rows past
+ * it are handed to `take`; the page bound keeps a runaway feed from spinning.
+ */
+async function readBack<T>(
+  fetchPage: (cursor: number | undefined) => Promise<{ result: T[]; next_cursor: number | null }>,
+  reached: (row: T) => boolean,
+  take: (row: T) => void,
+  what: string,
+): Promise<void> {
+  let cursor: number | undefined;
+  for (let pageNumber = 0; pageNumber < MAX_PAGES; pageNumber++) {
+    const page = await fetchPage(cursor);
+    let done = false;
+    for (const row of page.result) {
+      if (reached(row)) {
+        done = true;
+        continue;
+      }
+      take(row);
+    }
+    if (done || page.next_cursor === null) return;
+    cursor = page.next_cursor;
+  }
+  throw new Error(`${what} pagination exceeded safety limit; cursor not advanced`);
 }
 
 const txIndex = (row: CpAddressReceive) => Number(row.tx_index);
@@ -242,10 +277,11 @@ async function seedBurnEvents(db: D1Database): Promise<void> {
 export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
   const state = await q<{ key: string; value: string }>(
     db,
-    `SELECT key, value FROM chain_state WHERE key IN (?1, ?2, ?3)`,
+    `SELECT key, value FROM chain_state WHERE key IN (?1, ?2, ?3, ?4)`,
     CURSOR_KEY,
     DESTRUCTION_CURSOR_KEY,
     SUPPLY_SEED_KEY,
+    BURN_RESCAN_KEY,
   );
   const states = new Map(state.map((row) => [row.key, row.value]));
   const receiveValue = states.get(CURSOR_KEY);
@@ -254,6 +290,8 @@ export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
   const destructionStored = destructionValue === undefined
     ? null
     : Number(destructionValue);
+  const rescanValue = states.get(BURN_RESCAN_KEY);
+  const rescanFrom = rescanValue === undefined ? null : Number(rescanValue);
   let reconciled = false;
   if (states.get(SUPPLY_SEED_KEY) !== "1") {
     await seedBurnEvents(db);
@@ -265,30 +303,22 @@ export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
   const latestReceive = latestReceives.result[0];
   let nextCursor = receiveStored;
   const freshSends = new Map<string, CpAddressReceive>();
+  const receivePage = (cursor: number | undefined) =>
+    fetchAddressReceives(COUNTERPARTY_BURN_ADDRESS, PAGE_SIZE, cursor);
+  const takeSend = (row: CpAddressReceive) => {
+    freshSends.set(`${row.tx_hash}:${row.msg_index}:${row.asset}`, row);
+  };
   if (latestReceive) {
     const newest = txIndex(latestReceive);
-    nextCursor = newest > (receiveStored ?? -1) ? newest : receiveStored;
-    if (receiveStored !== null && newest > receiveStored) {
-      let cursor: number | undefined;
-      let reachedStored = false;
-      for (let pageNumber = 0; pageNumber < MAX_PAGES; pageNumber++) {
-        const page = await fetchAddressReceives(
-          COUNTERPARTY_BURN_ADDRESS,
-          PAGE_SIZE,
-          cursor,
-        );
-        for (const row of page.result) {
-          if (txIndex(row) <= receiveStored) {
-            reachedStored = true;
-            continue;
-          }
-          freshSends.set(`${row.tx_hash}:${row.msg_index}:${row.asset}`, row);
-        }
-        if (reachedStored || page.next_cursor === null) break;
-        cursor = page.next_cursor;
-        if (pageNumber === MAX_PAGES - 1) {
-          throw new Error("Burn receive pagination exceeded safety limit; cursor not advanced");
-        }
+    if (rescanFrom !== null) {
+      // After a rollback the node's newest row is the cursor, even below the
+      // old one: the old one may number a transaction that no longer exists.
+      nextCursor = newest;
+      await readBack(receivePage, (row) => row.block_index < rescanFrom, takeSend, "Burn receive");
+    } else {
+      nextCursor = newest > (receiveStored ?? -1) ? newest : receiveStored;
+      if (receiveStored !== null && newest > receiveStored) {
+        await readBack(receivePage, (row) => txIndex(row) <= receiveStored, takeSend, "Burn receive");
       }
     }
   }
@@ -297,28 +327,31 @@ export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
   const latestDestruction = latestDestructions.result[0];
   let nextDestructionCursor = destructionStored;
   const freshDestructions = new Map<number, CpAssetDestructionEvent>();
+  const destructionPage = (cursor: number | undefined) => fetchAssetDestructions(PAGE_SIZE, cursor);
+  const takeDestruction = (row: CpAssetDestructionEvent) => {
+    freshDestructions.set(row.event_index, row);
+  };
   if (latestDestruction) {
     const newest = latestDestruction.event_index;
-    nextDestructionCursor = newest > (destructionStored ?? -1)
-      ? newest
-      : destructionStored;
-    if (destructionStored !== null && newest > destructionStored) {
-      let cursor: number | undefined;
-      let reachedStored = false;
-      for (let pageNumber = 0; pageNumber < MAX_PAGES; pageNumber++) {
-        const page = await fetchAssetDestructions(PAGE_SIZE, cursor);
-        for (const row of page.result) {
-          if (row.event_index <= destructionStored) {
-            reachedStored = true;
-            continue;
-          }
-          freshDestructions.set(row.event_index, row);
-        }
-        if (reachedStored || page.next_cursor === null) break;
-        cursor = page.next_cursor;
-        if (pageNumber === MAX_PAGES - 1) {
-          throw new Error("Asset destruction pagination exceeded safety limit; cursor not advanced");
-        }
+    if (rescanFrom !== null) {
+      nextDestructionCursor = newest;
+      await readBack(
+        destructionPage,
+        (row) => row.block_index < rescanFrom,
+        takeDestruction,
+        "Asset destruction",
+      );
+    } else {
+      nextDestructionCursor = newest > (destructionStored ?? -1)
+        ? newest
+        : destructionStored;
+      if (destructionStored !== null && newest > destructionStored) {
+        await readBack(
+          destructionPage,
+          (row) => row.event_index <= destructionStored,
+          takeDestruction,
+          "Asset destruction",
+        );
       }
     }
   }
@@ -390,29 +423,43 @@ export async function scanBurnReceives(db: D1Database): Promise<BurnScan> {
     nextCursor,
     nextDestructionCursor,
     seeded: receiveStored === null && destructionStored === null,
+    rescanFrom,
   };
 }
 
-/** Monotonic even if a retry races another caller after durable acceptance. */
+/** Monotonic even if a retry races another caller after durable acceptance,
+ * except after a rollback's rescan (`rescanFrom`): its cursors are the node's
+ * newest and may sit below the old ones. Those writes and the marker's
+ * removal are one batch, and the marker goes only if it still names the block
+ * this scan re-read from, so a second rollback in between is not forgotten. */
 export async function advanceBurnCursor(
   db: D1Database,
   nextCursor: number | null,
   nextDestructionCursor?: number | null,
+  rescanFrom: number | null = null,
 ): Promise<void> {
+  const guard = rescanFrom === null
+    ? `
+       WHERE CAST(excluded.value AS INTEGER) > CAST(chain_state.value AS INTEGER)`
+    : "";
   const statements: D1PreparedStatement[] = [];
   if (nextCursor !== null) {
     statements.push(db.prepare(
       `INSERT INTO chain_state (key, value) VALUES (?1, ?2)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value
-       WHERE CAST(excluded.value AS INTEGER) > CAST(chain_state.value AS INTEGER)`,
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value${guard}`,
     ).bind(CURSOR_KEY, String(nextCursor)));
   }
   if (nextDestructionCursor !== undefined && nextDestructionCursor !== null) {
     statements.push(db.prepare(
       `INSERT INTO chain_state (key, value) VALUES (?1, ?2)
-       ON CONFLICT(key) DO UPDATE SET value = excluded.value
-       WHERE CAST(excluded.value AS INTEGER) > CAST(chain_state.value AS INTEGER)`,
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value${guard}`,
     ).bind(DESTRUCTION_CURSOR_KEY, String(nextDestructionCursor)));
+  }
+  if (rescanFrom !== null) {
+    statements.push(
+      db.prepare(`DELETE FROM chain_state WHERE key = ?1 AND value = ?2`)
+        .bind(BURN_RESCAN_KEY, String(rescanFrom)),
+    );
   }
   if (statements.length > 0) await db.batch(statements);
 }

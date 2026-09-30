@@ -36,7 +36,9 @@ mint cannot be included in two batches.
 
 ## Safe payout sequence
 
-1. Wait until the intended cutoff transaction is confirmed and indexed.
+1. Wait until the intended cutoff transaction is indexed and six confirmations
+   deep; `scripts/reward-batch.mjs` counts no mint above `tip - 5` and refuses
+   to build a batch whose cutoff is not that deep yet.
 2. Produce a canonical manifest sorted by address containing each address,
    eligible mint count, and raw MINTS quantity. Save the human-readable JSON
    and its SHA-256 outside D1 as well.
