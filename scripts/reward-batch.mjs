@@ -11,17 +11,16 @@
  * afterwards from what actually landed on chain.
  *
  * Usage:
- *   node scripts/reward-batch.mjs --cutoff 1000 [--out dist/reward-batch-1]
+ *   node scripts/reward-batch.mjs --cutoff 1000 [--out dist/reward-batch-1] [--height N]
  *
  * WHY TWO FILES
  *
- * Counterparty refuses an MPMA send to any address whose packed form exceeds
- * 22 bytes (lib/messages/versions/mpma.py: "Address not supported by MPMA
- * send"). Packing is one version byte plus the payload, so a 20-byte witness
- * program packs to 21 and fits, while a 32-byte one packs to 33 and does not.
- * That excludes P2TR *and* P2WSH — not just taproot, which is the trap: today
- * this data has no P2WSH, so a bc1p check would pass and then break on the
- * first batch that does. This tests the packed length, like core does.
+ * Before Core 11.4's `mpma_taproot_support` (block 971,700), Counterparty
+ * refuses an MPMA send to a P2TR or P2WSH address; those recipients go to
+ * manual.csv for individual sends. From that block on, everyone fits in the
+ * MPMA and manual.csv is empty. See scripts/lib/mpma.mjs. The chain tip is
+ * read from the Counterparty API (COUNTERPARTY_API_BASE, or the public node)
+ * unless --height gives it.
  *
  * QUANTITY UNITS
  *
@@ -36,6 +35,7 @@ import { execSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { mpmaCapable } from "./lib/mpma.mjs";
 
 /** Raw divisible MINTS per eligible mint. Mirrors REWARD_PER_MINT_RAW in
  *  apps/api/src/queries/rewards.ts — the two must not drift. */
@@ -99,26 +99,24 @@ function query(sql) {
   return JSON.parse(out.slice(out.search(/^\[/m)))[0].results;
 }
 
-/**
- * Whether Counterparty can encode this destination inside an MPMA send.
- *
- * Mirrors core's rule — packed length must be 22 bytes or less — rather than
- * matching on an address prefix. Base58 (P2PKH/P2SH) packs to 21. A bech32
- * address packs to one version byte plus its witness program, so the question
- * is only how long that program is, which the data part's length gives:
- * strip the 6-character checksum and the 1-character witness version, and
- * every remaining character carries 5 bits.
- */
-function mpmaCapable(address) {
-  const sep = address.lastIndexOf("1");
-  const looksBech32 = /^(bc|tb)1/i.test(address);
-  if (!looksBech32) return true; // base58 P2PKH/P2SH pack to 21 bytes
-  const data = address.slice(sep + 1);
-  const programChars = data.length - 6 - 1; // checksum, witness version
-  const programBytes = Math.floor((programChars * 5) / 8);
-  return 1 + programBytes <= 22;
+/** The chain tip the sends will be composed at. */
+async function chainTip() {
+  const given = arg("height", null);
+  if (given !== null) {
+    const height = Number(given);
+    if (!Number.isSafeInteger(height) || height < 1) {
+      console.error("--height must be a positive integer");
+      process.exit(1);
+    }
+    return height;
+  }
+  const base = (process.env.COUNTERPARTY_API_BASE || "https://api.counterparty.io:4000/v2").replace(/\/+$/, "");
+  const res = await fetch(`${base}/`);
+  if (!res.ok) throw new Error(`Counterparty ${base}/ -> HTTP ${res.status}`);
+  return (await res.json()).result.counterparty_height;
 }
 
+const tip = await chainTip();
 const mints = query(SQL);
 if (mints.length < cutoff) {
   console.error(
@@ -141,8 +139,8 @@ const payouts = [...byAddress.values()]
   .map((r) => ({ ...r, quantity: (BigInt(r.mint_count) * REWARD_PER_MINT_RAW).toString() }))
   .sort((a, b) => b.mint_count - a.mint_count || a.address.localeCompare(b.address));
 
-const mpma = payouts.filter((p) => mpmaCapable(p.address));
-const manual = payouts.filter((p) => !mpmaCapable(p.address));
+const mpma = payouts.filter((p) => mpmaCapable(p.address, tip));
+const manual = payouts.filter((p) => !mpmaCapable(p.address, tip));
 
 /** Raw to whole units. Every payout is a whole number of MINTS by
  *  construction -- REWARD_PER_MINT_RAW is exactly 100 * 1e8 -- so this never
@@ -170,6 +168,7 @@ const manifest = {
   eligible_mints: mints.length,
   recipient_count: payouts.length,
   total_quantity: total.toString(),
+  chain_tip: tip,
   mpma_recipients: mpma.length,
   manual_recipients: manual.length,
   // Every mint that earns a share, in order. This is the evidence behind the
@@ -198,6 +197,7 @@ writeFileSync(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2
 const whole = (raw) => (Number(BigInt(raw) / 100_000_000n)).toLocaleString("en-US");
 console.log(`reward batch through mint #${cutoff}`);
 console.log(`  cutoff tx        ${last.tx_hash} (block ${last.block_index})`);
+console.log(`  chain tip        ${tip}`);
 console.log(`  recipients       ${payouts.length}`);
 console.log(`  total            ${whole(total)} ${ASSET}`);
 console.log(`  mpma.csv         ${mpma.length} addresses, ${whole(
