@@ -67,7 +67,8 @@ interface OrderRow {
   tokenRemaining: string;
   xcpRemaining: string;
   status: string;
-  expireIndex: number;
+  /** Null for an order that never expires. */
+  expireIndex: number | null;
 }
 
 /**
@@ -97,10 +98,24 @@ function toRows(asset: string, orders: CpOrder[]): OrderRow[] {
       tokenRemaining: String(buying ? o.get_remaining : o.give_remaining),
       xcpRemaining: String(buying ? o.give_remaining : o.get_remaining),
       status: o.status,
-      expireIndex: o.expire_index,
+      expireIndex: expireIndex(o),
     });
   }
   return rows;
+}
+
+/**
+ * The block an order expires at, or null when it never does.
+ *
+ * Core returns expiration = 0 with expire_index = null for an order that never
+ * expires. Should it ever omit expire_index for one that does expire, the
+ * block is still derivable from where the order was placed and how long it
+ * asked to stay open.
+ */
+function expireIndex(o: CpOrder): number | null {
+  if (typeof o.expire_index === "number" && Number.isFinite(o.expire_index)) return o.expire_index;
+  if (typeof o.expiration === "number" && o.expiration > 0) return o.block_index + o.expiration;
+  return null;
 }
 
 /**

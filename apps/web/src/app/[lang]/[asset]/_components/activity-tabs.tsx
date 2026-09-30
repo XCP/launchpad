@@ -1070,7 +1070,7 @@ export function ActivityTabs({
                           ) : (
                             <>
                               {num.percent(filled, { digits: 0 })} ·{" "}
-                              {o!.expire_index === null ? "GTC" : num.commas(o!.expire_index)}
+                              {o!.expire_index === null ? t("No expiry") : num.commas(o!.expire_index)}
                             </>
                           )}
                         </td>
