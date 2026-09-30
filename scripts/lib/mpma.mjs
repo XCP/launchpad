@@ -18,12 +18,13 @@
 export const MPMA_TAPROOT_SUPPORT_BLOCK = 971_700;
 
 /**
- * `tipHeight` is the chain tip the send will be composed at. Core checks the
- * block after its tip; this waits for the tip itself to reach the activation,
- * so the one block where the two differ keeps today's split.
+ * `tipHeight` is the chain tip the send will be composed at. Core applies
+ * `mpma_taproot_support` from the block after its tip, which is the earliest
+ * block the send can land in, so a tip of 971,699 already takes every
+ * destination. An unknown tip keeps the pre-activation split.
  */
 export function mpmaCapable(address, tipHeight) {
-  if (Number.isSafeInteger(tipHeight) && tipHeight >= MPMA_TAPROOT_SUPPORT_BLOCK) return true;
+  if (Number.isSafeInteger(tipHeight) && tipHeight + 1 >= MPMA_TAPROOT_SUPPORT_BLOCK) return true;
   const looksBech32 = /^(bc|tb|bcrt)1/i.test(address);
   if (!looksBech32) return true; // base58 P2PKH/P2SH pack to 21 bytes
   // A bech32 address packs to one version byte plus its witness program, so
