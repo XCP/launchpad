@@ -22,6 +22,11 @@
  * read from the Counterparty API (COUNTERPARTY_API_BASE, or the public node)
  * unless --height gives it.
  *
+ * SIX CONFIRMATIONS
+ *
+ * Only mints six confirmations deep count (scripts/lib/reward-eligibility.mjs),
+ * so a reorg near the tip cannot change who a frozen batch paid.
+ *
  * QUANTITY UNITS
  *
  * Raw satoshi units, not whole MINTS. The extension's CSV importer passes the
@@ -36,6 +41,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { mpmaCapable } from "./lib/mpma.mjs";
+import { eligibleMintsSql, REWARD_CONFIRMATIONS, settledThrough } from "./lib/reward-eligibility.mjs";
 
 /** Raw divisible MINTS per eligible mint. Mirrors REWARD_PER_MINT_RAW in
  *  apps/api/src/queries/rewards.ts — the two must not drift. */
@@ -56,24 +62,6 @@ if (!Number.isInteger(cutoff) || cutoff < 1) {
 }
 
 /**
- * The programme's canonical order, and the reason it is spelled out in full
- * here rather than trusted to arrive sorted: entitlement is "the first N
- * conforming mints globally", so the tie-break has to be total and stable or
- * two runs of this script could disagree about who is inside the cutoff.
- * block, then tx_index, then tx_hash — the same order apps/api uses.
- */
-const SQL = [
-  "WITH eligible AS (",
-  "SELECT m.tx_hash, m.source, m.launch_tx, m.block_index, m.tx_index",
-  "FROM launch_mints m",
-  "JOIN launches l ON l.tx_hash = m.launch_tx AND l.conforming = 1",
-  "ORDER BY m.block_index, COALESCE(m.tx_index, 0), m.tx_hash",
-  `LIMIT ${cutoff})`,
-  "SELECT tx_hash, source, launch_tx, block_index, COALESCE(tx_index, 0) AS tx_index",
-  "FROM eligible ORDER BY block_index, tx_index, tx_hash",
-].join(" ");
-
-/**
  * --command, and deliberately without a shell.
  *
  * Two dead ends are worth recording so nobody walks back into them. `--file`
@@ -88,8 +76,8 @@ function query(sql) {
   // execSync with one quoted string, rather than execFileSync: resolving
   // `npx` across Git Bash and cmd from Node is the part that keeps failing,
   // and a single shell string sidesteps it. Safe to quote naively because the
-  // SQL is a constant assembled here -- no user input reaches it, and the only
-  // interpolation is `cutoff`, validated as a positive integer above.
+  // SQL is assembled from constants -- no user input reaches it, and the only
+  // interpolations are `cutoff` and the settled block, both validated integers.
   const out = execSync(
     `npx wrangler d1 execute ${DB} --remote --json --command "${sql}"`,
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024, stdio: ["ignore", "pipe", "ignore"] },
@@ -117,11 +105,13 @@ async function chainTip() {
 }
 
 const tip = await chainTip();
-const mints = query(SQL);
+const settled = settledThrough(tip);
+const mints = query(eligibleMintsSql(cutoff, tip));
 if (mints.length < cutoff) {
   console.error(
-    `Only ${mints.length} eligible mints exist; asked for ${cutoff}. ` +
-      `Re-run when the programme reaches ${cutoff}.`,
+    `Only ${mints.length} eligible mints are ${REWARD_CONFIRMATIONS} confirmations deep ` +
+      `(block ${settled} or older at tip ${tip}); asked for ${cutoff}. ` +
+      `Re-run when mint #${cutoff} is that deep.`,
   );
   process.exit(2);
 }
@@ -169,6 +159,7 @@ const manifest = {
   recipient_count: payouts.length,
   total_quantity: total.toString(),
   chain_tip: tip,
+  settled_through_block: settled,
   mpma_recipients: mpma.length,
   manual_recipients: manual.length,
   // Every mint that earns a share, in order. This is the evidence behind the
@@ -197,7 +188,7 @@ writeFileSync(join(outDir, "manifest.json"), `${JSON.stringify(manifest, null, 2
 const whole = (raw) => (Number(BigInt(raw) / 100_000_000n)).toLocaleString("en-US");
 console.log(`reward batch through mint #${cutoff}`);
 console.log(`  cutoff tx        ${last.tx_hash} (block ${last.block_index})`);
-console.log(`  chain tip        ${tip}`);
+console.log(`  chain tip        ${tip} (mints through block ${settled})`);
 console.log(`  recipients       ${payouts.length}`);
 console.log(`  total            ${whole(total)} ${ASSET}`);
 console.log(`  mpma.csv         ${mpma.length} addresses, ${whole(

@@ -17,6 +17,8 @@
  */
 import { q } from "#api/db";
 import { fetchBlockHashes, type CpBlockHashes } from "#api/integrations/counterparty";
+import { COMMUNITY_ROLLUP_STALE_KEY } from "#api/queries/communities";
+import { BURN_RESCAN_KEY } from "#api/telegram/burns";
 
 /** Blocks compared each tick. Five-minute ticks see one or two new blocks. */
 const WINDOW = 12;
@@ -126,6 +128,8 @@ export async function checkLedger(db: D1Database): Promise<LedgerCheck> {
 export interface RollbackResult {
   mints_removed: number;
   launches_removed: number;
+  burns_removed: number;
+  buyers_removed: number;
   event_assets_reset: number;
 }
 
@@ -137,6 +141,9 @@ const POOL_PREFIX = "events_pool:";
  * re-reads it from the node's current ledger. One batch, so a failure leaves
  * the index exactly as it was.
  *
+ * What comes from the chain is rolled back; what records something that
+ * happened off it is not.
+ *
  * - Mints after the block are deleted, and their launches' `earned_quantity`
  *   cleared: that value is what tells the next pass a launch's mint history
  *   needs reading, and it must not match by coincidence. The crown is
@@ -145,11 +152,18 @@ const POOL_PREFIX = "events_pool:";
  *   back the ones the node still has, and any it no longer has stay gone.
  * - A traded asset whose event cursor passed the block loses its events after
  *   it, its candles, and both cursors, so its next pass is a first run: the
- *   authoritative refold from block 0.
+ *   authoritative refold from block 0. A buyer whose every buy was after the
+ *   block leaves `behavior_buyers`; the refold adds back the ones still true.
+ * - Burns after the block are deleted and their launches' burned supply
+ *   summed again from the burns that remain. The burn scan's cursors are
+ *   Core's tx_index and event_index, which a re-parse hands out again from
+ *   the fork, so they cannot be rewound to a block: the scan is told to
+ *   re-read by block from the one after this, and it resets both cursors to
+ *   what it finds.
  *
- * Rollups are not touched here; the pass that follows rebuilds them.
- * Telegram announcements already sent and recorded reward batches are history
- * and stay.
+ * The rollups summarising mints and trades are not touched here; the pass
+ * that follows rebuilds them from what remains. The community rollup, which
+ * otherwise waits hours, is marked stale so the next tick rebuilds it.
  */
 export async function rollbackIndexTo(db: D1Database, block: number): Promise<RollbackResult> {
   const cursors = await q<{ key: string }>(
@@ -160,6 +174,11 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
   );
   const assets = cursors.map((row) => row.key.slice(CURSOR_PREFIX.length));
 
+  // Deliberately absent: `announced`, `announcement_work`, and the reward
+  // tables. A Telegram post that went out and a reward batch that was frozen
+  // or sent are records of things that happened off the chain; a re-parse
+  // cannot unsay the post or unsend the payment, so their records stay. Reward
+  // batches only ever take mints six blocks deep (scripts/reward-batch.mjs).
   const statements: D1PreparedStatement[] = [
     db.prepare(
       `UPDATE launches SET earned_quantity = NULL
@@ -180,9 +199,46 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
         WHERE last_mint_block > ?1`,
     ).bind(block),
     db.prepare(`DELETE FROM launches WHERE announce_block > ?1`).bind(block),
+    // Before the events go: which buyers to reconsider is read from them.
+    db.prepare(
+      `DELETE FROM behavior_buyers
+        WHERE address IN (SELECT address FROM asset_events WHERE block_index > ?1 AND kind = 'buy')
+          AND NOT EXISTS (SELECT 1 FROM asset_events e
+                           WHERE e.address = behavior_buyers.address
+                             AND e.kind = 'buy' AND e.block_index <= ?1)`,
+    ).bind(block),
     db.prepare(`DELETE FROM asset_events WHERE block_index > ?1`).bind(block),
+    // Same sum as reconcileBurnedSupply, without the burns about to go, and
+    // only for the launches they touched.
+    db.prepare(
+      `UPDATE launches
+          SET burned_quantity = CAST(COALESCE((
+            SELECT SUM(CAST(b.quantity AS INTEGER))
+              FROM token_burns b
+             WHERE b.asset = launches.asset
+               AND b.tx_index > launches.tx_index
+               AND b.block_index <= ?1
+          ), 0) AS TEXT)
+        WHERE asset IN (SELECT asset FROM token_burns WHERE block_index > ?1)`,
+    ).bind(block),
+    db.prepare(`DELETE FROM token_burns WHERE block_index > ?1`).bind(block),
+    // The count is kept by an insert trigger, so a delete has to restate it.
+    db.prepare(
+      `UPDATE burn_totals SET burns = (SELECT COUNT(*) FROM token_burns)
+        WHERE id = 1 AND burns IS NOT (SELECT COUNT(*) FROM token_burns)`,
+    ),
+    db.prepare(
+      `INSERT INTO chain_state (key, value) VALUES (?1, ?2)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value
+       WHERE CAST(excluded.value AS INTEGER) < CAST(chain_state.value AS INTEGER)`,
+    ).bind(BURN_RESCAN_KEY, String(block + 1)),
+    db.prepare(`INSERT OR IGNORE INTO chain_state (key, value) VALUES (?1, '1')`).bind(COMMUNITY_ROLLUP_STALE_KEY),
     db.prepare(`DELETE FROM indexed_blocks WHERE block_index > ?1`).bind(block),
   ];
+  const MINTS = 1;
+  const LAUNCHES = 3;
+  const BUYERS = 4;
+  const BURNS = 7;
   for (let i = 0; i < assets.length; i += SQL_VAR_LIMIT) {
     const chunk = assets.slice(i, i + SQL_VAR_LIMIT);
     const places = chunk.map((_, idx) => `?${idx + 1}`).join(",");
@@ -196,8 +252,10 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
 
   const results = await db.batch(statements);
   return {
-    mints_removed: results[1]!.meta.rows_written ?? 0,
-    launches_removed: results[3]!.meta.rows_written ?? 0,
+    mints_removed: results[MINTS]!.meta.rows_written ?? 0,
+    launches_removed: results[LAUNCHES]!.meta.rows_written ?? 0,
+    burns_removed: results[BURNS]!.meta.rows_written ?? 0,
+    buyers_removed: results[BUYERS]!.meta.rows_written ?? 0,
     event_assets_reset: assets.length,
   };
 }

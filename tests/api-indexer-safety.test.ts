@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fixture from "./fixtures/fewgoodman-index-recovery.json";
 import { apiReplayDb } from "./helpers/api-replay-db";
 import { CORE_ACTIVATIONS, coreVersionGate, parseCoreVersion } from "#api/indexer/core-version";
+import { eligibleMintsSql, settledThrough } from "../scripts/lib/reward-eligibility.mjs";
 
 vi.mock("#api/integrations/mempool", () => ({ fetchTxFee: async () => ({ feeSats: 100, weightWu: 400 }) }));
 vi.mock("#api/integrations/price", () => ({ fetchXcpUsd: async () => null, fetchXcpUsdHistory: async () => [], historicalXcpUsdAt: () => null }));
@@ -11,6 +12,14 @@ let database: ReturnType<typeof apiReplayDb>;
 const metadata = { get: async () => null } as unknown as R2Bucket;
 const count = (sql: string, ...binds: Array<string | number>) =>
   (database.raw.prepare(sql).get(...binds) as { n: number }).n;
+const stateValue = (key: string) =>
+  (database.raw.prepare("SELECT value FROM chain_state WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;
+function insertFixtureLaunch() {
+  const writable = new Set(database.raw.prepare("PRAGMA table_xinfo(launches)").all().filter(c => c.hidden === 0).map(c => c.name));
+  const entries = Object.entries(fixture.launch).filter(([key]) => writable.has(key));
+  database.raw.prepare(`INSERT INTO launches (${entries.map(([key]) => key).join(",")}) VALUES (${entries.map(() => "?").join(",")})`)
+    .run(...entries.map(([, value]) => (typeof value === "boolean" ? Number(value) : value) as string | number | null));
+}
 
 beforeEach(() => {
   vi.resetModules();
@@ -236,7 +245,150 @@ describe("rollbackIndexTo", () => {
     expect(await rollbackIndexTo(database.db, 965_950)).toMatchObject({ event_assets_reset: 1 });
     expect(raw.prepare("SELECT id FROM asset_events ORDER BY id").all().map(r => r.id)).toEqual(["old", "quiet"]);
     expect(raw.prepare("SELECT asset FROM price_candles").all().map(r => r.asset)).toEqual(["QUIETONE"]);
-    expect(raw.prepare("SELECT key FROM chain_state ORDER BY key").all().map(r => r.key))
+    expect(raw.prepare("SELECT key FROM chain_state WHERE key LIKE 'events_%' ORDER BY key").all().map(r => r.key))
       .toEqual(["events_hw:QUIETONE", "events_pool:QUIETONE"]);
+  });
+
+  it("drops buyers whose every buy was after the block, and keeps the rest", async () => {
+    const raw = database.raw;
+    const event = raw.prepare(`INSERT INTO asset_events (id, event, address, asset, block_index, token_delta, xcp_delta, kind)
+      VALUES (?, 'x', ?, 'FEWGOODMAN', ?, '1', '-1', ?)`);
+    event.run("early", "EARLY", 965_900, "buy");
+    event.run("early-again", "EARLY", 965_990, "buy");
+    event.run("late", "LATE", 965_990, "buy");
+    event.run("seller", "SELLER", 965_990, "sell");
+    raw.exec("INSERT INTO behavior_buyers (address) VALUES ('EARLY'), ('LATE'), ('UNTOUCHED')");
+
+    const { rollbackIndexTo } = await import("#api/indexer/ledger");
+    expect(await rollbackIndexTo(database.db, 965_950)).toMatchObject({ buyers_removed: 1 });
+    expect(raw.prepare("SELECT address FROM behavior_buyers ORDER BY address").all().map(r => r.address))
+      .toEqual(["EARLY", "UNTOUCHED"]);
+  });
+
+  it("removes burns after the block, restates the burned supply and count, and asks the burn scan to re-read", async () => {
+    const raw = database.raw;
+    insertFixtureLaunch();
+    const launchTx = fixture.launch.tx_index;
+    const burn = raw.prepare(`INSERT INTO token_burns (key, tx_hash, tx_index, msg_index, block_index, source, destination, asset, quantity)
+      VALUES (?, ?, ?, 0, ?, 'holder', 'burn', 'FEWGOODMAN', ?)`);
+    burn.run("burn:kept", "a".repeat(64), launchTx + 10, 965_940, "100");
+    burn.run("burn:gone", "b".repeat(64), launchTx + 20, 965_960, "50");
+    raw.prepare("UPDATE launches SET burned_quantity = '150' WHERE asset = 'FEWGOODMAN'").run();
+    expect(count("SELECT burns AS n FROM burn_totals WHERE id = 1")).toBe(2);
+    // History of what happened off the chain.
+    raw.exec("INSERT INTO announced (key, at) VALUES ('burn:gone', 1)");
+    raw.exec("INSERT INTO community_totals (id, minters, represented, creators, collectors, paid_xcp) VALUES (1, 1, 1, 1, 1, '5')");
+
+    const { rollbackIndexTo } = await import("#api/indexer/ledger");
+    const { hasCommunityRollup } = await import("#api/queries/communities");
+    expect(await hasCommunityRollup(database.db)).toBe(true);
+    expect(await rollbackIndexTo(database.db, 965_950)).toMatchObject({ burns_removed: 1 });
+    expect(raw.prepare("SELECT key FROM token_burns").all().map(r => r.key)).toEqual(["burn:kept"]);
+    expect(raw.prepare("SELECT burned_quantity FROM launches WHERE asset = 'FEWGOODMAN'").get())
+      .toEqual({ burned_quantity: "100" });
+    expect(count("SELECT burns AS n FROM burn_totals WHERE id = 1")).toBe(1);
+    expect(stateValue("telegram_burn_rescan_from_block")).toBe("965951");
+    expect(count("SELECT COUNT(*) AS n FROM announced")).toBe(1);
+    expect(await hasCommunityRollup(database.db)).toBe(false);
+
+    // A deeper rollback before the scan ran widens the re-read; a shallower one does not narrow it.
+    await rollbackIndexTo(database.db, 965_900);
+    await rollbackIndexTo(database.db, 965_945);
+    expect(stateValue("telegram_burn_rescan_from_block")).toBe("965901");
+  });
+});
+
+describe("burn scan after a rollback", () => {
+  const BURN = "1CounterpartyXXXXXXXXXXXXXXXUWLpVr";
+  const launchTx = fixture.launch.tx_index;
+  const receive = (txIndex: number, block: number, quantity: string) => ({
+    tx_index: txIndex, tx_hash: String(txIndex).padStart(64, "0"), block_index: block, source: "holder",
+    destination: BURN, asset: "FEWGOODMAN", quantity, status: "valid", msg_index: 0, send_type: "send",
+  });
+  const destruction = (eventIndex: number, block: number, quantity: string) => ({
+    event_index: eventIndex, event: "ASSET_DESTRUCTION", tx_hash: String(eventIndex).padStart(64, "e"), block_index: block,
+    params: { tx_hash: String(eventIndex).padStart(64, "e"), tx_index: launchTx + 50, block_index: block, source: "holder",
+      asset: "FEWGOODMAN", quantity, status: "valid", tag: "" },
+  });
+
+  it("re-reads by block from the rollback, resets both cursors below the old ones, and then clears the marker", async () => {
+    const raw = database.raw;
+    insertFixtureLaunch();
+    raw.prepare(`INSERT INTO token_burns (key, tx_hash, tx_index, msg_index, block_index, source, destination, asset, quantity)
+      VALUES ('burn:kept', ?, ?, 0, 965940, 'holder', ?, 'FEWGOODMAN', '100')`).run("a".repeat(64), launchTx + 10, BURN);
+    const state = raw.prepare("INSERT INTO chain_state (key, value) VALUES (?, ?)");
+    state.run("burned_supply_from_chain_events_seeded", "1");
+    // Cursors from the chain before the re-parse: higher than anything the node now has.
+    state.run("telegram_burn_receive_tx_index", String(launchTx + 900));
+    state.run("telegram_asset_destruction_event_index", "90000");
+    state.run("telegram_burn_rescan_from_block", "965951");
+
+    const receives = [receive(launchTx + 40, 965_960, "70"), receive(launchTx + 10, 965_940, "100")];
+    const destructions = [destruction(80_000, 965_955, "5"), destruction(70_000, 965_900, "9")];
+    const fetch = vi.fn(async (input: string) => {
+      const url = new URL(input);
+      const limit = Number(url.searchParams.get("limit"));
+      if (url.pathname === `/v2/addresses/${BURN}/receives`) return Response.json({ result: receives.slice(0, limit), next_cursor: null });
+      if (url.pathname === "/v2/events/ASSET_DESTRUCTION") return Response.json({ result: destructions.slice(0, limit), next_cursor: null });
+      throw new Error(`unexpected read ${url}`);
+    });
+    vi.stubGlobal("fetch", fetch);
+
+    const { advanceBurnCursor, scanBurnReceives } = await import("#api/telegram/burns");
+    const scan = await scanBurnReceives(database.db);
+    expect(scan).toMatchObject({ nextCursor: launchTx + 40, nextDestructionCursor: 80_000, rescanFrom: 965_951 });
+    expect(scan.announcements.map(a => a.key)).toEqual([
+      `burn:${receive(launchTx + 40, 0, "").tx_hash}:0:FEWGOODMAN`,
+      "destroy:80000:FEWGOODMAN",
+    ]);
+    expect(raw.prepare("SELECT key FROM token_burns ORDER BY block_index").all().map(r => r.key)).toEqual([
+      "burn:kept", "destroy:80000:FEWGOODMAN", `burn:${receive(launchTx + 40, 0, "").tx_hash}:0:FEWGOODMAN`,
+    ]);
+    expect(raw.prepare("SELECT burned_quantity FROM launches WHERE asset = 'FEWGOODMAN'").get())
+      .toEqual({ burned_quantity: "175" });
+
+    await advanceBurnCursor(database.db, scan.nextCursor, scan.nextDestructionCursor, scan.rescanFrom);
+    expect(stateValue("telegram_burn_receive_tx_index")).toBe(String(launchTx + 40));
+    expect(stateValue("telegram_asset_destruction_event_index")).toBe("80000");
+    expect(stateValue("telegram_burn_rescan_from_block")).toBeNull();
+
+    // Back to normal: monotonic, and nothing re-read below the cursor.
+    await advanceBurnCursor(database.db, launchTx + 1, 1);
+    expect(stateValue("telegram_burn_receive_tx_index")).toBe(String(launchTx + 40));
+    fetch.mockClear();
+    const quiet = await scanBurnReceives(database.db);
+    expect(quiet).toMatchObject({ announcements: [], rescanFrom: null });
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a marker a second rollback moved while the scan ran", async () => {
+    database.raw.prepare("INSERT INTO chain_state (key, value) VALUES ('telegram_burn_rescan_from_block', '965901')").run();
+    const { advanceBurnCursor } = await import("#api/telegram/burns");
+    await advanceBurnCursor(database.db, 5, 6, 965_951);
+    expect(stateValue("telegram_burn_rescan_from_block")).toBe("965901");
+  });
+});
+
+describe("reward eligibility", () => {
+  it("counts only mints six confirmations deep, in the programme's order", () => {
+    const raw = database.raw;
+    insertFixtureLaunch();
+    const TIP = 970_000;
+    expect(settledThrough(TIP)).toBe(969_995);
+    const mint = raw.prepare(`INSERT INTO launch_mints (tx_hash, launch_tx, block_index, source, earn_quantity, paid_quantity, tx_index)
+      VALUES (?, ?, ?, ?, '1', '1', ?)`);
+    mint.run("c".repeat(64), fixture.launch.tx_hash, 969_990, "third", 3);
+    mint.run("a".repeat(64), fixture.launch.tx_hash, 969_980, "first", 1);
+    mint.run("b".repeat(64), fixture.launch.tx_hash, 969_995, "six-deep", 2);
+    mint.run("d".repeat(64), fixture.launch.tx_hash, 969_996, "five-deep", 4);
+    mint.run("e".repeat(64), fixture.launch.tx_hash, TIP, "tip", 5);
+    const sources = (cutoff: number, tip: number) =>
+      raw.prepare(eligibleMintsSql(cutoff, tip)).all().map(r => r.source);
+    expect(sources(10, TIP)).toEqual(["first", "third", "six-deep"]);
+    // Fewer than the cutoff: the script refuses rather than reach for shallow mints.
+    expect(sources(4, TIP)).toHaveLength(3);
+    expect(sources(4, TIP + 1)).toEqual(["first", "third", "six-deep", "five-deep"]);
+    expect(() => eligibleMintsSql(10, Number.NaN)).toThrow();
+    expect(() => eligibleMintsSql(0, TIP)).toThrow();
   });
 });

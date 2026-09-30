@@ -174,7 +174,7 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
       event: "burn_scan_skipped",
       error: error instanceof Error ? error.message : String(error),
     });
-    return { announcements: [], nextCursor: null, nextDestructionCursor: null, seeded: false };
+    return { announcements: [], nextCursor: null, nextDestructionCursor: null, seeded: false, rescanFrom: null };
   });
   for (const burn of burnScan.announcements) {
     items.push({ key: burn.key, a: burn.a, mintOf: null, earned: "0", paid: "0" });
@@ -267,6 +267,7 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
       env.DB,
       burnScan.nextCursor,
       burnScan.nextDestructionCursor,
+      burnScan.rescanFrom,
     );
     return { announced: 0, queued: 0 };
   }
@@ -279,6 +280,7 @@ export async function announceLive(env: Env, height: number): Promise<LiveResult
     env.DB,
     burnScan.nextCursor,
     burnScan.nextDestructionCursor,
+    burnScan.rescanFrom,
   );
   return { announced: queued.accepted, queued: queued.depth };
 }
