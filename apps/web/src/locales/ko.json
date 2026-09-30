@@ -1292,5 +1292,6 @@
   "Asset name first registered in {year}.": "자산 이름이 {year}년에 처음 등록되었습니다.",
   "If it fails, every minter’s XCP is automatically refunded.": "출시가 실패하면 모든 민팅 참여자가 지불한 XCP 전액이 자동으로 환불됩니다.",
   "Finish launching {asset}": "{asset} 런칭 마치기",
-  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "{asset} 인스크립션의 커밋은 전송되었지만 리빌은 아직입니다. 런칭은 리빌이 온체인에 올라가야 성립하며, 그때까지 커밋의 BTC는 그 리빌만 사용할 수 있는 출력에 머뭅니다."
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "{asset} 인스크립션의 커밋은 전송되었지만 리빌은 아직입니다. 런칭은 리빌이 온체인에 올라가야 성립하며, 그때까지 커밋의 BTC는 그 리빌만 사용할 수 있는 출력에 머뭅니다.",
+  "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": "{asset} 인스크립션의 커밋은 온체인에 올라가지 못했고, 커밋이 사용하는 코인 하나가 이후 다른 확정된 트랜잭션에서 사용되어 앞으로도 올라갈 수 없습니다. 리빌을 기다리는 BTC는 없으며, 새 런칭을 시작할 수 있습니다."
 }

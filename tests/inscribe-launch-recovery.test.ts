@@ -28,6 +28,8 @@ parent.addOutputAddress(ADDRESS, 200_000n);
 
 let commitStatus: number;
 let outspend: { spent: boolean; txid?: string };
+/** The commit's funding input, as the Bitcoin API reports it: a body, an HTTP status, or a failed request. */
+let fundingOutspend: { spent: boolean; txid?: string; status?: { confirmed: boolean } } | number | "offline";
 let broadcasts: string[];
 
 const signPsbt = vi.fn(async (psbtHex: string) => {
@@ -75,6 +77,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   commitStatus = 200;
   outspend = { spent: false };
+  fundingOutspend = { spent: false };
   broadcasts = [];
   vi.stubGlobal("fetch", vi.fn(async (input: string) => {
     const url = String(input);
@@ -83,6 +86,10 @@ beforeEach(() => {
     }
     if (url.startsWith(`${COUNTERPARTY_API_BASE}/utxos/`)) return Response.json({ result: [], next_cursor: null });
     if (url === `${BITCOIN_API_BASE}/tx/${parent.id}/hex`) return new Response(hex.encode(parent.unsignedTx));
+    if (url === `${BITCOIN_API_BASE}/tx/${parent.id}/outspend/0`) {
+      if (fundingOutspend === "offline") throw new TypeError("Failed to fetch");
+      return typeof fundingOutspend === "number" ? new Response("error", { status: fundingOutspend }) : Response.json(fundingOutspend);
+    }
     if (/\/tx\/[0-9a-f]{64}\/status$/.test(url)) return new Response(commitStatus === 200 ? "{}" : "not found", { status: commitStatus });
     if (/\/tx\/[0-9a-f]{64}\/outspend\/0$/.test(url)) return Response.json(outspend);
     throw new Error(`unexpected fetch ${url}`);
@@ -104,10 +111,10 @@ describe("two-step inscription launch", () => {
     });
     expect(record!.revealRawTx).toBeUndefined();
 
-    const { revealTxid } = await resume();
+    const result = await resume();
     expect(broadcasts).toHaveLength(2);
     expect(revealSpends(broadcasts[1]!)).toBe(`${commitTxid}:0`);
-    expect(revealTxid).toBe(txidFromRawTx(broadcasts[1]!));
+    expect(result).toEqual({ outcome: "launched", commitTxid, revealTxid: txidFromRawTx(broadcasts[1]!) });
     expect(loadPendingReveal(ADDRESS)).toBeNull();
   });
 
@@ -127,10 +134,44 @@ describe("two-step inscription launch", () => {
     await expect(launch()).rejects.toThrow();
     signPsbt.mockClear();
     outspend = { spent: true, txid: "ab".repeat(32) };
-    expect(await resume()).toMatchObject({ revealTxid: "ab".repeat(32) });
+    expect(await resume()).toMatchObject({ outcome: "launched", revealTxid: "ab".repeat(32) });
     expect(signPsbt).not.toHaveBeenCalled();
     expect(broadcasts).toHaveLength(1);
     expect(loadPendingReveal(ADDRESS)).toBeNull();
+  });
+
+  it("drops a kept commit that can never confirm, broadcasting and asking nothing", async () => {
+    signPsbt.mockImplementationOnce(signPsbt.getMockImplementation()!).mockRejectedValueOnce(new Error("page closed"));
+    await expect(launch()).rejects.toThrow();
+    const commitTxid = txidFromRawTx(broadcasts[0]!);
+    signPsbt.mockClear();
+    commitStatus = 404;
+    fundingOutspend = { spent: true, txid: "cd".repeat(32), status: { confirmed: true } };
+    expect(await resume()).toEqual({ outcome: "abandoned", commitTxid, spentBy: "cd".repeat(32) });
+    expect(signPsbt).not.toHaveBeenCalled();
+    expect(broadcasts).toHaveLength(1);
+    expect(loadPendingReveal(ADDRESS)).toBeNull();
+  });
+
+  it.each([
+    ["the conflicting spend is still unconfirmed", { spent: true, txid: "cd".repeat(32), status: { confirmed: false } }],
+    ["the funding coin is unspent", { spent: false }],
+    ["the only spend reported is the commit itself", "commit" as const],
+    ["the Bitcoin API errors", 503],
+    ["the Bitcoin API cannot be reached", "offline" as const],
+  ])("keeps the record when %s", async (_, reported) => {
+    signPsbt.mockImplementationOnce(signPsbt.getMockImplementation()!).mockRejectedValueOnce(new Error("page closed"));
+    await expect(launch()).rejects.toThrow();
+    const commitRaw = broadcasts[0]!;
+    commitStatus = 404;
+    fundingOutspend = reported === "commit"
+      ? { spent: true, txid: txidFromRawTx(commitRaw), status: { confirmed: true } }
+      : reported;
+    // What a node says to a commit whose input is gone, or any other refusal.
+    broadcast.mockRejectedValueOnce(new Error("bad-txns-inputs-missingorspent"));
+    await expect(resume()).rejects.toThrow("bad-txns-inputs-missingorspent");
+    expect(broadcast).toHaveBeenLastCalledWith(commitRaw);
+    expect(loadPendingReveal(ADDRESS)).not.toBeNull();
   });
 
   it("refuses a kept record whose commit does not pay its envelope", async () => {

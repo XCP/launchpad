@@ -1292,5 +1292,6 @@
   "Asset name first registered in {year}.": "アセット名は{year}年に初めて登録されました。",
   "If it fails, every minter’s XCP is automatically refunded.": "成立しなかった場合、すべての参加者に拠出したXCPが自動的に全額返還されます。",
   "Finish launching {asset}": "{asset} のローンチを完了",
-  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "{asset} の刻印のコミットはブロードキャスト済みですが、リビールはまだです。ローンチはリビールがオンチェーンになって初めて成立し、それまでコミットの BTC は、そのリビールだけが使える出力で待機します。"
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "{asset} の刻印のコミットはブロードキャスト済みですが、リビールはまだです。ローンチはリビールがオンチェーンになって初めて成立し、それまでコミットの BTC は、そのリビールだけが使える出力で待機します。",
+  "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": "{asset} の刻印のコミットはオンチェーンに届かず、それが使うコインの一つはその後、別の承認済みトランザクションで使われたため、今後も届くことはありません。リビールを待っている BTC はなく、新しいローンチを始められます。"
 }
