@@ -1,9 +1,36 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { apiReplayDb } from "./helpers/api-replay-db";
+import fixture from "./fixtures/fewgoodman-index-recovery.json";
 
 let database: ReturnType<typeof apiReplayDb>;
 beforeEach(() => { vi.resetModules(); database = apiReplayDb(); });
 afterEach(() => { database.raw.close(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+it("fences the original anchor when a descendant lands or node status lags", async () => {
+  database.raw.exec("INSERT INTO indexed_blocks(block_index,block_hash,ledger_hash,messages_hash) VALUES(100,'a100','l100','m100')");
+  let replaced = false;
+  vi.stubGlobal("fetch", async (input:string) => {
+    const url = new URL(input);
+    const h = Number(url.searchParams.get("cursor") ?? 101);
+    return Response.json({result:[{block_index:h,block_hash:replaced?'fork':`a${h}`,ledger_hash:`l${h}`,messages_hash:`m${h}`} ]});
+  });
+  const {verifyLedgerTip} = await import("#api/indexer/ledger");
+  await expect(verifyLedgerTip(database.db,100)).resolves.toBeUndefined();
+  replaced = true;
+  await expect(verifyLedgerTip(database.db,100)).rejects.toThrow("Chain changed");
+});
+
+it("does not erase graduates or reload unaffected historic mints on repeated recovery", async () => {
+  const columns = new Set(database.raw.prepare("PRAGMA table_xinfo(launches)").all().filter(c=>c.hidden===0).map(c=>c.name));
+  const entries = Object.entries({...fixture.launch,status:'closed',phase:'graduated',earned_quantity:'6900000000000000'}).filter(([k])=>columns.has(k));
+  database.raw.prepare(`INSERT INTO launches(${entries.map(([k])=>k).join(',')}) VALUES(${entries.map(()=>'?').join(',')})`).run(...entries.map(([,v])=>typeof v==='boolean'?Number(v):v));
+  const before = database.raw.prepare("SELECT phase,earned_quantity,pool_xcp_reserve,pool_token_reserve FROM launches").get();
+  const {rollbackIndexTo} = await import("#api/indexer/ledger");
+  await rollbackIndexTo(database.db,969885);
+  await rollbackIndexTo(database.db,969885);
+  expect(database.raw.prepare("SELECT phase,earned_quantity,pool_xcp_reserve,pool_token_reserve FROM launches").get()).toEqual(before);
+  expect(database.raw.prepare("SELECT value FROM chain_state WHERE key='ledger_recovery'").get()).toEqual({value:'969885'});
+});
 
 it("revisits its retained checkpoint after downtime moves the fork outside the rolling window", async () => {
   let tip = 100;

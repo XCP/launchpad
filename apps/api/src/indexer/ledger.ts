@@ -272,7 +272,9 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
     db.prepare("DELETE FROM orders WHERE block_index>?").bind(block),
     db.prepare("DELETE FROM chain_state WHERE key >= 'orders_digest:' AND key < 'orders_digest;'"),
     db.prepare("UPDATE chain_state SET value=? WHERE key='block_height' AND CAST(value AS INTEGER)>?").bind(String(block),block),
-    db.prepare("UPDATE launches SET phase='pending',earned_quantity=NULL WHERE status='closed'"),
+    // Keep the last known display state while recovery is incomplete. Mints
+    // affected by this rollback were invalidated above; clearing every closed
+    // launch here forces all historic feeds to reload and can starve recovery.
     db.prepare("INSERT INTO chain_state(key,value) VALUES('ledger_recovery',?) ON CONFLICT(key) DO UPDATE SET value=CAST(min(CAST(value AS INTEGER),CAST(excluded.value AS INTEGER)) AS TEXT)").bind(String(block)),
   );
   const results = await db.batch(statements);
@@ -286,10 +288,10 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
 }
 
 
-/** Fence a pass with the same freshly observed tip identity. A changed tip
- * leaves the durable pending marker in place for repair on the next tick. */
+/** Recheck the pass's fixed anchor. A later descendant is normal progress,
+ * not a reorg; a replacement or missing anchor still requires recovery. */
 export async function verifyLedgerTip(db: D1Database, height: number): Promise<void> {
-  const tip = (await fetchBlockHashes(1))[0];
+  const tip = (await fetchBlockHashes(1, height))[0];
   const stored = await one<StoredBlock>(db, "SELECT block_index,block_hash,ledger_hash,messages_hash FROM indexed_blocks WHERE block_index=?", height);
   if (!tip || tip.block_index !== height || !stored || differs(stored,tip))
     throw new Error("Chain changed during index pass");

@@ -237,7 +237,7 @@ export async function syncLaunches(
     if (
       fm.status === "closed" &&
       truthy(fm.pool_quantity) &&
-      priorLaunch?.phase !== "refunded"
+      (reindexed || priorLaunch?.phase !== "refunded")
     ) {
       const lookup = await fetchPool(fm.asset);
       poolUnknown = !lookup.known;
