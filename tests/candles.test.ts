@@ -111,6 +111,36 @@ describe("foldCandles — OHLC within one bucket", () => {
     // Same trades, same volume, different span.
     for (const c of all) expect(c.volume).toBe(6_500_000n);
   });
+
+  it("orders newest-first same-block fills by their transaction indexes", () => {
+    // HONDACIVIC block 965496: the first/last prices were reversed in D1
+    // because all six fills share one block_time.
+    const amounts = [
+      [3181285, 1266583819n, 74999999977737n],
+      [3181283, 1775158898n, 99999999990251n],
+      [3181282, 1882021964n, 99999999999608n],
+      [3181280, 1184563363n, 59999999980362n],
+      [3181277, 2074237802n, 99999999981905n],
+      [3181276, 1175550855n, 53999999969463n],
+    ] as const;
+    const candles = foldCandles("HONDACIVIC", amounts.map(([txIndex, xcp, token]) =>
+      fill({ time: 1788537316, block: 965496, txIndex, xcp, token }),
+    ));
+    for (const c of candles) {
+      expect(c).toMatchObject({ open: 2177n, close: 1689n, high: 2177n,
+        low: 1689n, volume: 9358116701n, trades: 6 });
+    }
+  });
+
+  it("orders different venue fills inside one transaction by event index", () => {
+    const c = one(foldCandles(ASSET, [
+      fill({ txIndex: 100, eventIndex: 30, xcp: 3_000_000n }),
+      fill({ txIndex: 100, eventIndex: 10, xcp: 1_000_000n }),
+      fill({ txIndex: 100, eventIndex: 20, xcp: 2_000_000n }),
+    ]));
+    expect(c).toMatchObject({ open: 1000n, close: 3000n, high: 3000n,
+      low: 1000n, volume: 6_000_000n, trades: 3 });
+  });
 });
 
 describe("foldCandles — bucket boundaries", () => {

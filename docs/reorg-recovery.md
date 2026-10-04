@@ -28,8 +28,10 @@ closed/refunded launches. Same-total replacement mints continue to trigger a
 rescan. Already-sent announcements and reward batches remain off-chain history.
 
 Order books are complete, tip-fenced snapshots. Changed snapshots remove absent
-orders, restore remaining quantities and status, and update transaction index,
-inclusion block and expiry after re-mining. Digests commit only after upserts and
+orders, restore remaining quantities and status, and refresh transaction index,
+Core's block field and expiry. Core's order `block_index` can change on a later
+status update; it is not proof of the original Bitcoin inclusion height or of
+re-mining. Digests commit only after upserts and
 deletions; an interrupted deletion retries. Non-expiring orders remain supported.
 The unchanged-book path still skips all order writes.
 
@@ -38,3 +40,31 @@ identity changes, no common ancestor, mid-pass forks and restart, equal-total
 replacement mints, shortened height, complete book deletion and re-mined orders.
 As before, reads may observe partial progress during a pass; this is a resumable
 indexer, not a globally atomic snapshot across every table and external service.
+
+## Historical audit and candles
+
+A read-only production audit on 2026-10-04 compared 251 launches, 3,911 mints,
+2,569 orders, 2,366 trade rows, 1,869 candles and 88 burns with complete Core
+feeds. The source anchor remained at block 969880 during the market audit, and
+the compared D1 tables were unchanged between the two reads. Launch phases,
+conformance, pool reserves, order statuses/quantities, trade amounts and burns
+matched. The 1,000-mint reward batch and 233 entitlements matched; its 76 payment
+transactions were confirmed and their SEND/ENHANCED_SEND/MPMA_SEND amounts agreed.
+
+The audit found reversed candle opens/closes when newest-first feeds contained
+several transactions in one block. Every fill shares that block's timestamp, so
+sorting by timestamp and block alone retained reverse transaction order. Candle
+folding now uses the merged trades' transaction/event indexes to break ties.
+Regressions cover the observed six-trade HONDACIVIC block 965496, multiple events
+inside one transaction, both venues and unchanged re-reads.
+
+258 historical candles differ from a complete chronological fold in open/close
+only. No production repair was performed. Deploy the fix before applying a
+reviewed, before-image-guarded candle correction; preserve high/low, volume,
+trade counts and economic/payment records. A full database reset is not needed.
+
+Legacy metadata is separate: migration 0013 deliberately left 273 older mint
+indexes NULL, and migration 0025 left 475 older trade indexes at zero. Three of
+those trade rows also lack event-order enrichment. These can be enriched from
+canonical history without treating them as missing trades. 308 order rows differ
+only in Core's mutable block field; do not classify that difference as re-mining.
