@@ -9,6 +9,7 @@ import {
   fetchFairmints,
   fetchNodeStatus,
   fetchPool,
+  fetchRecoveryPools,
 } from "#api/integrations/counterparty";
 import { coreVersionGate } from "#api/indexer/core-version";
 import { checkLedger, rollbackIndexTo, verifyLedgerTip, type LedgerCheck } from "#api/indexer/ledger";
@@ -166,6 +167,7 @@ export async function syncLaunches(
   await db.prepare("INSERT INTO chain_state(key,value) VALUES('pending_index_height',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(height)).run();
   const all = await fetchAllFairminters();
   const reindexed = ledger.rolled_back_to !== null;
+  const recoveryPools = reindexed ? await fetchRecoveryPools() : null;
   // Remembered so what runs after this pass can judge "now" without a node
   // read of its own. The feed announces straight after this, which is exactly
   // when the node is likeliest to be refusing us; see currentHeight.
@@ -239,7 +241,11 @@ export async function syncLaunches(
       truthy(fm.pool_quantity) &&
       (reindexed || priorLaunch?.phase !== "refunded")
     ) {
-      const lookup = await fetchPool(fm.asset);
+      const lookup = recoveryPools
+        ? recoveryPools.known
+          ? { known: true as const, pool: recoveryPools.pools.get(fm.asset) ?? null }
+          : recoveryPools
+        : await fetchPool(fm.asset);
       poolUnknown = !lookup.known;
       if (!lookup.known) {
         if (lookup.deferred) poolLookupsDeferred++;

@@ -690,6 +690,38 @@ export interface CpPool {
  */
 export type PoolLookup = { known: true; pool: CpPool | null } | { known: false; deferred?: boolean };
 
+/** Recovery must reconsider absent pools too. Read the complete set once,
+ * rather than issuing one request for every historical refunded launch.
+ * A failed/incomplete listing cannot establish absence for any asset. */
+export async function fetchRecoveryPools(): Promise<
+  { known: true; pools: Map<string, CpPool> } | { known: false; deferred?: boolean }
+> {
+  try {
+    const pools = new Map<string, CpPool>();
+    const seen = new Set<string>();
+    let cursor: string | number | null = null;
+    for (;;) {
+      const suffix = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+      const data: { result: CpPool[]; next_cursor: string | number | null } =
+        await get(`/pools?limit=1000&verbose=true${suffix}`);
+      if (!Array.isArray(data.result) || !("next_cursor" in data)) throw new Error("Incomplete pool listing");
+      for (const pool of data.result) {
+        if (typeof pool.asset_a !== "string" || typeof pool.asset_b !== "string"
+          || pool.reserve_a == null || pool.reserve_b == null) throw new Error("Invalid pool listing");
+        if (pool.asset_a === "XCP") pools.set(pool.asset_b, pool);
+        else if (pool.asset_b === "XCP") pools.set(pool.asset_a, pool);
+      }
+      if (data.next_cursor === null) return { known: true, pools };
+      if (!["string", "number"].includes(typeof data.next_cursor)
+        || seen.has(String(data.next_cursor))) throw new Error("Invalid pool cursor");
+      cursor = data.next_cursor;
+      seen.add(String(cursor));
+    }
+  } catch (error) {
+    return { known: false, deferred: error instanceof CounterpartyReadDeferred };
+  }
+}
+
 export async function fetchPool(asset: string): Promise<PoolLookup> {
   const path = `/pools/${encodeURIComponent(asset)}/XCP?verbose=true`;
   try {
