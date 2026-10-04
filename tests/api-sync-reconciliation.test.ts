@@ -38,7 +38,7 @@ it("reconciles committed mint/reward totals when a later feed and backfill are t
   const fetch = vi.fn(async (input: string) => {
     const url = new URL(input);
     if (url.pathname === "/v2/") return Response.json({ result: { counterparty_height: 965977 } });
-    if (url.pathname === "/v2/blocks") return Response.json({ result: [], next_cursor: null });
+    if (url.pathname === "/v2/blocks") return Response.json({ result: [{block_index:965977,block_hash:"aa",ledger_hash:"bb",messages_hash:"cc"}], next_cursor: null });
     if (url.pathname === "/v2/fairminters") return Response.json({ result: launches, next_cursor: null });
     const i = hashes.findIndex(hash => url.pathname === `/v2/fairminters/${hash}/fairmints`);
     if (i >= 0) {

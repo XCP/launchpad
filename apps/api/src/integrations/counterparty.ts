@@ -1,3 +1,4 @@
+import { freshCounterpartyUrl } from "#api/integrations/fresh-read";
 /**
  * The only module in this worker allowed to call the Counterparty API. The
  * poller reads through here; every read route answers from D1.
@@ -51,7 +52,7 @@ async function get<T>(path: string): Promise<T> {
     // the queue. Check again immediately before starting its own request.
     assertCounterpartyReadAllowed();
     signal.throwIfAborted();
-    const res = await fetch(`${base}${path}`, { signal });
+    const res = await fetch(freshCounterpartyUrl(`${base}${path}`), { signal });
     if (!res.ok) {
       if (res.status === 429) recordCounterpartyCooldown(res.headers.get("retry-after"));
       // A Worker holds six outbound connections, and a Response whose body is
@@ -431,6 +432,7 @@ export async function fetchNodeStatus(): Promise<NodeStatus> {
 
 export interface CpBlockHashes {
   block_index: number;
+  block_hash: string | null;
   ledger_hash: string | null;
   messages_hash: string | null;
 }
@@ -443,6 +445,7 @@ export async function fetchBlockHashes(limit: number, cursor?: number): Promise<
   const data: { result: CpBlockHashes[] | null } = await get(`/blocks?${qs.toString()}`);
   return (data.result ?? []).map((b) => ({
     block_index: Number(b.block_index),
+    block_hash: typeof b.block_hash === "string" ? b.block_hash : null,
     ledger_hash: typeof b.ledger_hash === "string" ? b.ledger_hash : null,
     messages_hash: typeof b.messages_hash === "string" ? b.messages_hash : null,
   }));
