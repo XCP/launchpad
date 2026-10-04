@@ -15,7 +15,7 @@
  * one small read on each side; a quiet tick inserts the block or two that
  * are new and nothing else.
  */
-import { q } from "#api/db";
+import { one, q } from "#api/db";
 import { fetchBlockHashes, type CpBlockHashes } from "#api/integrations/counterparty";
 import { COMMUNITY_ROLLUP_STALE_KEY } from "#api/queries/communities";
 import { BURN_RESCAN_KEY } from "#api/telegram/burns";
@@ -24,10 +24,12 @@ import { BURN_RESCAN_KEY } from "#api/telegram/burns";
 const WINDOW = 12;
 /** Blocks kept, and how far back one deeper read looks for the fork point. */
 const RETAIN = 144;
-const SQL_VAR_LIMIT = 100;
+// Two cursor keys per asset keep every statement within 100 bind variables.
+const SQL_VAR_LIMIT = 50;
 
 interface StoredBlock {
   block_index: number;
+  block_hash: string | null;
   ledger_hash: string;
   messages_hash: string | null;
 }
@@ -45,13 +47,14 @@ export interface LedgerCheck {
 }
 
 const differs = (stored: StoredBlock, api: CpBlockHashes) =>
-  stored.ledger_hash !== api.ledger_hash
+  (stored.block_hash !== null && stored.block_hash !== api.block_hash)
+  || stored.ledger_hash !== api.ledger_hash
   || (stored.messages_hash !== null && api.messages_hash !== null && stored.messages_hash !== api.messages_hash);
 
 async function storedFrom(db: D1Database, lowest: number): Promise<StoredBlock[]> {
   return q<StoredBlock>(
     db,
-    `SELECT block_index, ledger_hash, messages_hash FROM indexed_blocks WHERE block_index >= ?1 ORDER BY block_index`,
+    `SELECT block_index, block_hash, ledger_hash, messages_hash FROM indexed_blocks WHERE block_index >= ?1 ORDER BY block_index`,
     lowest,
   );
 }
@@ -64,17 +67,28 @@ async function storedFrom(db: D1Database, lowest: number): Promise<StoredBlock[]
 function firstMismatch(stored: StoredBlock[], api: Map<number, CpBlockHashes>, apiTop: number): number | null {
   for (const row of stored) {
     const theirs = api.get(row.block_index);
+    if (!theirs && row.block_index <= apiTop) throw new Error("Gap in block verification response");
     if (theirs ? differs(row, theirs) : row.block_index > apiTop) return row.block_index;
   }
   return null;
 }
 
 export async function checkLedger(db: D1Database): Promise<LedgerCheck> {
-  const recent = (await fetchBlockHashes(WINDOW)).filter((b) => b.ledger_hash !== null);
-  if (recent.length === 0) return { compared: 0, recorded: 0, rolled_back_to: null, fork_below_window: false };
+  const recent = await fetchBlockHashes(WINDOW);
+  if (recent.some(b => !b.ledger_hash || !b.block_hash)) throw new Error("Incomplete block identity");
+  if (recent.length === 0) throw new Error("No parsed blocks available for verification");
   const api = new Map(recent.map((b) => [b.block_index, b]));
   const apiTop = Math.max(...api.keys());
   let apiLowest = Math.min(...api.keys());
+  // Always revisit our last checkpoint, even after downtime moves it outside
+  // the rolling window. A moving probe must never silently forget a fork.
+  const checkpoint = await one<StoredBlock>(db, "SELECT block_index,block_hash,ledger_hash,messages_hash FROM indexed_blocks ORDER BY block_index DESC LIMIT 1");
+  if (checkpoint && checkpoint.block_index < apiLowest) {
+    const overlap = await fetchBlockHashes(RETAIN, checkpoint.block_index);
+    for (const b of overlap) if (b.ledger_hash !== null) api.set(b.block_index, b);
+    if (!api.has(checkpoint.block_index)) throw new Error("Cannot verify retained checkpoint");
+    apiLowest = Math.min(...api.keys());
+  }
   let stored = await storedFrom(db, apiLowest);
   let mismatch = firstMismatch(stored, api, apiTop);
 
@@ -89,11 +103,13 @@ export async function checkLedger(db: D1Database): Promise<LedgerCheck> {
   }
 
   const compared = stored.filter((row) => api.has(row.block_index)).length;
-  let rolledBackTo: number | null = null;
+  const recovery = await one<{value:string}>(db, "SELECT value FROM chain_state WHERE key='ledger_recovery'");
+  let rolledBackTo: number | null = recovery ? Number(recovery.value) : null;
   let forkBelowWindow = false;
   if (mismatch !== null) {
     const matchedBelow = stored.some((row) => row.block_index < mismatch! && !differs(row, api.get(row.block_index)!));
     forkBelowWindow = !matchedBelow;
+    if (forkBelowWindow) throw new Error("No verified common ancestor; rebuild required");
     rolledBackTo = mismatch - 1;
     const rollback = await rollbackIndexTo(db, rolledBackTo);
     console.warn({
@@ -106,15 +122,16 @@ export async function checkLedger(db: D1Database): Promise<LedgerCheck> {
     stored = stored.filter((row) => row.block_index <= rolledBackTo!);
   }
 
-  const known = new Set(stored.map((row) => row.block_index));
+  const known = new Set(stored.filter(row => row.block_hash !== null).map((row) => row.block_index));
   const fresh = [...api.values()].filter((b) => !known.has(b.block_index) && b.block_index >= apiTop - RETAIN);
   const insert = db.prepare(
-    `INSERT OR IGNORE INTO indexed_blocks (block_index, ledger_hash, messages_hash) VALUES (?1, ?2, ?3)`,
+    `INSERT INTO indexed_blocks (block_index, ledger_hash, messages_hash, block_hash) VALUES (?1, ?2, ?3, ?4)
+     ON CONFLICT(block_index) DO UPDATE SET block_hash=excluded.block_hash WHERE indexed_blocks.block_hash IS NULL`,
   );
-  const statements = fresh.map((b) => insert.bind(b.block_index, b.ledger_hash, b.messages_hash));
+  const statements = fresh.map((b) => insert.bind(b.block_index, b.ledger_hash, b.messages_hash, b.block_hash));
   if (fresh.length > 0) {
     statements.push(db.prepare(`DELETE FROM indexed_blocks WHERE block_index < ?1`).bind(apiTop - RETAIN));
-    await db.batch(statements);
+    for (let i=0;i<statements.length;i+=100) await db.batch(statements.slice(i,i+100));
   }
 
   return {
@@ -169,7 +186,8 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
   const cursors = await q<{ key: string }>(
     db,
     `SELECT key FROM chain_state
-      WHERE key >= 'events_hw:' AND key < 'events_hw;' AND CAST(value AS INTEGER) > ?1`,
+      WHERE key >= 'events_hw:' AND key < 'events_hw;' AND CAST(value AS INTEGER) > ?1
+      UNION SELECT 'events_hw:' || asset AS key FROM asset_events WHERE block_index > ?1`,
     block,
   );
   const assets = cursors.map((row) => row.key.slice(CURSOR_PREFIX.length));
@@ -250,6 +268,13 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
     );
   }
 
+  statements.push(
+    db.prepare("DELETE FROM orders WHERE block_index>?").bind(block),
+    db.prepare("DELETE FROM chain_state WHERE key >= 'orders_digest:' AND key < 'orders_digest;'"),
+    db.prepare("UPDATE chain_state SET value=? WHERE key='block_height' AND CAST(value AS INTEGER)>?").bind(String(block),block),
+    db.prepare("UPDATE launches SET phase='pending',earned_quantity=NULL WHERE status='closed'"),
+    db.prepare("INSERT INTO chain_state(key,value) VALUES('ledger_recovery',?) ON CONFLICT(key) DO UPDATE SET value=CAST(min(CAST(value AS INTEGER),CAST(excluded.value AS INTEGER)) AS TEXT)").bind(String(block)),
+  );
   const results = await db.batch(statements);
   return {
     mints_removed: results[MINTS]!.meta.rows_written ?? 0,
@@ -258,4 +283,14 @@ export async function rollbackIndexTo(db: D1Database, block: number): Promise<Ro
     buyers_removed: results[BUYERS]!.meta.rows_written ?? 0,
     event_assets_reset: assets.length,
   };
+}
+
+
+/** Fence a pass with the same freshly observed tip identity. A changed tip
+ * leaves the durable pending marker in place for repair on the next tick. */
+export async function verifyLedgerTip(db: D1Database, height: number): Promise<void> {
+  const tip = (await fetchBlockHashes(1))[0];
+  const stored = await one<StoredBlock>(db, "SELECT block_index,block_hash,ledger_hash,messages_hash FROM indexed_blocks WHERE block_index=?", height);
+  if (!tip || tip.block_index !== height || !stored || differs(stored,tip))
+    throw new Error("Chain changed during index pass");
 }

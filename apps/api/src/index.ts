@@ -278,7 +278,7 @@ export default {
               const sync = await runScheduledJob("sync_after_mempool", () =>
                 syncLaunches(env.DB, env.METADATA),
               );
-              if (sync?.paused) return;
+              if (!sync || sync.paused) return;
               await runScheduledJob("announce_after_mempool", async () =>
                 announceLive(env, await currentHeight(env.DB)),
               );
@@ -307,7 +307,7 @@ export default {
         // A node too old for its height (see src/indexer/core-version.ts) is
         // not read for anything else this tick either: the order book and the
         // balances below come from the same ledger the index refused.
-        if (sync?.paused) return;
+        if (!sync || sync.paused) return;
         // After the indexer, never inside it. The feed reads committed state
         // rather than the tick's own deltas, so an announcement can only
         // describe something D1 already believes — and a tick that dies

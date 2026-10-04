@@ -119,6 +119,7 @@ describe("re-parse detection", () => {
   const after = [mint("1", 965_975, 3_200_001), mint("3", 965_980, 3_200_003)];
   const hashes = (reparsed: boolean) => Array.from({ length: 12 }, (_, i) => TIP - i).map(block => ({
     block_index: block,
+    block_hash: `${reparsed && block >= FORK ? "b" : "a"}${block}`,
     ledger_hash: `${reparsed && block >= FORK ? "b" : "a"}${block}`,
     messages_hash: `${reparsed && block >= FORK ? "n" : "m"}${block}`,
   }));
@@ -176,7 +177,7 @@ describe("re-parse detection", () => {
     expect(await syncLaunches(database.db, metadata)).toMatchObject({ ledger_rolled_back_to: null, mints_ingested: 0 });
   });
 
-  it("indexes on when the comparison cannot be made, and still rolls back once it can", async () => {
+  it("pauses when the comparison cannot be made, and rolls back once it can", async () => {
     const state = { reparsed: false, blocksDown: false };
     vi.stubGlobal("fetch", chain(state));
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
@@ -186,7 +187,7 @@ describe("re-parse detection", () => {
     state.reparsed = true;
     state.blocksDown = true;
     const blind = await syncLaunches(database.db, metadata);
-    expect(blind).toMatchObject({ ledger_check_failed: true, partial: true, ledger_rolled_back_to: null });
+    expect(blind).toMatchObject({ paused: true, written: 0, ledger_check_failed: true, partial: true, ledger_rolled_back_to: null });
     expect(warn).toHaveBeenCalledWith(expect.objectContaining({ event: "ledger_check_failed" }));
     // Blind, the index cannot tell: the earned total did not move, so the
     // vanished mint stays and its replacement is never read.
@@ -200,13 +201,36 @@ describe("re-parse detection", () => {
       .toEqual(["1".repeat(64), "3".repeat(64)]);
   });
 
+  it("retains a pending pass when the chain changes mid-read and repairs it next tick", async () => {
+    const state = {reparsed:false};
+    const underlying = chain(state);
+    let changeDuringPass = false;
+    vi.stubGlobal("fetch", async (input:string) => {
+      const response = await underlying(input);
+      if (changeDuringPass && new URL(input).pathname === "/v2/fairminters") {
+        state.reparsed = true; changeDuringPass = false;
+      }
+      return response;
+    });
+    vi.spyOn(console,"warn").mockImplementation(()=>{});
+    const {syncLaunches} = await import("#api/indexer/sync");
+    await syncLaunches(database.db,metadata);
+    changeDuringPass = true;
+    expect(await syncLaunches(database.db,metadata)).toMatchObject({paused:true,partial:true,ledger_check_failed:true});
+    expect(stateValue("pending_index_height")).toBe(String(TIP));
+    expect(await syncLaunches(database.db,metadata)).toMatchObject({paused:false,partial:false,ledger_rolled_back_to:FORK-1});
+    expect(stateValue("pending_index_height")).toBeNull();
+    expect(stateValue("ledger_recovery")).toBeNull();
+    expect(database.raw.prepare("SELECT tx_hash FROM launch_mints ORDER BY block_index").all().map(r=>r.tx_hash)).toEqual(["1".repeat(64),"3".repeat(64)]);
+  });
+
   it("walks further back when the whole window changed", async () => {
     const { checkLedger } = await import("#api/indexer/ledger");
     const insert = database.raw.prepare("INSERT INTO indexed_blocks (block_index, ledger_hash, messages_hash) VALUES (?, ?, ?)");
     for (let block = TIP - 40; block <= TIP; block++) insert.run(block, `a${block}`, null);
     const deepFork = TIP - 20;
     const page = (top: number, limit: number) => Array.from({ length: limit }, (_, i) => top - i)
-      .map(block => ({ block_index: block, ledger_hash: `${block >= deepFork ? "b" : "a"}${block}`, messages_hash: null }));
+      .map(block => ({ block_index: block, block_hash: `hash${block}`, ledger_hash: `${block >= deepFork ? "b" : "a"}${block}`, messages_hash: null }));
     const fetch = vi.fn(async (input: string) => {
       const url = new URL(input);
       const limit = Number(url.searchParams.get("limit"));

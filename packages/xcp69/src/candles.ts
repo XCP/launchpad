@@ -24,6 +24,9 @@ export interface Fill {
   /** Real Unix seconds — the bucket this folds into. */
   time: number;
   block: number;
+  /** Canonical order inside a block and, for multi-venue fills, a transaction. */
+  txIndex?: number;
+  eventIndex?: number;
   xcp: bigint;
   token: bigint;
 }
@@ -91,7 +94,11 @@ export function foldCandles(asset: string, fills: Fill[], stored: Stored = new M
   const byBucket = new Map<string, Candle>();
   // Chronological, so the first fill seen in a bucket is genuinely its open
   // and the last is its close.
-  for (const fill of [...fills].sort((a, b) => a.time - b.time || a.block - b.block)) {
+  for (const fill of [...fills].sort((a, b) =>
+    a.time - b.time || a.block - b.block
+    || (a.txIndex ?? 0) - (b.txIndex ?? 0)
+    || (a.eventIndex ?? 0) - (b.eventIndex ?? 0)
+  )) {
     if (fill.time <= 0) continue;
     const price = fillPrice(fill.xcp, fill.token);
     if (price === null) continue;

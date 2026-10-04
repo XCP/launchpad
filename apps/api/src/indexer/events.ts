@@ -431,12 +431,15 @@ export async function syncAssetEvents(
     // match has two, but as a PRICE each is exactly one fill — so candles come
     // from the matches themselves, not from the per-address event rows, which
     // would double-count every order-book trade.
-    const fills = [...poolMatches, ...orderMatches].flatMap<Fill>((m) => {
-      const forwardIsToken = m.forward_asset === target.asset;
-      const xcp = rawInt(forwardIsToken ? m.backward_quantity : m.forward_quantity);
-      const token = rawInt(forwardIsToken ? m.forward_quantity : m.backward_quantity);
-      if (xcp === null || token === null || !m.block_time) return [];
-      return [{ time: m.block_time, block: m.block_index, xcp, token }];
+    // Reuse the transaction/event order already resolved above. Raw venue
+    // feeds are newest-first and every fill in a block shares a timestamp;
+    // folding those arrays directly reverses opens/closes inside the block.
+    const fills = mergedTrades.flatMap<Fill>((trade) => {
+      const xcp = rawInt(trade.xcpQuantity);
+      const token = rawInt(trade.tokenQuantity);
+      if (xcp === null || token === null || !trade.time) return [];
+      return [{ time: trade.time, block: trade.block,
+        txIndex: trade.txIndex, eventIndex: trade.eventIndex, xcp, token }];
     });
     if (fills.length > 0) {
       // A first run fetched from block 0, so every fill this asset ever had is

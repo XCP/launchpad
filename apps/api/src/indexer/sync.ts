@@ -11,7 +11,7 @@ import {
   fetchPool,
 } from "#api/integrations/counterparty";
 import { coreVersionGate } from "#api/indexer/core-version";
-import { checkLedger, type LedgerCheck } from "#api/indexer/ledger";
+import { checkLedger, rollbackIndexTo, verifyLedgerTip, type LedgerCheck } from "#api/indexer/ledger";
 import {
   fetchXcpUsd,
   fetchXcpUsdHistory,
@@ -151,8 +151,21 @@ export async function syncLaunches(
     return pausedResult();
   }
   // Before anything is read back from D1: a rollback changes what is stored.
-  const [ledger, all] = await Promise.all([checkLedgerSafely(db), fetchAllFairminters()]);
-  const reindexed = ledger !== null && ledger.rolled_back_to !== null;
+  const ledger = await checkLedgerSafely(db);
+  if (!ledger) return { ...pausedResult(), ledger_check_failed: true };
+  const pending = await one<{value:string}>(db,"SELECT value FROM chain_state WHERE key='pending_index_height'");
+  if (pending) {
+    const rollbackTo = Math.min(Number(pending.value), ledger.rolled_back_to ?? height);
+    await rollbackIndexTo(db,rollbackTo);
+    ledger.rolled_back_to = rollbackTo;
+    // rollbackIndexTo also removes identities above the repair point. Re-read
+    // them before fencing the resumed pass.
+    if (!await checkLedgerSafely(db)) return { ...pausedResult(), ledger_check_failed: true };
+  }
+  await verifyLedgerTip(db,height);
+  await db.prepare("INSERT INTO chain_state(key,value) VALUES('pending_index_height',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(height)).run();
+  const all = await fetchAllFairminters();
+  const reindexed = ledger.rolled_back_to !== null;
   // Remembered so what runs after this pass can judge "now" without a node
   // read of its own. The feed announces straight after this, which is exactly
   // when the node is likeliest to be refusing us; see currentHeight.
@@ -598,13 +611,22 @@ export async function syncLaunches(
   });
   const rewardRollup = rewardsStale ? await refreshRewardAccounts(db) : null;
 
+  let verified = true;
+  try { await verifyLedgerTip(db,height); }
+  catch (error) {
+    verified = false;
+    console.warn({event:"ledger_fence_failed",error:error instanceof Error ? error.message : String(error)});
+  }
+  const partial = !verified || poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
+    + eventProgress.failed + eventProgress.deferred + announceProgress.failed + announceProgress.deferred > 0;
+  if (verified) await db.prepare("DELETE FROM chain_state WHERE key='pending_index_height'").run();
+  if (!partial) await db.prepare("DELETE FROM chain_state WHERE key='ledger_recovery'").run();
   return {
-    partial: ledger === null || poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
-      + eventProgress.failed + eventProgress.deferred + announceProgress.failed + announceProgress.deferred > 0,
-    paused: false,
+    partial,
+    paused: !verified,
     ledger_blocks_compared: ledger?.compared ?? 0,
     ledger_rolled_back_to: ledger?.rolled_back_to ?? null,
-    ledger_check_failed: ledger === null,
+    ledger_check_failed: !verified,
     pool_lookups_failed: poolLookupsFailed,
     pool_lookups_deferred: poolLookupsDeferred,
     mint_feeds_failed: mintFeedsFailed,
@@ -634,9 +656,7 @@ export async function syncLaunches(
   };
 }
 
-/** The comparison, or null when it could not be made. A failed check never
- *  blocks the pass: the recorded hashes stay, so the next tick that can ask
- *  still finds any re-parse and rolls back past whatever this one wrote. */
+/** A failed verification pauses the pass and preserves its recovery markers. */
 async function checkLedgerSafely(db: D1Database): Promise<LedgerCheck | null> {
   try {
     return await checkLedger(db);

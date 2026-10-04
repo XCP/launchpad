@@ -33,8 +33,8 @@ describe(`migration ${REBUILD}`, () => {
   it("makes expire_index nullable and keeps every row, column and index", () => {
     const db = new DatabaseSync(":memory:");
     const files = readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort();
-    expect(files.at(-1)).toBe(REBUILD);
-    for (const file of files.slice(0, -1)) db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
+    expect(files).toContain(REBUILD);
+    for (const file of files.filter(file => file < REBUILD)) db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
 
     const columnsBefore = db.prepare("PRAGMA table_info(orders)").all();
     const indexSql = () => db
@@ -86,6 +86,7 @@ describe("an order that never expires", () => {
     ];
     vi.stubGlobal("fetch", vi.fn(async (input: string) => {
       const url = new URL(input);
+      if (url.pathname.endsWith("/blocks")) return Response.json({result:[{block_index:969000,block_hash:"aa",ledger_hash:"bb",messages_hash:"cc"}]});
       if (url.pathname.endsWith(`/assets/${ASSET}/orders`)) return Response.json({ result: book, next_cursor: null });
       throw new Error(`No fixture for ${url}`);
     }));

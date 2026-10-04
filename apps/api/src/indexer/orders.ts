@@ -31,7 +31,7 @@
  * mutable state can.
  */
 import { one, q } from "#api/db";
-import { fetchAssetOrders, type CpOrder } from "#api/integrations/counterparty";
+import { fetchAssetOrders, fetchBlockHashes, type CpOrder } from "#api/integrations/counterparty";
 
 /**
  * Politeness bound on the fan-out, not a claim about how many markets exist.
@@ -133,7 +133,7 @@ function expireIndex(o: CpOrder): number | null {
  */
 async function digest(rows: OrderRow[]): Promise<string> {
   const canonical = rows
-    .map((r) => `${r.txHash}:${r.status}:${r.tokenRemaining}:${r.xcpRemaining}`)
+    .map((r) => JSON.stringify(r))
     .sort()
     .join("\n");
   const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical));
@@ -180,6 +180,8 @@ export async function syncOrders(
     ).map((r) => [r.key, r.value]),
   );
 
+  const before = (await fetchBlockHashes(1))[0];
+  if (!before?.ledger_hash) throw new Error("Cannot verify order snapshot tip");
   const books = await Promise.all(
     worklist.map((asset) =>
       fetchAssetOrders(asset)
@@ -188,6 +190,8 @@ export async function syncOrders(
     ),
   );
 
+  const after = (await fetchBlockHashes(1))[0];
+  if (!after || JSON.stringify(before) !== JSON.stringify(after)) throw new Error("Chain changed during order snapshot");
   for (const book of books) {
     if (!book) {
       result.failed += 1;
@@ -203,10 +207,7 @@ export async function syncOrders(
 
     result.markets_changed += 1;
 
-    // Delta-guarded, so the rows that did not change cost a comparison rather
-    // than a write. Only the three mutable columns are compared: the rest of
-    // the row is immutable for a given tx_hash, so testing it could only ever
-    // produce a false positive.
+    // Delta-guard every persisted chain field, including re-mined inclusion data.
     const stmt = db.prepare(
       `INSERT INTO orders
          (tx_hash, tx_index, block_index, source, asset, side,
@@ -214,11 +215,27 @@ export async function syncOrders(
           token_remaining, xcp_remaining, status, updated_at)
        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
        ON CONFLICT(tx_hash) DO UPDATE SET
+         tx_index = excluded.tx_index,
+         block_index = excluded.block_index,
+         source = excluded.source,
+         asset = excluded.asset,
+         side = excluded.side,
+         token_quantity = excluded.token_quantity,
+         xcp_quantity = excluded.xcp_quantity,
+         expire_index = excluded.expire_index,
          token_remaining = excluded.token_remaining,
          xcp_remaining   = excluded.xcp_remaining,
          status          = excluded.status,
          updated_at      = excluded.updated_at
-       WHERE orders.status IS NOT excluded.status
+       WHERE orders.tx_index IS NOT excluded.tx_index
+          OR orders.block_index IS NOT excluded.block_index
+          OR orders.source IS NOT excluded.source
+          OR orders.asset IS NOT excluded.asset
+          OR orders.side IS NOT excluded.side
+          OR orders.token_quantity IS NOT excluded.token_quantity
+          OR orders.xcp_quantity IS NOT excluded.xcp_quantity
+          OR orders.expire_index IS NOT excluded.expire_index
+          OR orders.status IS NOT excluded.status
           OR orders.token_remaining IS NOT excluded.token_remaining
           OR orders.xcp_remaining IS NOT excluded.xcp_remaining`,
     );
@@ -246,6 +263,15 @@ export async function syncOrders(
       result.rows_written += results.reduce((n, res) => n + (res.meta.rows_written ?? 0), 0);
     }
 
+    // A complete, fenced snapshot also proves absence. Keep the digest pending
+    // through deletions so a failed batch cannot strand orphan orders forever.
+    const present = new Set(rows.map(row => row.txHash));
+    const existing = await q<{tx_hash:string}>(db,"SELECT tx_hash FROM orders WHERE asset=?",book.asset);
+    const removed = existing.filter(row => !present.has(row.tx_hash));
+    for (let i=0;i<removed.length;i+=UPSERT_CHUNK) {
+      const results = await db.batch(removed.slice(i,i+UPSERT_CHUNK).map(row=>db.prepare("DELETE FROM orders WHERE tx_hash=? AND asset=?").bind(row.tx_hash,book.asset)));
+      result.rows_written += results.reduce((n,res)=>n+(res.meta.rows_written??0),0);
+    }
     // Written only AFTER the rows land. A digest stored before a failed batch
     // would mark this market as up to date while D1 still held the old book,
     // and nothing would ever correct it — the next tick would compare the same

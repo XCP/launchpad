@@ -17,15 +17,14 @@ import { fetchBlockHeight } from "#api/integrations/counterparty";
 
 const HEIGHT_KEY = "block_height";
 
-/** Delta-guarded and monotonic: a quiet tick writes no row, and a reorg's
- *  brief step backwards cannot walk the stored value down with it. */
+/** Record the verified source height, including a shorter replacement chain. */
 export async function recordBlockHeight(db: D1Database, height: number): Promise<void> {
   if (!Number.isSafeInteger(height) || height <= 0) return;
   await db
     .prepare(
       `INSERT INTO chain_state (key, value) VALUES (?1, ?2)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value
-       WHERE CAST(chain_state.value AS INTEGER) < CAST(excluded.value AS INTEGER)`,
+       WHERE chain_state.value IS NOT excluded.value`,
     )
     .bind(HEIGHT_KEY, String(height))
     .run();

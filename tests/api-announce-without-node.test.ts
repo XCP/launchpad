@@ -100,6 +100,7 @@ describe("the index pass stops re-asking about pools it has already found missin
     ];
     const fetch = vi.fn(async (input: string) => {
       const url = new URL(input);
+      if (url.pathname === "/v2/blocks") return Response.json({result:[{block_index:HEIGHT,block_hash:"aa",ledger_hash:"bb",messages_hash:"cc"}]});
       if (url.pathname === "/v2/") return Response.json({ result: { counterparty_height: HEIGHT } });
       if (url.pathname === "/v2/fairminters") return Response.json({ result: fairminters, next_cursor: null });
       if (url.pathname === "/v2/pools/FEWGOODMAN/XCP") {

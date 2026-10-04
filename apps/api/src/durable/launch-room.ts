@@ -1,3 +1,4 @@
+import { freshCounterpartyUrl } from "#api/integrations/fresh-read";
 import { DurableObject } from "cloudflare:workers";
 import { compareRawDesc, sumRaw } from "@launchpad/xcp69/numeric";
 import { mergePairTrades } from "@launchpad/xcp69/trades";
@@ -348,7 +349,7 @@ export class LaunchRoom extends DurableObject<Env> {
     const encoded = encodeURIComponent(asset);
     const grab = async (path: string) => {
       try {
-        const res = await fetch(`${counterpartyApiBase()}${path}`, {
+        const res = await fetch(freshCounterpartyUrl(`${counterpartyApiBase()}${path}`), {
           signal: AbortSignal.timeout(8_000),
         });
         if (!res.ok) return [];
@@ -388,7 +389,7 @@ export class LaunchRoom extends DurableObject<Env> {
    *  foreshadows. Sorted biggest-first, same as the table it replaces. */
   private async fetchPending(txHash: string): Promise<PendingMint[]> {
     try {
-      const res = await fetch(`${counterpartyApiBase()}/mempool/events/NEW_FAIRMINT?limit=1000`, {
+      const res = await fetch(freshCounterpartyUrl(`${counterpartyApiBase()}/mempool/events/NEW_FAIRMINT?limit=1000`), {
         signal: AbortSignal.timeout(8_000),
       });
       if (!res.ok) return [];
