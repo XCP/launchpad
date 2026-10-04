@@ -123,5 +123,15 @@ describe("the index pass stops re-asking about pools it has already found missin
     expect(database.raw.prepare("SELECT phase, pool_xcp_reserve FROM launches WHERE tx_hash=?").get(fixture.launch.tx_hash))
       .toEqual({ phase: "graduated", pool_xcp_reserve: fixture.launch.pool_xcp_reserve });
     expect(database.raw.prepare("SELECT value FROM chain_state WHERE key='block_height'").get()).toEqual({ value: String(HEIGHT) });
+
+    // Recovery must revisit a formerly absent pool without first replacing
+    // either public phase with pending or invalidating unaffected mint totals.
+    database.raw.prepare("INSERT INTO chain_state(key,value) VALUES('ledger_recovery',?)").run(String(HEIGHT-1));
+    fetch.mockClear();
+    await syncLaunches(database.db, metadata);
+    expect(fetch.mock.calls.map(([input])=>new URL(input).pathname)).toContain('/v2/pools/NOPOOL/XCP');
+    expect(fetch.mock.calls.map(([input])=>new URL(input).pathname).filter(path=>path.endsWith('/fairmints'))).toEqual([]);
+    expect(database.raw.prepare("SELECT phase FROM launches WHERE tx_hash=?").get(refundedHash)).toEqual({phase:'refunded'});
+    expect(database.raw.prepare("SELECT phase FROM launches WHERE tx_hash=?").get(fixture.launch.tx_hash)).toEqual({phase:'graduated'});
   });
 });
