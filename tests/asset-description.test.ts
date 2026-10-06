@@ -58,7 +58,6 @@ describe("enhanced asset descriptions", () => {
     envelope({ asset: "FAKEBANG" }),
     envelope({ asset: "FAKEBANG", description: null }),
     envelope({ asset: "FAKEBANG", description: 123 }),
-    envelope({ asset: "FAKEBANG", description: "  " }),
   ])("does not display malformed or mismatched enhanced info: %j", async (body) => {
     network.mockResolvedValue(Response.json(body));
     expect(await read()).toBeNull();

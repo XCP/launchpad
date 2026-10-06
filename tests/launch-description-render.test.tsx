@@ -42,27 +42,29 @@ describe.each([
     return container;
   }
 
-  it.each(["404", "missing", "empty", "wrong-type", "malformed"])("falls back without words for %s metadata", async (failure) => {
+  it.each(["404", "missing", "wrong-type", "malformed"])("falls back without words for %s metadata", async (failure) => {
     const response = failure === "404" ? new Response(null, { status: 404 })
       : failure === "malformed" ? new Response("<html>Not JSON</html>")
       : Response.json(documentBody({
         asset: "FAKEBANG",
-        ...(failure === "missing" ? {} : { description: failure === "empty" ? "  " : 42 }),
+        ...(failure === "missing" ? {} : { description: 42 }),
       }));
     network.mockResolvedValue(response);
 
     const container = await renderDescription();
     const link = container.querySelector("a");
-    if (pointer.startsWith("https://xcp.fun/")) {
-      // Our own document with no usable words: say nothing, never the bare JSON link.
-      expect(container.innerHTML).toBe("");
-      expect(network).toHaveBeenCalledOnce();
-      return;
-    }
     expect(link?.getAttribute("href")).toBe(pointer);
     expect(link?.textContent).toBe(pointer);
     expect(link?.getAttribute("rel")).toBe("noreferrer nofollow");
     expect(container.querySelector("blockquote")).toBeNull();
+    expect(network).toHaveBeenCalledOnce();
+  });
+
+  it.each(["", " \n\t "])("renders nothing for an intentionally blank description: %j", async (description) => {
+    network.mockResolvedValue(Response.json(documentBody({ asset: "FAKEBANG", description })));
+
+    const container = await renderDescription();
+    expect(container.innerHTML).toBe("");
     expect(network).toHaveBeenCalledOnce();
   });
 

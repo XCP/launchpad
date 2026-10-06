@@ -23,7 +23,8 @@ function record(value: unknown): Record<string, unknown> | null {
 
 /** Server-side only: foreign JSON comes through the explorer's existing
  * enhanced-info reader, never a new arbitrary-URL proxy or browser fetch.
- * Curated words win; failed reads leave the page's existing fallback intact. */
+ * Curated words win. An empty string means a valid, intentionally blank
+ * description; null leaves the page's existing fallback intact. */
 export async function fetchAssetDescription(
   asset: string,
   description: string | null | undefined,
@@ -52,7 +53,7 @@ export async function fetchAssetDescription(
       if (typeof metadata?.description !== "string") return null;
       if (metadata.asset !== undefined &&
           (typeof metadata.asset !== "string" || metadata.asset.toUpperCase() !== asset.toUpperCase())) return null;
-      return metadata.description.trim().slice(0, MAX_DESCRIPTION_CHARS) || null;
+      return metadata.description.trim().slice(0, MAX_DESCRIPTION_CHARS);
     }
     const response = await fetch(
       `${XCP_API_BASE}/assets/${encodeURIComponent(asset)}/enhanced`,
@@ -74,7 +75,7 @@ export async function fetchAssetDescription(
     // External enhanced-info must identify this asset rather than merely
     // being arbitrary JSON. Our hosted legacy documents may omit it (above).
     if (typeof metadata.asset !== "string" || metadata.asset.toUpperCase() !== asset.toUpperCase()) return null;
-    return metadata.description.trim().slice(0, MAX_DESCRIPTION_CHARS) || null;
+    return metadata.description.trim().slice(0, MAX_DESCRIPTION_CHARS);
   } catch {
     return null;
   }
