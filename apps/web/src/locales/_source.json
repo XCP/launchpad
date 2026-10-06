@@ -1785,6 +1785,9 @@
   "Find a launch by asset name, and sort or filter the results.": [
     "app/[lang]/_components/launch-search.tsx"
   ],
+  "Finish launching {asset}": [
+    "app/[lang]/create/page.tsx"
+  ],
   "first at this price": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
@@ -2533,6 +2536,11 @@
   ],
   "No closed positions yet.": [
     "app/[lang]/profile/_components/history-tab.tsx"
+  ],
+  "No expiry": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx",
+    "app/[lang]/activity/_components/activity-view.tsx",
+    "app/[lang]/profile/_components/orders-tab.tsx"
   ],
   "no history": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -3596,6 +3604,12 @@
     "app/[lang]/faq/page.tsx"
   ],
   "The image itself becomes the permanent on-chain description (commit + reveal, two signatures, higher fees scale with image size; the inscription is burned so it belongs to the asset forever). Max 385 KB. Taproot wallets only.": [
+    "app/[lang]/create/page.tsx"
+  ],
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": [
+    "app/[lang]/create/page.tsx"
+  ],
+  "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": [
     "app/[lang]/create/page.tsx"
   ],
   "The inversion:": [

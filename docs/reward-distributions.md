@@ -36,7 +36,9 @@ mint cannot be included in two batches.
 
 ## Safe payout sequence
 
-1. Wait until the intended cutoff transaction is confirmed and indexed.
+1. Wait until the intended cutoff transaction is indexed and six confirmations
+   deep; `scripts/reward-batch.mjs` counts no mint above `tip - 5` and refuses
+   to build a batch whose cutoff is not that deep yet.
 2. Produce a canonical manifest sorted by address containing each address,
    eligible mint count, and raw MINTS quantity. Save the human-readable JSON
    and its SHA-256 outside D1 as well.
@@ -45,7 +47,9 @@ mint cannot be included in two batches.
    `reward_tx_hash`; freezing does not make anything public.
 4. Compose from that immutable manifest. Prefer one MPMA for compatible
    recipients and individual enhanced sends where MPMA cannot encode the
-   destination. All of those transactions share the same internal batch id.
+   destination (P2TR and P2WSH before Core 11.4's `mpma_taproot_support` at
+   block 971,700; every address from then on). All of those transactions
+   share the same internal batch id.
 5. Before signing, decode the unsigned transactions and reconcile every
    destination and raw quantity against the manifest. Never rely on the UI's
    rounded display values.

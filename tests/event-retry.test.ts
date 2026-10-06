@@ -24,6 +24,34 @@ beforeEach(async () => {
 });
 afterEach(async () => { await mf.dispose(); });
 describe("event ingestion acknowledges only completed reserve snapshots", () => {
+  it("writes candles in transaction order across both venue feeds", async () => {
+    await db.prepare(`CREATE TABLE price_candles (id TEXT PRIMARY KEY, asset TEXT,
+      resolution TEXT, bucket_start INTEGER, open TEXT, high TEXT, low TEXT,
+      close TEXT, volume_xcp TEXT, trades INTEGER, last_block INTEGER)`).run();
+    const poolFill = (tx: number, xcp: number) => ({
+      tx_hash: `pool-${tx}`, tx_index: tx, block_index: 965946,
+      block_time: 1788537316, source: "trader", status: "valid",
+      forward_asset: "FEWGOODMAN", forward_quantity: "100000000000",
+      backward_asset: "XCP", backward_quantity: String(xcp),
+    });
+    upstream.pool.mockResolvedValue([poolFill(103, 3000000), poolFill(101, 1000000)]);
+    upstream.book.mockResolvedValue([{
+      id: "maker_book", tx1_hash: "book", tx1_index: 102,
+      tx0_address: "maker", tx1_address: "trader", block_index: 965946,
+      block_time: 1788537316, status: "completed", forward_asset: "FEWGOODMAN",
+      forward_quantity: "100000000000", backward_asset: "XCP", backward_quantity: "2000000",
+    }]);
+    const targets = [{ asset: "FEWGOODMAN", poolRevision: "new-reserves" }];
+    await syncAssetEvents(db, targets, 965946);
+    const candles = await db.prepare("SELECT open,close,high,low,volume_xcp,trades FROM price_candles").all();
+    expect(candles.results).toHaveLength(2);
+    for (const candle of candles.results) expect(candle).toEqual({
+      open: "1000", close: "3000", high: "3000", low: "1000", volume_xcp: "6000000", trades: 3,
+    });
+    expect(await syncAssetEvents(db, targets, 965946)).toBe(0);
+    expect((await db.prepare("SELECT open,close,high,low,volume_xcp,trades FROM price_candles").all()).results).toEqual(candles.results);
+  });
+
   it.each([false, true])("retries an unchanged launch snapshot after a feed failure (prior marker: %s)", async markerExists => {
     if (markerExists) await db.prepare("INSERT INTO chain_state VALUES ('events_pool:FEWGOODMAN', 'old')").run();
     const targets = [{ asset: "FEWGOODMAN", poolRevision: '["53314898730","4018904691728146"]' }];

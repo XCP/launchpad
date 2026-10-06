@@ -1,0 +1,54 @@
+# Launchpad's own regtest pair for `npm run test:regtest`:
+#
+#   docker compose -f tests/regtest/docker-compose.yml -p launchpad-regtest up -d
+#
+# Counterparty Core is pinned to the release whose consensus the site builds
+# for. Regtest enables every protocol change from block 0, so this exercises
+# 11.5's `require_reveal_source_signature` and 11.4's `mpma_taproot_support`.
+# Host ports sit beside the usual 18443/24000 so another regtest pair can run
+# at the same time.
+services:
+  bitcoin-core:
+    image: bitcoin/bitcoin:30.0
+    command:
+      - -regtest=1
+      - -server=1
+      - -txindex=1
+      - -printtoconsole=1
+      - -rpcbind=0.0.0.0
+      - -rpcallowip=0.0.0.0/0
+      - -rpcuser=rpc
+      - -rpcpassword=rpc
+      - -fallbackfee=0.00002000
+      - -minrelaytxfee=0.00001000
+      - -blockmintxfee=0
+      - -zmqpubsequence=tcp://0.0.0.0:29332
+      - -zmqpubrawblock=tcp://0.0.0.0:29333
+      - -zmqpubrawtx=tcp://0.0.0.0:29332
+      - -zmqpubhashtx=tcp://0.0.0.0:29332
+    healthcheck:
+      test: ["CMD", "bitcoin-cli", "-regtest", "-rpcuser=rpc", "-rpcpassword=rpc", "getblockchaininfo"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  counterparty-core:
+    image: counterparty/counterparty:v11.5.0
+    depends_on:
+      bitcoin-core:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:24100:24000"
+    environment:
+      XDG_DATA_HOME: /data
+      XDG_LOG_HOME: /data
+    command:
+      - start
+      - --regtest
+      - --backend-connect=bitcoin-core
+      - --backend-user=rpc
+      - --backend-password=rpc
+      - --rpc-host=0.0.0.0
+      - --api-host=0.0.0.0
+      - --no-telemetry
+      - -vv

@@ -27,4 +27,7 @@ export interface Env {
   TELEGRAM_CHAT_ID?: string;
   /** Guards the admin routes that replay history into the channel. Secret. */
   ADMIN_TOKEN?: string;
+  /** The Counterparty API's `/v2` root. Unset reads the public node,
+   *  https://api.counterparty.io:4000/v2. */
+  COUNTERPARTY_API_BASE?: string;
 }

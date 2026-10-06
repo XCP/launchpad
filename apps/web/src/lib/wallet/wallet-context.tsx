@@ -11,7 +11,12 @@ import "@/lib/wallet/sdk-config";
 
 export type { ProofStatus };
 
-/** The site's vocabulary. `locked` reads as connected: the grant stands, and a signing call opens the unlock screen. */
+/**
+ * The site's vocabulary. `locked` reads as connected: the grant stands, and a signing call opens the unlock screen.
+ * `reload_required` (the extension was updated and this page's bridge to it is dead) reads as disconnected, so
+ * the connect button shows, and under the SDK's `reload` action it reloads the page; the address and the
+ * remembered connection stay, so the session is not dropped.
+ */
 export type XcpWalletStatus = "not_detected" | "disconnected" | "connected";
 
 const STATUS: Record<WalletReadyState, XcpWalletStatus> = {
@@ -20,6 +25,7 @@ const STATUS: Record<WalletReadyState, XcpWalletStatus> = {
   disconnected: "disconnected",
   connected: "connected",
   locked: "connected",
+  reload_required: "disconnected",
 };
 
 export function WalletProvider({ children }: { children: ReactNode }) {

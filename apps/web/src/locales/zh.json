@@ -1290,5 +1290,9 @@
   "{year} asset": "{year} 年资产",
   "Created by this fairminter.": "由此公平铸造合约创建。",
   "Asset name first registered in {year}.": "资产名称于 {year} 年首次注册。",
-  "If it fails, every minter’s XCP is automatically refunded.": "若发行失败，每位铸造参与者投入的全部 XCP 都会自动退还。"
+  "If it fails, every minter’s XCP is automatically refunded.": "若发行失败，每位铸造参与者投入的全部 XCP 都会自动退还。",
+  "Finish launching {asset}": "完成发射 {asset}",
+  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.": "{asset} 铭刻的 commit 已广播，但 reveal 尚未广播。reveal 上链后发射才算成立；在此之前，commit 的 BTC 会停留在只有该 reveal 才能花费的输出中。",
+  "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": "{asset} 铭刻的 commit 始终没有上链，而它花费的一枚币已被另一笔已确认的交易花掉，所以它永远不会上链。它的 BTC 没有在等待 reveal，你可以开始新的发射。",
+  "No expiry": "永不过期"
 }

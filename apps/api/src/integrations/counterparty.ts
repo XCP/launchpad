@@ -1,3 +1,4 @@
+import { freshCounterpartyUrl } from "#api/integrations/fresh-read";
 /**
  * The only module in this worker allowed to call the Counterparty API. The
  * poller reads through here; every read route answers from D1.
@@ -13,7 +14,35 @@ import {
   recordCounterpartyCooldown,
 } from "#api/integrations/cooldown";
 
-const BASE = "https://api.counterparty.io:4000/v2";
+export const DEFAULT_COUNTERPARTY_API_BASE = "https://api.counterparty.io:4000/v2";
+
+let base = DEFAULT_COUNTERPARTY_API_BASE;
+
+/**
+ * Point every Counterparty read in this worker at `COUNTERPARTY_API_BASE`
+ * (the `/v2` root), or back at the public node when it is unset. Called at
+ * each entry point — the fetch and scheduled handlers and the Durable
+ * Objects' constructors — because a Durable Object can run in an isolate the
+ * handlers never touched. An unusable value throws rather than quietly
+ * reading some other node.
+ */
+export function configureCounterpartyApi(env: { COUNTERPARTY_API_BASE?: string }): void {
+  const raw = env.COUNTERPARTY_API_BASE?.trim();
+  if (!raw) {
+    base = DEFAULT_COUNTERPARTY_API_BASE;
+    return;
+  }
+  const url = new URL(raw);
+  if ((url.protocol !== "https:" && url.protocol !== "http:") || url.search || url.hash) {
+    throw new Error(`COUNTERPARTY_API_BASE must be an http(s) /v2 root: ${raw}`);
+  }
+  base = url.href.replace(/\/+$/, "");
+}
+
+/** The `/v2` root reads go to, without a trailing slash. */
+export function counterpartyApiBase(): string {
+  return base;
+}
 
 async function get<T>(path: string): Promise<T> {
   const signal = AbortSignal.timeout(15_000);
@@ -23,7 +52,7 @@ async function get<T>(path: string): Promise<T> {
     // the queue. Check again immediately before starting its own request.
     assertCounterpartyReadAllowed();
     signal.throwIfAborted();
-    const res = await fetch(`${BASE}${path}`, { signal });
+    const res = await fetch(freshCounterpartyUrl(`${base}${path}`), { signal });
     if (!res.ok) {
       if (res.status === 429) recordCounterpartyCooldown(res.headers.get("retry-after"));
       // A Worker holds six outbound connections, and a Response whose body is
@@ -256,7 +285,10 @@ export interface CpOrder {
   get_asset: string;
   get_quantity: number | string;
   get_remaining: number | string;
-  expire_index: number;
+  /** Blocks the order stays open for; 0 means it never expires. */
+  expiration: number;
+  /** The block it expires at, or null for an order that never expires. */
+  expire_index: number | null;
   /** `open`, `filled`, `cancelled` or `expired`. Counterparty has no
    *  "partially filled" status — that is an open order whose remaining is
    *  below its original, and the tape derives it. */
@@ -379,8 +411,44 @@ export async function fetchFairminter(txHash: string): Promise<CpFairminter | nu
 }
 
 export async function fetchBlockHeight(): Promise<number> {
-  const data: { result: { counterparty_height: number } } = await get("/");
-  return data.result.counterparty_height;
+  return (await fetchNodeStatus()).height;
+}
+
+export interface NodeStatus {
+  height: number;
+  /** Core's release, `11.5.0`; null when the node does not say. */
+  version: string | null;
+}
+
+/** The API root: how far the node has parsed and which Core release did it. */
+export async function fetchNodeStatus(): Promise<NodeStatus> {
+  const data: { result: { counterparty_height: number; version?: unknown } } = await get("/");
+  const version = data.result.version;
+  return {
+    height: data.result.counterparty_height,
+    version: typeof version === "string" && version ? version : null,
+  };
+}
+
+export interface CpBlockHashes {
+  block_index: number;
+  block_hash: string | null;
+  ledger_hash: string | null;
+  messages_hash: string | null;
+}
+
+/** Core's consensus hashes for the newest `limit` blocks at or below `cursor`
+ *  (the tip when absent), newest first. One request. */
+export async function fetchBlockHashes(limit: number, cursor?: number): Promise<CpBlockHashes[]> {
+  const qs = new URLSearchParams({ limit: String(limit) });
+  if (cursor !== undefined) qs.set("cursor", String(cursor));
+  const data: { result: CpBlockHashes[] | null } = await get(`/blocks?${qs.toString()}`);
+  return (data.result ?? []).map((b) => ({
+    block_index: Number(b.block_index),
+    block_hash: typeof b.block_hash === "string" ? b.block_hash : null,
+    ledger_hash: typeof b.ledger_hash === "string" ? b.ledger_hash : null,
+    messages_hash: typeof b.messages_hash === "string" ? b.messages_hash : null,
+  }));
 }
 
 export interface CpAddressReceive {
@@ -621,6 +689,38 @@ export interface CpPool {
  * declining to say, which is not the same as saying no. Only the first is an answer.
  */
 export type PoolLookup = { known: true; pool: CpPool | null } | { known: false; deferred?: boolean };
+
+/** Recovery must reconsider absent pools too. Read the complete set once,
+ * rather than issuing one request for every historical refunded launch.
+ * A failed/incomplete listing cannot establish absence for any asset. */
+export async function fetchRecoveryPools(): Promise<
+  { known: true; pools: Map<string, CpPool> } | { known: false; deferred?: boolean }
+> {
+  try {
+    const pools = new Map<string, CpPool>();
+    const seen = new Set<string>();
+    let cursor: string | number | null = null;
+    for (;;) {
+      const suffix = cursor === null ? "" : `&cursor=${encodeURIComponent(cursor)}`;
+      const data: { result: CpPool[]; next_cursor: string | number | null } =
+        await get(`/pools?limit=1000&verbose=true${suffix}`);
+      if (!Array.isArray(data.result) || !("next_cursor" in data)) throw new Error("Incomplete pool listing");
+      for (const pool of data.result) {
+        if (typeof pool.asset_a !== "string" || typeof pool.asset_b !== "string"
+          || pool.reserve_a == null || pool.reserve_b == null) throw new Error("Invalid pool listing");
+        if (pool.asset_a === "XCP") pools.set(pool.asset_b, pool);
+        else if (pool.asset_b === "XCP") pools.set(pool.asset_a, pool);
+      }
+      if (data.next_cursor === null) return { known: true, pools };
+      if (!["string", "number"].includes(typeof data.next_cursor)
+        || seen.has(String(data.next_cursor))) throw new Error("Invalid pool cursor");
+      cursor = data.next_cursor;
+      seen.add(String(cursor));
+    }
+  } catch (error) {
+    return { known: false, deferred: error instanceof CounterpartyReadDeferred };
+  }
+}
 
 export async function fetchPool(asset: string): Promise<PoolLookup> {
   const path = `/pools/${encodeURIComponent(asset)}/XCP?verbose=true`;

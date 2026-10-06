@@ -98,10 +98,15 @@ describe("the index pass stops re-asking about pools it has already found missin
       listing({ tx_hash: refundedHash, tx_index: fixture.launch.tx_index + 1, asset: "NOPOOL", lp_asset: null,
         earned_quantity: "100000000000000", paid_quantity: "1000000" }),
     ];
+    let refuseSnapshot = false;
     const fetch = vi.fn(async (input: string) => {
       const url = new URL(input);
+      if (url.pathname === "/v2/blocks") return Response.json({result:[{block_index:HEIGHT,block_hash:"aa",ledger_hash:"bb",messages_hash:"cc"}]});
       if (url.pathname === "/v2/") return Response.json({ result: { counterparty_height: HEIGHT } });
       if (url.pathname === "/v2/fairminters") return Response.json({ result: fairminters, next_cursor: null });
+      if (url.pathname === "/v2/pools" && refuseSnapshot) return new Response(null, { status: 503 });
+      if (url.pathname === "/v2/pools") return Response.json({ result: [{ asset_a: "XCP", asset_b: "FEWGOODMAN",
+        reserve_a: fixture.launch.pool_xcp_reserve, reserve_b: fixture.launch.pool_token_reserve }], next_cursor: null });
       if (url.pathname === "/v2/pools/FEWGOODMAN/XCP") {
         return Response.json({ result: { asset_a: "XCP", asset_b: "FEWGOODMAN",
           reserve_a: fixture.launch.pool_xcp_reserve, reserve_b: fixture.launch.pool_token_reserve } });
@@ -122,5 +127,31 @@ describe("the index pass stops re-asking about pools it has already found missin
     expect(database.raw.prepare("SELECT phase, pool_xcp_reserve FROM launches WHERE tx_hash=?").get(fixture.launch.tx_hash))
       .toEqual({ phase: "graduated", pool_xcp_reserve: fixture.launch.pool_xcp_reserve });
     expect(database.raw.prepare("SELECT value FROM chain_state WHERE key='block_height'").get()).toEqual({ value: String(HEIGHT) });
+
+    // Recovery must revisit a formerly absent pool without first replacing
+    // either public phase with pending or invalidating unaffected mint totals.
+    database.raw.prepare("INSERT INTO chain_state(key,value) VALUES('ledger_recovery',?)").run(String(HEIGHT-1));
+    for (let i = 1; i < 208; i++) {
+      const over = { tx_hash: i.toString(16).padStart(64, "0"), tx_index: fixture.launch.tx_index + i + 1,
+        asset: `NOPOOL${i}`, phase: "refunded", earned_quantity: "100000000000000", paid_quantity: "1000000",
+        mints: 1, minters: 1, pool_xcp_reserve: null, pool_token_reserve: null, pool_xcp_sats: 0, lp_asset: null };
+      insertLaunch(over);
+      fairminters.push(listing(over));
+    }
+    refuseSnapshot = true;
+    expect(await syncLaunches(database.db, metadata)).toMatchObject({ partial: true, pool_lookups_failed: 209 });
+    expect(database.raw.prepare("SELECT COUNT(*) AS n FROM launches WHERE phase='refunded'").get()).toEqual({n:208});
+    expect(database.raw.prepare("SELECT phase,pool_xcp_reserve FROM launches WHERE tx_hash=?").get(fixture.launch.tx_hash))
+      .toEqual({phase:'graduated',pool_xcp_reserve:fixture.launch.pool_xcp_reserve});
+    expect(database.raw.prepare("SELECT value FROM chain_state WHERE key='ledger_recovery'").get()).toBeDefined();
+    refuseSnapshot = false;
+    fetch.mockClear();
+    expect(await syncLaunches(database.db, metadata)).toMatchObject({ partial: false, pool_lookups_failed: 0 });
+    expect(fetch.mock.calls.map(([input])=>new URL(input).pathname).filter(path=>path.startsWith('/v2/pools'))).toEqual(['/v2/pools']);
+    expect(database.raw.prepare("SELECT COUNT(*) AS n FROM launches WHERE phase='refunded'").get()).toEqual({n:208});
+    expect(database.raw.prepare("SELECT key FROM chain_state WHERE key IN ('ledger_recovery','pending_index_height')").all()).toEqual([]);
+    expect(fetch.mock.calls.map(([input])=>new URL(input).pathname).filter(path=>path.endsWith('/fairmints'))).toEqual([]);
+    expect(database.raw.prepare("SELECT phase FROM launches WHERE tx_hash=?").get(refundedHash)).toEqual({phase:'refunded'});
+    expect(database.raw.prepare("SELECT phase FROM launches WHERE tx_hash=?").get(fixture.launch.tx_hash)).toEqual({phase:'graduated'});
   });
 });

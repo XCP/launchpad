@@ -522,9 +522,11 @@ function OrderTape({ rows, height }: { rows: ActivityOrder[]; height?: number })
                 {r.state === "partial"
                   ? t("{pct}% filled", { pct })
                   : r.state === "open"
-                    ? height
-                      ? t("{eta} left", { eta: blocksEta(r.expireBlock - height, t) })
-                      : ""
+                    ? r.expireBlock === null
+                      ? t("No expiry")
+                      : height
+                        ? t("{eta} left", { eta: blocksEta(r.expireBlock - height, t) })
+                        : ""
                     : r.state === "filled"
                       ? ""
                       : pct > 0

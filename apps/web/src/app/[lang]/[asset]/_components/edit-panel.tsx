@@ -8,6 +8,7 @@ import { fetchIndexedLaunch } from "@/lib/api/launchpad-api";
 import { useSession } from "@/providers/session-context";
 import { useT } from "@/lib/i18n/client";
 import { isValidTelegram, isValidX } from "@/lib/social";
+import { messageVerificationFor } from "@/lib/wallet/message-verification";
 import { useWallet } from "@/lib/wallet/wallet-context";
 import { announceArtUpdate } from "@/components/token-image";
 
@@ -25,7 +26,7 @@ import { announceArtUpdate } from "@/components/token-image";
  */
 export function EditPanel({ asset }: { asset: string }) {
   const t = useT();
-  const { address, status: walletStatus, proofStatus, signMessage, session } = useWallet();
+  const { address, status: walletStatus, proofStatus, signMessage, session, connectionProof } = useWallet();
   const { address: sessionAddress } = useSession();
   const { data: owner } = useSWR<string | null>(
     walletStatus === "connected" ? [asset, "asset-owner"] : null,
@@ -142,10 +143,13 @@ export function EditPanel({ asset }: { asset: string }) {
       form.set("address", address);
       form.set("signature", signature);
       form.set("issued", String(issued));
-      // Horizon signs BIP-137; the route verifies by the declared dialect.
-      if (signature && session.messageVerification) {
-        form.set("verification", JSON.stringify(session.messageVerification));
-      }
+      // The route verifies by the declared dialect, and the connection proof
+      // is the wallet's own word on how it signs for this address (BIP-137
+      // for a Trezor, Horizon, or XCP Wallet 0.14's legacy accounts).
+      const verification = signature
+        ? messageVerificationFor(address, connectionProof, session.messageVerification)
+        : undefined;
+      if (verification) form.set("verification", JSON.stringify(verification));
       const res = await fetch("/api/launches", {
         method: "PUT",
         body: form,

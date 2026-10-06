@@ -5,11 +5,14 @@ import { CounterpartyReadDeferred } from "#api/integrations/cooldown";
 import {
   fetchAllFairminters,
   fetchAnnounceFacts,
-  fetchBlockHeight,
   fetchBlockTime,
   fetchFairmints,
+  fetchNodeStatus,
   fetchPool,
+  fetchRecoveryPools,
 } from "#api/integrations/counterparty";
+import { coreVersionGate } from "#api/indexer/core-version";
+import { checkLedger, rollbackIndexTo, verifyLedgerTip, type LedgerCheck } from "#api/indexer/ledger";
 import {
   fetchXcpUsd,
   fetchXcpUsdHistory,
@@ -107,6 +110,14 @@ export interface SyncResult {
    *  is skipped entirely when no mint, trade, graduation, or verdict moved. */
   behavior_written: number;
   reward_accounts_written: number;
+  /** The node's Core release is too old for its height; nothing was indexed. */
+  paused: boolean;
+  /** Recorded blocks compared with the node's ledger hashes this tick. */
+  ledger_blocks_compared: number;
+  /** The block the index was rolled back to after Core re-parsed later ones. */
+  ledger_rolled_back_to: number | null;
+  /** The ledger comparison could not be made this tick; the next one repeats it. */
+  ledger_check_failed: boolean;
   partial: boolean;
   pool_lookups_failed: number;
   pool_lookups_deferred: number;
@@ -131,7 +142,32 @@ export async function syncLaunches(
   db: D1Database,
   metadata: R2Bucket,
 ): Promise<SyncResult> {
-  const [all, height] = await Promise.all([fetchAllFairminters(), fetchBlockHeight()]);
+  const node = await fetchNodeStatus();
+  const height = node.height;
+  // A node parsing past an activation on the release before it has the wrong
+  // ledger from there on; taking nothing is the only correct index of it.
+  const gate = coreVersionGate(node.version, height);
+  if (!gate.ok) {
+    console.warn({ event: "indexer_paused", reason: "core_version", height, ...gate });
+    return pausedResult();
+  }
+  // Before anything is read back from D1: a rollback changes what is stored.
+  const ledger = await checkLedgerSafely(db);
+  if (!ledger) return { ...pausedResult(), ledger_check_failed: true };
+  const pending = await one<{value:string}>(db,"SELECT value FROM chain_state WHERE key='pending_index_height'");
+  if (pending) {
+    const rollbackTo = Math.min(Number(pending.value), ledger.rolled_back_to ?? height);
+    await rollbackIndexTo(db,rollbackTo);
+    ledger.rolled_back_to = rollbackTo;
+    // rollbackIndexTo also removes identities above the repair point. Re-read
+    // them before fencing the resumed pass.
+    if (!await checkLedgerSafely(db)) return { ...pausedResult(), ledger_check_failed: true };
+  }
+  await verifyLedgerTip(db,height);
+  await db.prepare("INSERT INTO chain_state(key,value) VALUES('pending_index_height',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").bind(String(height)).run();
+  const all = await fetchAllFairminters();
+  const reindexed = ledger.rolled_back_to !== null;
+  const recoveryPools = reindexed ? await fetchRecoveryPools() : null;
   // Remembered so what runs after this pass can judge "now" without a node
   // read of its own. The feed announces straight after this, which is exactly
   // when the node is likeliest to be refusing us; see currentHeight.
@@ -203,9 +239,13 @@ export async function syncLaunches(
     if (
       fm.status === "closed" &&
       truthy(fm.pool_quantity) &&
-      priorLaunch?.phase !== "refunded"
+      (reindexed || priorLaunch?.phase !== "refunded")
     ) {
-      const lookup = await fetchPool(fm.asset);
+      const lookup = recoveryPools
+        ? recoveryPools.known
+          ? { known: true as const, pool: recoveryPools.pools.get(fm.asset) ?? null }
+          : recoveryPools
+        : await fetchPool(fm.asset);
       poolUnknown = !lookup.known;
       if (!lookup.known) {
         if (lookup.deferred) poolLookupsDeferred++;
@@ -554,9 +594,10 @@ export async function syncLaunches(
   // above could have changed the summary. On a quiet tick this is skipped
   // entirely, which is the whole reason materialising /v2/stats pays for
   // itself rather than just moving the cost from read time to write time.
-  const stale = rollupIsStale({ mintsIngested, feesBackfilled, resolved });
+  // A rollback removed rows every rollup summarises, whatever this pass re-read.
+  const stale = reindexed || rollupIsStale({ mintsIngested, feesBackfilled, resolved });
   const rollup = stale ? await refreshRollup(db) : null;
-  const behaviorStale = behaviorRollupIsStale({
+  const behaviorStale = reindexed || behaviorRollupIsStale({
     mintsIngested,
     eventsIngested,
     resolved,
@@ -569,16 +610,29 @@ export async function syncLaunches(
   // row reader on this database when every asker rebuilt it. Eligibility is
   // joined to `launches.conforming`, so a changed verdict counts as staleness
   // alongside new mints.
-  const rewardsStale = rewardAccountsAreStale({
+  const rewardsStale = reindexed || rewardAccountsAreStale({
     mintsIngested,
     resolved,
     graduations: newGraduations.size,
   });
   const rewardRollup = rewardsStale ? await refreshRewardAccounts(db) : null;
 
+  let verified = true;
+  try { await verifyLedgerTip(db,height); }
+  catch (error) {
+    verified = false;
+    console.warn({event:"ledger_fence_failed",error:error instanceof Error ? error.message : String(error)});
+  }
+  const partial = !verified || poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
+    + eventProgress.failed + eventProgress.deferred + announceProgress.failed + announceProgress.deferred > 0;
+  if (verified) await db.prepare("DELETE FROM chain_state WHERE key='pending_index_height'").run();
+  if (!partial) await db.prepare("DELETE FROM chain_state WHERE key='ledger_recovery'").run();
   return {
-    partial: poolLookupsFailed + poolLookupsDeferred + mintFeedsFailed + mintFeedsDeferred
-      + eventProgress.failed + eventProgress.deferred + announceProgress.failed + announceProgress.deferred > 0,
+    partial,
+    paused: !verified,
+    ledger_blocks_compared: ledger?.compared ?? 0,
+    ledger_rolled_back_to: ledger?.rolled_back_to ?? null,
+    ledger_check_failed: !verified,
     pool_lookups_failed: poolLookupsFailed,
     pool_lookups_deferred: poolLookupsDeferred,
     mint_feeds_failed: mintFeedsFailed,
@@ -605,6 +659,49 @@ export async function syncLaunches(
     reward_accounts_written: rewardRollup
       ? rewardRollup.sources_written + rewardRollup.sources_removed
       : 0,
+  };
+}
+
+/** A failed verification pauses the pass and preserves its recovery markers. */
+async function checkLedgerSafely(db: D1Database): Promise<LedgerCheck | null> {
+  try {
+    return await checkLedger(db);
+  } catch (error) {
+    console.warn({
+      event: "ledger_check_failed",
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+}
+
+function pausedResult(): SyncResult {
+  return {
+    candidates: 0,
+    written: 0,
+    resolved: 0,
+    mints_ingested: 0,
+    events_ingested: 0,
+    announce_backfilled: 0,
+    fees_backfilled: 0,
+    descriptions_backfilled: 0,
+    launch_prices_backfilled: 0,
+    rollup_written: 0,
+    behavior_written: 0,
+    reward_accounts_written: 0,
+    paused: true,
+    ledger_blocks_compared: 0,
+    ledger_rolled_back_to: null,
+    ledger_check_failed: false,
+    partial: true,
+    pool_lookups_failed: 0,
+    pool_lookups_deferred: 0,
+    mint_feeds_failed: 0,
+    mint_feeds_deferred: 0,
+    event_assets_failed: 0,
+    event_assets_deferred: 0,
+    announce_reads_failed: 0,
+    announce_reads_deferred: 0,
   };
 }
 

@@ -23,9 +23,10 @@ import { useT } from "@/lib/i18n/client";
 import { useNumbers } from "@/lib/i18n/numbers";
 import { rich } from "@/lib/i18n/rich";
 import { msg, type T } from "@/lib/i18n/t";
-import { inscribeLaunch, type InscribeStep } from "@/lib/inscribe-launch";
+import { inscribeLaunch, type InscribeStep, resumeInscribeLaunch } from "@/lib/inscribe-launch";
 import { launchCostSats } from "@/lib/launch-cost";
 import { metadataJsonUrl } from "@/lib/metadata";
+import { usePendingReveal } from "@/lib/pending-reveal";
 import {
   fetchFeeRate,
   registerPending,
@@ -210,6 +211,7 @@ function estimateFromBlocks(blocksFromNow: number, t: T): string {
 
 const INSCRIBE_STEP_LABELS: Record<InscribeStep, string> = {
   preparing: msg("Preparing inscription…"),
+  "sign-bundle": msg("Confirm in wallet…"),
   "sign-commit": msg("Confirm commit in wallet…"),
   "broadcast-commit": msg("Broadcasting commit…"),
   "sign-reveal": msg("Confirm reveal in wallet…"),
@@ -224,12 +226,18 @@ export default function CreatePage() {
   const num = useNumbers();
   const t = useT();
   const usd = useFiat();
-  const { address, status: walletStatus, signPsbt, broadcastTransaction } = useWallet();
+  const { address, status: walletStatus, signPsbt, signCommitAndReveal, broadcastTransaction, session } = useWallet();
   const compose = useCompose();
   const isTaproot = address?.startsWith("bc1p") ?? false;
   const [inscribe, setInscribe] = useState(false);
   const [inscribeStep, setInscribeStep] = useState<InscribeStep | null>(null);
   const [inscribeTxid, setInscribeTxid] = useState<string | null>(null);
+  // An inscription launch whose commit went out and whose reveal did not
+  // (lib/pending-reveal), for the connected address.
+  const pendingReveal = usePendingReveal(address);
+  const [resuming, setResuming] = useState(false);
+  // A kept launch that resuming found could never confirm, and dropped.
+  const [abandoned, setAbandoned] = useState<{ address: string; asset: string } | null>(null);
 
   const [name, setName] = useState("");
   const [nameCheck, setNameCheck] = useState<NameCheck>("idle");
@@ -343,6 +351,8 @@ export default function CreatePage() {
     isValidTelegram(telegram) &&
     scheduleValid &&
     walletStatus === "connected" &&
+    // One kept envelope per address: finish that launch before another inscription.
+    !(inscribe && pendingReveal) &&
     !submitting &&
     compose.status !== "composing" &&
     compose.status !== "signing" &&
@@ -395,7 +405,10 @@ export default function CreatePage() {
       if (inscribe && isTaproot && address) {
         // 3a. Commit/reveal inscription: the image is inscribed and the
         //     inscription output burned; the description is the JSON URL,
-        //     as on a hosted launch.
+        //     as on a hosted launch. A wallet that signs a commit and its
+        //     reveal in one approval gets both before either is broadcast.
+        const features = await session.getWallet()?.features().catch(() => null);
+        const bundles = features?.marketplaceBundles ?? [];
         const { revealTxid } = await inscribeLaunch({
           asset: name,
           lpAsset: generateLpAssetName(),
@@ -407,6 +420,7 @@ export default function CreatePage() {
           description: upload.json_url,
           address,
           signPsbt,
+          signCommitAndReveal: bundles.includes("commit-and-reveal") ? signCommitAndReveal : undefined,
           broadcast: broadcastTransaction,
           onStep: setInscribeStep,
         });
@@ -453,6 +467,38 @@ export default function CreatePage() {
       setInscribeStep(null);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const finishLaunch = async () => {
+    const record = pendingReveal;
+    if (!record || submitting || walletStatus !== "connected") return;
+    setSubmitting(true);
+    setResuming(true);
+    setUploadError(null);
+    try {
+      const result = await resumeInscribeLaunch({
+        record,
+        signPsbt,
+        broadcast: broadcastTransaction,
+        onStep: setInscribeStep,
+      });
+      if (result.outcome === "abandoned") {
+        setAbandoned({ address: record.address, asset: record.asset });
+        setInscribeStep(null);
+        return;
+      }
+      const { revealTxid } = result;
+      setName(record.asset);
+      setScheduledStart(record.startBlock);
+      setScheduledLabel(blockHeight === undefined ? null : estimateFromBlocks(record.startBlock - blockHeight, t));
+      setInscribeTxid(revealTxid);
+    } catch (e) {
+      setUploadError(e instanceof Error ? e.message : t("Something went wrong"));
+      setInscribeStep(null);
+    } finally {
+      setSubmitting(false);
+      setResuming(false);
     }
   };
 
@@ -520,7 +566,7 @@ export default function CreatePage() {
   }
 
   const buttonLabel =
-    inscribeStep && inscribeStep !== "done"
+    inscribeStep && inscribeStep !== "done" && !resuming
       ? t(INSCRIBE_STEP_LABELS[inscribeStep])
       : compose.status === "composing"
         ? t("Composing…")
@@ -548,6 +594,35 @@ export default function CreatePage() {
           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">
             {t("Name, image, description. Everything else is the standard.")}
           </p>
+
+          {/* Not during a launch in progress: its own commit is kept the same
+              way while the wallet asks for the reveal. */}
+          {pendingReveal && walletStatus === "connected" && (!submitting || resuming) && (
+            <div className="mt-5 rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 p-4 text-sm text-amber-900 dark:text-amber-200">
+              <p>
+                {t(
+                  "The inscription commit for {asset} is broadcast, but its reveal is not. The launch exists only once the reveal is on-chain, and until then the commit's BTC waits in an output only that reveal can spend.",
+                  { asset: pendingReveal.asset },
+                )}
+              </p>
+              <CTA className="mt-3" size="md" onClick={finishLaunch} disabled={submitting}>
+                {resuming && inscribeStep && inscribeStep !== "done"
+                  ? t(INSCRIBE_STEP_LABELS[inscribeStep])
+                  : t("Finish launching {asset}", { asset: pendingReveal.asset })}
+              </CTA>
+            </div>
+          )}
+
+          {abandoned && abandoned.address === address && !pendingReveal && (
+            <div className="mt-5 rounded-2xl border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/40 p-4 text-sm text-gray-700 dark:text-gray-300">
+              <p>
+                {t(
+                  "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.",
+                  { asset: abandoned.asset },
+                )}
+              </p>
+            </div>
+          )}
 
           {/* Name — on Counterparty the asset name is the ticker; one identity */}
           <div className="mt-6">
