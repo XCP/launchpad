@@ -194,6 +194,9 @@ const compareRecent = (a: SectionRow, b: SectionRow): number => {
 export const SORTS: Record<string, SortOption[]> = {
   graduated: [
     { id: "mcap", label: msg("Market cap"), by: (a, b) => b.marketCapXcp - a.marketCapXcp },
+    // Per token, not per supply: burns lower market cap but not price. A
+    // launch with no pool prices at 0 and lands last, as NULL does in SQL.
+    { id: "price", label: msg("Price"), by: (a, b) => b.priceXcp - a.priceXcp },
     { id: "performance", label: msg("Performance (All)"), by: comparePerformance },
     { id: "performance_24h", label: msg("Performance (24h)"), by: compareRecent },
     { id: "minters", label: msg("Minters"), by: (a, b) => minterRank(b) - minterRank(a) },

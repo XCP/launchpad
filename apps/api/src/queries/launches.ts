@@ -250,6 +250,15 @@ export function paceOrder(tip: number): string {
 const SORT_SQL = {
   progress: "rank_key DESC",
   mcap: "market_cap_rank DESC",
+  // XCP per whole token, the pool ratio the price column shows. Unlike market
+  // cap this ignores supply, so a launch that burned part of its supply ranks
+  // by what one token costs rather than by what all of them are worth. NULL
+  // (no pool yet) sorts last under DESC.
+  price: `CASE
+    WHEN CAST(pool_token_reserve AS REAL) > 0
+    THEN CAST(pool_xcp_reserve AS REAL) / CAST(pool_token_reserve AS REAL)
+    ELSE NULL
+  END DESC`,
   // USD return is current TOKEN/XCP * current XCP/USD divided by mint
   // TOKEN/XCP * graduation XCP/USD. The current XCP/USD factor is common to
   // every launch, so omitting it preserves the exact rank. NULL sorts last
