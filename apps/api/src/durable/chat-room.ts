@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { CHAT_COOLDOWN_MS, CHAT_MAX_BANS, CHAT_MAX_CONNECTIONS, CHAT_MAX_MESSAGES, CHAT_TTL_MS, chatHandle, isChatAuthorId, normalizeChatPost, type ChatBan, type ChatBanResult, type ChatFrame, type ChatMessage, type ChatPost, type ChatPostResult } from "@launchpad/chat";
+import { CHAT_COOLDOWN_MS, CHAT_MAX_BANS, CHAT_MAX_CONNECTIONS, CHAT_MAX_MESSAGES, chatHandle, isChatAuthorId, normalizeChatPost, type ChatBan, type ChatBanResult, type ChatFrame, type ChatMessage, type ChatPost, type ChatPostResult } from "@launchpad/chat";
 import type { Env } from "#api/env";
 import { closeWebSocket } from "#api/durable/websocket";
 
@@ -8,6 +8,9 @@ const GLOBAL_WINDOW_MS = 10_000;
 const GLOBAL_MAX_POSTS = 20;
 /** Retry receipts contain no text and have a bounded lifetime and row count. */
 const MAX_RECEIPTS = 2_048;
+/** Receipts back retries and the per-author cooldown, so they still expire.
+ *  Messages do not: history is bounded by CHAT_MAX_MESSAGES alone. */
+const RECEIPT_TTL_MS = 24 * 60 * 60 * 1_000;
 
 type MessageRow = { id: string; author_id: string; handle: string; text: string; created_at: number };
 type ReceiptRow = { message_id: string; created_at: number; digest: string };
@@ -104,7 +107,7 @@ export class ChatRoom extends DurableObject<Env> {
       if (sender && now - sender.created_at < CHAT_COOLDOWN_MS) return {
         ok: false, error: "rate_limited", retryAfter: Math.ceil((sender.created_at + CHAT_COOLDOWN_MS - now) / 1_000),
       };
-      // Fifty retained messages exceed the twenty-message global window, so
+      // Two hundred retained messages exceed the twenty-message global window, so
       // capping history can never erase a still-relevant global rate entry.
       const recent = this.ctx.storage.sql.exec<{ count: number; oldest: number | null }>(
         "SELECT COUNT(*) AS count, MIN(created_at) AS oldest FROM chat_messages WHERE created_at > ?", now - GLOBAL_WINDOW_MS,
@@ -165,11 +168,10 @@ export class ChatRoom extends DurableObject<Env> {
   webSocketError(ws: WebSocket) { closeWebSocket(ws, 1011, "WebSocket error"); this.publishPresence(); }
 
   async alarm() {
-    const before = this.history().length;
+    // Only receipts expire, and they are never shown, so readers hear nothing.
     this.ctx.storage.transactionSync(() => this.pruneExpired(Date.now()));
     const cleanup = this.scheduleCleanup();
     if (this.env.CHAT_ENABLED !== "true") this.closeReaders();
-    else if (this.history().length !== before) this.broadcast({ type: "history", messages: this.history() });
     await cleanup;
   }
 
@@ -178,8 +180,7 @@ export class ChatRoom extends DurableObject<Env> {
   }
 
   private pruneExpired(now: number) {
-    this.ctx.storage.sql.exec("DELETE FROM chat_messages WHERE created_at <= ?", now - CHAT_TTL_MS);
-    this.ctx.storage.sql.exec("DELETE FROM chat_receipts WHERE created_at <= ?", now - CHAT_TTL_MS);
+    this.ctx.storage.sql.exec("DELETE FROM chat_receipts WHERE created_at <= ?", now - RECEIPT_TTL_MS);
   }
 
   private pruneCaps() {
@@ -190,16 +191,11 @@ export class ChatRoom extends DurableObject<Env> {
   }
 
   private scheduleCleanup(): Promise<void> {
-    const messages = this.ctx.storage.sql.exec<{ oldest: number | null }>(
-      "SELECT MIN(created_at) AS oldest FROM chat_messages",
-    ).one().oldest;
-    // A direct MIN uses the existing receipt timestamp index. MIN over a
-    // UNION scanned every retained receipt each time someone opened chat.
-    const receipts = this.ctx.storage.sql.exec<{ oldest: number | null }>(
+    // A direct MIN uses the existing receipt timestamp index.
+    const oldest = this.ctx.storage.sql.exec<{ oldest: number | null }>(
       "SELECT MIN(created_at) AS oldest FROM chat_receipts",
     ).one().oldest;
-    const oldest = messages === null ? receipts : receipts === null ? messages : Math.min(messages, receipts);
-    const desired = oldest === null ? null : oldest + CHAT_TTL_MS;
+    const desired = oldest === null ? null : oldest + RECEIPT_TTL_MS;
     // Capture the SQL decision now, then apply decisions in event order. The
     // durable alarm remains the source of truth after hibernation, and an
     // older empty read cannot delete a newer post's cleanup alarm.

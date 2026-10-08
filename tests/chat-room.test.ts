@@ -8,6 +8,7 @@ import { closeWebSocket } from "../apps/api/src/durable/websocket";
 
 // Execute the actual DO class and SQL against SQLite. Only Cloudflare's base
 // class/transport/alarm boundary is replaced; no message or limit logic is.
+const RECEIPT_TTL_MS = 24 * 60 * 60 * 1_000;
 const source = readFileSync(new URL("../apps/api/src/durable/chat-room.ts", import.meta.url), "utf8")
   .replace(/^import .*;\r?$/gm, "").replace("export class ChatRoom", "class ChatRoom");
 const compiled = transformSync(source, { loader: "ts", target: "es2022" }).code;
@@ -214,41 +215,39 @@ describe("shared read-only chat room", () => {
     expect(receipt.digest).toBe(Buffer.from(bytes).toString("hex"));
   });
 
-  it("keeps only 50 ordered messages while retrying a capped message without extra stored text", async () => {
+  it("keeps only 200 ordered messages while retrying a capped message without extra stored text", async () => {
     const s = setup(); const first = await s.publish(post());
-    for (let n = 2; n <= 51; n++) { s.advance(1000); expect((await s.publish(post(n))).ok).toBe(true); }
+    for (let n = 2; n <= 201; n++) { s.advance(1000); expect((await s.publish(post(n))).ok).toBe(true); }
     s.hibernate(); const { socket } = await s.connect();
     const history = socket.frames[0]; expect(history.type).toBe("history");
     if (history.type === "history") {
-      expect(history.messages).toHaveLength(50);
-      expect(history.messages[0].text).toBe("Message 2"); expect(history.messages.at(-1)!.text).toBe("Message 51");
+      expect(history.messages).toHaveLength(200);
+      expect(history.messages[0].text).toBe("Message 2"); expect(history.messages.at(-1)!.text).toBe("Message 201");
     }
     expect(await s.publish(post())).toEqual(first);
-    expect(socket.frames).toHaveLength(1); expect(s.count("chat_messages")).toBe(50);
+    expect(socket.frames).toHaveLength(1); expect(s.count("chat_messages")).toBe(200);
     const receipt = s.db.prepare("SELECT * FROM chat_receipts WHERE author_id = ?").get(author())!;
     expect(receipt).not.toHaveProperty("text"); expect(receipt).not.toHaveProperty("handle");
   });
 
-  it("prunes on the 24-hour boundary, broadcasts expiry and retires its cleanup alarm", async () => {
-    const s = setup(); await s.publish(post()); const firstExpiry = s.now + protocol.CHAT_TTL_MS;
+  it("expires receipts on the 24-hour boundary but keeps messages, silently retiring its alarm", async () => {
+    const s = setup(); await s.publish(post()); const firstExpiry = s.now + RECEIPT_TTL_MS;
     s.advance(4000); await s.publish(post(2));
     const { socket } = await s.connect(); expect(s.alarm).toBe(firstExpiry);
-    s.advance(protocol.CHAT_TTL_MS - 4000); s.hibernate(); await s.fire();
-    expect(s.count("chat_messages")).toBe(1); expect(s.count("chat_receipts")).toBe(1);
+    s.advance(RECEIPT_TTL_MS - 4000); s.hibernate(); await s.fire();
+    expect(s.count("chat_messages")).toBe(2); expect(s.count("chat_receipts")).toBe(1);
     expect(s.alarm).toBe(firstExpiry + 4000);
     expect(s.alarms.set.mock.calls).toEqual([[firstExpiry], [firstExpiry + 4000]]);
-    expect(socket.frames.at(-1)?.type).toBe("history");
     s.advance(4000); await s.fire();
-    expect(socket.frames.at(-1)).toEqual({ type: "history", messages: [], count: 1 });
-    expect(s.count("chat_messages")).toBe(0); expect(s.count("chat_receipts")).toBe(0); expect(s.alarm).toBeNull();
-    const frames = socket.frames.length; await s.fire(); expect(socket.frames).toHaveLength(frames);
+    expect(s.count("chat_messages")).toBe(2); expect(s.count("chat_receipts")).toBe(0); expect(s.alarm).toBeNull();
+    await s.fire(); expect(socket.frames.filter((frame) => frame.type === "history")).toHaveLength(1);
     expect(s.alarms.delete).not.toHaveBeenCalled();
   });
 
   it("does not rewrite unchanged alarms for reads, cooldown refusals, retries, or hibernation", async () => {
     const s = setup(); await s.connect(); await s.connect(); await s.fire();
     expect(s.alarms.set).not.toHaveBeenCalled(); expect(s.alarms.delete).not.toHaveBeenCalled();
-    const first = await s.publish(post()); const expiry = s.now + protocol.CHAT_TTL_MS;
+    const first = await s.publish(post()); const expiry = s.now + RECEIPT_TTL_MS;
     expect(s.alarms.set.mock.calls).toEqual([[expiry]]);
     await s.connect(); s.hibernate(); await s.connect();
     expect(await s.publish(post(2, author()))).toEqual({ ok: false, error: "rate_limited", retryAfter: 3 });
@@ -260,7 +259,7 @@ describe("shared read-only chat room", () => {
 
   it("keeps a newer post's alarm after a delayed read prunes the previously expired room", async () => {
     const s = setup(); await s.publish(post()); const expiredAlarm = s.alarm;
-    s.advance(protocol.CHAT_TTL_MS + 1);
+    s.advance(RECEIPT_TTL_MS + 1);
     let finishRead!: (value: number | null) => void;
     s.alarms.get.mockImplementationOnce(() => new Promise<number | null>((resolve) => { finishRead = resolve; }));
     const reading = s.connect();
@@ -271,13 +270,14 @@ describe("shared read-only chat room", () => {
     finishRead(expiredAlarm);
     expect((await reading).response.status).toBe(101); expect((await publishing).ok).toBe(true);
     expect(s.alarms.delete).toHaveBeenCalledTimes(1);
-    expect(s.alarm).toBe(s.now + protocol.CHAT_TTL_MS);
+    expect(s.alarm).toBe(s.now + RECEIPT_TTL_MS);
     expect(s.alarms.set).toHaveBeenCalledTimes(2);
   });
 
-  it("does not replay stale history when an alarm was delayed", async () => {
-    const s = setup(); await s.publish(post()); s.advance(protocol.CHAT_TTL_MS + 1); s.hibernate();
-    const { socket } = await s.connect(); expect(socket.frames).toEqual([{ type: "history", messages: [], count: 1 }]);
+  it("serves day-old history to a quiet room after a delayed alarm", async () => {
+    const s = setup(); const first = await s.publish(post()); s.advance(RECEIPT_TTL_MS + 1); s.hibernate();
+    const { socket } = await s.connect();
+    if (first.ok) expect(socket.frames).toEqual([{ type: "history", messages: [first.message], count: 1 }]);
     expect(s.count("chat_receipts")).toBe(0); expect(s.alarm).toBeNull();
     expect(s.alarms.delete).toHaveBeenCalledTimes(1);
     await s.connect(); await s.connect();
@@ -292,13 +292,13 @@ describe("shared read-only chat room", () => {
     s.db.prepare(`WITH RECURSIVE seed(n) AS (VALUES(1) UNION ALL SELECT n + 1 FROM seed WHERE n < 2048)
       INSERT INTO chat_receipts (author_id, request_id, message_id, created_at, digest)
       SELECT printf('%064x', n), printf('request-%05d', n), printf('seed-message-%05d', n), ? + n * 3000, printf('%064x', 0) FROM seed`).run(base);
-    s.db.prepare(`WITH RECURSIVE seed(n) AS (VALUES(1999) UNION ALL SELECT n + 1 FROM seed WHERE n < 2048)
+    s.db.prepare(`WITH RECURSIVE seed(n) AS (VALUES(1849) UNION ALL SELECT n + 1 FROM seed WHERE n < 2048)
       INSERT INTO chat_messages (id, author_id, handle, text, created_at)
       SELECT printf('seed-message-%05d', n), printf('%064x', n), 'PepeAAAA', 'Message ' || n, ? + n * 3000 FROM seed`).run(base);
     for (const n of [2049, 2050]) { s.advance(3000); expect((await s.publish(post(n))).ok).toBe(true); }
-    expect(s.count("chat_messages")).toBe(50); expect(s.count("chat_receipts")).toBe(2048);
+    expect(s.count("chat_messages")).toBe(200); expect(s.count("chat_receipts")).toBe(2048);
     expect(s.db.prepare("SELECT request_id FROM chat_receipts ORDER BY created_at LIMIT 1").get()!.request_id).toBe(post(3).requestId);
-    expect(s.db.prepare("SELECT text FROM chat_messages ORDER BY seq LIMIT 1").get()!.text).toBe("Message 2001");
+    expect(s.db.prepare("SELECT text FROM chat_messages ORDER BY seq LIMIT 1").get()!.text).toBe("Message 1851");
     expect(s.db.prepare("SELECT text FROM chat_messages ORDER BY seq DESC LIMIT 1").get()!.text).toBe("Message 2050");
   });
 
@@ -380,9 +380,9 @@ describe("shared read-only chat room", () => {
     expect(await s.listBans()).toHaveLength(protocol.CHAT_MAX_BANS);
   });
 
-  it("retains bans through history expiry and permits moderation while chat is disabled", async () => {
+  it("retains bans through receipt expiry and permits moderation while chat is disabled", async () => {
     const s = setup(); await s.setBan(author(), true);
-    s.advance(protocol.CHAT_TTL_MS + 1); s.hibernate(); await s.fire();
+    s.advance(RECEIPT_TTL_MS + 1); s.hibernate(); await s.fire();
     expect(s.count("chat_bans")).toBe(1);
     s.env.CHAT_ENABLED = "false";
     expect(await s.listBans()).toHaveLength(1);

@@ -4,7 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatPanel } from "@/components/chat-panel";
 import { LocaleProvider } from "@/lib/i18n/client";
-import { CHAT_COOLDOWN_MS, chatHandle, type ChatMessage } from "@launchpad/chat";
+import { CHAT_COOLDOWN_MS, CHAT_MAX_MESSAGES, chatHandle, type ChatMessage } from "@launchpad/chat";
 import { ChatProvider, useChatRoute } from "@/providers/chat-context";
 
 const boundary = vi.hoisted(() => ({
@@ -114,9 +114,9 @@ describe("chat transcript and socket lifecycle", () => {
   it("deduplicates messages, bounds history, replaces it on reconnect and ignores stale/malformed frames", async () => {
     vi.useFakeTimers(); await render();
     const first = newestSocket();
-    await act(() => first.frame({ type: "history", messages: Array.from({ length: 50 }, (_, n) => message(n + 1, `history ${n}`)) }));
-    await act(() => { first.frame({ type: "message", message: message(51, "latest") }); first.frame({ type: "message", message: message(51, "latest") }); first.frame("x".repeat(100001)); });
-    expect(transcript().querySelectorAll("p")).toHaveLength(50);
+    await act(() => first.frame({ type: "history", messages: Array.from({ length: CHAT_MAX_MESSAGES }, (_, n) => message(n + 1, `history ${n}`)) }));
+    await act(() => { first.frame({ type: "message", message: message(CHAT_MAX_MESSAGES + 1, "latest") }); first.frame({ type: "message", message: message(CHAT_MAX_MESSAGES + 1, "latest") }); first.frame("x".repeat(CHAT_MAX_MESSAGES * 2_000 + 1)); });
+    expect(transcript().querySelectorAll("p")).toHaveLength(CHAT_MAX_MESSAGES);
     expect(transcript().textContent).not.toContain("history 0");
     await act(() => first.close());
     await act(async () => vi.advanceTimersByTime(1001));
