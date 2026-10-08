@@ -1,8 +1,12 @@
 /** Shared wire limits: Unicode codepoints, not UTF-16 units or Latin letters. */
 export const CHAT_MAX_CODEPOINTS = 280;
 export const CHAT_MAX_LINES = 3;
-export const CHAT_MAX_MESSAGES = 50;
-export const CHAT_TTL_MS = 24 * 60 * 60 * 1_000;
+/**
+ * History is kept by count, never by age. A quiet room used to expire every
+ * message after a day and open to an empty transcript; now the last
+ * CHAT_MAX_MESSAGES stay until newer posts push them out.
+ */
+export const CHAT_MAX_MESSAGES = 200;
 export const CHAT_COOLDOWN_MS = 3_000;
 export const CHAT_MAX_RAW_BYTES = 4_096;
 export const CHAT_MAX_CONNECTIONS = 500;
@@ -88,7 +92,8 @@ function parseMessage(value: unknown): ChatMessage | null {
 /** Parse only bounded, valid frames; do not forward unknown fields into UI state. */
 export function parseChatFrame(value: unknown): ChatFrame | null {
   if (typeof value === "string") {
-    if (value.length > 100_000) return null;
+    // A full history frame: worst-case escaped text plus envelope per message.
+    if (value.length > CHAT_MAX_MESSAGES * 2_000) return null;
     try { value = JSON.parse(value); } catch { return null; }
   }
   if (!object(value)) return null;

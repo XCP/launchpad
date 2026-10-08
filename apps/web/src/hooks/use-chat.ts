@@ -1,15 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { CHAT_MAX_MESSAGES, CHAT_TTL_MS, isChatAuthorId, isChatHandle, parseChatFrame, type ChatBan, type ChatMessage } from "@launchpad/chat";
+import { CHAT_MAX_MESSAGES, isChatAuthorId, isChatHandle, parseChatFrame, type ChatBan, type ChatMessage } from "@launchpad/chat";
 
 const WS_URL = process.env.NEXT_PUBLIC_CHAT_WS_URL ?? "wss://api.xcp.fun/ws/chat";
 const MAX_BACKOFF_MS = 30_000;
 export type ChatStatus = "connecting" | "live" | "reconnecting" | "offline";
 
 function recentMessages(messages: ChatMessage[]): ChatMessage[] {
-  const cutoff = Date.now() - CHAT_TTL_MS;
-  return [...new Map(messages.filter((message) => message.createdAt > cutoff).map((message) => [message.id, message])).values()]
+  return [...new Map(messages.map((message) => [message.id, message])).values()]
     .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))
     .slice(-CHAT_MAX_MESSAGES);
 }
@@ -50,7 +49,7 @@ export function useChat(active: boolean) {
           const frame = parseChatFrame(event.data);
           if (!frame) return;
           if (frame.count !== undefined) setConnections(frame.count);
-          // Reconnection history is authoritative: expired/removed messages
+          // Reconnection history is authoritative: capped/removed messages
           // must disappear instead of being merged back into the transcript.
           if (frame.type === "history") {
             attempt = 0;
@@ -64,11 +63,9 @@ export function useChat(active: boolean) {
       ws.onerror = () => { if (current()) ws.close(); };
     };
     connect();
-    const expiry = setInterval(() => setMessages((previous) => recentMessages(previous)), 30_000);
     return () => {
       stopped = true;
       clearTimeout(timer);
-      clearInterval(expiry);
       socket?.close();
     };
   }, [active, acceptMessage]);

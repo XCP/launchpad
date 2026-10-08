@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CHAT_MAX_CODEPOINTS, CHAT_MAX_LINES, chatHandle, chatLineCount, normalizeChatPost, normalizeChatText, parseChatFrame, type ChatMessage } from "@launchpad/chat";
+import { CHAT_MAX_CODEPOINTS, CHAT_MAX_MESSAGES, CHAT_MAX_LINES, chatHandle, chatLineCount, normalizeChatPost, normalizeChatText, parseChatFrame, type ChatMessage } from "@launchpad/chat";
 
 const message: ChatMessage = { id: "message-123", authorId: "a".repeat(64), handle: "Quiet-Otter-1234", text: "Hello", createdAt: 1_800_000_000_000 };
 const compactMessage: ChatMessage = { ...message, handle: chatHandle(message.authorId) };
@@ -47,7 +47,7 @@ describe("plain-text chat protocol", () => {
     expect(parseChatFrame({ type: "history", messages: [message] })).toEqual({ type: "history", messages: [compactMessage] });
     expect(parseChatFrame({ type: "history", messages: [] })).toEqual({ type: "history", messages: [] });
     expect(parseChatFrame({ type: "history", messages: [message, message] })).toBeNull();
-    expect(parseChatFrame({ type: "history", messages: Array.from({ length: 51 }, (_, i) => ({ ...message, id: `message-${i}` })) })).toBeNull();
+    expect(parseChatFrame({ type: "history", messages: Array.from({ length: CHAT_MAX_MESSAGES + 1 }, (_, i) => ({ ...message, id: `message-${i}` })) })).toBeNull();
     expect(parseChatFrame({ type: "message", message: { ...message, createdAt: NaN } })).toBeNull();
     expect(parseChatFrame({ type: "message", message: { ...message, text: " noncanonical " } })).toBeNull();
     expect(parseChatFrame("x".repeat(100001))).toBeNull();
