@@ -111,5 +111,6 @@
   "{year} asset": "Asset-origin chip: the asset name was first registered in the calendar year {year}, before this fairminter. Preserve {year}; it does not date the issuer address or newly minted tokens.",
   "Created by this fairminter.": "Tooltip for New asset: the current fairminter registered the asset name as part of this launch.",
   "Asset name first registered in {year}.": "Tooltip for an existing asset: {year} is the calendar year when its name was first registered, not when this launch minted tokens. Preserve {year}.",
-  "If it fails, every minter’s XCP is automatically refunded.": "All-or-nothing pool launch deadline explanation: if the sale misses its target, consensus automatically returns every participant’s full XCP contribution without a manual claim. Explicitly preserve automatic and full refund; this does not include Bitcoin transaction fees or describe other mint types."
+  "If it fails, every minter’s XCP is automatically refunded.": "All-or-nothing pool launch deadline explanation: if the sale misses its target, consensus automatically returns every participant’s full XCP contribution without a manual claim. Explicitly preserve automatic and full refund; this does not include Bitcoin transaction fees or describe other mint types.",
+  "Must hold 10 XCP to chat.": "Shown in the chat box to a signed-in wallet with under 10 XCP. It means the wallet must HOLD (keep a balance of) at least 10 XCP; nothing is paid, spent or charged. Avoid wording that reads as a fee or price."
 }

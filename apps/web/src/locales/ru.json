@@ -730,6 +730,7 @@
   "Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.": "Минты, возвраты и исполнения в пуле или в книге ордеров по запускам XCP-69. «Прочее» сводит эти события с текущим балансом и может означать отправку, получение, сжигание или движение ликвидности. Открытый минт показывает, сколько вы внесли — эти XCP находятся в эскроу по консенсусу и вернутся автоматически, если запуск не доберёт софткап.",
   "missed the cap, paid back": "не добрали софткап, деньги возвращены",
   "More than one wallet is installed. Pick the one to connect with.": "Установлено несколько кошельков. Выберите, какой подключить.",
+  "Must hold 10 XCP to chat.": "Чтобы писать в чате, нужно иметь 10 XCP.",
   "Name": "Имя",
   "Name, image, description. Everything else is the standard.": "Имя, изображение, описание. Всё остальное — стандарт.",
   "named assets only, divisible": "только именованные активы, делимые",

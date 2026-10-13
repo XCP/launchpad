@@ -198,6 +198,20 @@ describe("chat writes require the current verified wallet", () => {
     expect(button("Send").disabled).toBe(true);
   });
 
+  it("says a wallet under the minimum must hold 10 XCP, and blocks sending", async () => {
+    boundary.identity.mockResolvedValue(Response.json({ address: "wallet-one", authorId: "a".repeat(64), handle: HANDLE_A, isAdmin: false, holdsMinimum: false }));
+    await render(); await type("hello");
+    expect(document.body.textContent).toContain("Must hold 10 XCP to chat.");
+    expect(button("Send").disabled).toBe(true); expect(boundary.fetch).not.toHaveBeenCalled();
+  });
+
+  it("closes the composer when a send is refused for the minimum, keeping the draft", async () => {
+    boundary.fetch.mockResolvedValueOnce(Response.json({ error: "insufficient_xcp" }, { status: 403 }));
+    await render(); await type("still here"); await submit();
+    expect(document.body.textContent).toContain("Must hold 10 XCP to chat.");
+    expect(input().value).toBe("still here"); expect(button("Send").disabled).toBe(true);
+  });
+
   it("preserves a failed message and reuses its request ID on retry", async () => {
     boundary.fetch.mockRejectedValueOnce(new Error("connection lost"));
     await render(); await type("retry this exact message"); await submit();

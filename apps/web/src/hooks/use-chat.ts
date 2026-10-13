@@ -114,12 +114,17 @@ export function useMutedChatAuthors() {
   };
 }
 
-export interface ChatIdentity { address: string; authorId: string; handle: string; isAdmin: boolean }
+export interface ChatIdentity { address: string; authorId: string; handle: string; isAdmin: boolean; holdsMinimum?: boolean | null }
 export function useChatIdentity(active: boolean, address: string | null) {
   const [identity, setIdentity] = useState<ChatIdentity | null>(null);
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
+  // Read through a ref so learning the verdict does not itself re-ask.
+  const belowMinimum = useRef(false);
+  useEffect(() => { belowMinimum.current = identity?.holdsMinimum === false; }, [identity?.holdsMinimum]);
   useEffect(() => {
-    if (!active || !address || (resolvedAddress === address && identity?.address === address)) return;
+    // Under the minimum is re-asked whenever chat reopens, so a top-up is
+    // picked up without a reload.
+    if (!active || !address || (resolvedAddress === address && identity?.address === address && !belowMinimum.current)) return;
     let stopped = false;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10_000);
@@ -130,14 +135,17 @@ export function useChatIdentity(active: boolean, address: string | null) {
         if (stopped || !value || typeof value !== "object") return;
         const candidate = value as Partial<ChatIdentity>;
         if (candidate.address === address && isChatAuthorId(candidate.authorId) && isChatHandle(candidate.handle)) {
-          setIdentity({ address, authorId: candidate.authorId, handle: candidate.handle, isAdmin: candidate.isAdmin === true });
+          setIdentity({ address, authorId: candidate.authorId, handle: candidate.handle, isAdmin: candidate.isAdmin === true,
+            holdsMinimum: typeof candidate.holdsMinimum === "boolean" ? candidate.holdsMinimum : null });
           setResolvedAddress(address);
         }
       }).catch(() => {}).finally(() => clearTimeout(timeout));
     return () => { stopped = true; clearTimeout(timeout); controller.abort(); };
   }, [active, address, resolvedAddress, identity?.address]);
-  const rememberIdentity = (messageIdentity: Omit<ChatIdentity, "isAdmin">) => setIdentity((previous) => ({
+  const rememberIdentity = (messageIdentity: Omit<ChatIdentity, "isAdmin" | "holdsMinimum">) => setIdentity((previous) => ({
     ...messageIdentity, isAdmin: previous?.address === messageIdentity.address && previous.isAdmin === true,
+    // An accepted post is proof the server let this wallet in.
+    holdsMinimum: true,
   }));
   return { identity: identity?.address === address ? identity : null, rememberIdentity };
 }

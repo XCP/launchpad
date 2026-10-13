@@ -730,6 +730,7 @@
   "Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.": "XCP-69 发射上的铸造、退款以及池子或订单簿成交。“其他”用于将这些事件与实时余额对账，可能代表转出、转入、销毁或流动性变动。进行中的铸造显示你已投入的数量 — 这些 XCP 由共识托管，若发射未达软顶会自动退回。",
   "missed the cap, paid back": "未达软顶，已退回",
   "More than one wallet is installed. Pick the one to connect with.": "已安装多个钱包。请选择要连接的那个。",
+  "Must hold 10 XCP to chat.": "需持有 10 XCP 才能聊天。",
   "Name": "名称",
   "Name, image, description. Everything else is the standard.": "名称、图片、描述。其余一切都由标准决定。",
   "named assets only, divisible": "仅限命名资产，可分割",

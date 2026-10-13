@@ -535,16 +535,20 @@ export async function fetchHolderConcentration(
  *  question the profile actually asks, without paging every asset held. */
 export async function fetchAssetBalance(address: string, asset: string): Promise<string> {
   try {
-    const data = await get<{ result: { quantity: Raw }[] }>(
-      `/addresses/${encodeURIComponent(address)}/balances/${encodeURIComponent(asset)}`,
-      30,
-    );
-    return (data.result ?? [])
-      .reduce((sum, r) => sum + big(r.quantity), 0n)
-      .toString();
+    return (await fetchAssetBalanceOrThrow(address, asset)).toString();
   } catch {
     return "0";
   }
+}
+
+/** The same read, for a caller that must not mistake "could not read" for
+ *  "holds nothing": a failure throws instead of reading as zero. */
+export async function fetchAssetBalanceOrThrow(address: string, asset: string): Promise<bigint> {
+  const data = await get<{ result: { quantity: Raw }[] }>(
+    `/addresses/${encodeURIComponent(address)}/balances/${encodeURIComponent(asset)}`,
+    30,
+  );
+  return (data.result ?? []).reduce((sum, r) => sum + big(r.quantity), 0n);
 }
 
 /**
