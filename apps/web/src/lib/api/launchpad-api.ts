@@ -1913,3 +1913,32 @@ export function fetchActivityLaunches(limit = 50): Promise<ActivityLaunch[] | nu
     minters: r.minters,
   }));
 }
+
+/**
+ * XCP this address has paid into launches that are still minting.
+ *
+ * That XCP is escrowed until the launch graduates or refunds, so it has left
+ * the address's balance without leaving its owner. Paged to exhaustion; a
+ * failure throws, because a caller gating on this must not read "unknown" as
+ * "none".
+ */
+export async function fetchMintingXcpPaid(address: string): Promise<bigint> {
+  let total = 0n;
+  let offset: number | null = 0;
+  while (offset !== null) {
+    const res = await launchpadApiFetch(
+      `/v2/mints/by/${encodeURIComponent(address)}?limit=1000&offset=${offset}`,
+      { next: { revalidate: 15 } },
+    );
+    if (!res.ok) throw new Error(`Mints by address unavailable (${res.status})`);
+    const data = (await res.json()) as {
+      result?: { phase?: string; paid_quantity?: string | null }[];
+      next_offset?: number | null;
+    };
+    for (const mint of data.result ?? []) {
+      if (mint.phase === "minting" && mint.paid_quantity) total += BigInt(mint.paid_quantity);
+    }
+    offset = data.next_offset ?? null;
+  }
+  return total;
+}

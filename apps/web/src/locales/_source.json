@@ -2471,6 +2471,9 @@
   "More than one wallet is installed. Pick the one to connect with.": [
     "components/connect-button.tsx"
   ],
+  "Must hold 10 XCP to chat.": [
+    "components/chat-panel.tsx"
+  ],
   "Mute {name}": [
     "components/chat-panel.tsx"
   ],

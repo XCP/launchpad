@@ -698,6 +698,7 @@
     "Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.",
     "missed the cap, paid back",
     "More than one wallet is installed. Pick the one to connect with.",
+    "Must hold 10 XCP to chat.",
     "Name",
     "Name, image, description. Everything else is the standard.",
     "named assets only, divisible",

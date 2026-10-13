@@ -142,7 +142,7 @@ function ChatContent({ messages, status, connections, acceptMessage, identity, d
           </ul>
         </>}
       </div>}
-      <ChatComposer key={address ?? "guest"} ref={composer} drafts={drafts} rememberDraft={rememberDraft} ownHandle={identity?.handle ?? null} acceptMessage={acceptMessage} runCommand={runCommand} />
+      <ChatComposer key={address ?? "guest"} ref={composer} drafts={drafts} rememberDraft={rememberDraft} ownHandle={identity?.handle ?? null} belowMinimum={identity?.holdsMinimum === false} acceptMessage={acceptMessage} runCommand={runCommand} />
     </div>
   );
 }
@@ -183,8 +183,10 @@ function ChatText({ text, ownHandle, assetLinks }: { text: string; ownHandle: st
 
 interface ChatComposerHandle { mention: (handle: string) => void }
 
-function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, runCommand }: {
+function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, belowMinimum, runCommand }: {
   acceptMessage: (message: ChatMessage) => void;
+  /** The verified wallet holds under the 10 XCP chat minimum. */
+  belowMinimum: boolean;
   ref: Ref<ChatComposerHandle>;
   drafts: Record<string, ChatDraftMemory>;
   rememberDraft: (address: string, update: Partial<ChatDraftMemory>) => void;
@@ -195,7 +197,10 @@ function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, ru
   const num = useNumbers();
   const wallet = useWallet();
   const session = useSession();
-  const canPost = wallet.status === "connected" && !!wallet.address && session.address === wallet.address;
+  const { markBelowMinimum } = useChatContext();
+  const verified = wallet.status === "connected" && !!wallet.address && session.address === wallet.address;
+  const needsXcp = verified && belowMinimum;
+  const canPost = verified && !needsXcp;
   const draftKey = wallet.address ?? "guest";
   const memory = drafts[draftKey];
   const [draft, setDraft] = useState(memory?.draft ?? "");
@@ -305,6 +310,8 @@ function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, ru
       } else if (result.error === "unauthorized" || result.error === "session_mismatch") {
         setError(t("Reconnect your wallet to verify again."));
         session.invalidate();
+      } else if (result.error === "insufficient_xcp") {
+        markBelowMinimum();
       } else if (result.error === "rate_limited") {
         const retryAfter = typeof result.retryAfter === "number" && Number.isFinite(result.retryAfter) ? Math.max(1, Math.min(3600, result.retryAfter)) : CHAT_COOLDOWN_MS / 1000;
         setNow(Date.now()); setCooldownUntil(Date.now() + retryAfter * 1000);
@@ -337,7 +344,7 @@ function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, ru
           aria-label={seconds > 0 && !notice && canPost ? t("Wait {n}s before sending again.", { n: num.commas(seconds) }) : undefined}
           className="h-6 min-w-0 flex-1 overflow-y-auto text-[11px] leading-3 text-gray-500 outline-none dark:text-gray-400">
           <div className="flex min-h-full items-center"><span>
-          {notice ?? (!canPost ? <>
+          {notice ?? (needsXcp ? t("Must hold 10 XCP to chat.") : !canPost ? <>
             {session.status === "checking" ? t("Verifying wallet…") : session.status === "unauthenticated" ? t("Reconnect your wallet to verify again.") : t("Verify your wallet to chat.")}
             {session.status === "unavailable" && <> {" "}<button type="button" onClick={() => session.retry()} className={`text-purple-600 hover:underline dark:text-purple-400 ${FOCUS}`}>{t("Retry verification")}</button></>}
           </> : lines > CHAT_MAX_LINES ? t("Use at most {max} lines.", { max: CHAT_MAX_LINES })

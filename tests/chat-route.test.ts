@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { GET, POST } from "@/app/api/chat/route";
 import { chatIdentity } from "@/lib/chat-identity";
+import { holdsChatMinimum } from "@/lib/chat-eligibility";
 import { issueSession, SESSION_COOKIE } from "@/lib/session";
 
 vi.mock("@opennextjs/cloudflare", () => ({ getCloudflareContext: vi.fn() }));
+vi.mock("@/lib/chat-eligibility", () => ({ holdsChatMinimum: vi.fn() }));
 
 const address = "bc1qtest-wallet-address";
 const secret = "chat-test-secret-0123456789abcdef0123456789";
@@ -18,6 +20,7 @@ const env = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(getCloudflareContext).mockResolvedValue({ env } as unknown as Awaited<ReturnType<typeof getCloudflareContext>>);
+  vi.mocked(holdsChatMinimum).mockResolvedValue(true);
   publish.mockImplementation(async (post) => ({
     ok: true,
     message: { id: "message-1", authorId: post.authorId, handle: post.handle, text: post.text, createdAt: Date.now() },
@@ -90,6 +93,30 @@ describe("authenticated chat publishing", () => {
     expect(await failed.json()).toEqual({ error: "unavailable" });
   });
 
+  it("refuses a wallet under the XCP minimum before it reaches the room", async () => {
+    vi.mocked(holdsChatMinimum).mockResolvedValueOnce(false);
+    const response = await POST(await request());
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "insufficient_xcp" });
+    expect(holdsChatMinimum).toHaveBeenCalledWith(address);
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("answers an unreadable balance as unavailable, never as a pass or a refusal", async () => {
+    vi.mocked(holdsChatMinimum).mockRejectedValueOnce(new Error("node down"));
+    const response = await POST(await request());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "unavailable" });
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("does not hold configured chat admins to the minimum", async () => {
+    vi.mocked(getCloudflareContext).mockResolvedValue({ env: { ...env, CHAT_ADMIN_ADDRESSES: address } } as unknown as Awaited<ReturnType<typeof getCloudflareContext>>);
+    vi.mocked(holdsChatMinimum).mockResolvedValue(false);
+    expect((await POST(await request())).status).toBe(200);
+    expect(holdsChatMinimum).not.toHaveBeenCalled();
+  });
+
   it("fails closed when the chat identity secret is absent", async () => {
     const req = await request();
     vi.mocked(getCloudflareContext).mockResolvedValue({ env: { ...env, CHAT_HANDLE_SECRET: undefined } } as unknown as Awaited<ReturnType<typeof getCloudflareContext>>);
@@ -104,10 +131,18 @@ describe("chat pseudonyms", () => {
     const response = await GET(new Request("https://xcp.fun/api/chat", { headers: { cookie: req.headers.get("cookie")! } }));
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).toBe("private, no-store");
-    expect(await response.json()).toEqual({ address, ...await chatIdentity(address, secret), isAdmin: false });
+    expect(await response.json()).toEqual({ address, ...await chatIdentity(address, secret), isAdmin: false, holdsMinimum: true });
     expect(env.CHAT_ROOM.get).not.toHaveBeenCalled();
     expect(publish).not.toHaveBeenCalled();
     expect((await GET(new Request("https://xcp.fun/api/chat"))).status).toBe(401);
+  });
+  it("tells the browser whether the wallet holds the minimum, and null when it cannot tell", async () => {
+    const cookie = (await request()).headers.get("cookie")!;
+    const read = async () => (await (await GET(new Request("https://xcp.fun/api/chat", { headers: { cookie } }))).json()).holdsMinimum;
+    vi.mocked(holdsChatMinimum).mockResolvedValueOnce(false);
+    expect(await read()).toBe(false);
+    vi.mocked(holdsChatMinimum).mockRejectedValueOnce(new Error("node down"));
+    expect(await read()).toBeNull();
   });
   it("is stable for the same wallet and secret, with separate identities for different wallets or secrets", async () => {
     const first = await chatIdentity(address, secret);

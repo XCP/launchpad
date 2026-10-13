@@ -730,6 +730,7 @@
   "Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.": "XCP-69 ローンチでのミント・返金・プールや板での約定。「その他」はこれらのイベントと実残高との差分で、送金・受取・バーン・流動性の移動を表します。進行中のミントにはコミット済みの量が表示されます — その XCP はコンセンサスによりエスクローされ、ローンチがソフトキャップに届かなければ自動的に戻ります。",
   "missed the cap, paid back": "キャップ未達、返金済み",
   "More than one wallet is installed. Pick the one to connect with.": "複数のウォレットがインストールされています。接続するものを選んでください。",
+  "Must hold 10 XCP to chat.": "チャットするには10 XCPの保有が必要です。",
   "Name": "名前",
   "Name, image, description. Everything else is the standard.": "名前、画像、説明文。それ以外はすべて標準どおりです。",
   "named assets only, divisible": "名前付きアセットのみ、分割可能",

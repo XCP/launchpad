@@ -2,6 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { isChatRequestId, normalizeChatText, type ChatPost, type ChatPostResult } from "@launchpad/chat";
 import { chatReply as reply, readChatBody as readBody, isChatAdmin } from "@/lib/chat-server";
 import { chatIdentity } from "@/lib/chat-identity";
+import { holdsChatMinimum } from "@/lib/chat-eligibility";
 import { readCookie, readSession, sameOrigin, SESSION_COOKIE } from "@/lib/session";
 
 // A narrow structural binding type keeps Worker implementation code out of
@@ -21,7 +22,11 @@ export async function GET(request: Request) {
     const bindings = env as unknown as { CHAT_HANDLE_SECRET?: string; CHAT_ADMIN_ADDRESSES?: string };
     const secret = bindings.CHAT_HANDLE_SECRET;
     if (!secret) return reply({ error: "unavailable" }, 503);
-    return reply({ address, ...await chatIdentity(address, secret), isAdmin: isChatAdmin(address, bindings.CHAT_ADMIN_ADDRESSES) }, 200);
+    const isAdmin = isChatAdmin(address, bindings.CHAT_ADMIN_ADDRESSES);
+    // Null when the balance could not be read: the composer stays open and
+    // the post itself is checked, rather than locking a holder out on a blip.
+    const holdsMinimum = isAdmin ? true : await holdsChatMinimum(address).catch(() => null);
+    return reply({ address, ...await chatIdentity(address, secret), isAdmin, holdsMinimum }, 200);
   } catch {
     return reply({ error: "unavailable" }, 503);
   }
@@ -52,8 +57,14 @@ export async function POST(request: Request) {
   }
   try {
     const { env } = await getCloudflareContext({ async: true });
-    const bindings = env as unknown as { CHAT_ROOM?: ChatBinding; CHAT_HANDLE_SECRET?: string };
+    const bindings = env as unknown as { CHAT_ROOM?: ChatBinding; CHAT_HANDLE_SECRET?: string; CHAT_ADMIN_ADDRESSES?: string };
     if (!bindings.CHAT_ROOM || !bindings.CHAT_HANDLE_SECRET) return reply({ error: "unavailable" }, 503);
+    // Free identities made bans and cooldowns optional; holding 10 XCP makes
+    // each new identity cost something. An unreadable balance falls through
+    // to the catch below as "unavailable", never as a refusal or a pass.
+    if (!isChatAdmin(address, bindings.CHAT_ADMIN_ADDRESSES) && !await holdsChatMinimum(address)) {
+      return reply({ error: "insufficient_xcp" }, 403);
+    }
     const identity = await chatIdentity(address, bindings.CHAT_HANDLE_SECRET);
     const room = bindings.CHAT_ROOM.get(bindings.CHAT_ROOM.idFromName("global"));
     // Never forward the address, signature, session cookie or client-supplied

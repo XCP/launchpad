@@ -730,6 +730,7 @@
   "Mints, refunds, and pool or order-book fills on XCP-69 launches. “Other” reconciles those events to the live balance and can represent a send, receive, burn, or liquidity movement. An open mint shows what you've committed — that XCP is escrowed by consensus and comes back automatically if the launch misses its soft cap.": "XCP-69 런칭의 민팅, 환불, 풀 또는 호가창 체결입니다. “기타”는 이 이벤트들을 실시간 잔액과 맞추는 항목으로 전송, 수신, 소각, 유동성 이동일 수 있습니다. 진행 중인 민팅에는 투입한 금액이 표시됩니다 — 그 XCP는 합의에 따라 에스크로되며 런칭이 소프트캡에 미달하면 자동으로 돌아옵니다.",
   "missed the cap, paid back": "소프트캡 미달, 환불 완료",
   "More than one wallet is installed. Pick the one to connect with.": "지갑이 여러 개 설치되어 있습니다. 연결할 지갑을 선택하세요.",
+  "Must hold 10 XCP to chat.": "채팅하려면 10 XCP를 보유해야 합니다.",
   "Name": "이름",
   "Name, image, description. Everything else is the standard.": "이름, 이미지, 설명. 나머지는 전부 표준입니다.",
   "named assets only, divisible": "이름 있는 자산만, 분할 가능",
