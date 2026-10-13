@@ -94,14 +94,14 @@ function useChatState() {
   const session = useSession();
   const address = wallet.status === "connected" && wallet.address && session.address === wallet.address ? wallet.address : null;
   const room = useChat(active);
-  const { identity, rememberIdentity } = useChatIdentity(active, address);
+  const { identity, rememberIdentity, markBelowMinimum } = useChatIdentity(active, address);
   const acceptMessage = (message: ChatMessage) => {
     room.acceptMessage(message);
     if (address) rememberIdentity({ address, authorId: message.authorId, handle: message.handle });
   };
   const moderation = useChatModeration(identity);
   const [showBanned, setShowBanned] = useState(false);
-  return { ...room, acceptMessage, identity, moderation, showBanned, setShowBanned, desktop, expanded, collapsed, setCollapsed, open, setOpen, drafts, rememberDraft, navigateAsset, registerRoute };
+  return { ...room, acceptMessage, identity, markBelowMinimum, moderation, showBanned, setShowBanned, desktop, expanded, collapsed, setCollapsed, open, setOpen, drafts, rememberDraft, navigateAsset, registerRoute };
 }
 
 /** The locale layout survives asset page changes; the page only owns its UI. */

@@ -212,6 +212,15 @@ describe("chat writes require the current verified wallet", () => {
     expect(input().value).toBe("still here"); expect(button("Send").disabled).toBe(true);
   });
 
+  it("re-checks the minimum when chat reopens, so a top-up lets the wallet post", async () => {
+    boundary.identity.mockResolvedValue(Response.json({ address: "wallet-one", authorId: "a".repeat(64), handle: HANDLE_A, isAdmin: false, holdsMinimum: false }));
+    await render(); expect(document.body.textContent).toContain("Must hold 10 XCP to chat.");
+    boundary.identity.mockResolvedValue(Response.json({ address: "wallet-one", authorId: "a".repeat(64), handle: HANDLE_A, isAdmin: false, holdsMinimum: true }));
+    await click(button("Collapse chat")); await click(button("Open chat"));
+    expect(document.body.textContent).not.toContain("Must hold 10 XCP to chat.");
+    await type("topped up"); expect(button("Send").disabled).toBe(false);
+  });
+
   it("preserves a failed message and reuses its request ID on retry", async () => {
     boundary.fetch.mockRejectedValueOnce(new Error("connection lost"));
     await render(); await type("retry this exact message"); await submit();

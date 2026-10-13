@@ -197,12 +197,10 @@ function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, be
   const num = useNumbers();
   const wallet = useWallet();
   const session = useSession();
+  const { markBelowMinimum } = useChatContext();
   const verified = wallet.status === "connected" && !!wallet.address && session.address === wallet.address;
-  // A refusal on send closes the composer too, for a balance that fell after
-  // chat opened. Reopening chat re-asks, so a top-up reopens it.
-  const [refused, setRefused] = useState(false);
-  const short = verified && (belowMinimum || refused);
-  const canPost = verified && !short;
+  const needsXcp = verified && belowMinimum;
+  const canPost = verified && !needsXcp;
   const draftKey = wallet.address ?? "guest";
   const memory = drafts[draftKey];
   const [draft, setDraft] = useState(memory?.draft ?? "");
@@ -313,7 +311,7 @@ function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, be
         setError(t("Reconnect your wallet to verify again."));
         session.invalidate();
       } else if (result.error === "insufficient_xcp") {
-        setRefused(true);
+        markBelowMinimum();
       } else if (result.error === "rate_limited") {
         const retryAfter = typeof result.retryAfter === "number" && Number.isFinite(result.retryAfter) ? Math.max(1, Math.min(3600, result.retryAfter)) : CHAT_COOLDOWN_MS / 1000;
         setNow(Date.now()); setCooldownUntil(Date.now() + retryAfter * 1000);
@@ -346,7 +344,7 @@ function ChatComposer({ acceptMessage, ref, drafts, rememberDraft, ownHandle, be
           aria-label={seconds > 0 && !notice && canPost ? t("Wait {n}s before sending again.", { n: num.commas(seconds) }) : undefined}
           className="h-6 min-w-0 flex-1 overflow-y-auto text-[11px] leading-3 text-gray-500 outline-none dark:text-gray-400">
           <div className="flex min-h-full items-center"><span>
-          {notice ?? (short ? t("Must hold 10 XCP to chat.") : !canPost ? <>
+          {notice ?? (needsXcp ? t("Must hold 10 XCP to chat.") : !canPost ? <>
             {session.status === "checking" ? t("Verifying wallet…") : session.status === "unauthenticated" ? t("Reconnect your wallet to verify again.") : t("Verify your wallet to chat.")}
             {session.status === "unavailable" && <> {" "}<button type="button" onClick={() => session.retry()} className={`text-purple-600 hover:underline dark:text-purple-400 ${FOCUS}`}>{t("Retry verification")}</button></>}
           </> : lines > CHAT_MAX_LINES ? t("Use at most {max} lines.", { max: CHAT_MAX_LINES })

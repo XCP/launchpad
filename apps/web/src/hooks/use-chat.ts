@@ -114,7 +114,9 @@ export function useMutedChatAuthors() {
   };
 }
 
-export interface ChatIdentity { address: string; authorId: string; handle: string; isAdmin: boolean; holdsMinimum?: boolean | null }
+export interface ChatIdentity { address: string; authorId: string; handle: string; isAdmin: boolean;
+  /** Whether the wallet holds the chat minimum; null when the server could not tell. Display only: the server checks every post. */
+  holdsMinimum: boolean | null }
 export function useChatIdentity(active: boolean, address: string | null) {
   const [identity, setIdentity] = useState<ChatIdentity | null>(null);
   const [resolvedAddress, setResolvedAddress] = useState<string | null>(null);
@@ -147,7 +149,9 @@ export function useChatIdentity(active: boolean, address: string | null) {
     // An accepted post is proof the server let this wallet in.
     holdsMinimum: true,
   }));
-  return { identity: identity?.address === address ? identity : null, rememberIdentity };
+  /** A post refused for the minimum. Reopening chat re-asks. */
+  const markBelowMinimum = () => setIdentity((previous) => previous?.address === address ? { ...previous, holdsMinimum: false } : previous);
+  return { identity: identity?.address === address ? identity : null, rememberIdentity, markBelowMinimum };
 }
 
 /** Moderation is explicit and private: no background list polling. */
