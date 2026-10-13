@@ -20,12 +20,12 @@ export function AddressBadges({
   address,
   issuerSource,
   collections,
-  maxChips = 6,
+  maxChips = 3,
 }: {
   address: string;
   issuerSource?: string;
   collections?: string[];
-  /** Collection flair slots, including the overflow count; identity badges remain separate. */
+  /** Visible collection badges before the overflow count; identity badges remain separate. */
   maxChips?: number;
 }) {
   const t = useT();
@@ -46,12 +46,12 @@ export function AddressBadges({
   );
 }
 
-/** Reserve the final slot for a count when the row exceeds its limit.
+/** Show up to the badge limit, then a count for any additional collections.
  *  The count's tooltip names every remaining collection. */
 function CollectionChips({ tags, maxChips }: { tags: string[]; maxChips: number }) {
   const t = useT();
   const matched = COLLECTIONS.filter((c) => tags.includes(c.tag));
-  const shown = matched.length <= maxChips ? matched : matched.slice(0, maxChips - 1);
+  const shown = matched.slice(0, maxChips);
   const rest = matched.slice(shown.length);
   return (
     <>
