@@ -27,25 +27,18 @@ afterAll(async () => { await mf.dispose(); });
 /**
  * The two cases below drive a REAL close handshake: a Node client, the HTTP
  * upgrade, workerd's own hibernation machinery, and the close frame coming
- * back. They pass on a developer machine and fail inside the CI container,
- * where both routes close 1006 within milliseconds — the connection opens,
- * and the client never sees a close frame at all.
- *
- * That is workerd's handshake rather than ours, and the part that IS ours is
- * covered unconditionally by the `closeWebSocket` cases below: which codes it
- * refuses to send and which it passes through. So these two are skipped where
- * they cannot run rather than being loosened into an assertion that would
- * accept the broken result, which would leave nothing testing the thing they
- * exist for. Run them locally, and delete this guard if a later miniflare
- * makes them work in a container.
+ * back. The part that is ours, which codes `closeWebSocket` refuses to send
+ * and which it passes through, is also covered without a server below.
  */
-const handshake = process.env.CI ? it.skip : it;
-
 describe("hibernating WebSocket close handshakes", () => {
-  handshake.each(["COIN?fm=test", "presence"])("acknowledges normal close for %s", async (route) => {
+  it.each(["COIN?fm=test", "presence"])("acknowledges normal close for %s", async (route) => {
     const ws = new WebSocket(origin + route);
+    // Close after the server's first frame, as a real client would. Node's
+    // built-in client reports 1006 when it closes while that frame is still
+    // arriving; the `ws` client gets a clean 1000 against the same server,
+    // so that race is the client's, not workerd's or ours.
     await new Promise<void>((resolve, reject) => {
-      ws.addEventListener("open", () => resolve(), { once: true });
+      ws.addEventListener("message", () => resolve(), { once: true });
       ws.addEventListener("error", reject, { once: true });
     });
     const closed = new Promise<{ code: number; wasClean: boolean }>((resolve, reject) => {
