@@ -10,6 +10,7 @@ import type { CounterpartyEvent } from "@launchpad/xcp69/trades";
 import {
   acquireCounterpartyRead,
   assertCounterpartyReadAllowed,
+  COUNTERPARTY_READ_TIMEOUT_MS,
   CounterpartyReadDeferred,
   recordCounterpartyCooldown,
 } from "#api/integrations/cooldown";
@@ -45,14 +46,20 @@ export function counterpartyApiBase(): string {
 }
 
 async function get<T>(path: string): Promise<T> {
-  const signal = AbortSignal.timeout(15_000);
-  const release = await acquireCounterpartyRead(signal);
+  const startedAt = Date.now();
+  const deadline = startedAt + COUNTERPARTY_READ_TIMEOUT_MS;
+  const signal = AbortSignal.timeout(COUNTERPARTY_READ_TIMEOUT_MS);
+  let release: (() => void) | undefined;
+  let stage = "admission";
   try {
+    release = await acquireCounterpartyRead(signal, deadline);
     // A concurrent response may establish a cooldown after this read joined
     // the queue. Check again immediately before starting its own request.
     assertCounterpartyReadAllowed();
     signal.throwIfAborted();
+    stage = "fetch";
     const res = await fetch(freshCounterpartyUrl(`${base}${path}`), { signal });
+    stage = "body";
     if (!res.ok) {
       if (res.status === 429) recordCounterpartyCooldown(res.headers.get("retry-after"));
       // A Worker holds six outbound connections, and a Response whose body is
@@ -68,8 +75,14 @@ async function get<T>(path: string): Promise<T> {
     // hard cap sits above. Parse losslessly so unsafe magnitudes survive as
     // strings instead of silently drifting, the same way the web app does.
     return parseJsonLossless<T>(await res.text());
+  } catch (error) {
+    if (signal.aborted) console.warn({
+      event: "counterparty_read_timeout", path: path.split("?")[0], stage,
+      duration_ms: Date.now() - startedAt,
+    });
+    throw error;
   } finally {
-    release();
+    release?.();
   }
 }
 

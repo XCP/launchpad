@@ -3,34 +3,54 @@
  * it does not claim to coordinate every Worker in the account. */
 let notBefore = 0;
 const DEFAULT_COOLDOWN_MS = 30_000;
+export const COUNTERPARTY_READ_TIMEOUT_MS = 15_000;
 const READ_LIMIT = 2;
-let active = 0;
+const active = new Map<() => void, number>();
 const queued: Array<{ admit: () => void; reject: (error: unknown) => void }> = [];
 
 function drain(): void {
+  // Workers can cancel an invocation without running its timers or finally
+  // blocks. A later invocation must not wait forever on its abandoned slots.
+  // Reap by wall time as well as listening for aborts in a live invocation.
+  const now = Date.now();
+  let expired = 0;
+  for (const [cleanup, deadline] of active) {
+    if (deadline <= now) {
+      active.delete(cleanup);
+      cleanup();
+      expired++;
+    }
+  }
+  if (expired > 0) console.warn({ event: "counterparty_read_slots_expired", count: expired });
   if (Date.now() < notBefore) {
     for (const waiting of queued.splice(0)) waiting.reject(new CounterpartyReadDeferred(notBefore));
     return;
   }
-  while (active < READ_LIMIT && queued.length > 0) queued.shift()!.admit();
-}
-
-function release(): void {
-  active--;
-  drain();
+  while (active.size < READ_LIMIT && queued.length > 0) queued.shift()!.admit();
 }
 
 /** The existing read timeout includes admission, so a queue cannot add a
  * second timeout window to work running under the indexer's lease. Only
  * permits are shared; responses and fetch promises belong to their caller. */
-export function acquireCounterpartyRead(signal: AbortSignal): Promise<() => void> {
+export function acquireCounterpartyRead(signal: AbortSignal, deadline: number): Promise<() => void> {
   assertCounterpartyReadAllowed();
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
     const waiting = {
       admit() {
         signal.removeEventListener("abort", abort);
-        active++;
+        if (signal.aborted || deadline <= Date.now()) {
+          reject(signal.reason ?? new DOMException("Counterparty read deadline expired", "TimeoutError"));
+          return;
+        }
+        const cleanup = () => signal.removeEventListener("abort", release);
+        const release = () => {
+          cleanup();
+          // A late finally must not release a replacement read's slot.
+          if (active.delete(cleanup)) drain();
+        };
+        active.set(cleanup, deadline);
+        signal.addEventListener("abort", release, { once: true });
         resolve(release);
       },
       reject(error: unknown) {

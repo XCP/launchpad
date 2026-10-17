@@ -165,4 +165,38 @@ describe("the API refuses reads during Counterparty's cooldown without waiting",
     expect(timeout.mock.calls).toEqual([[15_000], [15_000], [15_000]]);
     timeout.mockRestore();
   });
+
+  it("reclaims abandoned slots without letting late cleanup release their replacements", async () => {
+    const { acquireCounterpartyRead } = await import("#api/integrations/cooldown");
+    const abandoned = await Promise.all(Array.from({ length: 2 }, () =>
+      acquireCounterpartyRead(new AbortController().signal, NOW + 1_000)));
+    // An invocation ended: neither its abort timer nor its finally will run.
+    vi.setSystemTime(NOW + 1_001);
+    const replacements = await Promise.all(Array.from({ length: 2 }, () =>
+      acquireCounterpartyRead(new AbortController().signal, NOW + 2_000)));
+    let admitted = false;
+    const next = acquireCounterpartyRead(new AbortController().signal, NOW + 2_000)
+      .then(release => { admitted = true; return release; });
+    abandoned.forEach(release => release());
+    await Promise.resolve();
+    expect(admitted).toBe(false);
+    replacements[0]!();
+    const release = await next;
+    expect(admitted).toBe(true);
+    release();
+    replacements[1]!();
+  });
+
+  it("releases an admitted read on abort even if its body never settles", async () => {
+    const { acquireCounterpartyRead } = await import("#api/integrations/cooldown");
+    const controller = new AbortController();
+    const first = await acquireCounterpartyRead(controller.signal, NOW + 1_000);
+    const second = await acquireCounterpartyRead(new AbortController().signal, NOW + 1_000);
+    const next = acquireCounterpartyRead(new AbortController().signal, NOW + 1_000);
+    controller.abort();
+    const release = await next;
+    first();
+    second();
+    release();
+  });
 });
