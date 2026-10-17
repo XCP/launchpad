@@ -776,6 +776,7 @@ export function LaunchView({
       <LaunchRoomProvider asset={asset} fairminterTxHash={fm.tx_hash} enabled>
       <ActivityTabs
         asset={asset}
+        burnedQuantity={burnedQuantity}
         mints={mints}
         divisible={fm.divisible}
         issuerSource={fm.source}

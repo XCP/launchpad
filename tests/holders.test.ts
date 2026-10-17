@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 import {
+  BURNED_ROW,
+  withBurnedRow,
   coalesceHolderBalances,
   currentHolderCount,
   includeFormerHolders,
 } from "@/lib/holders";
 
 describe("holder balances", () => {
+  it("combines burns and destructions without counting the burn balance twice", () => {
+    const rows = withBurnedRow([{address:"alice",quantity:70n},{address:"burn",quantity:10n}], "burn", "30");
+    expect(rows).toEqual([{address:"alice",quantity:70n},{address:BURNED_ROW,quantity:30n}]);
+    expect(currentHolderCount(rows)).toBe(1);
+    expect(rows.reduce((sum,row)=>sum+row.quantity,0n)).toBe(100n);
+  });
+  it("shows destruction-only totals even without a burn-address balance", () => {
+    expect(withBurnedRow([], "burn", "123456789012345678")).toEqual([{address:BURNED_ROW,quantity:123456789012345678n}]);
+  });
+  it("hides zero burns and does not mistake a reserved burn-address balance for a burn", () => {
+    expect(withBurnedRow([{address:"burn",quantity:10n}], "burn", "0")).toEqual([]);
+  });
   it("counts positive owners while retaining sold-out rows", () => {
     const rows = coalesceHolderBalances([
       { address: "alice", utxo: null, quantity: "50" },

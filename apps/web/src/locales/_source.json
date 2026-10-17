@@ -1065,6 +1065,9 @@
   "burn address": [
     "app/[lang]/[asset]/_components/address-badges.tsx"
   ],
+  "Burned": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
   "Burner": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
@@ -1982,6 +1985,9 @@
   ],
   "In XCP terms, exactly. In fiat terms, only if XCP's price held during the week-long window. Refunds return quantity, not value.": [
     "app/[lang]/faq/page.tsx"
+  ],
+  "Includes tokens sent to the burn address and explicitly destroyed tokens.": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "Inscribe the image on-chain.": [
     "app/[lang]/create/page.tsx"
