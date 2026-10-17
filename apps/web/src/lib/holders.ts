@@ -12,6 +12,17 @@ export interface HolderRow {
   quantity: bigint;
 }
 
+export const BURNED_ROW = "__burned__";
+
+/** The indexed total already combines confirmed burn sends and destructions.
+ * Replace the burn-address balance; adding it would count sends twice. */
+export function withBurnedRow(rows: HolderRow[], burnAddress: string, burnedQuantity: Raw): HolderRow[] {
+  const result = rows.filter(row => row.address !== burnAddress && row.address !== BURNED_ROW);
+  const quantity = big(burnedQuantity);
+  if (quantity > 0n) result.push({ address: BURNED_ROW, quantity });
+  return result.sort((a, b) => compareRawDesc(a.quantity, b.quantity));
+}
+
 /**
  * One row per ownership location, including locations whose live balance is
  * zero. Counterparty can return an address more than once (for example an
@@ -37,7 +48,7 @@ export function currentHolderCount(
   rows: HolderRow[],
   excludedAddresses: Iterable<string> = [],
 ): number {
-  const excluded = new Set(excludedAddresses);
+  const excluded = new Set([BURNED_ROW, ...excludedAddresses]);
   return rows.filter((row) => row.quantity > 0n && !excluded.has(row.address)).length;
 }
 

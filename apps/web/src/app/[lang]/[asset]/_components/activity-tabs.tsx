@@ -39,6 +39,8 @@ import { createTradeHistoryReader, tradeFingerprint } from "@/lib/api/trade-hist
 import { xcpOrderRemaining } from "@/lib/order-legs";
 import { tradeRoleForAddress } from "@launchpad/xcp69/trades";
 import {
+  BURNED_ROW,
+  withBurnedRow,
   currentHolderCount,
   includeFormerHolders,
   poolLockStatus,
@@ -102,8 +104,10 @@ export function ActivityTabs({
   poolXcpRaw,
   poolTokensRaw,
   lpAsset,
+  burnedQuantity = "0",
 }: {
   asset: string;
+  burnedQuantity?: Raw;
   mints: Fairmint[];
   divisible: boolean;
   /** During the sale there is no market yet: no trades, no book. */
@@ -221,14 +225,14 @@ export function ActivityTabs({
   // Counterparty's balance endpoint is a live snapshot, not holder history.
   // Restore absent minters/traders at zero so the table can show who sold out,
   // while the tab/header/card counts above remain strictly current balances.
-  const holderHistory = includeFormerHolders(
+  const holderHistory = withBurnedRow(includeFormerHolders(
     holders ?? [],
     [
       ...mints.map((mint) => mint.source),
       ...(roomState?.trades ?? []).map((trade) => trade.address),
       ...(trades ?? []).map((trade) => trade.addr),
     ],
-  );
+  ), BURN_ADDRESS, burnedQuantity);
   // One row: the pool is a single concentration of supply, and how much of it
   // is locked is a property OF that row, not a second holder.
   const poolLock = poolLockStatus(
@@ -245,11 +249,11 @@ export function ActivityTabs({
       : holderHistory;
   const holderBalance = new Map(
     holderRows
-      .filter((row) => row.address !== POOL_ROW)
+      .filter((row) => row.address !== POOL_ROW && row.address !== BURNED_ROW)
       .map((row) => [row.address, row.quantity]),
   );
-  // Shares are of circulating PLUS the locked pool, which is what makes them
-  // read as shares of supply rather than of whatever is left over.
+  // Display shares include the pool and removed tokens once, so destruction
+  // doesn't make the remaining holders' shares of this distribution inflate.
   const holderTotal = sumRaw(holderRows.map((h) => h.quantity));
 
   /**
@@ -454,7 +458,7 @@ export function ActivityTabs({
     tab === "minters"
       ? minters.slice(from, from + PER_PAGE).map((r) => r.source)
       : tab === "holders"
-        ? holderRows.slice(from, from + PER_PAGE).map((h) => h.address)
+        ? holderRows.slice(from, from + PER_PAGE).filter(h => h.address !== POOL_ROW && h.address !== BURNED_ROW).map((h) => h.address)
         : [],
   );
 
@@ -837,6 +841,7 @@ export function ActivityTabs({
               {holderRows.slice(from, from + PER_PAGE).map((h, i) => {
                 const pct = ratio(h.quantity, holderTotal) * 100;
                 const isPool = h.address === POOL_ROW;
+                const isBurned = h.address === BURNED_ROW;
                 const isUtxo = h.address.startsWith("utxo:");
                 const soldOut = h.quantity === 0n;
                 const displayedQuantity = tokenQty(h.quantity, divisible);
@@ -858,7 +863,11 @@ export function ActivityTabs({
                       <span className="w-8 text-right text-xs text-gray-400 dark:text-gray-500">
                         {from + i + 1}
                       </span>
-                      {isPool ? (
+                      {isBurned ? (
+                        <span className="font-sans font-medium text-orange-600 dark:text-orange-400" title={t("Includes tokens sent to the burn address and explicitly destroyed tokens.")}>
+                          <span aria-hidden>🔥 </span>{t("Burned")}
+                        </span>
+                      ) : isPool ? (
                         <>
                           {/* The chip follows the LP, not the pool. Liquidity
                               whose LP is burned can never be withdrawn; whatever
@@ -923,11 +932,11 @@ export function ActivityTabs({
                           doesn't mean anything for a holder who bought in
                           on the market; only the issuer's own row is a
                           fact worth flagging post-graduation. */}
-                      <AddressBadges
+                      {!isBurned && <AddressBadges
                         address={h.address}
                         issuerSource={issuerSource}
                         collections={collections?.get(h.address)}
-                      />
+                      />}
                     </span>
                     <span className="relative z-10 ml-auto shrink-0 whitespace-nowrap text-gray-900 dark:text-gray-100">
                       {soldOut ? (
