@@ -1297,5 +1297,6 @@
   "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": "{asset} 인스크립션의 커밋은 온체인에 올라가지 못했고, 커밋이 사용하는 코인 하나가 이후 다른 확정된 트랜잭션에서 사용되어 앞으로도 올라갈 수 없습니다. 리빌을 기다리는 BTC는 없으며, 새 런칭을 시작할 수 있습니다.",
   "No expiry": "만료 없음",
   "Burned": "소각됨",
-  "Includes tokens sent to the burn address and explicitly destroyed tokens.": "소각 주소로 전송된 토큰과 명시적으로 파기된 토큰을 포함합니다."
+  "Includes tokens sent to the burn address and explicitly destroyed tokens.": "소각 주소로 전송된 토큰과 명시적으로 파기된 토큰을 포함합니다.",
+  "Destroyed": "파기됨"
 }

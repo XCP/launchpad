@@ -1539,6 +1539,9 @@
   "Destination": [
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
+  "Destroyed": [
+    "app/[lang]/[asset]/_components/activity-tabs.tsx"
+  ],
   "dev": [
     "app/[lang]/[asset]/_components/address-badges.tsx"
   ],
