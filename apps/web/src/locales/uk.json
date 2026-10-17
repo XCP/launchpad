@@ -1297,5 +1297,6 @@
   "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": "Commit інскрипції {asset} так і не потрапив у блокчейн, а одну з монет, які він витрачає, уже витратила інша підтверджена транзакція, тож він туди ніколи не потрапить. Жодні його BTC не чекають на reveal, і можна почати новий запуск.",
   "No expiry": "Безстроково",
   "Burned": "Спалено",
-  "Includes tokens sent to the burn address and explicitly destroyed tokens.": "Включає токени, надіслані на адресу спалювання, і токени, знищені явно."
+  "Includes tokens sent to the burn address and explicitly destroyed tokens.": "Включає токени, надіслані на адресу спалювання, і токени, знищені явно.",
+  "Destroyed": "Знищено"
 }

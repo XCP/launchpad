@@ -864,9 +864,14 @@ export function ActivityTabs({
                         {from + i + 1}
                       </span>
                       {isBurned ? (
-                        <span className="font-sans font-medium text-orange-600 dark:text-orange-400" title={t("Includes tokens sent to the burn address and explicitly destroyed tokens.")}>
-                          <span aria-hidden>🔥 </span>{t("Burned")}
-                        </span>
+                        <>
+                          <span className="font-sans font-medium text-gray-900 dark:text-gray-100">
+                            <span aria-hidden>🔥 </span>{t("Burned")}
+                          </span>
+                          <span className="shrink-0 rounded-full border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/40 px-1.5 py-px text-[10px] font-medium text-orange-600 dark:text-orange-400" title={t("Includes tokens sent to the burn address and explicitly destroyed tokens.")}>
+                            {t("Destroyed")}
+                          </span>
+                        </>
                       ) : isPool ? (
                         <>
                           {/* The chip follows the LP, not the pool. Liquidity

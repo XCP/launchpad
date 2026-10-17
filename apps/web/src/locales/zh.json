@@ -1297,5 +1297,6 @@
   "The inscription commit for {asset} never made it on-chain, and a coin it spends has since been spent by another confirmed transaction, so it never will. None of its BTC is waiting on a reveal, and you can start a new launch.": "{asset} 铭刻的 commit 始终没有上链，而它花费的一枚币已被另一笔已确认的交易花掉，所以它永远不会上链。它的 BTC 没有在等待 reveal，你可以开始新的发射。",
   "No expiry": "永不过期",
   "Burned": "已销毁",
-  "Includes tokens sent to the burn address and explicitly destroyed tokens.": "包括发送到销毁地址的代币和通过销毁交易销毁的代币。"
+  "Includes tokens sent to the burn address and explicitly destroyed tokens.": "包括发送到销毁地址的代币和通过销毁交易销毁的代币。",
+  "Destroyed": "已销毁"
 }
