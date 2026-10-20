@@ -1,0 +1,35 @@
+{
+  "name": "xcp.fun",
+  "short_name": "xcp.fun",
+  "description": "Discover Counterparty token launches and community projects on Bitcoin.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#09090b",
+  "categories": [
+    "finance",
+    "counterparty"
+  ],
+  "icons": [
+    {
+      "src": "/wallet-app/icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "wallet": {
+    "version": "1",
+    "subtitle": "Counterparty launches",
+    "heroImageUrl": "/wallet-app/banner.png",
+    "splashImageUrl": "/wallet-app/splash.png",
+    "chains": {
+      "optional": [
+        "bip122:000000000019d6689c085ae165831e93"
+      ]
+    },
+    "capabilities": {
+      "optional": ["provider.bitcoin"]
+    }
+  }
+}

@@ -134,7 +134,7 @@ export function SiteHeader() {
         <div className={`flex shrink-0 items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 min-[360px]:gap-4 ${layout === "tight-nav" ? "nav:gap-3 min-[1340px]:gap-4" : ""}`}>
           {/* Telegram uses its icon on phones and in translated headers.
               Status chips take turns here to leave room for the menu. */}
-          <span className="flex items-center gap-1 min-[360px]:gap-2 nav:hidden">
+          <span className={`flex items-center gap-1 min-[360px]:gap-2 nav:hidden ${process.env.NEXT_PUBLIC_CASATOOKAN_ENABLED === "true" ? "max-sm:hidden" : ""}`}>
             {queued ? <MempoolChip className="max-[360px]:gap-1 max-[360px]:px-2" /> : <RewardsChip />}
             <TelegramChip />
           </span>
@@ -148,7 +148,7 @@ export function SiteHeader() {
           <div className="hidden nav:block min-[1340px]:hidden">
             <LanguageSwitch compact />
           </div>
-          <div className="hidden nav:block">
+          <div className={process.env.NEXT_PUBLIC_CASATOOKAN_ENABLED === "true" ? "" : "hidden nav:block"}>
             <HeaderWallet />
           </div>
           <MobileMenu />

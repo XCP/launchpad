@@ -1355,6 +1355,9 @@
     "components/connect-button.tsx",
     "components/header-wallet.tsx"
   ],
+  "Connect a wallet that supports this inscription reveal to finish the launch.": [
+    "app/[lang]/create/page.tsx"
+  ],
   "Connect a wallet to chat.": [
     "components/chat-panel.tsx"
   ],
@@ -3864,6 +3867,9 @@
     "app/[lang]/create/page.tsx"
   ],
   "Upload token image": [
+    "app/[lang]/create/page.tsx"
+  ],
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": [
     "app/[lang]/create/page.tsx"
   ],
   "Use at most {max} lines.": [

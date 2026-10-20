@@ -19,7 +19,7 @@ import { useT } from "@/lib/i18n/client";
  */
 export function HeaderWallet() {
   const t = useT();
-  const { status, address, proofStatus } = useWallet();
+  const { status, address, proofStatus, connecting, connectError } = useWallet();
   const menu = useWalletMenu();
   const { accounts, switchAccount, disconnect } = menu;
   /**
@@ -70,17 +70,20 @@ export function HeaderWallet() {
   // — and that read is synchronous from localStorage, so it lands within a
   // frame of hydration rather than after a round trip.
   return (
-    <div className="flex shrink-0 justify-end">
+    <div className="relative flex shrink-0 justify-end">
       {!connected ? (
         <>
           <button
             type="button"
             onClick={onClick}
+            disabled={connecting}
+            aria-busy={connecting}
             className="rounded-md bg-purple-600 px-3 py-1.5 text-white hover:bg-purple-500"
           >
             {t("Connect")}
           </button>
           {installPrompt}
+          {connectError && <p role="alert" className="absolute right-0 top-full z-50 mt-2 w-64 rounded-lg border border-red-200 bg-white p-3 text-sm text-red-700 dark:border-red-900 dark:bg-gray-900 dark:text-red-400">{connectError}</p>}
         </>
       ) : (
         <P.Root>

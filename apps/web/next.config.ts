@@ -5,6 +5,13 @@ import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 void initOpenNextCloudflareForDev();
 
 const nextConfig: NextConfig = {
+  async headers() {
+    return [
+      { source: "/.well-known/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
+      { source: "/.well-known/wallet-app.json", headers: [{ key: "Content-Type", value: "application/json; charset=utf-8" }] },
+      { source: "/wallet-app/:path*", headers: [{ key: "Access-Control-Allow-Origin", value: "*" }] },
+    ];
+  },
   reactCompiler: true,
   /**
    * How long one page may take to prerender, in seconds.

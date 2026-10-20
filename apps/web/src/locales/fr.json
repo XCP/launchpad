@@ -1298,5 +1298,7 @@
   "No expiry": "Sans expiration",
   "Burned": "Brûlés",
   "Includes tokens sent to the burn address and explicitly destroyed tokens.": "Comprend les tokens envoyés à l’adresse de destruction et les tokens explicitement détruits.",
-  "Destroyed": "Détruits"
+  "Destroyed": "Détruits",
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": "Utilisez un portefeuille compatible avec les inscriptions d’images, ou lancez avec une image hébergée.",
+  "Connect a wallet that supports this inscription reveal to finish the launch.": "Connectez un portefeuille compatible avec la révélation de cette inscription pour terminer le lancement."
 }

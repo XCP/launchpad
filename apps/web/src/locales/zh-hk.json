@@ -1298,5 +1298,7 @@
   "No expiry": "永不過期",
   "Burned": "已銷毀",
   "Includes tokens sent to the burn address and explicitly destroyed tokens.": "包括傳送到銷毀地址的代幣及透過銷毀交易銷毀的代幣。",
-  "Destroyed": "已銷毀"
+  "Destroyed": "已銷毀",
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": "請使用支援圖片銘文的錢包，或使用託管圖片發行。",
+  "Connect a wallet that supports this inscription reveal to finish the launch.": "請連接支援此銘文揭示交易的錢包以完成發行。"
 }
