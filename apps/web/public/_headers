@@ -1,0 +1,9 @@
+
+/.well-known/*
+  Access-Control-Allow-Origin: *
+
+/.well-known/wallet-app.json
+  Content-Type: application/json; charset=utf-8
+
+/wallet-app/*
+  Access-Control-Allow-Origin: *
