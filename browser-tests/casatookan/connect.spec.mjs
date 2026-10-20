@@ -7,6 +7,7 @@ const enabled = process.env.CASATOOKAN_TEST_ENABLED !== 'false'
 const address = 'bc1qvux25709r4uw6rzc8wyl7wwecjdhrx085hm5ty'
 const publicKey = '0256b328b30c8bf5839e24058747879408bdb36241dc9c2e7c619faa12b2920967'
 const taproot = 'bc1pfqarxerx6v0zh6zcj2f3a3np8jselxn8vgefdx95c0n328qpzg4ssw6kv5'
+const unsupported = '3N722gUQ2YmphkTzm9nsgD8rkxh1xvukYC'
 const header = page => page.getByRole('banner')
 const connect = page => header(page).getByRole('button', { name: 'Conectar', exact: true }).first()
 const account = page => header(page).getByText(/bc1q.*5ty/).filter({ visible: true }).first()
@@ -16,7 +17,7 @@ async function bridge(page, options = {}) {
     const signature = secp256k1.sign(legacyMessageHash(message), new Uint8Array(32).fill(9))
     return Buffer.from([31 + signature.recovery, ...signature.toCompactRawBytes()]).toString('base64')
   })
-  await page.addInitScript(({ address, publicKey, taproot, options }) => {
+  await page.addInitScript(({ address, publicKey, taproot, unsupported, options }) => {
     const listeners = new Map()
     const state = {
       requests: 0, signatures: 0, psbts: 0, reject: false, unsupported: false,
@@ -35,9 +36,9 @@ async function bridge(page, options = {}) {
               if (state.reject) throw { code: 4001, message: 'User rejected connection' }
               state.granted = true
               sessionStorage.setItem('casa-grant', 'yes')
-              return [state.unsupported ? taproot : address]
+              return [state.unsupported ? unsupported : options.taproot ? taproot : address]
             },
-            getAccounts: async () => state.granted ? [state.unsupported ? taproot : address] : [],
+            getAccounts: async () => state.granted ? [state.unsupported ? unsupported : options.taproot ? taproot : address] : [],
             getPublicKey: async () => publicKey,
             getNetwork: async () => 'livenet',
             signMessage: async message => { state.signatures++; return window.signCasaProof(message) },
@@ -54,7 +55,7 @@ async function bridge(page, options = {}) {
     window.casaTest = state
     if (!options.delay) state.inject()
     if (options.competing) window.HorizonWalletProvider = { request: async () => { throw new Error('Wrong wallet selected') } }
-  }, { address, publicKey, taproot, options })
+  }, { address, publicKey, taproot, unsupported, options })
   for (const host of ['api.xcp.io', 'api.xcp.fun', 'mempool.space', 'api.digirare.com']) {
     await page.route('https://' + host + '/**', route => route.fulfill({ status: 503, json: { error: 'API disabled in wallet connection test' } }))
   }
@@ -102,11 +103,18 @@ test.describe('enabled pilot', () => {
     await expect(header(page).getByRole('alert')).toBeVisible()
     await page.evaluate(() => { window.casaTest.reject = false; window.casaTest.unsupported = true })
     await connect(page).click()
-    await expect(header(page).getByRole('alert')).toContainText('Legacy or Native SegWit')
+    await expect(header(page).getByRole('alert')).toContainText('Legacy, Native SegWit or BIP-86 Taproot')
     await page.evaluate(() => { window.casaTest.unsupported = false })
     await connect(page).click()
     await expect(account(page)).toBeVisible()
     await expect(header(page).getByRole('alert')).toHaveCount(0)
+  })
+
+  test('Taproot connects with its declared proof dialect', async ({ page }) => {
+    await bridge(page, { taproot: true })
+    await page.goto(route)
+    await connect(page).click()
+    await expect(page.getByText(/bc1p.*kv5/).filter({ visible: true }).first()).toBeVisible()
   })
 
   test('revocation clears both live and restored connections', async ({ page }) => {
