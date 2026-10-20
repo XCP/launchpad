@@ -1298,5 +1298,7 @@
   "No expiry": "Бессрочно",
   "Burned": "Сожжено",
   "Includes tokens sent to the burn address and explicitly destroyed tokens.": "Включает токены, отправленные на адрес сжигания, и токены, уничтоженные явно.",
-  "Destroyed": "Уничтожено"
+  "Destroyed": "Уничтожено",
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": "Используйте кошелёк с поддержкой записи изображений в блокчейн или запустите токен с изображением на сервере.",
+  "Connect a wallet that supports this inscription reveal to finish the launch.": "Подключите кошелёк с поддержкой раскрытия этой записи, чтобы завершить запуск."
 }

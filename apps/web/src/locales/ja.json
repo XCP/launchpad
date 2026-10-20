@@ -1298,5 +1298,7 @@
   "No expiry": "有効期限なし",
   "Burned": "バーン済み",
   "Includes tokens sent to the burn address and explicitly destroyed tokens.": "バーンアドレスに送信されたトークンと、明示的に破棄されたトークンを含みます。",
-  "Destroyed": "破棄済み"
+  "Destroyed": "破棄済み",
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": "画像のインスクリプションに対応したウォレットを使うか、ホストされた画像でローンチしてください。",
+  "Connect a wallet that supports this inscription reveal to finish the launch.": "このインスクリプションのリビールに対応したウォレットを接続して、ローンチを完了してください。"
 }

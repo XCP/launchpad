@@ -19,7 +19,7 @@ Format: https://docs.casatookan.com/apps.html
 
 ## Wallet connection pilot
 
-Build with `NEXT_PUBLIC_CASATOOKAN_ENABLED=true` to include Casa Tookan in the SDK chooser. It is off by default. The SDK is pinned to `c04b34226bba26e8f9c8a757fa11aef31aab2bf3` (XCP/wallet-sdk#13), including revoked-grant recovery and session-listener restart fixes.
+Build with `NEXT_PUBLIC_CASATOOKAN_ENABLED=true` to include Casa Tookan in the SDK chooser. It is off by default. The SDK is pinned to `089ca36869ab72440292c3064143e7dc0ea8e75c` (XCP/wallet-sdk#13), including revoked-grant recovery and session-listener restart fixes.
 
 Mainnet Legacy, Native SegWit and BIP-86 Taproot accounts are supported. Ordinary compose flows use the SDK PSBT fallback. The adapter supports selected inputs, foreign signatures, non-ALL authorizations and one approval for up to 20 PSBTs. Every PSBT is limited to 64 KiB, with explicit prevouts. Nested SegWit, multisig and script-path commit/reveal remain unsupported. Casa does not validate application intents; existing site validation remains required.
 
@@ -33,12 +33,29 @@ Seven enabled browser checks and two disabled-pilot checks passed on `/es/profil
 
 The browser fixture signs deterministic test messages. Public API calls are blocked, so these runs do not prove live backend authentication or transaction composition. No production deployment or broadcast was performed.
 
-The local Next development server returns a self-redirect for the unprefixed English `/profile` route, on both `localhost` and `127.0.0.1`. `/es/profile` works. The wallet pilot does not change the locale proxy; investigate the English-route behavior before rollout and repeat the check on the deployed build.
+An earlier local development run self-redirected `/profile`. Production checks subsequently returned `/profile` 200 (English), `/en/profile` 308 to `/profile`, and `/es/profile` 200 (Spanish). No production routing defect is established and this PR does not change the locale proxy.
 
 ## Expanded SDK support
 
-Pinned SDK `c04b34226bba26e8f9c8a757fa11aef31aab2bf3` passed 476 unit tests and a real dev-wallet check of Taproot proof signing, a shared PSBT v2 transaction, a reusable authorization and a twenty-transaction batch. Evidence is in XCP/wallet-sdk#13. These are unfunded signing checks; installed-phone lifecycle and funded settlement remain unverified.
+Pinned SDK `089ca36869ab72440292c3064143e7dc0ea8e75c` passed 481 unit tests and a real dev-wallet check of Taproot proof signing, a shared PSBT v2 transaction, a reusable authorization and a twenty-transaction batch. Evidence is in XCP/wallet-sdk#13. These are unfunded signing checks; installed-phone lifecycle and funded settlement remain unverified.
 
 Expanded site browser suite: 8 passing checks, including Taproot connection, restore/revocation and mobile discovery. The browser suite uses a deterministic injected bridge; separate live-wallet evidence is recorded in the SDK PR.
 
 Web typecheck, ESLint, numeric checks and all locale checks pass; the pinned lockfile passes an npm ci dry run.
+
+## Inscription boundary
+
+The real Casa signer rejects both script-path variants and tree-bearing key-path
+recovery. The create page requires the wallet's `commit-and-reveal` capability
+before allowing a new inscription, and rechecks before uploading metadata.
+Casa users can launch normally with a hosted image. A selected inscription is
+not silently converted into a hosted launch on wallet change.
+
+Pending launches remain stored. An unsigned reveal requires a capable wallet;
+an already-signed reveal can still be resumed without asking Casa to sign it.
+
+Inscription follow-up validation: 34 safety/recovery unit tests and four new
+browser tests pass against the updated SDK. Browser coverage includes desktop
+and mobile restrictions before upload/signing, retained unsigned reveals, and
+resuming already-signed reveals. Web typecheck, ESLint, numeric checks, all ten
+locale checks, and the lockfile dry run pass.

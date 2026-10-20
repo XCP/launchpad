@@ -1298,5 +1298,7 @@
   "No expiry": "Безстроково",
   "Burned": "Спалено",
   "Includes tokens sent to the burn address and explicitly destroyed tokens.": "Включає токени, надіслані на адресу спалювання, і токени, знищені явно.",
-  "Destroyed": "Знищено"
+  "Destroyed": "Знищено",
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": "Використовуйте гаманець із підтримкою запису зображень у блокчейн або запустіть токен із зображенням на сервері.",
+  "Connect a wallet that supports this inscription reveal to finish the launch.": "Підключіть гаманець із підтримкою розкриття цього запису, щоб завершити запуск."
 }

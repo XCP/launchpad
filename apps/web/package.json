@@ -20,7 +20,7 @@
     "@noble/hashes": "^1.8.0",
     "@scure/base": "^2.2.0",
     "@scure/btc-signer": "^2.2.0",
-    "@xcp/wallet-sdk": "github:XCP/wallet-sdk#c04b34226bba26e8f9c8a757fa11aef31aab2bf3",
+    "@xcp/wallet-sdk": "github:XCP/wallet-sdk#089ca36869ab72440292c3064143e7dc0ea8e75c",
     "babel-plugin-react-compiler": "^1.0.0",
     "bignumber.js": "^9.3.1",
     "next": "16.3.4",

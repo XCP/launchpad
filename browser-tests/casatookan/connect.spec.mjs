@@ -173,3 +173,49 @@ test('app metadata and missing paths preserve JSON/404 and CORS', async ({ reque
   expect(missing.status()).toBe(404)
   expect(missing.headers()['access-control-allow-origin']).toBe('*')
 })
+
+for (const width of [1280, 390]) {
+  test(`Taproot inscription is unavailable before upload or signing at ${width}px`, async ({ page }) => {
+    test.skip(!enabled)
+    await page.setViewportSize({ width, height: 900 })
+    await bridge(page, { taproot: true })
+    let uploads = 0
+    await page.route('**/api/launches', route => {
+      if (route.request().method() === 'POST') uploads++
+      return route.fulfill({ status: 503, json: {} })
+    })
+    await page.goto('/es/create')
+    await connect(page).click()
+    await expect(page.getByText(/bc1p.*kv5/).filter({ visible: true }).first()).toBeVisible()
+    await expect(page.getByRole('checkbox')).toBeDisabled()
+    await expect(page.getByText('Usa una billetera compatible con inscripciones de imágenes o lanza con una imagen alojada.')).toBeVisible()
+    await expect(page.locator('input[type=file]')).toBeAttached()
+    expect(uploads).toBe(0)
+    expect(await page.evaluate(() => window.casaTest.psbts)).toBe(0)
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true)
+  })
+}
+
+for (const signed of [false, true]) {
+  test(`keeps pending inscription and allows resume only for signed reveal (${signed})`, async ({ page }) => {
+    test.skip(!enabled)
+    await bridge(page, { taproot: true })
+    const pending = {
+      version: 1, address: taproot, asset: 'TESTLAUNCH', startBlock: 999999,
+      revealScript: '51', tapInternalKey: '11'.repeat(32), commitTxid: '22'.repeat(32),
+      commitVout: 0, commitAmount: 10000, commitRawTx: '00', recipient: taproot,
+      feeRate: 1, createdAt: Date.now(), ...(signed ? { revealRawTx: '00' } : {}),
+    }
+    await page.addInitScript(record => localStorage.setItem('xcp.fun:pending-reveal:' + record.address, JSON.stringify(record)), pending)
+    await page.goto('/es/create')
+    await connect(page).click()
+    const finish = page.getByRole('button', { name: /TESTLAUNCH/ })
+    if (signed) await expect(finish).toBeEnabled()
+    else {
+      await expect(finish).toBeDisabled()
+      await expect(page.getByText('Conecta una billetera compatible con la revelación de esta inscripción para finalizar el lanzamiento.')).toBeVisible()
+    }
+    expect(await page.evaluate(address => JSON.parse(localStorage.getItem('xcp.fun:pending-reveal:' + address)), taproot)).toEqual(pending)
+    expect(await page.evaluate(() => window.casaTest.psbts)).toBe(0)
+  })
+}

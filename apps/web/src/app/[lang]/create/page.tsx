@@ -226,9 +226,13 @@ export default function CreatePage() {
   const num = useNumbers();
   const t = useT();
   const usd = useFiat();
-  const { address, status: walletStatus, signPsbt, signCommitAndReveal, broadcastTransaction, session } = useWallet();
+  const { address, status: walletStatus, signPsbt, signCommitAndReveal, broadcastTransaction, session, wallet: selectedWallet } = useWallet();
   const compose = useCompose();
   const isTaproot = address?.startsWith("bc1p") ?? false;
+  const { data: canInscribe = false } = useSWR(
+    walletStatus === "connected" && isTaproot ? ["inscription-support", selectedWallet, address] : null,
+    async () => (await session.getWallet()?.features())?.marketplaceBundles?.includes("commit-and-reveal") ?? false,
+  );
   const [inscribe, setInscribe] = useState(false);
   const [inscribeStep, setInscribeStep] = useState<InscribeStep | null>(null);
   const [inscribeTxid, setInscribeTxid] = useState<string | null>(null);
@@ -347,6 +351,7 @@ export default function CreatePage() {
     (nameCheck === "available" || nameCheck === "owned") &&
     image !== null &&
     !imageTooBigToInscribe &&
+    (!inscribe || canInscribe) &&
     isValidX(xProfile) &&
     isValidTelegram(telegram) &&
     scheduleValid &&
@@ -363,6 +368,9 @@ export default function CreatePage() {
     setSubmitting(true);
     setUploadError(null);
     try {
+      if (inscribe && !(await session.getWallet()?.features())?.marketplaceBundles?.includes("commit-and-reveal")) {
+        throw new Error(t("Use a wallet that supports image inscriptions, or launch with a hosted image."));
+      }
       // 1. Host image + metadata JSON (write-once) so the on-chain
       //    description URL resolves from the first block.
       const form = new FormData();
@@ -403,12 +411,6 @@ export default function CreatePage() {
           : baseFeeRate;
 
       if (inscribe && isTaproot && address) {
-        // 3a. Commit/reveal inscription: the image is inscribed and the
-        //     inscription output burned; the description is the JSON URL,
-        //     as on a hosted launch. A wallet that signs a commit and its
-        //     reveal in one approval gets both before either is broadcast.
-        const features = await session.getWallet()?.features().catch(() => null);
-        const bundles = features?.marketplaceBundles ?? [];
         const { revealTxid } = await inscribeLaunch({
           asset: name,
           lpAsset: generateLpAssetName(),
@@ -420,7 +422,7 @@ export default function CreatePage() {
           description: upload.json_url,
           address,
           signPsbt,
-          signCommitAndReveal: bundles.includes("commit-and-reveal") ? signCommitAndReveal : undefined,
+          signCommitAndReveal,
           broadcast: broadcastTransaction,
           onStep: setInscribeStep,
         });
@@ -472,7 +474,7 @@ export default function CreatePage() {
 
   const finishLaunch = async () => {
     const record = pendingReveal;
-    if (!record || submitting || walletStatus !== "connected") return;
+    if (!record || submitting || walletStatus !== "connected" || (!record.revealRawTx && !canInscribe)) return;
     setSubmitting(true);
     setResuming(true);
     setUploadError(null);
@@ -605,7 +607,10 @@ export default function CreatePage() {
                   { asset: pendingReveal.asset },
                 )}
               </p>
-              <CTA className="mt-3" size="md" onClick={finishLaunch} disabled={submitting}>
+              {!pendingReveal.revealRawTx && !canInscribe && (
+                <p className="mt-2">{t("Connect a wallet that supports this inscription reveal to finish the launch.")}</p>
+              )}
+              <CTA className="mt-3" size="md" onClick={finishLaunch} disabled={submitting || (!pendingReveal.revealRawTx && !canInscribe)}>
                 {resuming && inscribeStep && inscribeStep !== "done"
                   ? t(INSCRIBE_STEP_LABELS[inscribeStep])
                   : t("Finish launching {asset}", { asset: pendingReveal.asset })}
@@ -738,6 +743,7 @@ export default function CreatePage() {
                 <input
                   type="checkbox"
                   checked={inscribe}
+                  disabled={!canInscribe && !inscribe}
                   onChange={(e) => setInscribe(e.target.checked)}
                   className="mt-0.5"
                 />
@@ -748,6 +754,11 @@ export default function CreatePage() {
                       "The image itself becomes the permanent on-chain description (commit + reveal, two signatures, higher fees scale with image size; the inscription is burned so it belongs to the asset forever). Max 385 KB. Taproot wallets only.",
                     )}
                   </span>
+                  {!canInscribe && (
+                    <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">
+                      {t("Use a wallet that supports image inscriptions, or launch with a hosted image.")}
+                    </span>
+                  )}
                   {imageTooBigToInscribe && (
                     <span className="mt-1 block text-xs text-red-600 dark:text-red-400">
                       {t(

@@ -1298,5 +1298,7 @@
   "No expiry": "만료 없음",
   "Burned": "소각됨",
   "Includes tokens sent to the burn address and explicitly destroyed tokens.": "소각 주소로 전송된 토큰과 명시적으로 파기된 토큰을 포함합니다.",
-  "Destroyed": "파기됨"
+  "Destroyed": "파기됨",
+  "Use a wallet that supports image inscriptions, or launch with a hosted image.": "이미지 인스크립션을 지원하는 지갑을 사용하거나 호스팅된 이미지로 출시하세요.",
+  "Connect a wallet that supports this inscription reveal to finish the launch.": "출시를 완료하려면 이 인스크립션의 리빌을 지원하는 지갑을 연결하세요."
 }
