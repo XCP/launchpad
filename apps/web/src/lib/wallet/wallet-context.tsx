@@ -7,6 +7,7 @@ import {
   WalletProvider as SdkWalletProvider,
   useWallet as useSdkWallet,
 } from "@xcp/wallet-sdk/react";
+import { CASATOOKAN_WALLET, discoverWallets, KNOWN_WALLETS } from "@xcp/wallet-sdk/web";
 import "@/lib/wallet/sdk-config";
 
 export type { ProofStatus };
@@ -28,9 +29,15 @@ const STATUS: Record<WalletReadyState, XcpWalletStatus> = {
   reload_required: "disconnected",
 };
 
+const wallets = discoverWallets(
+  process.env.NEXT_PUBLIC_CASATOOKAN_ENABLED === "true"
+    ? [...KNOWN_WALLETS, CASATOOKAN_WALLET]
+    : KNOWN_WALLETS,
+);
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   // Connect is login here: a wallet that proves nothing at connect (Horizon) is asked to sign the proof.
-  return <SdkWalletProvider proofOnConnect>{children}</SdkWalletProvider>;
+  return <SdkWalletProvider wallets={wallets} proofOnConnect>{children}</SdkWalletProvider>;
 }
 
 export function useWallet() {

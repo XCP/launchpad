@@ -29,7 +29,7 @@
       ]
     },
     "capabilities": {
-      "optional": []
+      "optional": ["provider.bitcoin"]
     }
   }
 }
