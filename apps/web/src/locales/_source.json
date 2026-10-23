@@ -151,6 +151,9 @@
   "{label} Counterparty on Bitcoin mainnet. XCP-69 launches are ordinary Bitcoin transactions carrying Counterparty messages.": [
     "app/[lang]/docs/page.tsx"
   ],
+  "{label}. Use arrow keys to inspect days.": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "{lead} {n} XCP left at {sats} sats/XCP. BTC lands with every sale. Closing settles 5 blocks after it confirms and returns the rest.": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
@@ -198,6 +201,9 @@
   "{n} blocks · {asset}": [
     "app/[lang]/[asset]/_components/scheduled-pulse.tsx"
   ],
+  "{n} burn actions": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "{n} buyers": [
     "app/[lang]/[asset]/_components/pressure-panel.tsx"
   ],
@@ -221,6 +227,9 @@
   ],
   "{n} fills": [
     "components/address-hover-card.tsx"
+  ],
+  "{n} fills · pools + order book": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "{n} graduated · {pct}%": [
     "app/[lang]/stats/_components/stats-content.tsx"
@@ -252,9 +261,6 @@
     "app/[lang]/profile/_components/rewards-card.tsx",
     "components/address-hover-card.tsx"
   ],
-  "{n} mint · about {when}": [
-    "app/[lang]/stats/_components/stats-content.tsx"
-  ],
   "{n} minted": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
   ],
@@ -272,10 +278,8 @@
   ],
   "{n} mints": [
     "app/[lang]/profile/_components/rewards-card.tsx",
+    "app/[lang]/stats/_components/ecosystem-activity.tsx",
     "components/address-hover-card.tsx"
-  ],
-  "{n} mints · about {when}": [
-    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "{n} MINTS for every mint": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
@@ -414,6 +418,7 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
   ],
   "{n}d": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx",
     "lib/format.ts"
   ],
   "{n}d ago": [
@@ -673,6 +678,9 @@
   "100% at confirmation": [
     "app/[lang]/[asset]/_components/trade-panel.tsx"
   ],
+  "144 blocks per day. Separate scales. Tap or hover to inspect.": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "2 · The liquidity is locked": [
     "app/[lang]/faq/_components/explainer.tsx"
   ],
@@ -734,6 +742,9 @@
   "About": [
     "app/[lang]/docs/page.tsx"
   ],
+  "About {n}d ago": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "Across {n} fully exited position": [
     "app/[lang]/profile/_components/history-tab.tsx"
   ],
@@ -758,6 +769,12 @@
   "Across {n} pools": [
     "app/[lang]/profile/_components/pools-tab.tsx"
   ],
+  "Actions": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
+  "Actions across {n} assets": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "Actions for {name}": [
     "components/chat-panel.tsx"
   ],
@@ -766,11 +783,15 @@
   ],
   "Activity": [
     "app/[lang]/profile/_components/profile-view.tsx",
+    "app/[lang]/stats/_components/ecosystem-activity.tsx",
     "components/site-footer.tsx",
     "components/site-header.tsx"
   ],
   "Activity — xcp.fun": [
     "app/[lang]/activity/page.tsx"
+  ],
+  "Activity charts are unavailable right now.": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "Activity unavailable.": [
     "components/address-hover-card.tsx"
@@ -903,7 +924,8 @@
   "Asset": [
     "app/[lang]/activity/_components/activity-view.tsx",
     "app/[lang]/faq/page.tsx",
-    "app/[lang]/mempool/_components/mempool-view.tsx"
+    "app/[lang]/mempool/_components/mempool-view.tsx",
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "Asset name first registered in {year}.": [
     "app/[lang]/[asset]/_components/launch-view.tsx"
@@ -1073,6 +1095,9 @@
   ],
   "Burns": [
     "app/[lang]/activity/_components/activity-view.tsx"
+  ],
+  "Burns & destructions": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "buy": [
     "app/[lang]/limit/_components/limit-surface.tsx"
@@ -1497,6 +1522,9 @@
     "components/language-switch.tsx",
     "components/site-footer.tsx"
   ],
+  "Current day · partial": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "Currently unloading:": [
     "app/[lang]/dispense/_components/bridge.tsx"
   ],
@@ -1626,6 +1654,9 @@
   "Earned so far": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
+  "Ecosystem overview": [
+    "app/[lang]/stats/_components/stats-content.tsx"
+  ],
   "Edit token info": [
     "app/[lang]/[asset]/_components/edit-panel.tsx"
   ],
@@ -1668,9 +1699,6 @@
   ],
   "Event": [
     "app/[lang]/activity/_components/activity-view.tsx"
-  ],
-  "Every launch that conforms to XCP-69, and what has actually been minted.": [
-    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Every LP token is burned — this liquidity can never be withdrawn.": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -1874,9 +1902,6 @@
   "Grid view": [
     "app/[lang]/_components/launch-sections.tsx"
   ],
-  "Grouped by 144 blocks — a Bitcoin day. Exact against the chain, and approximate against a wall clock, which is the right way round for a chain this page is describing.": [
-    "app/[lang]/stats/_components/stats-content.tsx"
-  ],
   "guaranteed by consensus, not this website": [
     "app/[lang]/faq/page.tsx"
   ],
@@ -1897,6 +1922,9 @@
   ],
   "hold one, made none": [
     "app/[lang]/stats/_components/communities.tsx"
+  ],
+  "Holder burns and explicit destructions of launch tokens. Excludes LP tokens and failed-mint cleanup. Token amounts stay separate by asset.": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "Holders": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
@@ -2071,6 +2099,9 @@
   "Language": [
     "components/language-switch.tsx",
     "components/site-footer.tsx"
+  ],
+  "Last {n} days · approximate": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "latest launch {age}": [
     "components/address-hover-card.tsx"
@@ -2366,6 +2397,7 @@
     "app/[lang]/faq/_components/explainer.tsx"
   ],
   "mint transactions": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "Mint window": [
@@ -2416,9 +2448,7 @@
     "app/[lang]/all/_components/all-launches-view.tsx",
     "app/[lang]/profile/_components/launches-tab.tsx",
     "app/[lang]/profile/_components/profile-view.tsx",
-    "app/[lang]/stats/_components/stats-content.tsx"
-  ],
-  "Minting activity": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx",
     "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "minting is live": [
@@ -2479,6 +2509,9 @@
   ],
   "More than one wallet is installed. Pick the one to connect with.": [
     "components/connect-button.tsx"
+  ],
+  "Most active burns": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "Must hold 10 XCP to chat.": [
     "components/chat-panel.tsx"
@@ -2546,6 +2579,9 @@
   "No banned users.": [
     "components/chat-panel.tsx"
   ],
+  "No burns in this window.": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "No closed positions yet.": [
     "app/[lang]/profile/_components/history-tab.tsx"
   ],
@@ -2597,9 +2633,6 @@
   ],
   "No mints from that address. Search matches a full address exactly.": [
     "app/[lang]/rewards/_components/earners-table.tsx"
-  ],
-  "No mints in this window.": [
-    "app/[lang]/stats/_components/stats-content.tsx"
   ],
   "No mints yet — be the first.": [
     "app/[lang]/[asset]/_components/activity-tabs.tsx"
@@ -2940,6 +2973,9 @@
   "Per address": [
     "app/[lang]/[asset]/_components/launch-stats.tsx"
   ],
+  "per day": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "Per mint": [
     "app/[lang]/rewards/_components/rewards-content.tsx"
   ],
@@ -3270,6 +3306,9 @@
   "Sale closing": [
     "app/[lang]/[asset]/_components/mint-deadline.tsx",
     "app/[lang]/dispense/_components/bridge.tsx"
+  ],
+  "Same period · ranked by actions": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "Save failed": [
     "app/[lang]/[asset]/_components/edit-panel.tsx"
@@ -3680,6 +3719,9 @@
   "This XCP is escrowed by consensus. It returns automatically if a launch misses its soft cap; if the launch graduates, you receive the tokens shown below instead.": [
     "app/[lang]/profile/_components/minting-tab.tsx"
   ],
+  "Time range": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "Time remaining": [
     "app/[lang]/[asset]/_components/mint-deadline.tsx"
   ],
@@ -3710,6 +3752,9 @@
   ],
   "Tokens minted": [
     "app/[lang]/faq/_components/explainer.tsx"
+  ],
+  "Tokens removed": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
   ],
   "Too soon — needs to be block {n} or later (1 hour out). The launch has to confirm before it opens.": [
     "app/[lang]/create/page.tsx"
@@ -3764,11 +3809,18 @@
     "app/[lang]/[asset]/_components/activity-tabs.tsx",
     "app/[lang]/activity/_components/activity-view.tsx"
   ],
+  "Trading": [
+    "app/[lang]/stats/_components/ecosystem-activity.tsx"
+  ],
   "Trading and pricing": [
     "app/[lang]/docs/page.tsx"
   ],
   "Trading Data": [
     "app/[lang]/_components/launch-sections.tsx"
+  ],
+  "Trading, burns and minting across XCP-69.": [
+    "app/[lang]/stats/_components/stats-content.tsx",
+    "app/[lang]/stats/page.tsx"
   ],
   "Transaction": [
     "app/[lang]/profile/_components/rewards-tab.tsx"
@@ -4057,9 +4109,6 @@
   ],
   "XCP-69 launches and mints sitting in the Bitcoin mempool, not yet confirmed.": [
     "app/[lang]/mempool/page.tsx"
-  ],
-  "XCP-69 launches by phase, and what has actually been minted.": [
-    "app/[lang]/stats/page.tsx"
   ],
   "XCP-69 launches on Counterparty": [
     "components/site-footer.tsx"

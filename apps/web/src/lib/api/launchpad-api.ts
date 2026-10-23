@@ -1113,6 +1113,12 @@ export async function fetchCandles(
 }
 
 export interface LaunchStats {
+  /** Optional during API/web rollout. Missing is unavailable, not zero. */
+  ecosystem?: {
+    height: number;
+    trades_daily: { bucket: number; n: number; xcp: string }[];
+    burns_daily: { bucket: number; asset: string; divisible: number; n: number; quantity: string }[];
+  };
   counts: { scheduled: number; minting: number; graduated: number; refunded: number };
   total: number;
   activity: {
@@ -1149,9 +1155,10 @@ export interface LaunchStats {
 /** How many conforming launches sit in each phase. Null on any failure — the
  *  homepage shows section counts when it has them and simply omits them when
  *  it doesn't, rather than rendering a confident zero. */
-export async function fetchLaunchStats(height = 0): Promise<LaunchStats | null> {
+export async function fetchLaunchStats(height = 0, includeActivity = false): Promise<LaunchStats | null> {
   try {
-    const res = await launchpadApiFetch(`/v2/stats?height=${height}`, {
+    const path = includeActivity ? "/v2/stats?activity=1" : `/v2/stats?height=${height}`;
+    const res = await launchpadApiFetch(path, {
       signal: AbortSignal.timeout(3_000),
       next: { revalidate: 60 },
     });

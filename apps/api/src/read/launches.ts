@@ -27,6 +27,7 @@ import {
   tradeVolumeByDay,
 } from "#api/queries/launches";
 import { J, router } from "#api/read/respond";
+import { burnActivityByBucket, statsHeight, STATS_BLOCKS_PER_BUCKET, STATS_BUCKETS, tradeActivityByBucket } from "#api/queries/stats";
 import { getRewardAccount, listRewardBatches } from "#api/queries/rewards";
 import { getAddressLaunchpadSummary } from "#api/queries/address-summary";
 import {
@@ -140,10 +141,6 @@ launchesRoute.get("/v2/launches/index", async (c) => {
 
 // Conforming launches per phase. The homepage shows a slice of each section
 // and needs the size of the whole; /stats asks the same question directly.
-/** ~28 Bitcoin days of history, which is as far back as a "what's happening
- *  lately" chart stays a chart rather than a timeline. */
-const ACTIVITY_BUCKETS = 28;
-const BLOCKS_PER_DAY = 144;
 /** Edge-cache lifetimes, in seconds, kept together so the site's freshness
  *  policy reads as one decision rather than as numbers scattered per route.
  *  STATS_TTL matches the cron interval; nothing it summarises can change
@@ -209,16 +206,26 @@ launchesRoute.get("/v2/research/behavior", async (c) => {
 });
 
 launchesRoute.get("/v2/stats", async (c) => {
-  const height = Number(c.req.query("height") ?? 0) || 0;
-  const since = height > 0 ? Math.max(0, height - ACTIVITY_BUCKETS * BLOCKS_PER_DAY) : 0;
-  const sinceBucket = Math.floor(since / BLOCKS_PER_DAY);
-  const [rows, totals, buckets, refundBuckets, tradeVolume] = await Promise.all([
+  const includeActivity = c.req.query("activity") === "1";
+  // Anchor every chart to our indexed tip, even if the caller's node is ahead.
+  // The detailed charts are opt-in so launch counts/rewards do not pay for
+  // extra aggregation. The chart URL is stable across caller block heights.
+  const height = includeActivity
+    ? await statsHeight(c.env.DB)
+    : Number(c.req.query("height") ?? 0) || 0;
+  const sinceBucket = includeActivity
+    ? Math.max(0, Math.floor(height / STATS_BLOCKS_PER_BUCKET) - STATS_BUCKETS + 1)
+    : Math.floor(Math.max(0, height - 28 * STATS_BLOCKS_PER_BUCKET) / STATS_BLOCKS_PER_BUCKET);
+  const startBlock = sinceBucket * STATS_BLOCKS_PER_BUCKET;
+  const [rows, totals, buckets, refundBuckets, tradeVolume, trades, burns] = await Promise.all([
     countByPhase(c.env.DB),
     getMintTotals(c.env.DB),
     // Whole buckets, so the window is expressed in the unit the rollup stores.
     listMintBuckets(c.env.DB, sinceBucket),
     refundsByBucket(c.env.DB, sinceBucket),
     tradeVolumeByDay(c.env.DB),
+    includeActivity ? tradeActivityByBucket(c.env.DB, startBlock, height) : Promise.resolve([]),
+    includeActivity ? burnActivityByBucket(c.env.DB, startBlock, height) : Promise.resolve([]),
   ]);
   const counts: Record<string, number> = {
     scheduled: 0,
@@ -256,21 +263,20 @@ launchesRoute.get("/v2/stats", async (c) => {
         total,
         activity,
         markets,
+        ...(includeActivity ? { ecosystem: { height, trades_daily: trades, burns_daily: burns } } : {}),
         // Bucket index is `block / 144`; the client turns it back into an
         // approximate day using the height it already has.
         daily: buckets,
         refunds_daily: refundBuckets,
-        blocks_per_bucket: BLOCKS_PER_DAY,
+        blocks_per_bucket: STATS_BLOCKS_PER_BUCKET,
       },
     },
     // Matched to the indexer's own cadence rather than the 60s every other
     // route uses: the cron writes every 5 minutes, so a shorter TTL cannot
     // make this fresher — it can only re-serve the same answer more times.
     //
-    // This used to be the cost control, back when the route ran three full
-    // aggregates per request. Since migration 0010 those are materialised and
-    // a miss costs a primary-key lookup plus a short indexed range, so the TTL
-    // is now about freshness honesty rather than about cost.
+    // Mint totals are materialised; trading and burns use indexed, bounded
+    // block ranges. The shared edge cache avoids repeating these per visitor.
     STATS_TTL,
   );
 });

@@ -10,7 +10,7 @@ import { StatsContent } from "@/app/[lang]/stats/_components/stats-content";
 
 const PAGE_METADATA: Metadata = {
   title: msg("Stats — xcp.fun"),
-  description: msg("XCP-69 launches by phase, and what has actually been minted."),
+  description: msg("Trading, burns and minting across XCP-69."),
 };
 
 /** The page's own metadata, plus the hreflang set for the locale it is
@@ -36,7 +36,7 @@ export const revalidate = 60;
 export default async function StatsPage() {
   const height = await fetchBlockHeight();
   const [stats, xcpUsd, xcpUsdHistory, communities] = await Promise.all([
-    fetchLaunchStats(height),
+    fetchLaunchStats(height, true),
     fetchXcpUsd(),
     fetchXcpUsdHistory(),
     fetchCommunities(),
