@@ -35,6 +35,19 @@ CHAT_ENABLED = "true"
 # Optional COUNTERPARTY_API_BASE is the Counterparty API's /v2 root; unset
 # reads https://api.counterparty.io:4000/v2.
 
+# The node compatibility gateway exists for xcp.fun, not as a hosted public
+# Counterparty node. This approximate per-colo/per-caller ceiling is generous
+# for a page (five reads a second sustained) but makes bulk reuse unattractive.
+# Ordinary upstream responses are also cached under Counterparty's own TTL, so
+# repeated first-party reads normally do not reach the node at all.
+[[ratelimits]]
+name = "NODE_PUBLIC_RATE_LIMITER"
+namespace_id = "2026102901"
+
+  [ratelimits.simple]
+  limit = 300
+  period = 60
+
 # Blocks land every ~10 minutes, and Counterparty's /fairminters list has no
 # server-side filter beyond status — every tick re-lists the chain's ENTIRE
 # fairminter universe (not just xcp.fun's own tracked set), so this job's

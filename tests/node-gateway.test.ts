@@ -15,25 +15,47 @@ afterEach(() => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllGlobals(
 async function fixture() {
   const fetch = vi.fn(async () => new Response('{"result":[]}', { headers: { "content-type": "application/json" } }));
   vi.stubGlobal("fetch", fetch);
+  const entries = new Map<string, Response>();
+  const cache = {
+    match: vi.fn(async (request: Request) => entries.get(request.url)?.clone()),
+    put: vi.fn(async (request: Request, response: Response) => { entries.set(request.url, response.clone()); }),
+  } as unknown as Cache;
+  vi.stubGlobal("caches", { default: cache });
+  const limiter = { limit: vi.fn(async () => ({ success: true })) } as unknown as RateLimit;
+  const pending: Promise<unknown>[] = [];
+  const executionCtx = {
+    waitUntil(promise: Promise<unknown>) { pending.push(promise); },
+    passThroughOnException() {},
+  } as ExecutionContext;
   const { nodeRoute } = await import("#api/read/node");
-  const request = (path: string, init?: RequestInit) => nodeRoute.request(`https://api.xcp.fun/node${path}`, init);
-  return { fetch, request };
+  const request = (path: string, init?: RequestInit) => nodeRoute.request(
+    `https://api.xcp.fun/node${path}`,
+    init,
+    { NODE_PUBLIC_RATE_LIMITER: limiter } as never,
+    executionCtx,
+  );
+  const flush = () => Promise.all(pending.splice(0));
+  return { cache, fetch, flush, limiter, request };
 }
 
 describe("first-party read-only protocol fallback", () => {
-  it("preserves raw integer digits, next_cursor and query encoding without touching a cache or forwarding credentials", async () => {
+  it("preserves raw integer digits, next_cursor and query encoding without forwarding credentials", async () => {
     const { fetch, request } = await fixture();
     const raw = '{"result":[{"quantity":10000000000000001}],"next_cursor":"a+b/c=="}';
     fetch.mockResolvedValue(new Response(raw, { headers: {
       "content-type": "application/json", "cache-control": "public,max-age=300", "set-cookie": "upstream-session=secret",
     } }));
     const path = `/v2/addresses/${ADDRESS}/balances?type=address&limit=1000&cursor=a%2Bb%2Fc%3D%3D`;
-    const response = await request(path, { headers: { authorization: "Bearer secret", cookie: "session=private", "x-admin-token": "secret" } });
+    const response = await request(path, { headers: {
+      origin: "https://xcp.fun", authorization: "Bearer secret", cookie: "session=private", "x-admin-token": "secret",
+    } });
     expect(response.status).toBe(200);
     expect(await response.text()).toBe(raw);
-    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(response.headers.get("cache-control")).toBe("public, max-age=300");
+    expect(response.headers.get("cloudflare-cdn-cache-control")).toBe("no-store");
     expect(response.headers.get("set-cookie")).toBeNull();
-    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://xcp.fun");
+    expect(response.headers.get("x-xcp-proxy-cache")).toBe("MISS");
     expect(fetch).toHaveBeenCalledExactlyOnceWith(`${CP}${path.slice(3)}`, expect.objectContaining({
       method: "GET", cache: "no-store", redirect: "manual", headers: { accept: "application/json" }, signal: expect.any(AbortSignal),
     }));
@@ -123,7 +145,7 @@ describe("first-party read-only protocol fallback", () => {
     const { fetch, request } = await fixture();
     const response = await request(path, { method });
     expect(response.status).toBe(expected);
-    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(fetch).not.toHaveBeenCalled();
   });
@@ -137,11 +159,55 @@ describe("first-party read-only protocol fallback", () => {
 
   it("answers preflight locally with only that operation's method", async () => {
     const { fetch, request } = await fixture();
-    const response = await request("/v2/blocks/last", { method: "OPTIONS" });
+    const response = await request("/v2/blocks/last", { method: "OPTIONS", headers: { origin: "https://xcp.fun" } });
     expect(response.status).toBe(204);
     expect(response.headers.get("access-control-allow-methods")).toBe("GET, OPTIONS");
     expect(response.headers.get("access-control-expose-headers")).toContain("Retry-After");
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://xcp.fun");
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects an outside browser origin before consuming a rate-limit check or upstream request", async () => {
+    const { fetch, limiter, request } = await fixture();
+    const response = await request("/v2/blocks/last", { headers: { origin: "https://outside.example" } });
+    expect(response.status).toBe(403);
+    expect(response.headers.get("access-control-allow-origin")).toBeNull();
+    expect(limiter.limit).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("caps a caller before either a cache read or an upstream request", async () => {
+    const { cache, fetch, limiter, request } = await fixture();
+    vi.mocked(limiter.limit).mockResolvedValue({ success: false });
+    const response = await request("/v2/blocks/last", { headers: { "cf-connecting-ip": "192.0.2.1" } });
+    expect(response.status).toBe(429);
+    expect(response.headers.get("retry-after")).toBe("60");
+    expect(limiter.limit).toHaveBeenCalledExactlyOnceWith({ key: "192.0.2.1" });
+    expect(cache.match).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("collapses repeated cacheable reads while leaving no-store responses live", async () => {
+    const { fetch, flush, request } = await fixture();
+    fetch
+      .mockResolvedValueOnce(new Response('{"result":{"block_index":1}}', {
+        headers: { "cache-control": "public, max-age=60", "content-type": "application/json" },
+      }))
+      .mockResolvedValue(new Response('{"result":[]}', {
+        headers: { "cache-control": "no-store", "content-type": "application/json" },
+      }));
+
+    const first = await request("/v2/blocks/last", { headers: { origin: "https://xcp.fun" } });
+    expect(first.headers.get("x-xcp-proxy-cache")).toBe("MISS");
+    await flush();
+    const second = await request("/v2/blocks/last", { headers: { origin: "https://xcp.fun" } });
+    expect(second.headers.get("x-xcp-proxy-cache")).toBe("HIT");
+    expect(await second.text()).toBe('{"result":{"block_index":1}}');
+    expect(fetch).toHaveBeenCalledTimes(1);
+
+    expect((await request("/v2/mempool/events?limit=1")).headers.get("cache-control")).toBe("no-store");
+    expect((await request("/v2/mempool/events?limit=1")).headers.get("x-xcp-proxy-cache")).toBe("MISS");
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it.each([400, 404, 500, 503])("keeps upstream status %d, body and Retry-After visible without retries or negative caching", async status => {
@@ -184,6 +250,9 @@ describe("first-party read-only protocol fallback", () => {
     fetch.mockImplementation(() => new Promise<Response>(r => { resolve.push(r); }));
     const first = request("/v2/blocks/last");
     const second = request(`/v2/transactions/${HASH}`);
+    await Promise.resolve(); // rate-limit binding
+    await Promise.resolve(); // edge-cache lookup
+    await Promise.resolve(); // upstream fetch
     expect(resolve).toHaveLength(2);
     resolve[0]!(new Response(null, { status: 429, headers: { "retry-after": "120" } }));
     await first;
@@ -216,7 +285,7 @@ describe("first-party read-only protocol fallback", () => {
       upstreamSignal.addEventListener("abort", () => reject(upstreamSignal!.reason), { once: true });
     }));
     const pending = request("/v2/blocks/last", { signal: caller.signal });
-    expect(fetch).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledOnce());
     if (cancelledBy === "caller") caller.abort();
     else deadline.abort(new DOMException("Read deadline expired", "TimeoutError"));
     expect((await pending).status).toBe(504);
