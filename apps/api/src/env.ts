@@ -30,4 +30,9 @@ export interface Env {
   /** The Counterparty API's `/v2` root. Unset reads the public node,
    *  https://api.counterparty.io:4000/v2. */
   COUNTERPARTY_API_BASE?: string;
+  /** Per-caller guard on the public compatibility gateway. This is not the
+   *  upstream quota: cache coalescing and the shared 429 cooldown protect
+   *  Counterparty itself. It keeps one outside integration from turning our
+   *  first-party fallback into its general-purpose API. */
+  NODE_PUBLIC_RATE_LIMITER: RateLimit;
 }
